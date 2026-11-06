@@ -30,6 +30,7 @@ const COMMON: Case[] = [
   ["parent-of.sh", (id) => [id], 2],
   ["cascade-check.sh", (id) => [id], 2],
   ["groom-verify.sh", (id) => [id], 2],
+  ["item-record.sh", (id) => [id], 2],
   ["add.sh", (id) => ["A title", "--parent", id], 2],
 ];
 const CASES: Record<Backend, Case[]> = {
@@ -52,12 +53,12 @@ const reached = (calls: string, id: string) =>
 
 /**
  * cloud's groom-verify.sh refuses a non-number before it resolves a token, in
- * its own words ("not a task number"); the helper then refuses 0 and an
- * overlong number ("not an issue number").
+ * its own words ("not a task number"); the item-record.sh it runs then refuses
+ * 0 and an overlong number through the helper ("not an issue number").
  */
 const marker = (backend: Backend, script: string) =>
   backend === "cloud" && script === "groom-verify.sh"
-    ? "groom-verify.sh: not a"
+    ? ".sh: not a"
     : `${script}: not an issue number:`;
 
 for (const backend of BACKENDS) {

@@ -1,7 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { REDIRECT_REFUSED } from "../../src/domain/cloud/cloud_wire.ts";
-import { CLOUD, run, TOKEN, withServer } from "./cloud_stub.ts";
+import { CLOUD, run, textRule, TOKEN, withServer } from "./cloud_stub.ts";
 
 // The Cloud backlog scripts make every request through `cloud_curl`. Real scripts, a
 // real curl and a real HTTP server: a shim on PATH records what curl was handed,
@@ -218,11 +218,11 @@ Deno.test("cloud_curl: an empty success stays empty, and is not called bad JSON"
   });
 });
 
-Deno.test("CLOUD_JSON uses no regex", async () => {
+Deno.test("CLOUD_JSON, and the character rule it is built on, use no regex", async () => {
   const config = await Deno.readTextFile(join(CLOUD, "_config.sh"));
-  const start = config.indexOf("CLOUD_JSON='");
+  const start = config.indexOf(`CLOUD_JSON="$ISSUE_TEXT_JQ"'`);
   assertEquals(start > 0, true, "the filter moved");
-  const filter = config.slice(start, config.indexOf("cloud_curl() {"));
+  const filter = (await textRule()) + config.slice(start, config.indexOf("cloud_curl() {"));
   assertEquals(/gsub|\btest\(|\bsub\(/.test(filter), false, filter);
 });
 

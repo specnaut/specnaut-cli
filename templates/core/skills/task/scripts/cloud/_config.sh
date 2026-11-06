@@ -109,11 +109,10 @@ require_issue_number() {
 # header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
 # which `-f` does not make of a 3xx). No Cloud request follows a redirect. What comes
 # back is normalized JSON (`CLOUD_JSON`): one line per string, except a `body`.
-CLOUD_JSON='
-  def printable: . >= 32 and (. < 127 or . > 159)
-    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
-  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
-  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+# Which characters pass is `_issue_text.sh`'s rule, installed beside this file.
+# shellcheck source=../_issue_text.sh
+. "$(dirname "$0")/_issue_text.sh"
+CLOUD_JSON="$ISSUE_TEXT_JQ"'
   def clean:
     if type == "object" then
       with_entries(.key as $k

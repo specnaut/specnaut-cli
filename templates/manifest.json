@@ -357,6 +357,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "item-record",
+      "suffix": "item-record.sh",
+      "source": "core/skills/task/scripts/local/item-record.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
       "source": "core/skills/task/scripts/local/add.sh",
@@ -421,6 +429,22 @@
     },
     {
       "category": "backlog-script",
+      "name": "read-items",
+      "suffix": "read-items.sh",
+      "source": "core/skills/task/scripts/read-items.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_issue_text",
+      "suffix": "_issue_text.sh",
+      "source": "core/skills/task/scripts/_issue_text.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/local/parent-of.sh",
@@ -456,6 +480,14 @@
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
       "source": "core/skills/task/scripts/github/groom-verify.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "item-record",
+      "suffix": "item-record.sh",
+      "source": "core/skills/task/scripts/github/item-record.sh",
       "executable": true,
       "backend": "github"
     },
@@ -557,6 +589,22 @@
     },
     {
       "category": "backlog-script",
+      "name": "read-items",
+      "suffix": "read-items.sh",
+      "source": "core/skills/task/scripts/read-items.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_issue_text",
+      "suffix": "_issue_text.sh",
+      "source": "core/skills/task/scripts/_issue_text.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/github/parent-of.sh",
@@ -600,6 +648,14 @@
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
       "source": "core/skills/task/scripts/gitlab/groom-verify.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "item-record",
+      "suffix": "item-record.sh",
+      "source": "core/skills/task/scripts/gitlab/item-record.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -669,6 +725,22 @@
     },
     {
       "category": "backlog-script",
+      "name": "read-items",
+      "suffix": "read-items.sh",
+      "source": "core/skills/task/scripts/read-items.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_issue_text",
+      "suffix": "_issue_text.sh",
+      "source": "core/skills/task/scripts/_issue_text.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/gitlab/parent-of.sh",
@@ -709,6 +781,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "item-record",
+      "suffix": "item-record.sh",
+      "source": "core/skills/task/scripts/cloud/item-record.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
       "source": "core/skills/task/scripts/cloud/add.sh",
@@ -744,6 +824,22 @@
       "name": "_close_shipped",
       "suffix": "_close_shipped.sh",
       "source": "core/skills/task/scripts/_close_shipped.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "read-items",
+      "suffix": "read-items.sh",
+      "source": "core/skills/task/scripts/read-items.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_issue_text",
+      "suffix": "_issue_text.sh",
+      "source": "core/skills/task/scripts/_issue_text.sh",
       "executable": true,
       "backend": "cloud"
     },

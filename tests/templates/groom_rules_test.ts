@@ -163,3 +163,13 @@ Deno.test("rules: never 'complete' on input it could not read — exit 2", async
   }
   assertEquals((await rules([rec()], ["--bogus"])).code, 2);
 });
+
+Deno.test("a comment may be an object whose body is its text, as item-record.sh writes it", async () => {
+  const marked = { body: "🤖 specnaut-groom — which tenant?", author: "me", by_viewer: true };
+  let r = await rules([{ ...rec({ status: "Backlog" }), comments: [marked] }]);
+  assertEquals([r.code, r.stdout], [0, ""], r.stderr);
+  r = await rules([{ ...rec({ status: "Backlog" }), comments: [{ ...marked, body: "thanks" }] }]);
+  assertEquals(r.code, 1, r.stderr);
+  r = await rules([{ ...rec(), comments: [{ author: "me" }] }]);
+  assertEquals([r.code, r.stdout], [2, ""], "a comment without a body is unreadable");
+});

@@ -5,6 +5,9 @@ const SERVER = fromFileUrl(new URL("./cloud_stub_server.ts", import.meta.url));
 export const CLOUD = fromFileUrl(
   new URL("../../templates/core/skills/task/scripts/cloud", import.meta.url),
 );
+/** The shared character rule cloud's `_config.sh` sources (CLOUD_JSON), and its text. */
+const TEXT_RULE = join(CLOUD, "../_issue_text.sh");
+export const textRule = () => Deno.readTextFile(TEXT_RULE);
 const BASH = fromFileUrl(new URL("../../templates/core/specnaut/scripts/bash", import.meta.url));
 export const TOKEN = "tok-Secret.123";
 
@@ -64,6 +67,8 @@ async function layOut(dir: string, apiUrl: string, opts: RunOptions) {
   for await (const f of Deno.readDir(CLOUD)) {
     await Deno.copyFile(join(CLOUD, f.name), join(scripts, f.name));
   }
+  // The shared character rule cloud's `_config.sh` sources, installed beside it.
+  await Deno.copyFile(TEXT_RULE, join(scripts, "_issue_text.sh"));
   for await (const f of Deno.readDir(BASH)) {
     if (f.isFile) {
       await Deno.copyFile(join(BASH, f.name), join(dir, ".specnaut", "scripts", "bash", f.name));

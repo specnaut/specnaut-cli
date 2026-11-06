@@ -66,9 +66,11 @@ export async function project(backend: string, files: string[], config?: string)
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(bash, { recursive: true });
   await Deno.mkdir(join(dir, "bin"));
-  for (const f of ["_config.sh", "groom-verify.sh", ...files]) {
+  for (const f of ["_config.sh", "groom-verify.sh", "item-record.sh", ...files]) {
     await Deno.copyFile(join(BOARD_SCRIPTS, backend, f), join(scripts, f));
   }
+  // The shared character rule cloud's `_config.sh` sources, installed beside it.
+  await Deno.copyFile(join(BOARD_SCRIPTS, "_issue_text.sh"), join(scripts, "_issue_text.sh"));
   // groom-rules.sh sources common.sh (its CR-safe jq), which sources the
   // template resolver: the three are installed side by side.
   for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh"]) {

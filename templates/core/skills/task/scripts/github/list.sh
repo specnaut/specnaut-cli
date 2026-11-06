@@ -6,12 +6,16 @@
 # call (vs ~20 for the bulky `repository.issues[].projectItems[].fieldValues[]`
 # query that lived here previously and was the main rate-limit offender).
 #
-# Usage: list.sh [Status]
+# Usage: list.sh [--numbers] [Status]
+#   --numbers  one issue number per line and nothing else — what `read-items.sh`
+#              reads; no title reaches its output
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
+NUMBERS=false
+if [ "${1:-}" = "--numbers" ]; then NUMBERS=true; shift; fi
 FILTER="${1:-}"
 
 # `Done` is the one Status whose membership implies a CLOSED issue.
@@ -43,11 +47,11 @@ fi
 JSON=$(gh issue list --repo "$REPO" --state "$STATE" --limit 200 \
   --json number,title,projectItems)
 
-echo "$JSON" | jq_lf -r --arg filter "$FILTER" '
+echo "$JSON" | jq_lf -r --arg filter "$FILTER" --argjson numbers "$NUMBERS" '
   .[]
   | . as $issue
   | (.projectItems[0].status.name // "—") as $status
   | select($issue.projectItems | length > 0)
   | select($filter == "" or $status == $filter)
-  | "  #\($issue.number)  \($status)  \($issue.title)"
+  | if $numbers then "\($issue.number)" else "  #\($issue.number)  \($status)  \($issue.title)" end
 '

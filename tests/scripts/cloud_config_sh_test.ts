@@ -33,6 +33,7 @@ async function source(
     await Deno.mkdir(scripts, { recursive: true });
     await Deno.writeTextFile(join(dir, ".specnaut", "backlog-config.yml"), config);
     await Deno.copyFile(CONFIG_SH, join(scripts, "_config.sh"));
+    await Deno.copyFile(join(CONFIG_SH, "../../_issue_text.sh"), join(scripts, "_issue_text.sh"));
     await Deno.writeTextFile(join(scripts, "probe.sh"), probe);
     const { code, stdout, stderr } = await new Deno.Command("bash", {
       args: [".specnaut/scripts/backlog/probe.sh"],

@@ -6468,13 +6468,19 @@ item_url() {
     suffix: "list.sh",
     content: `#!/usr/bin/env bash
 # List backlog items from .specnaut/backlog/. Optional Status filter.
+# Usage: list.sh [--numbers] [Status]
+#   --numbers  one item number per line, zero padding dropped, and nothing else
+#              (\`read-items.sh\`); a file whose name starts with no number is skipped
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+NUMBERS=false
+if [ "\${1:-}" = "--numbers" ]; then NUMBERS=true; shift; fi
 FILTER="\${1:-}"
 
 if [ ! -d "\$BACKLOG_DIR" ]; then
+  [ "\$NUMBERS" = false ] || exit 0
   echo "(no backlog yet — run 'add.sh' to create the first item)"
   exit 0
 fi
@@ -6484,8 +6490,11 @@ for f in "\$BACKLOG_DIR"/*.md; do
   status=\$(awk '/^---\$/{n++; next} n==1 && /^status:/ {sub(/^status:[[:space:]]*/, ""); print; exit}' "\$f")
   title=\$(awk '/^---\$/{n++; next} n==1 && /^title:/ {sub(/^title:[[:space:]]*/, ""); print; exit}' "\$f")
   num=\$(basename "\$f" | cut -d- -f1)
-  if [ -z "\$FILTER" ] || [ "\$status" = "\$FILTER" ]; then
+  if [ -n "\$FILTER" ] && [ "\$status" != "\$FILTER" ]; then continue; fi
+  if [ "\$NUMBERS" = false ]; then
     printf "  #%-4s  %-12s  %s\\n" "\$num" "\$status" "\$title"
+  elif [[ \$num =~ ^[0-9]{1,10}\$ ]] && [ "\$((10#\$num))" -gt 0 ]; then
+    echo "\$((10#\$num))"
   fi
 done
 `,
@@ -6533,18 +6542,9 @@ cat "\${matches[0]}"
 # This script FETCHES and NORMALISES; it decides nothing. What "complete" means
 # lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
 #
-# Where each part of the record comes from, in a task file
-# (\`.specnaut/backlog/NNN-slug.md\`):
-#   body         everything after the frontmatter
-#   sizes        the frontmatter \`size:\` value, split on commas — so \`M, L\` is
-#                two sizes. \`complexity:\` is a retired key and is NOT a size.
-#   priorities   the frontmatter \`priority:\` value, split the same way
-#   status       the frontmatter \`status:\` (the column \`move.sh\` writes)
-#   comments     each \`## Clarification (…)\` section \`clarify-comment.sh\` appends
-#   state, closed_reason
-#                CANNOT be read: a task file has no closed state and records no
-#                close reason (\`Done\` is a column). Passed as open / "", so
-#                "closed as not_planned" is never an outcome on this backend.
+# The record of each item is \`item-record.sh\`'s — one read, shared with
+# \`read-items.sh\`; its header says where each part comes from (a task file has
+# no closed state, so "closed as not_planned" is never an outcome here).
 #
 # Usage: groom-verify.sh [--ready <column>|none] <number>...
 # Output and exit codes: those of groom-rules.sh — plus exit 2 when an item has
@@ -6569,6 +6569,60 @@ while [ "\$#" -gt 0 ]; do
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
 
+RECORDS=\$(bash "\$(dirname "\$0")/item-record.sh" "\${ITEMS[@]}") ||
+  { echo "groom-verify.sh: nothing verified" >&2; exit 2; }
+
+rc=0
+printf '%s\\n' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "item-record",
+    suffix: "item-record.sh",
+    content: `#!/usr/bin/env bash
+# One record per item, as JSON Lines — local backend. The one read both
+# \`groom-verify.sh\` (through groom-rules.sh) and \`read-items.sh\` use.
+#
+# This script READS and NORMALISES; it decides nothing. Where each part of the
+# record comes from, in a task file (\`.specnaut/backlog/NNN-slug.md\`):
+#   item         the number, as a string, zero padding dropped
+#   title        the frontmatter \`title:\`, verbatim
+#   created      the frontmatter \`created:\`, verbatim; null without one
+#   body         everything after the frontmatter
+#   author, association, by_viewer
+#                CANNOT be read: a task file names no author. null.
+#   sizes        the frontmatter \`size:\` value, split on commas — so \`M, L\` is
+#                two sizes. \`complexity:\` is a retired key and is NOT a size.
+#   priorities   the frontmatter \`priority:\` value, split the same way
+#   status       the frontmatter \`status:\` (the column \`move.sh\` writes)
+#   comments     each \`## Clarification (…)\` section \`clarify-comment.sh\`
+#                appends, as { body, author, association, by_viewer } with no
+#                author known
+#   state, closed_reason
+#                CANNOT be read: a task file has no closed state and records no
+#                close reason (\`Done\` is a column). Passed as open / "".
+#
+# Usage: item-record.sh <number>...
+# Output: one JSON object per line, in the order given — or nothing at all:
+# exit 2 when an argument is not a number, an item has no task file, or its
+# frontmatter cannot be read.
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -gt 0 ] || { echo "usage: item-record.sh <number>..." >&2; exit 2; }
+ITEMS=()
+for a in "\$@"; do
+  n=\$(require_issue_number "\$a") || exit 2
+  ITEMS+=("\$n")
+done
+
 # One task file → one record on stdout. Fails (non-zero) on a file it cannot read.
 record() {
   local num="\$1" padded file
@@ -6576,7 +6630,7 @@ record() {
   file=""
   for file in "\$BACKLOG_DIR/\$padded"-*.md; do break; done
   if [ -z "\$file" ] || [ ! -f "\$file" ]; then
-    echo "groom-verify.sh: no backlog item #\$padded in \$BACKLOG_DIR" >&2
+    echo "item-record.sh: no backlog item #\$padded in \$BACKLOG_DIR" >&2
     return 1
   fi
   # shellcheck disable=SC2016  # jq program.
@@ -6587,9 +6641,8 @@ record() {
        // error("frontmatter never closed")) as \$end
     | \$l[1:\$end] as \$fm
     | \$l[\$end + 1:] as \$body
-    | def key(\$k):
-        [\$fm[] | select(test("^" + \$k + ":")) | sub("^" + \$k + ":\\\\s*"; "") | sub("\\\\s+#.*\$"; "")]
-        | first // "";
+    | def raw(\$k): [\$fm[] | select(startswith(\$k + ":")) | .[(\$k | length) + 1:] | sub("^\\\\s+"; "")] | first;
+      def key(\$k): (raw(\$k) // "") | sub("\\\\s+#.*\$"; "");
       def values: gsub("[\\\\[\\\\]\\"'\\'']"; "") | [splits("\\\\s*,\\\\s*")] | map(gsub("^\\\\s+|\\\\s+\$"; "")) | map(select(. != ""));
       def clarifications:
         reduce \$body[] as \$x ({cur: null, out: []};
@@ -6601,26 +6654,27 @@ record() {
           else . end)
         | if .cur != null then .out + [.cur] else .out end
         | map(sub("^\\\\s+"; ""));
+      def nobody: { author: null, association: null, by_viewer: null };
     { item: \$item,
-      body: (\$body | join("\\n")),
-      sizes: (key("size") | values),
-      priorities: (key("priority") | values),
-      status: key("status"),
-      comments: clarifications,
-      state: "open",
-      closed_reason: "" }
-  ' || { echo "groom-verify.sh: cannot read the frontmatter of \$file" >&2; return 1; }
+      title: (raw("title") // ""),
+      created: raw("created"),
+      body: (\$body | join("\\n")) }
+    + nobody
+    + { sizes: (key("size") | values),
+        priorities: (key("priority") | values),
+        status: key("status"),
+        comments: [clarifications[] | { body: . } + nobody],
+        state: "open",
+        closed_reason: "" }
+  ' || { echo "item-record.sh: cannot read the frontmatter of \$file" >&2; return 1; }
 }
 
 RECORDS=""
 for num in "\${ITEMS[@]}"; do
-  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num not read — nothing verified" >&2; exit 2; }
+  rec=\$(record "\$num") || { echo "item-record.sh: #\$num not read" >&2; exit 2; }
   RECORDS+="\$rec"\$'\\n'
 done
-
-rc=0
-printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
-exit "\$rc"
+printf '%s' "\$RECORDS"
 `,
     executable: true,
     backend: "local",
@@ -7437,6 +7491,252 @@ exit "\$rc"
   },
   {
     category: "backlog-script",
+    name: "read-items",
+    suffix: "read-items.sh",
+    content: `#!/usr/bin/env bash
+# Hand the product owner the items it works on, their text as data — every
+# backend. Shared: installed beside each backend's own scripts, as
+# \`_close_shipped.sh\` is, and run as \`.specnaut/scripts/backlog/read-items.sh\`.
+#
+# Issue text is written by whoever can open or comment on an issue. So it is
+# read here, by the backend's \`item-record.sh\` (one run: Cloud resolves one
+# token), and written to ONE file in a fresh directory only the user can open,
+# outside the repository. stdout is three lines and nothing else:
+#
+#   ITEMS_FILE: <path>     the file, for the product owner to read
+#   ITEMS: <n> <n> ...     the numbers read, in order (\`none\` when there are none)
+#   FINGERPRINT: <hex>     \`git hash-object\` of \`git status --porcelain\`, at the read
+#
+# The file, top to bottom:
+#   - a header — format, verb, id, fingerprint, nonce, items — the facts a plan
+#     made from this file is later checked against;
+#   - per item, the values the tracker itself vouches for, one \`key: value\`
+#     line each, each checked against its shape: item, created, status, size,
+#     priority, state, closed_reason, association, by_viewer, comments. A value
+#     outside its shape is not written on its line; it becomes a block below.
+#   - every field another person can write — title, body, each comment — as
+#       <untrusted-issue-text nonce="N" item="42" field="comment" author="login" association="NONE" by_viewer="false">
+#       "the value, JSON-encoded on one line"
+#       </untrusted-issue-text nonce="N">
+#     N is 128 bits from /dev/urandom, new each run, drawn again should the
+#     text hold it. The value is first kept to \`_issue_text.sh\`'s inert
+#     characters, then cut at its field's cap (the tag then says
+#     truncated="true"), and every < and > is written < and >, so no
+#     line inside a block can read as a tag. An author login outside
+#     [A-Za-z0-9._-]{1,64} is written author="".
+# How a reader treats the blocks is the agent definition's rule, not this file's.
+#
+# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
+#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
+#               lower-case word, recorded in the header
+#   --id <n>    the item the verb acts on; read first, recorded in the header
+#   --status    every item in that column, as \`list.sh --numbers\` lists them
+# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
+# git work tree, no randomness, or a temporary directory inside the repository.
+# On any failure stdout stays empty and no directory is left behind.
+set -euo pipefail
+
+here=\$(dirname "\$0")
+usage() {
+  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  exit 2
+}
+die() { echo "read-items.sh: \$*" >&2; exit 2; }
+
+[ "\$#" -gt 0 ] || usage
+VERB=\$1
+shift
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || die "not a verb: \$(printf '%q' "\$VERB")"
+ID=""
+STATUS=""
+BY_STATUS=false
+NUMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --id) [ -n "\${2:-}" ] && [ -z "\$ID" ] || usage; ID=\$2; shift 2 ;;
+    --status) [ "\$#" -ge 2 ] && [ "\$BY_STATUS" = false ] || usage; STATUS=\$2; BY_STATUS=true; shift 2 ;;
+    -*) usage ;;
+    *) NUMS+=("\$1"); shift ;;
+  esac
+done
+if [ "\$BY_STATUS" = true ]; then
+  [ "\${#NUMS[@]}" -eq 0 ] || usage
+  (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+  usage
+fi
+
+# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_issue_text.sh
+. "\$here/_issue_text.sh"
+
+ROOT=\$(cd "\$here/../../.." && pwd)
+porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
+  die "\$ROOT is not a git work tree: the fingerprint needs one"
+FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
+  die "git could not hash the work tree's status"
+FINGERPRINT=\${FINGERPRINT%\$'\\r'}
+[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+
+if [ "\$BY_STATUS" = true ]; then
+  listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
+  while IFS= read -r n; do
+    n=\${n%\$'\\r'}
+    [ -z "\$n" ] || NUMS+=("\$n")
+  done <<<"\$listed"
+fi
+ALL=()
+[ -z "\$ID" ] || ALL+=("\$ID")
+ALL+=(\${NUMS[@]+"\${NUMS[@]}"})
+
+RECORDS=""
+if [ "\${#ALL[@]}" -gt 0 ]; then
+  RECORDS=\$(bash "\$here/item-record.sh" "\${ALL[@]}") || die "nothing read"
+fi
+
+# 128 bits, as 32 hex digits. A nonce the fetched text already holds is drawn
+# again: only the closing tag this run wrote may carry it.
+NONCE=""
+for _ in 1 2 3 4 5; do
+  NONCE=\$(od -An -N16 -tx1 /dev/urandom | tr -d ' \\t\\r\\n') || NONCE=""
+  [[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || die "could not read 128 random bits from /dev/urandom"
+  case "\$RECORDS" in *"\$NONCE"*) NONCE="" ;; *) break ;; esac
+done
+[ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
+
+TMP=\${TMPDIR:-/tmp}
+DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+trap 'rm -rf "\$DIR"' EXIT
+chmod 700 "\$DIR"
+case "\$(cd "\$DIR" && pwd -P)/" in
+  "\$(cd "\$ROOT" && pwd -P)"/*) die "the temporary directory is inside the repository: set TMPDIR elsewhere" ;;
+esac
+FILE="\$DIR/items.txt"
+
+# shellcheck disable=SC2016  # jq program.
+PROGRAM='
+  def alnum: (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122);
+  def number: type == "string" and length <= 10 and (explode | all(.[]; . >= 48 and . <= 57))
+    and (.[0:1] | . != "" and . != "0");
+  def word(\$max): type == "string" and length > 0 and length <= \$max
+    and (explode | all(.[]; alnum or . == 32 or . == 45 or . == 95 or . == 46 or . == 58 or . == 47));
+  def created:
+    if type != "string" then "-"
+    else (if endswith("Z") and index(".") != null then split(".")[0] + "Z" else . end) as \$v
+      | (\$v | explode) as \$c
+      | ("0000-00-00T00:00:00Z" | explode) as \$t
+      | if (\$c | length) == (\$t | length)
+           and all(range(\$t | length); if \$t[.] == 48 then \$c[.] >= 48 and \$c[.] <= 57 else \$c[.] == \$t[.] end)
+        then \$v else "-" end
+    end;
+  def assoc: . as \$a
+    | if any("COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN",
+             "MEMBER", "NONE", "OWNER"; . == \$a) then . else "UNKNOWN" end;
+  def viewer: if . == true then "true" elif . == false then "false" else "unknown" end;
+  def login: if type == "string" and length <= 64 and (explode | all(.[]; alnum or . == 45 or . == 95 or . == 46))
+    then . else "" end;
+  def encoded: tojson | split("<") | join("\\\\u003c") | split(">") | join("\\\\u003e");
+  def block(\$item; \$field; \$who; \$cap):
+    (if type == "string" then . elif . == null then "" else tojson end | inert_body) as \$v
+    | (\$v | length > \$cap) as \$cut
+    | "<untrusted-issue-text nonce=\\"\\(\$nonce)\\" item=\\"\\(\$item)\\" field=\\"\\(\$field)\\" author=\\"\\(\$who.author | login)\\" association=\\"\\(\$who.association | assoc)\\" by_viewer=\\"\\(\$who.by_viewer | viewer)\\"\\(if \$cut then " truncated=\\"true\\"" else "" end)>",
+      (\$v | if \$cut then .[:\$cap] else . end | encoded),
+      "</untrusted-issue-text nonce=\\"\\(\$nonce)\\">";
+  def line(\$item; \$key; \$v; \$ok):
+    if \$ok then "\\(\$key): \\(\$v)"
+    else "\\(\$key): (outside its shape; the block below holds it)", (\$v | block(\$item; \$key; {}; 256)) end;
+  def listed(\$max): (. // []) as \$a | { ok: all(\$a[]; word(\$max)), v: (\$a | join(", ")) };
+
+  [inputs]
+  | if all(.[]; .item | number) | not then error("a record without an issue number") else . end
+  | reduce .[] as \$r ([]; if any(.[]; .item == \$r.item) then . else . + [\$r] end)
+  | (map(.item) | if length == 0 then "none" else join(" ") end) as \$items
+  | "specnaut-items: 1",
+    "verb: \\(\$verb)",
+    "id: \\(if \$has_id then .[0].item else "none" end)",
+    "fingerprint: \\(\$fingerprint)",
+    "nonce: \\(\$nonce)",
+    "items: \\(\$items)",
+    (.[] | . as \$r | .item as \$n
+      | "",
+        "item: \\(\$n)",
+        "created: \\(.created | created)",
+        line(\$n; "status"; .status; (.status == "" or (.status | word(64)))),
+        ((.sizes | listed(16)) as \$s | line(\$n; "size"; \$s.v; \$s.ok)),
+        ((.priorities | listed(16)) as \$p | line(\$n; "priority"; \$p.v; \$p.ok)),
+        line(\$n; "state"; \$r.state; (\$r.state == "open" or \$r.state == "closed")),
+        line(\$n; "closed_reason"; \$r.closed_reason; (\$r.closed_reason == "" or (\$r.closed_reason | word(32)))),
+        "association: \\(\$r.association | assoc)",
+        "by_viewer: \\(\$r.by_viewer | viewer)",
+        "comments: \\(if \$r.comments == null then "unreadable" else \$r.comments | length end)",
+        (\$r.title | block(\$n; "title"; \$r; 512)),
+        (\$r.body | block(\$n; "body"; \$r; 65536)),
+        (\$r.comments // [] | .[] | . as \$c | .body | block(\$n; "comment"; \$c; 16384)))
+'
+HAS_ID=false
+[ -z "\$ID" ] || HAS_ID=true
+(
+  umask 077
+  printf '%s\\n' "\$RECORDS" | jq_lf -n -r --arg nonce "\$NONCE" --arg verb "\$VERB" \\
+    --arg fingerprint "\$FINGERPRINT" --argjson has_id "\$HAS_ID" "\$ISSUE_TEXT_JQ\$PROGRAM" >"\$FILE"
+) || die "could not write the items file"
+ITEMS=\$(sed -n 's/^items: //p' "\$FILE" | head -1)
+[[ \$ITEMS =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || die "the items file has no item list"
+
+SHOWN=\$FILE
+if command -v cygpath >/dev/null 2>&1; then SHOWN=\$(cygpath -m "\$FILE"); fi
+trap - EXIT
+printf 'ITEMS_FILE: %s\\nITEMS: %s\\nFINGERPRINT: %s\\n' "\$SHOWN" "\$ITEMS" "\$FINGERPRINT"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_issue_text",
+    suffix: "_issue_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of which characters of tracker text reach a reader. Sourced —
+# never run — by cloud's \`_config.sh\` (CLOUD_JSON, every Cloud answer) and by
+# \`read-items.sh\` (the issue text handed to the product owner), each installed
+# beside it.
+#
+# \`ISSUE_TEXT_JQ\` holds jq definitions only; a caller appends its own program.
+# They use no regex, so a jq built without one runs them
+# (tests/scripts/cloud_curl_test.ts):
+#
+#   printable  a code point a terminal shows as itself: no C0 or C1 control,
+#              no DEL, no bidi mark or embedding (U+200E-200F, U+202A-202E,
+#              U+2066-2069), no line or paragraph separator (U+2028-2029)
+#   inert      printable, and none of what changes how text reads without
+#              showing itself either: the zero-width characters (U+200B-200D,
+#              U+2060-2064, U+FEFF), the Arabic letter mark (U+061C) and the
+#              tag characters (U+E0000-E007F)
+#   text       one line: a tab, a newline and U+2028-2029 become a space
+#   body       lines kept: U+2028-2029 become a newline; tab and newline stay
+#   inert_body body, kept to inert characters — the form issue text takes
+#              before a reader that acts on what it reads sees it
+#
+# Code points are numbers here: 8203 is U+200B, 917504 is U+E0000.
+ISSUE_TEXT_JQ='
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def inert: printable and . != 1564 and (. < 8203 or . > 8205) and (. < 8288 or . > 8292)
+    and . != 65279 and (. < 917504 or . > 917631);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+  def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
+'
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "propagate-parent-status",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -7733,12 +8033,16 @@ project_item_id() {
 # call (vs ~20 for the bulky \`repository.issues[].projectItems[].fieldValues[]\`
 # query that lived here previously and was the main rate-limit offender).
 #
-# Usage: list.sh [Status]
+# Usage: list.sh [--numbers] [Status]
+#   --numbers  one issue number per line and nothing else — what \`read-items.sh\`
+#              reads; no title reaches its output
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = "--numbers" ]; then NUMBERS=true; shift; fi
 FILTER="\${1:-}"
 
 # \`Done\` is the one Status whose membership implies a CLOSED issue.
@@ -7770,13 +8074,13 @@ fi
 JSON=\$(gh issue list --repo "\$REPO" --state "\$STATE" --limit 200 \\
   --json number,title,projectItems)
 
-echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
+echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" --argjson numbers "\$NUMBERS" '
   .[]
   | . as \$issue
   | (.projectItems[0].status.name // "—") as \$status
   | select(\$issue.projectItems | length > 0)
   | select(\$filter == "" or \$status == \$filter)
-  | "  #\\(\$issue.number)  \\(\$status)  \\(\$issue.title)"
+  | if \$numbers then "\\(\$issue.number)" else "  #\\(\$issue.number)  \\(\$status)  \\(\$issue.title)" end
 '
 `,
     executable: true,
@@ -7830,24 +8134,8 @@ fi
 # This script FETCHES and NORMALISES; it decides nothing. What "complete" means
 # lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
 #
-# One GraphQL round-trip per issue (\`gh issue view --json projectItems\` carries
-# the Status of each project item but no other field, so it cannot answer for
-# Priority / Size). Where each part of the record comes from:
-#   body         the issue body
-#   sizes        the \`Size\` single-select of THIS project's item (project number
-#                and owner from backlog-config.yml), plus every \`size:<X>\` label
-#   priorities   the same, \`Priority\` field + \`priority:<X>\` labels. Both
-#                surfaces are read because a value may live on either (field
-#                first, label fallback) — a disagreement is two values.
-#   status       the \`Status\` single-select of this project's item; "" when the
-#                issue is not on the project
-#   comments     the last 100 comment bodies (the groom's comment is recent)
-#   state, closed_reason
-#                the issue's state and stateReason, lower-cased
-#                (\`not_planned\`, \`completed\`, …)
-# Field names match case-insensitively, as \`detect-fields.sh\` does. A projected
-# organization field is read as the project item lists it; if the item does not
-# carry the value, the axis reads as missing — never as present.
+# The record of each issue is \`item-record.sh\`'s — one fetch, read here and by
+# \`read-items.sh\` alike; its header says where each part comes from.
 #
 # Usage: groom-verify.sh [--ready <column>|none] <number>...
 #   --ready  the board's ready column, as \`groom-columns.sh\` resolved it
@@ -7873,8 +8161,70 @@ while [ "\$#" -gt 0 ]; do
   esac
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
+RECORDS=\$(bash "\$(dirname "\$0")/item-record.sh" "\${ITEMS[@]}") ||
+  { echo "groom-verify.sh: nothing verified" >&2; exit 2; }
+
+rc=0
+printf '%s\\n' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "item-record",
+    suffix: "item-record.sh",
+    content: `#!/usr/bin/env bash
+# One record per issue, as JSON Lines — GitHub backend. The one fetch both
+# \`groom-verify.sh\` (through groom-rules.sh) and \`read-items.sh\` read.
+#
+# This script FETCHES and NORMALISES; it decides nothing. One GraphQL
+# round-trip per issue (\`gh issue view --json projectItems\` carries the Status
+# of each project item but no other field, so it cannot answer for Priority /
+# Size). Where each part of the record comes from:
+#   item         the issue number, as a string
+#   title, body  the issue's own text
+#   created      createdAt, as GitHub gives it
+#   author, association, by_viewer
+#                the issue author's login, authorAssociation (OWNER, MEMBER,
+#                NONE, ...) and viewerDidAuthor: whether the account \`gh\` is
+#                logged in as wrote it. A deleted account's login is null.
+#   sizes        the \`Size\` single-select of THIS project's item (project number
+#                and owner from backlog-config.yml), plus every \`size:<X>\` label
+#   priorities   the same, \`Priority\` field + \`priority:<X>\` labels. Both
+#                surfaces are read because a value may live on either (field
+#                first, label fallback) — a disagreement is two values.
+#   status       the \`Status\` single-select of this project's item; "" when the
+#                issue is not on the project
+#   comments     the last 100 comments (the groom's comment is recent), each
+#                { body, author, association, by_viewer } as for the issue
+#   state, closed_reason
+#                the issue's state and stateReason, lower-cased
+#                (\`not_planned\`, \`completed\`, …)
+# Field names match case-insensitively, as \`detect-fields.sh\` does. A projected
+# organization field is read as the project item lists it; if the item does not
+# carry the value, the axis reads as missing — never as present.
+#
+# Usage: item-record.sh <number>...
+# Output: one JSON object per line, in the order given — or nothing at all:
+# exit 2 when an argument is not an issue number or an issue cannot be fetched
+# (gh error, rate limit, missing scope, unknown issue). Nothing is printed that
+# was not read.
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -gt 0 ] || { echo "usage: item-record.sh <number>..." >&2; exit 2; }
+ITEMS=()
+for a in "\$@"; do
+  n=\$(require_issue_number "\$a") || exit 2
+  ITEMS+=("\$n")
+done
 case "\$PROJECT_NUMBER" in
-  '' | *[!0-9]*) echo "groom-verify.sh: project_number '\$PROJECT_NUMBER' is not a number" >&2; exit 2 ;;
+  '' | *[!0-9]*) echo "item-record.sh: project_number '\$PROJECT_NUMBER' is not a number" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC2016  # GraphQL variables, not shell ones.
@@ -7882,9 +8232,10 @@ QUERY='
   query(\$owner: String!, \$name: String!, \$num: Int!) {
     repository(owner: \$owner, name: \$name) {
       issue(number: \$num) {
-        body state stateReason
+        title body createdAt state stateReason
+        author { login } authorAssociation viewerDidAuthor
         labels(first: 100) { nodes { name } }
-        comments(last: 100) { nodes { body } }
+        comments(last: 100) { nodes { body author { login } authorAssociation viewerDidAuthor } }
         projectItems(first: 20) {
           nodes {
             project { number owner { ... on Organization { login } ... on User { login } } }
@@ -7918,26 +8269,28 @@ record() {
         [\$card.fieldValues.nodes[]? | select(((.field.name // "") | ascii_downcase) == \$n) | .name];
       def labelled(\$prefix):
         [.labels.nodes[]?.name | select(ascii_downcase | startswith(\$prefix)) | .[(\$prefix | length):]];
+      def who: { author: (.author.login // null), association: (.authorAssociation // null),
+                 by_viewer: (.viewerDidAuthor | if type == "boolean" then . else null end) };
     { item: \$item,
-      body: (.body // ""),
-      sizes: (field("size") + labelled("size:")),
-      priorities: (field("priority") + labelled("priority:")),
-      status: (field("status") | first // ""),
-      comments: [.comments.nodes[]?.body // ""],
-      state: (if .state == "CLOSED" then "closed" elif .state == "OPEN" then "open" else error("state \\(.state)") end),
-      closed_reason: ((.stateReason // "") | ascii_downcase) }
+      title: (.title // ""),
+      created: (.createdAt // null),
+      body: (.body // "") }
+    + who
+    + { sizes: (field("size") + labelled("size:")),
+        priorities: (field("priority") + labelled("priority:")),
+        status: (field("status") | first // ""),
+        comments: [.comments.nodes[]? | { body: (.body // "") } + who],
+        state: (if .state == "CLOSED" then "closed" elif .state == "OPEN" then "open" else error("state \\(.state)") end),
+        closed_reason: ((.stateReason // "") | ascii_downcase) }
   '
 }
 
 RECORDS=""
 for num in "\${ITEMS[@]}"; do
-  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$REPO — nothing verified" >&2; exit 2; }
+  rec=\$(record "\$num") || { echo "item-record.sh: #\$num could not be read from \$REPO" >&2; exit 2; }
   RECORDS+="\$rec"\$'\\n'
 done
-
-rc=0
-printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
-exit "\$rc"
+printf '%s' "\$RECORDS"
 `,
     executable: true,
     backend: "github",
@@ -9526,6 +9879,252 @@ exit "\$rc"
   },
   {
     category: "backlog-script",
+    name: "read-items",
+    suffix: "read-items.sh",
+    content: `#!/usr/bin/env bash
+# Hand the product owner the items it works on, their text as data — every
+# backend. Shared: installed beside each backend's own scripts, as
+# \`_close_shipped.sh\` is, and run as \`.specnaut/scripts/backlog/read-items.sh\`.
+#
+# Issue text is written by whoever can open or comment on an issue. So it is
+# read here, by the backend's \`item-record.sh\` (one run: Cloud resolves one
+# token), and written to ONE file in a fresh directory only the user can open,
+# outside the repository. stdout is three lines and nothing else:
+#
+#   ITEMS_FILE: <path>     the file, for the product owner to read
+#   ITEMS: <n> <n> ...     the numbers read, in order (\`none\` when there are none)
+#   FINGERPRINT: <hex>     \`git hash-object\` of \`git status --porcelain\`, at the read
+#
+# The file, top to bottom:
+#   - a header — format, verb, id, fingerprint, nonce, items — the facts a plan
+#     made from this file is later checked against;
+#   - per item, the values the tracker itself vouches for, one \`key: value\`
+#     line each, each checked against its shape: item, created, status, size,
+#     priority, state, closed_reason, association, by_viewer, comments. A value
+#     outside its shape is not written on its line; it becomes a block below.
+#   - every field another person can write — title, body, each comment — as
+#       <untrusted-issue-text nonce="N" item="42" field="comment" author="login" association="NONE" by_viewer="false">
+#       "the value, JSON-encoded on one line"
+#       </untrusted-issue-text nonce="N">
+#     N is 128 bits from /dev/urandom, new each run, drawn again should the
+#     text hold it. The value is first kept to \`_issue_text.sh\`'s inert
+#     characters, then cut at its field's cap (the tag then says
+#     truncated="true"), and every < and > is written < and >, so no
+#     line inside a block can read as a tag. An author login outside
+#     [A-Za-z0-9._-]{1,64} is written author="".
+# How a reader treats the blocks is the agent definition's rule, not this file's.
+#
+# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
+#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
+#               lower-case word, recorded in the header
+#   --id <n>    the item the verb acts on; read first, recorded in the header
+#   --status    every item in that column, as \`list.sh --numbers\` lists them
+# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
+# git work tree, no randomness, or a temporary directory inside the repository.
+# On any failure stdout stays empty and no directory is left behind.
+set -euo pipefail
+
+here=\$(dirname "\$0")
+usage() {
+  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  exit 2
+}
+die() { echo "read-items.sh: \$*" >&2; exit 2; }
+
+[ "\$#" -gt 0 ] || usage
+VERB=\$1
+shift
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || die "not a verb: \$(printf '%q' "\$VERB")"
+ID=""
+STATUS=""
+BY_STATUS=false
+NUMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --id) [ -n "\${2:-}" ] && [ -z "\$ID" ] || usage; ID=\$2; shift 2 ;;
+    --status) [ "\$#" -ge 2 ] && [ "\$BY_STATUS" = false ] || usage; STATUS=\$2; BY_STATUS=true; shift 2 ;;
+    -*) usage ;;
+    *) NUMS+=("\$1"); shift ;;
+  esac
+done
+if [ "\$BY_STATUS" = true ]; then
+  [ "\${#NUMS[@]}" -eq 0 ] || usage
+  (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+  usage
+fi
+
+# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_issue_text.sh
+. "\$here/_issue_text.sh"
+
+ROOT=\$(cd "\$here/../../.." && pwd)
+porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
+  die "\$ROOT is not a git work tree: the fingerprint needs one"
+FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
+  die "git could not hash the work tree's status"
+FINGERPRINT=\${FINGERPRINT%\$'\\r'}
+[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+
+if [ "\$BY_STATUS" = true ]; then
+  listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
+  while IFS= read -r n; do
+    n=\${n%\$'\\r'}
+    [ -z "\$n" ] || NUMS+=("\$n")
+  done <<<"\$listed"
+fi
+ALL=()
+[ -z "\$ID" ] || ALL+=("\$ID")
+ALL+=(\${NUMS[@]+"\${NUMS[@]}"})
+
+RECORDS=""
+if [ "\${#ALL[@]}" -gt 0 ]; then
+  RECORDS=\$(bash "\$here/item-record.sh" "\${ALL[@]}") || die "nothing read"
+fi
+
+# 128 bits, as 32 hex digits. A nonce the fetched text already holds is drawn
+# again: only the closing tag this run wrote may carry it.
+NONCE=""
+for _ in 1 2 3 4 5; do
+  NONCE=\$(od -An -N16 -tx1 /dev/urandom | tr -d ' \\t\\r\\n') || NONCE=""
+  [[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || die "could not read 128 random bits from /dev/urandom"
+  case "\$RECORDS" in *"\$NONCE"*) NONCE="" ;; *) break ;; esac
+done
+[ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
+
+TMP=\${TMPDIR:-/tmp}
+DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+trap 'rm -rf "\$DIR"' EXIT
+chmod 700 "\$DIR"
+case "\$(cd "\$DIR" && pwd -P)/" in
+  "\$(cd "\$ROOT" && pwd -P)"/*) die "the temporary directory is inside the repository: set TMPDIR elsewhere" ;;
+esac
+FILE="\$DIR/items.txt"
+
+# shellcheck disable=SC2016  # jq program.
+PROGRAM='
+  def alnum: (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122);
+  def number: type == "string" and length <= 10 and (explode | all(.[]; . >= 48 and . <= 57))
+    and (.[0:1] | . != "" and . != "0");
+  def word(\$max): type == "string" and length > 0 and length <= \$max
+    and (explode | all(.[]; alnum or . == 32 or . == 45 or . == 95 or . == 46 or . == 58 or . == 47));
+  def created:
+    if type != "string" then "-"
+    else (if endswith("Z") and index(".") != null then split(".")[0] + "Z" else . end) as \$v
+      | (\$v | explode) as \$c
+      | ("0000-00-00T00:00:00Z" | explode) as \$t
+      | if (\$c | length) == (\$t | length)
+           and all(range(\$t | length); if \$t[.] == 48 then \$c[.] >= 48 and \$c[.] <= 57 else \$c[.] == \$t[.] end)
+        then \$v else "-" end
+    end;
+  def assoc: . as \$a
+    | if any("COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN",
+             "MEMBER", "NONE", "OWNER"; . == \$a) then . else "UNKNOWN" end;
+  def viewer: if . == true then "true" elif . == false then "false" else "unknown" end;
+  def login: if type == "string" and length <= 64 and (explode | all(.[]; alnum or . == 45 or . == 95 or . == 46))
+    then . else "" end;
+  def encoded: tojson | split("<") | join("\\\\u003c") | split(">") | join("\\\\u003e");
+  def block(\$item; \$field; \$who; \$cap):
+    (if type == "string" then . elif . == null then "" else tojson end | inert_body) as \$v
+    | (\$v | length > \$cap) as \$cut
+    | "<untrusted-issue-text nonce=\\"\\(\$nonce)\\" item=\\"\\(\$item)\\" field=\\"\\(\$field)\\" author=\\"\\(\$who.author | login)\\" association=\\"\\(\$who.association | assoc)\\" by_viewer=\\"\\(\$who.by_viewer | viewer)\\"\\(if \$cut then " truncated=\\"true\\"" else "" end)>",
+      (\$v | if \$cut then .[:\$cap] else . end | encoded),
+      "</untrusted-issue-text nonce=\\"\\(\$nonce)\\">";
+  def line(\$item; \$key; \$v; \$ok):
+    if \$ok then "\\(\$key): \\(\$v)"
+    else "\\(\$key): (outside its shape; the block below holds it)", (\$v | block(\$item; \$key; {}; 256)) end;
+  def listed(\$max): (. // []) as \$a | { ok: all(\$a[]; word(\$max)), v: (\$a | join(", ")) };
+
+  [inputs]
+  | if all(.[]; .item | number) | not then error("a record without an issue number") else . end
+  | reduce .[] as \$r ([]; if any(.[]; .item == \$r.item) then . else . + [\$r] end)
+  | (map(.item) | if length == 0 then "none" else join(" ") end) as \$items
+  | "specnaut-items: 1",
+    "verb: \\(\$verb)",
+    "id: \\(if \$has_id then .[0].item else "none" end)",
+    "fingerprint: \\(\$fingerprint)",
+    "nonce: \\(\$nonce)",
+    "items: \\(\$items)",
+    (.[] | . as \$r | .item as \$n
+      | "",
+        "item: \\(\$n)",
+        "created: \\(.created | created)",
+        line(\$n; "status"; .status; (.status == "" or (.status | word(64)))),
+        ((.sizes | listed(16)) as \$s | line(\$n; "size"; \$s.v; \$s.ok)),
+        ((.priorities | listed(16)) as \$p | line(\$n; "priority"; \$p.v; \$p.ok)),
+        line(\$n; "state"; \$r.state; (\$r.state == "open" or \$r.state == "closed")),
+        line(\$n; "closed_reason"; \$r.closed_reason; (\$r.closed_reason == "" or (\$r.closed_reason | word(32)))),
+        "association: \\(\$r.association | assoc)",
+        "by_viewer: \\(\$r.by_viewer | viewer)",
+        "comments: \\(if \$r.comments == null then "unreadable" else \$r.comments | length end)",
+        (\$r.title | block(\$n; "title"; \$r; 512)),
+        (\$r.body | block(\$n; "body"; \$r; 65536)),
+        (\$r.comments // [] | .[] | . as \$c | .body | block(\$n; "comment"; \$c; 16384)))
+'
+HAS_ID=false
+[ -z "\$ID" ] || HAS_ID=true
+(
+  umask 077
+  printf '%s\\n' "\$RECORDS" | jq_lf -n -r --arg nonce "\$NONCE" --arg verb "\$VERB" \\
+    --arg fingerprint "\$FINGERPRINT" --argjson has_id "\$HAS_ID" "\$ISSUE_TEXT_JQ\$PROGRAM" >"\$FILE"
+) || die "could not write the items file"
+ITEMS=\$(sed -n 's/^items: //p' "\$FILE" | head -1)
+[[ \$ITEMS =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || die "the items file has no item list"
+
+SHOWN=\$FILE
+if command -v cygpath >/dev/null 2>&1; then SHOWN=\$(cygpath -m "\$FILE"); fi
+trap - EXIT
+printf 'ITEMS_FILE: %s\\nITEMS: %s\\nFINGERPRINT: %s\\n' "\$SHOWN" "\$ITEMS" "\$FINGERPRINT"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_issue_text",
+    suffix: "_issue_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of which characters of tracker text reach a reader. Sourced —
+# never run — by cloud's \`_config.sh\` (CLOUD_JSON, every Cloud answer) and by
+# \`read-items.sh\` (the issue text handed to the product owner), each installed
+# beside it.
+#
+# \`ISSUE_TEXT_JQ\` holds jq definitions only; a caller appends its own program.
+# They use no regex, so a jq built without one runs them
+# (tests/scripts/cloud_curl_test.ts):
+#
+#   printable  a code point a terminal shows as itself: no C0 or C1 control,
+#              no DEL, no bidi mark or embedding (U+200E-200F, U+202A-202E,
+#              U+2066-2069), no line or paragraph separator (U+2028-2029)
+#   inert      printable, and none of what changes how text reads without
+#              showing itself either: the zero-width characters (U+200B-200D,
+#              U+2060-2064, U+FEFF), the Arabic letter mark (U+061C) and the
+#              tag characters (U+E0000-E007F)
+#   text       one line: a tab, a newline and U+2028-2029 become a space
+#   body       lines kept: U+2028-2029 become a newline; tab and newline stay
+#   inert_body body, kept to inert characters — the form issue text takes
+#              before a reader that acts on what it reads sees it
+#
+# Code points are numbers here: 8203 is U+200B, 917504 is U+E0000.
+ISSUE_TEXT_JQ='
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def inert: printable and . != 1564 and (. < 8203 or . > 8205) and (. < 8288 or . > 8292)
+    and . != 65279 and (. < 917504 or . > 917631);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+  def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
+'
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "cascade-check",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -10044,18 +10643,21 @@ glab_issues_all() {
     content: `#!/usr/bin/env bash
 # List open issues on the configured GitLab project, with their Status::
 # scoped label. Optional Status filter.
-# Usage: list.sh [Status]
+# Usage: list.sh [--numbers] [Status]
+#   --numbers  one issue number per line and nothing else (\`read-items.sh\`)
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = "--numbers" ]; then NUMBERS=true; shift; fi
 FILTER="\${1:-}"
 
 JSON=\$(glab issue list --repo "\$PROJECT_ID" --output json --per-page 100 \\
   --state opened 2>/dev/null || echo "[]")
 
-echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
+echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" --argjson numbers "\$NUMBERS" '
   .[]
   | . as \$issue
   | (
@@ -10063,7 +10665,7 @@ echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
     ) as \$rawStatus
   | (\$rawStatus | sub("^Status::"; "")) as \$status
   | select(\$filter == "" or \$status == \$filter)
-  | "  #\\(.iid)  \\(\$status)  \\(.title)"
+  | if \$numbers then "\\(.iid)" else "  #\\(.iid)  \\(\$status)  \\(.title)" end
 '
 `,
     executable: true,
@@ -10104,19 +10706,9 @@ glab issue view "\$NUM" --repo "\$PROJECT_ID" --comments
 # This script FETCHES and NORMALISES; it decides nothing. What "complete" means
 # lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
 #
-# Two \`glab\` calls per issue: \`glab issue view --output json\` (as \`move.sh\`
-# reads labels) and the notes API. Where each part of the record comes from:
-#   body         the issue description
-#   sizes        every \`size::<X>\` scoped label (\`size::M\`)
-#   priorities   every \`priority::<X>\` scoped label (\`priority::P1\`)
-#   status       the \`Status::<X>\` scoped label \`move.sh\` sets; "" without one
-#   comments     the latest 100 notes, system notes excluded — a label change
-#                is GitLab's note, not the groom's comment
-#   state        \`opened\` → open, \`closed\` → closed
-#   closed_reason
-#                CANNOT be read: GitLab records no reason for closing an issue.
-#                Passed as "", so "closed as not_planned" is never an outcome
-#                on this backend — the groom's marked comment is.
+# The record of each issue is \`item-record.sh\`'s — one fetch, read here and by
+# \`read-items.sh\` alike; its header says where each part comes from (GitLab
+# records no close reason, so the groom's marked comment is the outcome here).
 #
 # Usage: groom-verify.sh [--ready <column>|none] <number>...
 # Output and exit codes: those of groom-rules.sh — plus exit 2 when an issue
@@ -10140,10 +10732,73 @@ while [ "\$#" -gt 0 ]; do
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
 
+RECORDS=\$(bash "\$(dirname "\$0")/item-record.sh" "\${ITEMS[@]}") ||
+  { echo "groom-verify.sh: nothing verified" >&2; exit 2; }
+
+rc=0
+printf '%s\\n' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "item-record",
+    suffix: "item-record.sh",
+    content: `#!/usr/bin/env bash
+# One record per issue, as JSON Lines — GitLab backend. The one fetch both
+# \`groom-verify.sh\` (through groom-rules.sh) and \`read-items.sh\` read.
+#
+# This script FETCHES and NORMALISES; it decides nothing. The signed-in user
+# once per run (\`glab api user\`), then two \`glab\` calls per issue:
+# \`glab issue view --output json\` (as \`move.sh\` reads labels) and the notes
+# API. Where each part of the record comes from:
+#   item         the issue's iid, as a string
+#   title, body  the issue's title and description
+#   created      created_at, as GitLab gives it
+#   author       the author's username
+#   association  CANNOT be read: GitLab has no author association. null.
+#   by_viewer    whether the author is the user \`glab\` is signed in as; null
+#                when that user could not be read
+#   sizes        every \`size::<X>\` scoped label (\`size::M\`)
+#   priorities   every \`priority::<X>\` scoped label (\`priority::P1\`)
+#   status       the \`Status::<X>\` scoped label \`move.sh\` sets; "" without one
+#   comments     the latest 100 notes, system notes excluded — a label change
+#                is GitLab's note, not the groom's comment — each
+#                { body, author, association, by_viewer } as for the issue
+#   state        \`opened\` → open, \`closed\` → closed
+#   closed_reason
+#                CANNOT be read: GitLab records no reason for closing an issue.
+#                Passed as "", so "closed as not_planned" is never an outcome
+#                on this backend — the groom's marked comment is.
+#
+# Usage: item-record.sh <number>...
+# Output: one JSON object per line, in the order given — or nothing at all:
+# exit 2 when an argument is not an issue number or an issue cannot be fetched.
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -gt 0 ] || { echo "usage: item-record.sh <number>..." >&2; exit 2; }
+ITEMS=()
+for a in "\$@"; do
+  n=\$(require_issue_number "\$a") || exit 2
+  ITEMS+=("\$n")
+done
+
 # The API path segment: a \`group/project\` path must be URL-encoded; a numeric
 # id passes through unchanged. \`-j\`, never \`-r\`: no newline is written, so a
 # native Windows jq.exe has none to turn into CRLF — \`acme%2Fwidget\\r\` is no project.
 PROJECT_PATH=\$(jq_lf -jn --arg p "\$PROJECT_ID" '\$p | @uri')
+
+# The signed-in user's id, or "" — then no author is known to be the viewer.
+VIEWER=\$(glab api user 2>/dev/null | jq_lf -j '.id | numbers' 2>/dev/null) || VIEWER=""
+if [ -z "\$VIEWER" ]; then
+  echo "item-record.sh: could not read the signed-in GitLab user; by_viewer is unknown" >&2
+fi
 
 # One issue → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {
@@ -10153,34 +10808,37 @@ record() {
     return 1
   # On stdin, not as \`--argjson\`: a hundred notes can outgrow the argument limit.
   # shellcheck disable=SC2016  # jq program.
-  printf '%s\\n%s\\n' "\$issue" "\$notes" | jq_lf -n -c -e --arg item "\$1" '
+  printf '%s\\n%s\\n' "\$issue" "\$notes" | jq_lf -n -c -e --arg item "\$1" --arg viewer "\$VIEWER" '
     input as \$issue | input as \$notes
     | def scoped(\$scope):
       [\$issue.labels[]? | select(ascii_downcase | startswith(\$scope))
        | .[(\$scope | length):] | gsub("^\\"|\\"\$"; "")];
+      def who: { author: (.author.username // null), association: null,
+                 by_viewer: (if \$viewer == "" or (.author.id | type) != "number" then null
+                             else (.author.id | tostring) == \$viewer end) };
     if (\$notes | type) != "array" then error("notes are not a list") else . end
     | { item: \$item,
-        body: (\$issue.description // ""),
-        sizes: scoped("size::"),
-        priorities: scoped("priority::"),
-        status: (scoped("status::") | first // ""),
-        comments: [\$notes[] | select(.system != true) | .body // ""],
-        state: (if \$issue.state == "closed" then "closed"
-                elif \$issue.state == "opened" then "open"
-                else error("state \\(\$issue.state)") end),
-        closed_reason: "" }
+        title: (\$issue.title // ""),
+        created: (\$issue.created_at // null),
+        body: (\$issue.description // "") }
+      + (\$issue | who)
+      + { sizes: scoped("size::"),
+          priorities: scoped("priority::"),
+          status: (scoped("status::") | first // ""),
+          comments: [\$notes[] | select(.system != true) | { body: (.body // "") } + who],
+          state: (if \$issue.state == "closed" then "closed"
+                  elif \$issue.state == "opened" then "open"
+                  else error("state \\(\$issue.state)") end),
+          closed_reason: "" }
   '
 }
 
 RECORDS=""
 for num in "\${ITEMS[@]}"; do
-  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$PROJECT_ID — nothing verified" >&2; exit 2; }
+  rec=\$(record "\$num") || { echo "item-record.sh: #\$num could not be read from \$PROJECT_ID" >&2; exit 2; }
   RECORDS+="\$rec"\$'\\n'
 done
-
-rc=0
-printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
-exit "\$rc"
+printf '%s' "\$RECORDS"
 `,
     executable: true,
     backend: "gitlab",
@@ -10807,6 +11465,252 @@ exit "\$rc"
   },
   {
     category: "backlog-script",
+    name: "read-items",
+    suffix: "read-items.sh",
+    content: `#!/usr/bin/env bash
+# Hand the product owner the items it works on, their text as data — every
+# backend. Shared: installed beside each backend's own scripts, as
+# \`_close_shipped.sh\` is, and run as \`.specnaut/scripts/backlog/read-items.sh\`.
+#
+# Issue text is written by whoever can open or comment on an issue. So it is
+# read here, by the backend's \`item-record.sh\` (one run: Cloud resolves one
+# token), and written to ONE file in a fresh directory only the user can open,
+# outside the repository. stdout is three lines and nothing else:
+#
+#   ITEMS_FILE: <path>     the file, for the product owner to read
+#   ITEMS: <n> <n> ...     the numbers read, in order (\`none\` when there are none)
+#   FINGERPRINT: <hex>     \`git hash-object\` of \`git status --porcelain\`, at the read
+#
+# The file, top to bottom:
+#   - a header — format, verb, id, fingerprint, nonce, items — the facts a plan
+#     made from this file is later checked against;
+#   - per item, the values the tracker itself vouches for, one \`key: value\`
+#     line each, each checked against its shape: item, created, status, size,
+#     priority, state, closed_reason, association, by_viewer, comments. A value
+#     outside its shape is not written on its line; it becomes a block below.
+#   - every field another person can write — title, body, each comment — as
+#       <untrusted-issue-text nonce="N" item="42" field="comment" author="login" association="NONE" by_viewer="false">
+#       "the value, JSON-encoded on one line"
+#       </untrusted-issue-text nonce="N">
+#     N is 128 bits from /dev/urandom, new each run, drawn again should the
+#     text hold it. The value is first kept to \`_issue_text.sh\`'s inert
+#     characters, then cut at its field's cap (the tag then says
+#     truncated="true"), and every < and > is written < and >, so no
+#     line inside a block can read as a tag. An author login outside
+#     [A-Za-z0-9._-]{1,64} is written author="".
+# How a reader treats the blocks is the agent definition's rule, not this file's.
+#
+# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
+#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
+#               lower-case word, recorded in the header
+#   --id <n>    the item the verb acts on; read first, recorded in the header
+#   --status    every item in that column, as \`list.sh --numbers\` lists them
+# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
+# git work tree, no randomness, or a temporary directory inside the repository.
+# On any failure stdout stays empty and no directory is left behind.
+set -euo pipefail
+
+here=\$(dirname "\$0")
+usage() {
+  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  exit 2
+}
+die() { echo "read-items.sh: \$*" >&2; exit 2; }
+
+[ "\$#" -gt 0 ] || usage
+VERB=\$1
+shift
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || die "not a verb: \$(printf '%q' "\$VERB")"
+ID=""
+STATUS=""
+BY_STATUS=false
+NUMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --id) [ -n "\${2:-}" ] && [ -z "\$ID" ] || usage; ID=\$2; shift 2 ;;
+    --status) [ "\$#" -ge 2 ] && [ "\$BY_STATUS" = false ] || usage; STATUS=\$2; BY_STATUS=true; shift 2 ;;
+    -*) usage ;;
+    *) NUMS+=("\$1"); shift ;;
+  esac
+done
+if [ "\$BY_STATUS" = true ]; then
+  [ "\${#NUMS[@]}" -eq 0 ] || usage
+  (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+  usage
+fi
+
+# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_issue_text.sh
+. "\$here/_issue_text.sh"
+
+ROOT=\$(cd "\$here/../../.." && pwd)
+porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
+  die "\$ROOT is not a git work tree: the fingerprint needs one"
+FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
+  die "git could not hash the work tree's status"
+FINGERPRINT=\${FINGERPRINT%\$'\\r'}
+[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+
+if [ "\$BY_STATUS" = true ]; then
+  listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
+  while IFS= read -r n; do
+    n=\${n%\$'\\r'}
+    [ -z "\$n" ] || NUMS+=("\$n")
+  done <<<"\$listed"
+fi
+ALL=()
+[ -z "\$ID" ] || ALL+=("\$ID")
+ALL+=(\${NUMS[@]+"\${NUMS[@]}"})
+
+RECORDS=""
+if [ "\${#ALL[@]}" -gt 0 ]; then
+  RECORDS=\$(bash "\$here/item-record.sh" "\${ALL[@]}") || die "nothing read"
+fi
+
+# 128 bits, as 32 hex digits. A nonce the fetched text already holds is drawn
+# again: only the closing tag this run wrote may carry it.
+NONCE=""
+for _ in 1 2 3 4 5; do
+  NONCE=\$(od -An -N16 -tx1 /dev/urandom | tr -d ' \\t\\r\\n') || NONCE=""
+  [[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || die "could not read 128 random bits from /dev/urandom"
+  case "\$RECORDS" in *"\$NONCE"*) NONCE="" ;; *) break ;; esac
+done
+[ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
+
+TMP=\${TMPDIR:-/tmp}
+DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+trap 'rm -rf "\$DIR"' EXIT
+chmod 700 "\$DIR"
+case "\$(cd "\$DIR" && pwd -P)/" in
+  "\$(cd "\$ROOT" && pwd -P)"/*) die "the temporary directory is inside the repository: set TMPDIR elsewhere" ;;
+esac
+FILE="\$DIR/items.txt"
+
+# shellcheck disable=SC2016  # jq program.
+PROGRAM='
+  def alnum: (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122);
+  def number: type == "string" and length <= 10 and (explode | all(.[]; . >= 48 and . <= 57))
+    and (.[0:1] | . != "" and . != "0");
+  def word(\$max): type == "string" and length > 0 and length <= \$max
+    and (explode | all(.[]; alnum or . == 32 or . == 45 or . == 95 or . == 46 or . == 58 or . == 47));
+  def created:
+    if type != "string" then "-"
+    else (if endswith("Z") and index(".") != null then split(".")[0] + "Z" else . end) as \$v
+      | (\$v | explode) as \$c
+      | ("0000-00-00T00:00:00Z" | explode) as \$t
+      | if (\$c | length) == (\$t | length)
+           and all(range(\$t | length); if \$t[.] == 48 then \$c[.] >= 48 and \$c[.] <= 57 else \$c[.] == \$t[.] end)
+        then \$v else "-" end
+    end;
+  def assoc: . as \$a
+    | if any("COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN",
+             "MEMBER", "NONE", "OWNER"; . == \$a) then . else "UNKNOWN" end;
+  def viewer: if . == true then "true" elif . == false then "false" else "unknown" end;
+  def login: if type == "string" and length <= 64 and (explode | all(.[]; alnum or . == 45 or . == 95 or . == 46))
+    then . else "" end;
+  def encoded: tojson | split("<") | join("\\\\u003c") | split(">") | join("\\\\u003e");
+  def block(\$item; \$field; \$who; \$cap):
+    (if type == "string" then . elif . == null then "" else tojson end | inert_body) as \$v
+    | (\$v | length > \$cap) as \$cut
+    | "<untrusted-issue-text nonce=\\"\\(\$nonce)\\" item=\\"\\(\$item)\\" field=\\"\\(\$field)\\" author=\\"\\(\$who.author | login)\\" association=\\"\\(\$who.association | assoc)\\" by_viewer=\\"\\(\$who.by_viewer | viewer)\\"\\(if \$cut then " truncated=\\"true\\"" else "" end)>",
+      (\$v | if \$cut then .[:\$cap] else . end | encoded),
+      "</untrusted-issue-text nonce=\\"\\(\$nonce)\\">";
+  def line(\$item; \$key; \$v; \$ok):
+    if \$ok then "\\(\$key): \\(\$v)"
+    else "\\(\$key): (outside its shape; the block below holds it)", (\$v | block(\$item; \$key; {}; 256)) end;
+  def listed(\$max): (. // []) as \$a | { ok: all(\$a[]; word(\$max)), v: (\$a | join(", ")) };
+
+  [inputs]
+  | if all(.[]; .item | number) | not then error("a record without an issue number") else . end
+  | reduce .[] as \$r ([]; if any(.[]; .item == \$r.item) then . else . + [\$r] end)
+  | (map(.item) | if length == 0 then "none" else join(" ") end) as \$items
+  | "specnaut-items: 1",
+    "verb: \\(\$verb)",
+    "id: \\(if \$has_id then .[0].item else "none" end)",
+    "fingerprint: \\(\$fingerprint)",
+    "nonce: \\(\$nonce)",
+    "items: \\(\$items)",
+    (.[] | . as \$r | .item as \$n
+      | "",
+        "item: \\(\$n)",
+        "created: \\(.created | created)",
+        line(\$n; "status"; .status; (.status == "" or (.status | word(64)))),
+        ((.sizes | listed(16)) as \$s | line(\$n; "size"; \$s.v; \$s.ok)),
+        ((.priorities | listed(16)) as \$p | line(\$n; "priority"; \$p.v; \$p.ok)),
+        line(\$n; "state"; \$r.state; (\$r.state == "open" or \$r.state == "closed")),
+        line(\$n; "closed_reason"; \$r.closed_reason; (\$r.closed_reason == "" or (\$r.closed_reason | word(32)))),
+        "association: \\(\$r.association | assoc)",
+        "by_viewer: \\(\$r.by_viewer | viewer)",
+        "comments: \\(if \$r.comments == null then "unreadable" else \$r.comments | length end)",
+        (\$r.title | block(\$n; "title"; \$r; 512)),
+        (\$r.body | block(\$n; "body"; \$r; 65536)),
+        (\$r.comments // [] | .[] | . as \$c | .body | block(\$n; "comment"; \$c; 16384)))
+'
+HAS_ID=false
+[ -z "\$ID" ] || HAS_ID=true
+(
+  umask 077
+  printf '%s\\n' "\$RECORDS" | jq_lf -n -r --arg nonce "\$NONCE" --arg verb "\$VERB" \\
+    --arg fingerprint "\$FINGERPRINT" --argjson has_id "\$HAS_ID" "\$ISSUE_TEXT_JQ\$PROGRAM" >"\$FILE"
+) || die "could not write the items file"
+ITEMS=\$(sed -n 's/^items: //p' "\$FILE" | head -1)
+[[ \$ITEMS =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || die "the items file has no item list"
+
+SHOWN=\$FILE
+if command -v cygpath >/dev/null 2>&1; then SHOWN=\$(cygpath -m "\$FILE"); fi
+trap - EXIT
+printf 'ITEMS_FILE: %s\\nITEMS: %s\\nFINGERPRINT: %s\\n' "\$SHOWN" "\$ITEMS" "\$FINGERPRINT"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_issue_text",
+    suffix: "_issue_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of which characters of tracker text reach a reader. Sourced —
+# never run — by cloud's \`_config.sh\` (CLOUD_JSON, every Cloud answer) and by
+# \`read-items.sh\` (the issue text handed to the product owner), each installed
+# beside it.
+#
+# \`ISSUE_TEXT_JQ\` holds jq definitions only; a caller appends its own program.
+# They use no regex, so a jq built without one runs them
+# (tests/scripts/cloud_curl_test.ts):
+#
+#   printable  a code point a terminal shows as itself: no C0 or C1 control,
+#              no DEL, no bidi mark or embedding (U+200E-200F, U+202A-202E,
+#              U+2066-2069), no line or paragraph separator (U+2028-2029)
+#   inert      printable, and none of what changes how text reads without
+#              showing itself either: the zero-width characters (U+200B-200D,
+#              U+2060-2064, U+FEFF), the Arabic letter mark (U+061C) and the
+#              tag characters (U+E0000-E007F)
+#   text       one line: a tab, a newline and U+2028-2029 become a space
+#   body       lines kept: U+2028-2029 become a newline; tab and newline stay
+#   inert_body body, kept to inert characters — the form issue text takes
+#              before a reader that acts on what it reads sees it
+#
+# Code points are numbers here: 8203 is U+200B, 917504 is U+E0000.
+ISSUE_TEXT_JQ='
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def inert: printable and . != 1564 and (. < 8203 or . > 8205) and (. < 8288 or . > 8292)
+    and . != 65279 and (. < 917504 or . > 917631);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+  def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
+'
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "cascade-check",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -10986,11 +11890,10 @@ require_issue_number() {
 # header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
 # which \`-f\` does not make of a 3xx). No Cloud request follows a redirect. What comes
 # back is normalized JSON (\`CLOUD_JSON\`): one line per string, except a \`body\`.
-CLOUD_JSON='
-  def printable: . >= 32 and (. < 127 or . > 159)
-    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
-  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
-  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+# Which characters pass is \`_issue_text.sh\`'s rule, installed beside this file.
+# shellcheck source=../_issue_text.sh
+. "\$(dirname "\$0")/_issue_text.sh"
+CLOUD_JSON="\$ISSUE_TEXT_JQ"'
   def clean:
     if type == "object" then
       with_entries(.key as \$k
@@ -11047,23 +11950,26 @@ item_url() {
 # List tasks on the Specnaut Cloud board, with their status (column name).
 # Optional Status filter.
 #
-# Usage: list.sh [Status]
+# Usage: list.sh [--numbers] [Status]
+#   --numbers  one task number per line and nothing else (\`read-items.sh\`)
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = "--numbers" ]; then NUMBERS=true; shift; fi
 FILTER="\${1:-}"
 COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
 TASKS=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY")
 
-echo "\$TASKS" | jq_lf -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
+echo "\$TASKS" | jq_lf -r --argjson cols "\$COLS" --arg filter "\$FILTER" --argjson numbers "\$NUMBERS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
   | .tasks
   | sort_by(.number)[]
   | (\$names[.columnId] // "—") as \$status
   | select(\$filter == "" or \$status == \$filter)
-  | "  #\\(.number)  \\(\$status)  \\(.title)"
+  | if \$numbers then "\\(.number)" else "  #\\(.number)  \\(\$status)  \\(.title)" end
 '
 `,
     executable: true,
@@ -11127,19 +12033,10 @@ echo "\$RESP" | jq_lf -r --argjson cols "\$COLS" '
 # This script FETCHES and NORMALISES; it decides nothing. What "complete" means
 # lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
 #
-# The board's columns once per run, then one \`GET /tasks?number=\` per task —
-# the calls \`view.sh\` makes. Where each part of the record comes from:
-#   body         the task's \`body\`
-#   sizes        the task's \`size\`, upper-cased (the API carries \`m\`, \`xl\`, …)
-#   priorities   the task's \`priority\`, upper-cased (\`p1\` → \`P1\`)
-#   status       the name of the task's column (\`columnId\` → \`/columns\`)
-#   comments     CANNOT be read: the API accepts a comment (\`clarify-comment.sh\`
-#                posts one) but serves none back. Passed as null, so a task the
-#                groom left with a clarification reads "comments unreadable" —
-#                the only outcome this backend can prove is the ready column.
-#   state, closed_reason
-#                CANNOT be read: a task carries no closed state or close reason
-#                (\`Done\` is a column). Passed as open / "".
+# The record of each task is \`item-record.sh\`'s — one fetch, one token per
+# run, read here and by \`read-items.sh\` alike; its header says where each part
+# comes from. Cloud serves no comment back, so the ready column is the one
+# outcome this backend can prove.
 #
 # Usage: groom-verify.sh [--ready <column>|none] <number>...
 # Output and exit codes: those of groom-rules.sh — plus exit 2 when a task
@@ -11161,13 +12058,65 @@ while [ "\$#" -gt 0 ]; do
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
 
-# After the arguments: \`_config.sh\` resolves a token, which a usage error
-# should not cost.
+# No \`_config.sh\` here: \`item-record.sh\` resolves the run's one token, and
+# refuses 0 or an overlong number itself.
+RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+RECORDS=\$(bash "\$(dirname "\$0")/item-record.sh" "\${ITEMS[@]}") ||
+  { echo "groom-verify.sh: nothing verified" >&2; exit 2; }
+
+rc=0
+printf '%s\\n' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "item-record",
+    suffix: "item-record.sh",
+    content: `#!/usr/bin/env bash
+# One record per task, as JSON Lines — Specnaut Cloud. The one fetch both
+# \`groom-verify.sh\` (through groom-rules.sh) and \`read-items.sh\` read.
+#
+# This script FETCHES and NORMALISES; it decides nothing. One token and the
+# board's columns per run, then one \`GET /tasks?number=\` per task — the calls
+# \`view.sh\` makes. Where each part of the record comes from:
+#   item         the task number, as a string
+#   title, body  the task's \`title\` and \`body\`
+#   created      the task's \`createdAt\`; null without one
+#   author, association, by_viewer
+#                CANNOT be read: a task payload names no author. null.
+#   sizes        the task's \`size\`, upper-cased (the API carries \`m\`, \`xl\`, …)
+#   priorities   the task's \`priority\`, upper-cased (\`p1\` → \`P1\`)
+#   status       the name of the task's column (\`columnId\` → \`/columns\`)
+#   comments     CANNOT be read: the API accepts a comment (\`clarify-comment.sh\`
+#                posts one) but serves none back. Passed as null, so a task the
+#                groom left with a clarification reads "comments unreadable" —
+#                the only outcome this backend can prove is the ready column.
+#   state, closed_reason
+#                CANNOT be read: a task carries no closed state or close reason
+#                (\`Done\` is a column). Passed as open / "".
+#
+# Usage: item-record.sh <number>...
+# Output: one JSON object per line, in the order given — or nothing at all:
+# exit 2 when an argument is not a task number or a task cannot be fetched
+# (API error, no such task, not authenticated).
+set -euo pipefail
+
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
-RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+
+[ "\$#" -gt 0 ] || { echo "usage: item-record.sh <number>..." >&2; exit 2; }
+ITEMS=()
+for a in "\$@"; do
+  n=\$(require_issue_number "\$a") || exit 2
+  ITEMS+=("\$n")
+done
+
 if ! COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY"); then
-  echo "groom-verify.sh: could not read the board's columns — nothing verified" >&2
+  echo "item-record.sh: could not read the board's columns" >&2
   exit 2
 fi
 
@@ -11182,7 +12131,12 @@ record() {
     | (\$resp.task // error("no such task")) as \$t
     | def one(\$v): [\$v | select(. != null and . != "") | tostring | ascii_upcase];
     { item: \$item,
+      title: (\$t.title // ""),
+      created: (\$t.createdAt // null),
       body: (\$t.body // ""),
+      author: null,
+      association: null,
+      by_viewer: null,
       sizes: one(\$t.size),
       priorities: one(\$t.priority),
       status: (\$names[\$t.columnId // ""] // ""),
@@ -11194,14 +12148,10 @@ record() {
 
 RECORDS=""
 for num in "\${ITEMS[@]}"; do
-  num=\$(require_issue_number "\$num") || exit 2
-  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$PROJECT_KEY — nothing verified" >&2; exit 2; }
+  rec=\$(record "\$num") || { echo "item-record.sh: #\$num could not be read from \$PROJECT_KEY" >&2; exit 2; }
   RECORDS+="\$rec"\$'\\n'
 done
-
-rc=0
-printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
-exit "\$rc"
+printf '%s' "\$RECORDS"
 `,
     executable: true,
     backend: "cloud",
@@ -11547,6 +12497,252 @@ if ! reconcile; then
 fi
 [ -z "\$SWEEP_SUMMARY" ] || printf '%s\\n' "\$SWEEP_SUMMARY"
 exit "\$rc"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "read-items",
+    suffix: "read-items.sh",
+    content: `#!/usr/bin/env bash
+# Hand the product owner the items it works on, their text as data — every
+# backend. Shared: installed beside each backend's own scripts, as
+# \`_close_shipped.sh\` is, and run as \`.specnaut/scripts/backlog/read-items.sh\`.
+#
+# Issue text is written by whoever can open or comment on an issue. So it is
+# read here, by the backend's \`item-record.sh\` (one run: Cloud resolves one
+# token), and written to ONE file in a fresh directory only the user can open,
+# outside the repository. stdout is three lines and nothing else:
+#
+#   ITEMS_FILE: <path>     the file, for the product owner to read
+#   ITEMS: <n> <n> ...     the numbers read, in order (\`none\` when there are none)
+#   FINGERPRINT: <hex>     \`git hash-object\` of \`git status --porcelain\`, at the read
+#
+# The file, top to bottom:
+#   - a header — format, verb, id, fingerprint, nonce, items — the facts a plan
+#     made from this file is later checked against;
+#   - per item, the values the tracker itself vouches for, one \`key: value\`
+#     line each, each checked against its shape: item, created, status, size,
+#     priority, state, closed_reason, association, by_viewer, comments. A value
+#     outside its shape is not written on its line; it becomes a block below.
+#   - every field another person can write — title, body, each comment — as
+#       <untrusted-issue-text nonce="N" item="42" field="comment" author="login" association="NONE" by_viewer="false">
+#       "the value, JSON-encoded on one line"
+#       </untrusted-issue-text nonce="N">
+#     N is 128 bits from /dev/urandom, new each run, drawn again should the
+#     text hold it. The value is first kept to \`_issue_text.sh\`'s inert
+#     characters, then cut at its field's cap (the tag then says
+#     truncated="true"), and every < and > is written < and >, so no
+#     line inside a block can read as a tag. An author login outside
+#     [A-Za-z0-9._-]{1,64} is written author="".
+# How a reader treats the blocks is the agent definition's rule, not this file's.
+#
+# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
+#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
+#               lower-case word, recorded in the header
+#   --id <n>    the item the verb acts on; read first, recorded in the header
+#   --status    every item in that column, as \`list.sh --numbers\` lists them
+# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
+# git work tree, no randomness, or a temporary directory inside the repository.
+# On any failure stdout stays empty and no directory is left behind.
+set -euo pipefail
+
+here=\$(dirname "\$0")
+usage() {
+  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  exit 2
+}
+die() { echo "read-items.sh: \$*" >&2; exit 2; }
+
+[ "\$#" -gt 0 ] || usage
+VERB=\$1
+shift
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || die "not a verb: \$(printf '%q' "\$VERB")"
+ID=""
+STATUS=""
+BY_STATUS=false
+NUMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --id) [ -n "\${2:-}" ] && [ -z "\$ID" ] || usage; ID=\$2; shift 2 ;;
+    --status) [ "\$#" -ge 2 ] && [ "\$BY_STATUS" = false ] || usage; STATUS=\$2; BY_STATUS=true; shift 2 ;;
+    -*) usage ;;
+    *) NUMS+=("\$1"); shift ;;
+  esac
+done
+if [ "\$BY_STATUS" = true ]; then
+  [ "\${#NUMS[@]}" -eq 0 ] || usage
+  (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+  usage
+fi
+
+# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_issue_text.sh
+. "\$here/_issue_text.sh"
+
+ROOT=\$(cd "\$here/../../.." && pwd)
+porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
+  die "\$ROOT is not a git work tree: the fingerprint needs one"
+FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
+  die "git could not hash the work tree's status"
+FINGERPRINT=\${FINGERPRINT%\$'\\r'}
+[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+
+if [ "\$BY_STATUS" = true ]; then
+  listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
+  while IFS= read -r n; do
+    n=\${n%\$'\\r'}
+    [ -z "\$n" ] || NUMS+=("\$n")
+  done <<<"\$listed"
+fi
+ALL=()
+[ -z "\$ID" ] || ALL+=("\$ID")
+ALL+=(\${NUMS[@]+"\${NUMS[@]}"})
+
+RECORDS=""
+if [ "\${#ALL[@]}" -gt 0 ]; then
+  RECORDS=\$(bash "\$here/item-record.sh" "\${ALL[@]}") || die "nothing read"
+fi
+
+# 128 bits, as 32 hex digits. A nonce the fetched text already holds is drawn
+# again: only the closing tag this run wrote may carry it.
+NONCE=""
+for _ in 1 2 3 4 5; do
+  NONCE=\$(od -An -N16 -tx1 /dev/urandom | tr -d ' \\t\\r\\n') || NONCE=""
+  [[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || die "could not read 128 random bits from /dev/urandom"
+  case "\$RECORDS" in *"\$NONCE"*) NONCE="" ;; *) break ;; esac
+done
+[ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
+
+TMP=\${TMPDIR:-/tmp}
+DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+trap 'rm -rf "\$DIR"' EXIT
+chmod 700 "\$DIR"
+case "\$(cd "\$DIR" && pwd -P)/" in
+  "\$(cd "\$ROOT" && pwd -P)"/*) die "the temporary directory is inside the repository: set TMPDIR elsewhere" ;;
+esac
+FILE="\$DIR/items.txt"
+
+# shellcheck disable=SC2016  # jq program.
+PROGRAM='
+  def alnum: (. >= 48 and . <= 57) or (. >= 65 and . <= 90) or (. >= 97 and . <= 122);
+  def number: type == "string" and length <= 10 and (explode | all(.[]; . >= 48 and . <= 57))
+    and (.[0:1] | . != "" and . != "0");
+  def word(\$max): type == "string" and length > 0 and length <= \$max
+    and (explode | all(.[]; alnum or . == 32 or . == 45 or . == 95 or . == 46 or . == 58 or . == 47));
+  def created:
+    if type != "string" then "-"
+    else (if endswith("Z") and index(".") != null then split(".")[0] + "Z" else . end) as \$v
+      | (\$v | explode) as \$c
+      | ("0000-00-00T00:00:00Z" | explode) as \$t
+      | if (\$c | length) == (\$t | length)
+           and all(range(\$t | length); if \$t[.] == 48 then \$c[.] >= 48 and \$c[.] <= 57 else \$c[.] == \$t[.] end)
+        then \$v else "-" end
+    end;
+  def assoc: . as \$a
+    | if any("COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN",
+             "MEMBER", "NONE", "OWNER"; . == \$a) then . else "UNKNOWN" end;
+  def viewer: if . == true then "true" elif . == false then "false" else "unknown" end;
+  def login: if type == "string" and length <= 64 and (explode | all(.[]; alnum or . == 45 or . == 95 or . == 46))
+    then . else "" end;
+  def encoded: tojson | split("<") | join("\\\\u003c") | split(">") | join("\\\\u003e");
+  def block(\$item; \$field; \$who; \$cap):
+    (if type == "string" then . elif . == null then "" else tojson end | inert_body) as \$v
+    | (\$v | length > \$cap) as \$cut
+    | "<untrusted-issue-text nonce=\\"\\(\$nonce)\\" item=\\"\\(\$item)\\" field=\\"\\(\$field)\\" author=\\"\\(\$who.author | login)\\" association=\\"\\(\$who.association | assoc)\\" by_viewer=\\"\\(\$who.by_viewer | viewer)\\"\\(if \$cut then " truncated=\\"true\\"" else "" end)>",
+      (\$v | if \$cut then .[:\$cap] else . end | encoded),
+      "</untrusted-issue-text nonce=\\"\\(\$nonce)\\">";
+  def line(\$item; \$key; \$v; \$ok):
+    if \$ok then "\\(\$key): \\(\$v)"
+    else "\\(\$key): (outside its shape; the block below holds it)", (\$v | block(\$item; \$key; {}; 256)) end;
+  def listed(\$max): (. // []) as \$a | { ok: all(\$a[]; word(\$max)), v: (\$a | join(", ")) };
+
+  [inputs]
+  | if all(.[]; .item | number) | not then error("a record without an issue number") else . end
+  | reduce .[] as \$r ([]; if any(.[]; .item == \$r.item) then . else . + [\$r] end)
+  | (map(.item) | if length == 0 then "none" else join(" ") end) as \$items
+  | "specnaut-items: 1",
+    "verb: \\(\$verb)",
+    "id: \\(if \$has_id then .[0].item else "none" end)",
+    "fingerprint: \\(\$fingerprint)",
+    "nonce: \\(\$nonce)",
+    "items: \\(\$items)",
+    (.[] | . as \$r | .item as \$n
+      | "",
+        "item: \\(\$n)",
+        "created: \\(.created | created)",
+        line(\$n; "status"; .status; (.status == "" or (.status | word(64)))),
+        ((.sizes | listed(16)) as \$s | line(\$n; "size"; \$s.v; \$s.ok)),
+        ((.priorities | listed(16)) as \$p | line(\$n; "priority"; \$p.v; \$p.ok)),
+        line(\$n; "state"; \$r.state; (\$r.state == "open" or \$r.state == "closed")),
+        line(\$n; "closed_reason"; \$r.closed_reason; (\$r.closed_reason == "" or (\$r.closed_reason | word(32)))),
+        "association: \\(\$r.association | assoc)",
+        "by_viewer: \\(\$r.by_viewer | viewer)",
+        "comments: \\(if \$r.comments == null then "unreadable" else \$r.comments | length end)",
+        (\$r.title | block(\$n; "title"; \$r; 512)),
+        (\$r.body | block(\$n; "body"; \$r; 65536)),
+        (\$r.comments // [] | .[] | . as \$c | .body | block(\$n; "comment"; \$c; 16384)))
+'
+HAS_ID=false
+[ -z "\$ID" ] || HAS_ID=true
+(
+  umask 077
+  printf '%s\\n' "\$RECORDS" | jq_lf -n -r --arg nonce "\$NONCE" --arg verb "\$VERB" \\
+    --arg fingerprint "\$FINGERPRINT" --argjson has_id "\$HAS_ID" "\$ISSUE_TEXT_JQ\$PROGRAM" >"\$FILE"
+) || die "could not write the items file"
+ITEMS=\$(sed -n 's/^items: //p' "\$FILE" | head -1)
+[[ \$ITEMS =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || die "the items file has no item list"
+
+SHOWN=\$FILE
+if command -v cygpath >/dev/null 2>&1; then SHOWN=\$(cygpath -m "\$FILE"); fi
+trap - EXIT
+printf 'ITEMS_FILE: %s\\nITEMS: %s\\nFINGERPRINT: %s\\n' "\$SHOWN" "\$ITEMS" "\$FINGERPRINT"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_issue_text",
+    suffix: "_issue_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of which characters of tracker text reach a reader. Sourced —
+# never run — by cloud's \`_config.sh\` (CLOUD_JSON, every Cloud answer) and by
+# \`read-items.sh\` (the issue text handed to the product owner), each installed
+# beside it.
+#
+# \`ISSUE_TEXT_JQ\` holds jq definitions only; a caller appends its own program.
+# They use no regex, so a jq built without one runs them
+# (tests/scripts/cloud_curl_test.ts):
+#
+#   printable  a code point a terminal shows as itself: no C0 or C1 control,
+#              no DEL, no bidi mark or embedding (U+200E-200F, U+202A-202E,
+#              U+2066-2069), no line or paragraph separator (U+2028-2029)
+#   inert      printable, and none of what changes how text reads without
+#              showing itself either: the zero-width characters (U+200B-200D,
+#              U+2060-2064, U+FEFF), the Arabic letter mark (U+061C) and the
+#              tag characters (U+E0000-E007F)
+#   text       one line: a tab, a newline and U+2028-2029 become a space
+#   body       lines kept: U+2028-2029 become a newline; tab and newline stay
+#   inert_body body, kept to inert characters — the form issue text takes
+#              before a reader that acts on what it reads sees it
+#
+# Code points are numbers here: 8203 is U+200B, 917504 is U+E0000.
+ISSUE_TEXT_JQ='
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def inert: printable and . != 1564 and (. < 8203 or . > 8205) and (. < 8288 or . > 8292)
+    and . != 65279 and (. < 917504 or . > 917631);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
+  def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
+'
 `,
     executable: true,
     backend: "cloud",
@@ -27476,7 +28672,10 @@ esac
 #     "priorities": ["P1"],      every priority value found, on every surface
 #     "status": "Ready",         the board column, "" when the item has none
 #     "comments": ["…"] | null,  comment texts; null = this backend cannot read
-#                                them, which counts as no comment, never as one
+#                                them, which counts as no comment, never as one.
+#                                A comment may also be an object whose \`body\`
+#                                is its text (the shape \`item-record.sh\` writes);
+#                                its other keys are not read here.
 #     "state": "open"|"closed",
 #     "closed_reason": "not_planned" | "completed" | "" }
 #
@@ -27519,6 +28718,8 @@ fi
 # shellcheck disable=SC2016  # \$ready, \$l, … are jq variables, not shell ones.
 PROGRAM='
 def strings_or_empty: type == "array" and all(.[]; type == "string");
+def comment_text: if type == "object" then .body else . end;
+def comments_or_empty: type == "array" and all(.[]; comment_text | type == "string");
 
 def readable:
   type == "object"
@@ -27528,7 +28729,7 @@ def readable:
   and (.sizes | strings_or_empty)
   and (.priorities | strings_or_empty)
   and (.status | type) == "string"
-  and (.comments == null or (.comments | strings_or_empty))
+  and (.comments == null or (.comments | comments_or_empty))
   and (.state == "open" or .state == "closed")
   and (.closed_reason | type) == "string";
 
@@ -27548,7 +28749,7 @@ def exactly_one(\$axis; \$values; \$allowed):
     elif any(\$allowed[]; . == \$v[0]) | not then "\\(\$axis) (\\(\$v[0]) is not one of \\(\$allowed | join(" ")))"
     else empty end;
 
-def marked: any(.comments // [] | .[]; sub("^\\\\s+"; "") | startswith("🤖 specnaut-groom"));
+def marked: any(.comments // [] | .[] | comment_text; sub("^\\\\s+"; "") | startswith("🤖 specnaut-groom"));
 
 def outcome(\$ready):
   if \$ready == "none" then empty

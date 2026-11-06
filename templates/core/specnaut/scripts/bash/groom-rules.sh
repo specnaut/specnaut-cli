@@ -30,7 +30,10 @@
 #     "priorities": ["P1"],      every priority value found, on every surface
 #     "status": "Ready",         the board column, "" when the item has none
 #     "comments": ["…"] | null,  comment texts; null = this backend cannot read
-#                                them, which counts as no comment, never as one
+#                                them, which counts as no comment, never as one.
+#                                A comment may also be an object whose `body`
+#                                is its text (the shape `item-record.sh` writes);
+#                                its other keys are not read here.
 #     "state": "open"|"closed",
 #     "closed_reason": "not_planned" | "completed" | "" }
 #
@@ -73,6 +76,8 @@ fi
 # shellcheck disable=SC2016  # $ready, $l, … are jq variables, not shell ones.
 PROGRAM='
 def strings_or_empty: type == "array" and all(.[]; type == "string");
+def comment_text: if type == "object" then .body else . end;
+def comments_or_empty: type == "array" and all(.[]; comment_text | type == "string");
 
 def readable:
   type == "object"
@@ -82,7 +87,7 @@ def readable:
   and (.sizes | strings_or_empty)
   and (.priorities | strings_or_empty)
   and (.status | type) == "string"
-  and (.comments == null or (.comments | strings_or_empty))
+  and (.comments == null or (.comments | comments_or_empty))
   and (.state == "open" or .state == "closed")
   and (.closed_reason | type) == "string";
 
@@ -102,7 +107,7 @@ def exactly_one($axis; $values; $allowed):
     elif any($allowed[]; . == $v[0]) | not then "\($axis) (\($v[0]) is not one of \($allowed | join(" ")))"
     else empty end;
 
-def marked: any(.comments // [] | .[]; sub("^\\s+"; "") | startswith("🤖 specnaut-groom"));
+def marked: any(.comments // [] | .[] | comment_text; sub("^\\s+"; "") | startswith("🤖 specnaut-groom"));
 
 def outcome($ready):
   if $ready == "none" then empty

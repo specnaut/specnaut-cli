@@ -13,6 +13,8 @@ export const SCRIPTS = fromFileUrl(
   new URL("../../templates/core/skills/task/scripts/", import.meta.url),
 );
 export const BACKENDS = ["github", "gitlab", "local", "cloud"] as const;
+/** The spec family's shared helpers (`jq_lf`), which a shared backlog script sources. */
+const BASH = fromFileUrl(new URL("../../templates/core/specnaut/scripts/bash/", import.meta.url));
 export type Backend = typeof BACKENDS[number];
 
 const CONFIG: Record<Backend, string | null> = {
@@ -61,7 +63,8 @@ export interface Result {
 
 export interface Project {
   dir: string;
-  run(script: string, args: string[]): Promise<Result>;
+  /** `env` is added to the inherited environment (`TMPDIR`, say). */
+  run(script: string, args: string[], env?: Record<string, string>): Promise<Result>;
   read(rel: string): Promise<string>;
   write(rel: string, text: string): Promise<void>;
   cleanup(): Promise<void>;
@@ -73,6 +76,10 @@ export async function project(backend: Backend): Promise<Project> {
   const scripts = join(dir, ".specnaut", "scripts", "backlog");
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(join(dir, ".specnaut", "backlog"));
+  await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
+  for (const f of ["common.sh", "template-resolution.sh"]) {
+    await Deno.copyFile(join(BASH, f), join(dir, ".specnaut", "scripts", "bash", f));
+  }
   await Deno.mkdir(join(dir, "bin"));
   for await (const f of Deno.readDir(join(SCRIPTS, backend))) {
     await Deno.copyFile(join(SCRIPTS, backend, f.name), join(scripts, f.name));
@@ -93,7 +100,7 @@ export async function project(backend: Backend): Promise<Project> {
   const read = (rel: string) => Deno.readTextFile(join(dir, rel));
   return {
     dir,
-    async run(script, args) {
+    async run(script, args, env) {
       const out = await new Deno.Command("bash", {
         args: [
           "-c",
@@ -104,6 +111,7 @@ export async function project(backend: Backend): Promise<Project> {
           ...args,
         ],
         cwd: dir,
+        env,
         stdout: "piped",
         stderr: "piped",
       }).output();

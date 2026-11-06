@@ -10,7 +10,7 @@
 // later without it fails here rather than on a Windows user's machine.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+import { basename, fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 
 const TEMPLATES = fromFileUrl(new URL("../../templates/core/", import.meta.url));
@@ -75,13 +75,13 @@ exit "\${PIPESTATUS[0]}"
 
 /** Installs a family's shared file where a project has it; returns the driver's path. */
 async function install(root: string, family: string): Promise<string> {
-  const dir = family === "spec"
-    ? join(root, ".specnaut/scripts/bash")
-    : join(root, ".specnaut/scripts/backlog");
+  const spec = family === "spec";
+  const dir = join(root, spec ? ".specnaut/scripts/bash" : ".specnaut/scripts/backlog");
   await Deno.mkdir(dir, { recursive: true });
-  const files = family === "spec" ? ["common.sh", "template-resolution.sh"] : ["_config.sh"];
-  for (const f of files) {
-    await Deno.copyFile(join(family === "spec" ? SPEC : join(BOARD, family), f), join(dir, f));
+  const files = spec ? ["common.sh", "template-resolution.sh"] : ["_config.sh"];
+  // A backend's `_config.sh` sources the shared character rule beside it.
+  for (const f of spec ? files : [...files, "../_issue_text.sh"]) {
+    await Deno.copyFile(join(spec ? SPEC : join(BOARD, family), f), join(dir, basename(f)));
   }
   const config = CONFIG[family];
   if (config) await Deno.writeTextFile(join(root, ".specnaut/backlog-config.yml"), config);

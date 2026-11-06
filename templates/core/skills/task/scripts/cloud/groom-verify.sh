@@ -4,19 +4,10 @@
 # This script FETCHES and NORMALISES; it decides nothing. What "complete" means
 # lives in `.specnaut/scripts/bash/groom-rules.sh`, and its header is the rule.
 #
-# The board's columns once per run, then one `GET /tasks?number=` per task —
-# the calls `view.sh` makes. Where each part of the record comes from:
-#   body         the task's `body`
-#   sizes        the task's `size`, upper-cased (the API carries `m`, `xl`, …)
-#   priorities   the task's `priority`, upper-cased (`p1` → `P1`)
-#   status       the name of the task's column (`columnId` → `/columns`)
-#   comments     CANNOT be read: the API accepts a comment (`clarify-comment.sh`
-#                posts one) but serves none back. Passed as null, so a task the
-#                groom left with a clarification reads "comments unreadable" —
-#                the only outcome this backend can prove is the ready column.
-#   state, closed_reason
-#                CANNOT be read: a task carries no closed state or close reason
-#                (`Done` is a column). Passed as open / "".
+# The record of each task is `item-record.sh`'s — one fetch, one token per
+# run, read here and by `read-items.sh` alike; its header says where each part
+# comes from. Cloud serves no comment back, so the ready column is the one
+# outcome this backend can prove.
 #
 # Usage: groom-verify.sh [--ready <column>|none] <number>...
 # Output and exit codes: those of groom-rules.sh — plus exit 2 when a task
@@ -38,44 +29,12 @@ while [ "$#" -gt 0 ]; do
 done
 [ "${#ITEMS[@]}" -gt 0 ] || usage
 
-# After the arguments: `_config.sh` resolves a token, which a usage error
-# should not cost.
-# shellcheck source=./_config.sh
-. "$(dirname "$0")/_config.sh"
+# No `_config.sh` here: `item-record.sh` resolves the run's one token, and
+# refuses 0 or an overlong number itself.
 RULES="$(dirname "$0")/../bash/groom-rules.sh"
-if ! COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY"); then
-  echo "groom-verify.sh: could not read the board's columns — nothing verified" >&2
-  exit 2
-fi
-
-# One task → one record on stdout. Fails (non-zero) when it cannot be read.
-record() {
-  local resp
-  resp=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$1") || return 1
-  # shellcheck disable=SC2016  # jq program.
-  printf '%s\n%s\n' "$COLS" "$resp" | jq_lf -n -c -e --arg item "$1" '
-    input as $cols | input as $resp
-    | ([$cols.columns[]? | { (.id): .name }] | add // {}) as $names
-    | ($resp.task // error("no such task")) as $t
-    | def one($v): [$v | select(. != null and . != "") | tostring | ascii_upcase];
-    { item: $item,
-      body: ($t.body // ""),
-      sizes: one($t.size),
-      priorities: one($t.priority),
-      status: ($names[$t.columnId // ""] // ""),
-      comments: null,
-      state: "open",
-      closed_reason: "" }
-  '
-}
-
-RECORDS=""
-for num in "${ITEMS[@]}"; do
-  num=$(require_issue_number "$num") || exit 2
-  rec=$(record "$num") || { echo "groom-verify.sh: #$num could not be read from $PROJECT_KEY — nothing verified" >&2; exit 2; }
-  RECORDS+="$rec"$'\n'
-done
+RECORDS=$(bash "$(dirname "$0")/item-record.sh" "${ITEMS[@]}") ||
+  { echo "groom-verify.sh: nothing verified" >&2; exit 2; }
 
 rc=0
-printf '%s' "$RECORDS" | bash "$RULES" --ready "$READY" || rc=$?
+printf '%s\n' "$RECORDS" | bash "$RULES" --ready "$READY" || rc=$?
 exit "$rc"
