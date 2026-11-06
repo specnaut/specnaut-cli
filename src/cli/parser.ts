@@ -7,6 +7,7 @@ import {
   KNOWN_VERSION_SCHEMES,
 } from "../domain/installed_lock.ts";
 import type { Intent } from "./intent.ts";
+import { parseReconcile } from "./reconcile_parser.ts";
 import { parseScan } from "./scan_parser.ts";
 
 export type { Intent } from "./intent.ts";
@@ -168,45 +169,7 @@ export function parseArgs(argv: string[]): Intent {
     };
   }
 
-  if (command === "reconcile") {
-    const status = Boolean(parsed["status"]);
-    const acceptUpstream = Boolean(parsed["accept-upstream"]);
-    const acceptCurrent = Boolean(parsed["accept-current"]);
-    // positional args after the "reconcile" command
-    const positional = rest;
-
-    if (status) {
-      if (acceptUpstream || acceptCurrent || positional.length > 0) {
-        return { kind: "unknown", received: "reconcile --status takes no other arguments" };
-      }
-      return { kind: "reconcile-status" };
-    }
-
-    if (acceptUpstream && acceptCurrent) {
-      return {
-        kind: "unknown",
-        received: "reconcile --accept-upstream and --accept-current are mutually exclusive",
-      };
-    }
-    if (!acceptUpstream && !acceptCurrent) {
-      return {
-        kind: "unknown",
-        received:
-          "specnaut reconcile requires --status, or <path> with --accept-upstream / --accept-current",
-      };
-    }
-    if (positional.length !== 1) {
-      return {
-        kind: "unknown",
-        received: "specnaut reconcile <path> requires exactly one path",
-      };
-    }
-    return {
-      kind: "reconcile-path",
-      path: positional[0],
-      mode: acceptUpstream ? "accept-upstream" : "accept-current",
-    };
-  }
+  if (command === "reconcile") return parseReconcile(parsed, rest);
 
   // `specnaut login` — top-level alias for `specnaut cloud login` (#398), the
   // verb users reach for first (à la `gh auth login`).
