@@ -45,6 +45,11 @@ Deno.test("an issue not confirmed closed keeps its card, and the exit says so", 
 });
 
 Deno.test("gitlab reconciles through its real sweep, one move at a time; local and cloud move, which is the close", async () => {
+  // [backend, the calls a close of #7 and #8 makes]
+  const moves: Record<string, string[]> = {
+    local: ["move.sh 7 Done", "move.sh 8 Done"],
+    cloud: ["columns.sh --terminal", "move.sh 7 Shipped", "move.sh 8 Shipped"],
+  };
   const g = await backlog("gitlab", { closed: { "7": 12 }, drifted: ["3"] });
   try {
     const r = await g.run("7");
@@ -60,7 +65,7 @@ Deno.test("gitlab reconciles through its real sweep, one move at a time; local a
     try {
       const r = await b.run("7", "8");
       assertEquals(r.code, 0, r.stdout);
-      assertEquals(await b.calls(), ["move.sh 7 Done", "move.sh 8 Done"], backend);
+      assertEquals(await b.calls(), moves[backend], backend);
     } finally {
       await b.cleanup();
     }
@@ -77,7 +82,8 @@ Deno.test("a move or the reconcile that fails is 21 and a FAILED line, on every 
     ["gitlab", "sweep-closed.sh", "FAILED reconcile"],
     ["gitlab", "move.sh 3 Done", "FAILED #3"],
     ["local", "move.sh 7 Done", "FAILED #7"],
-    ["cloud", "move.sh 7 Done", "FAILED #7"],
+    ["cloud", "move.sh 7 Shipped", "FAILED #7"],
+    ["cloud", "columns.sh --terminal", "FAILED #7"],
   ];
   for (const [backend, fail, line] of cases) {
     const b = await backlog(backend, { closed: { "7": 12 }, drifted: ["3"], fail: [fail] });

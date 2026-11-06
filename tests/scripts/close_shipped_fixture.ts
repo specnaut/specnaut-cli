@@ -14,7 +14,7 @@ export interface Board {
   closed?: Record<string, number>;
   /** the numbers the sweep reports DRIFTED. */
   drifted?: string[];
-  /** the calls that fail, as logged: `move.sh 7 Done`, `move-batch.sh`, `sweep-closed.sh`. */
+  /** the calls that fail, as logged: `move.sh 7 Done`, `move-batch.sh`, `sweep-closed.sh`, `columns.sh`. */
   fail?: string[];
 }
 
@@ -44,6 +44,8 @@ export async function backlog(
   await stub("cascade-check.sh", `case $1 in ${cases} *) exit 3 ;; esac`);
   await stub("move.sh", "exit 0");
   await stub("move-batch.sh", "exit 0");
+  // Cloud asks the board for its terminal column; this board names it Shipped.
+  if (backend === "cloud") await stub("columns.sh", '[ "$1" = --terminal ] && echo Shipped');
   if (backend === "gitlab") {
     for (const f of ["sweep-closed.sh", "_config.sh"]) {
       await Deno.copyFile(join(SCRIPTS, backend, f), join(scripts, f));

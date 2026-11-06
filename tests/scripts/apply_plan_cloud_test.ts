@@ -76,3 +76,13 @@ Deno.test("cloud: a close passes the cascade check, then moves into the column t
     await p.cleanup();
   }
 });
+
+Deno.test("cloud: columns.sh --terminal names the column a close moves into", async () => {
+  const p = await cloudBoard(NO_KIDS);
+  try {
+    const out = await p.run("columns.sh", ["--terminal"]);
+    assertEquals([out.code, out.stdout], [0, "Shipped\n"], out.stderr);
+  } finally {
+    await p.cleanup();
+  }
+});

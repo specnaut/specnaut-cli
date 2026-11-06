@@ -7466,6 +7466,9 @@ reconcile() { :; }
 #                       sweep_board / reconciled / failed below; 0 when it
 #                       settled, non-zero when it did not. \`:\` where there is
 #                       no board to reconcile against.
+#   done_status         optional: the column a closed card moves to, on
+#                       stdout. Without it, \`Done\`. Cloud names its board's
+#                       terminal column, whatever it is called.
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
@@ -7509,6 +7512,9 @@ for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
 
+declare -F done_status >/dev/null || done_status() { echo Done; }
+DONE=\$(done_status) || DONE=""
+
 rc=0
 for n in "\$@"; do
   if ! why=\$(confirm_closed "\$n"); then
@@ -7516,10 +7522,10 @@ for n in "\$@"; do
     rc=20
     continue
   fi
-  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+  if [ -n "\$DONE" ] && bash "\$here/move.sh" "\$n" "\$DONE" >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    failed "#\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to \${DONE:-the terminal column (unreadable)}"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
@@ -10519,6 +10525,9 @@ reconcile() {
 #                       sweep_board / reconciled / failed below; 0 when it
 #                       settled, non-zero when it did not. \`:\` where there is
 #                       no board to reconcile against.
+#   done_status         optional: the column a closed card moves to, on
+#                       stdout. Without it, \`Done\`. Cloud names its board's
+#                       terminal column, whatever it is called.
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
@@ -10562,6 +10571,9 @@ for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
 
+declare -F done_status >/dev/null || done_status() { echo Done; }
+DONE=\$(done_status) || DONE=""
+
 rc=0
 for n in "\$@"; do
   if ! why=\$(confirm_closed "\$n"); then
@@ -10569,10 +10581,10 @@ for n in "\$@"; do
     rc=20
     continue
   fi
-  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+  if [ -n "\$DONE" ] && bash "\$here/move.sh" "\$n" "\$DONE" >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    failed "#\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to \${DONE:-the terminal column (unreadable)}"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
@@ -12775,6 +12787,9 @@ reconcile() {
 #                       sweep_board / reconciled / failed below; 0 when it
 #                       settled, non-zero when it did not. \`:\` where there is
 #                       no board to reconcile against.
+#   done_status         optional: the column a closed card moves to, on
+#                       stdout. Without it, \`Done\`. Cloud names its board's
+#                       terminal column, whatever it is called.
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
@@ -12818,6 +12833,9 @@ for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
 
+declare -F done_status >/dev/null || done_status() { echo Done; }
+DONE=\$(done_status) || DONE=""
+
 rc=0
 for n in "\$@"; do
   if ! why=\$(confirm_closed "\$n"); then
@@ -12825,10 +12843,10 @@ for n in "\$@"; do
     rc=20
     continue
   fi
-  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+  if [ -n "\$DONE" ] && bash "\$here/move.sh" "\$n" "\$DONE" >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    failed "#\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to \${DONE:-the terminal column (unreadable)}"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
@@ -14499,8 +14517,10 @@ exit 0
     content: `#!/usr/bin/env bash
 # After a merge: settle the board for the shipped items (phases/merge-close.md,
 # spec 042) — the cloud half. On this backend there is no separate issue to
-# close: \`move.sh <n> Done\` IS the close, in one write, and there is no board
-# to reconcile against. The loop, the lines and the exit table are the shared
+# close: the move to the board's terminal column IS the close, in one write,
+# and there is no board to reconcile against. That column is the last by
+# order, whatever it is called (\`columns.sh --terminal\`, \`terminal_column\` in
+# _config.sh). The loop, the lines and the exit table are the shared
 # body, _close_shipped.sh, beside this file.
 #
 # Usage: close-shipped.sh <issue-number>…
@@ -14509,6 +14529,7 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 confirm_closed() { :; }
 reconcile() { :; }
+done_status() { bash "\$here/columns.sh" --terminal 2>/dev/null; }
 
 # shellcheck source=../_close_shipped.sh
 . "\$here/_close_shipped.sh"
@@ -14533,6 +14554,9 @@ reconcile() { :; }
 #                       sweep_board / reconciled / failed below; 0 when it
 #                       settled, non-zero when it did not. \`:\` where there is
 #                       no board to reconcile against.
+#   done_status         optional: the column a closed card moves to, on
+#                       stdout. Without it, \`Done\`. Cloud names its board's
+#                       terminal column, whatever it is called.
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
@@ -14576,6 +14600,9 @@ for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
 
+declare -F done_status >/dev/null || done_status() { echo Done; }
+DONE=\$(done_status) || DONE=""
+
 rc=0
 for n in "\$@"; do
   if ! why=\$(confirm_closed "\$n"); then
@@ -14583,10 +14610,10 @@ for n in "\$@"; do
     rc=20
     continue
   fi
-  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+  if [ -n "\$DONE" ] && bash "\$here/move.sh" "\$n" "\$DONE" >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    failed "#\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to \${DONE:-the terminal column (unreadable)}"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
@@ -15469,13 +15496,22 @@ fi
 # product-owner reasons about on the Cloud backend. Names come straight from
 # the board, so a renamed/reordered column is reflected with no code change.
 #
-# Usage: columns.sh
+# --terminal prints only the terminal column's name (\`terminal_column\`,
+# _config.sh): the column a close moves a task to. Exit 3 when the board has
+# none.
+#
+# Usage: columns.sh [--terminal]
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
 RESP=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
+if [ "\${1:-}" = --terminal ]; then
+  terminal_column "\$RESP" || { echo "columns.sh: the board reports no columns" >&2; exit 3; }
+  printf '%s\\n' "\$TERMINAL_NAME"
+  exit 0
+fi
 
 echo "\$RESP" | jq_lf -r '.columns | sort_by(.order)[] | "  \\(.order)\\t\\(.name)"'
 `,
