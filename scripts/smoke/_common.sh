@@ -107,6 +107,7 @@ smoke-backlog-local.sh
 smoke-backlog-github.sh
 smoke-backlog-gitlab.sh
 smoke-backlog-cloud.sh
+smoke-backlog-plan.sh
 smoke-hooks.sh
 smoke-picker.sh
 smoke-all-harnesses.sh

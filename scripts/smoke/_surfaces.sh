@@ -19,14 +19,14 @@ SURFACES=(
   'templates/core/skills/ship/SKILL.md|smoke-tag-release.sh|bundled-skill'
   'templates/core/skills/ship/phases/*.md|smoke-tag-release.sh|ship-doc'
   'templates/core/skills/ship/scripts/*|smoke-tag-release.sh|tag-release-script'
-  'templates/core/skills/task/scripts/github/*|smoke-backlog-github.sh|github-backlog-script'
-  'templates/core/skills/task/scripts/gitlab/*|smoke-backlog-gitlab.sh|gitlab-backlog-script'
-  'templates/core/skills/task/scripts/local/*|smoke-backlog-local.sh|local-backlog-script'
+  'templates/core/skills/task/scripts/github/*|smoke-backlog-github.sh smoke-backlog-plan.sh|github-backlog-script'
+  'templates/core/skills/task/scripts/gitlab/*|smoke-backlog-gitlab.sh smoke-backlog-plan.sh|gitlab-backlog-script'
+  'templates/core/skills/task/scripts/local/*|smoke-backlog-local.sh smoke-backlog-plan.sh|local-backlog-script'
   # #563: this directory had NO glob and NO smoke, so every script the
   # cloud backend ships was asserted on by nothing — and the coverage scan
   # could not report it, because an unclaimed directory is invisible to a
   # map keyed on claims.
-  'templates/core/skills/task/scripts/cloud/*|smoke-backlog-cloud.sh|cloud-backlog-script'
+  'templates/core/skills/task/scripts/cloud/*|smoke-backlog-cloud.sh smoke-backlog-plan.sh|cloud-backlog-script'
   'templates/core/hooks/*|smoke-hooks.sh|bundled-hook'
   'templates/core/specnaut/scripts/*/*|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-merge.sh smoke-gates.sh|specnaut-helper-script'
   'templates/core/specnaut/LABELS.md|smoke-features.sh smoke-backlog-github.sh smoke-backlog-gitlab.sh|labels-doc'
@@ -40,6 +40,14 @@ SURFACES=(
   'templates/core/skills/task/scripts/collect-audit-scope.sh|smoke-task.sh|skill-script'
   # cli#711: the body every backend's close-shipped.sh sources. One source,
   # installed by all four backends, so each backend's smoke runs it.
+  # The product owner's write plan: the executor's shared body, the plan's
+  # vocabulary and scope, the inert-text rule and the read, installed by all
+  # four backends and run end to end by smoke-backlog-plan.sh.
+  'templates/core/skills/task/scripts/_apply_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_backlog_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_backlog_scope.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_issue_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/read-items.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_close_shipped.sh|smoke-backlog-github.sh smoke-backlog-gitlab.sh smoke-backlog-local.sh smoke-backlog-cloud.sh|backlog-shared-body'
   'templates/core/skills/status-audit/scripts/*|smoke-features.sh smoke-contracts.sh|skill-script'
   # #562 split two contracts out of the board skill (now `/task`, spec 037).
