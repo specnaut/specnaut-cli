@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { gitRead, Plants, twoCommitRepo } from "./git_read_fixture.ts";
+import { gitRead, Programs, twoCommitRepo } from "./git_read_fixture.ts";
 
 /**
  * `git-read.sh` takes data, never a git option: a revision, a path, a count, a
@@ -33,11 +33,15 @@ const REFUSED: [string, string[]][] = [
   ["a drive-letter path", ["files", "C:/Windows"]],
   ["an empty pattern", ["grep", "", "HEAD"]],
   ["too many arguments", ["names", "HEAD~1", "HEAD", "notes.txt"]],
-  ["a revision whose second line is an option", ["names", "HEAD\n--output=x", "HEAD"]],
-  ["a range whose second line is an option", ["log", "HEAD~1..HEAD\n--all"]],
-  ["a count with a second line", ["log", "HEAD", "1\n2"]],
-  ["a path with a second line", ["files", "notes.txt\n.."]],
-  ["a manifests output path outside the tree", ["manifests", "HEAD~1", "HEAD", "/tmp/m.diff"]],
+  ["a multi-line revision", ["names", "HEAD\n--output=x", "HEAD"]],
+  ["a multi-line range", ["log", "HEAD~1..HEAD\n--all"]],
+  ["a multi-line count", ["log", "HEAD", "1\n2"]],
+  ["a multi-line path", ["files", "notes.txt\n.."]],
+  ["a revision with a carriage return", ["names", "HEAD\r", "HEAD"]],
+  ["a range with a carriage return", ["log", "HEAD~1..HEAD\r"]],
+  ["a count with a carriage return", ["log", "HEAD", "1\r"]],
+  ["a path with a carriage return", ["files", "notes.txt\r"]],
+  ["a manifests form given an output path", ["manifests", "HEAD~1", "HEAD", "out.diff"]],
 ];
 
 for (const [why, argv] of REFUSED) {
@@ -65,7 +69,7 @@ Deno.test("git-read says what it refused, so a caller can tell a refusal from gi
 
 Deno.test("git-read writes no file an option names, even through a revision slot", async () => {
   const dir = await twoCommitRepo();
-  const p = await Plants.create();
+  const p = await Programs.create();
   try {
     const target = `${p.dir}/written`;
     await gitRead(["names", `--output=${target}`, "HEAD"], dir);

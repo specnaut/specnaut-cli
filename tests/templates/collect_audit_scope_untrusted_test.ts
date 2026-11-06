@@ -9,15 +9,15 @@ import {
 } from "./collect_audit_scope_fixture.ts";
 
 /**
- * `collect-audit-scope.sh` runs git inside a repository nobody vetted (#747).
- * Two of git's own features would let that repository act through it: a
- * `core.fsmonitor` value names a program git runs on an index read, a
- * `gpg.program` is run to verify a signed commit when `log.showSignature` is
- * on, and pathspec magic turns a `--path` into a pattern. The script reads
- * through the git library installed beside it (`_git_untrusted.sh`), which turns
- * all three off; these cases plant each one, show an unguarded git running it
- * (the control), and watch the script leave it inert. The library's own cases
- * are in `git_read_test.ts`.
+ * `collect-audit-scope.sh` reads a repository whose configuration nobody vetted,
+ * so no program that configuration names runs, and an argument is read as data.
+ * Three settings are covered here: a `core.fsmonitor` program, which git runs on
+ * an index read; a `gpg.program`, run to verify a signed commit when
+ * `log.showSignature` is on; and pathspec magic, which would read `--path` as a
+ * pattern. The script reads through the git library installed beside it
+ * (`_git_untrusted.sh`), which turns all three off; each case sets one, shows
+ * plain git running it (the control), and finds it unrun through the script. The
+ * library's own cases are in `git_read_test.ts`.
  */
 
 /** A program that leaves `<dir>/ran` behind when run, and the marker's path. */

@@ -4,10 +4,10 @@ import { IDENTITY, run } from "./child_fixture.ts";
 
 /**
  * The harness the `git-read.sh` tests share: the script, its library, a runner
- * that can set the environment, and planted programs that leave a marker when
- * something runs them. Each plant gets a positive control in the tests — plain
+ * that can set the environment, and configured programs that leave a marker when
+ * something runs them. Each program gets a positive control in the tests — plain
  * git runs it — so a marker that stays absent under the library means the
- * library turned it off, not that the plant was dead.
+ * library turned it off, not that the program was never live.
  */
 
 export const SCRIPT = fromFileUrl(
@@ -40,15 +40,15 @@ export function libraryGit(args: string[], cwd: string, env: Record<string, stri
 /** Forward slashes: git runs these programs through a shell, which reads `\` as an escape. */
 export const slash = (p: string) => p.replaceAll("\\", "/");
 
-/** A directory of programs; `plant(name)` writes one that leaves `ran-<name>` when run. */
-export class Plants {
+/** A directory of programs; `program(name)` writes one that leaves `ran-<name>` when run. */
+export class Programs {
   private constructor(readonly dir: string) {}
 
-  static async create(): Promise<Plants> {
-    return new Plants(await Deno.makeTempDir({ prefix: "git-read-plants-" }));
+  static async create(): Promise<Programs> {
+    return new Programs(await Deno.makeTempDir({ prefix: "git-read-programs-" }));
   }
 
-  async plant(name: string, at = `${this.dir}/${name}.sh`): Promise<string> {
+  async program(name: string, at = `${this.dir}/${name}.sh`): Promise<string> {
     const marker = slash(`${this.dir}/ran-${name}`);
     await Deno.writeTextFile(at, `#!/bin/sh\ntouch "${marker}"\nexit 1\n`);
     await Deno.chmod(at, 0o755);

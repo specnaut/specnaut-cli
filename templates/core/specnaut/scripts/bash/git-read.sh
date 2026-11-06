@@ -6,7 +6,7 @@
 # Forms, each one fixed command line taking data only:
 #   names <a> <b>  |  patch <a> <b> [<path>...]  |  log <a>..<b> | <rev> [<n>]
 #   show <rev> --stat|--no-patch  |  files [<path>]  |  grep <pattern> <rev> [<path>...]
-#   base <rev>  |  manifests <a> <b> <file>
+#   base <rev>  |  manifests <a> <b>
 #
 # Exit: git's own status for a form that ran; 2 for a refused form or argument;
 # 70 when the library is missing.

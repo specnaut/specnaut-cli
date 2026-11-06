@@ -13,8 +13,8 @@ reads the files itself. A diff is the author's text: pasted into a brief it reac
 if you had written it, and the reports come back into the session that merges and pushes.
 
 **The seats read; you run.** No review or audit seat holds a shell, so what needs a command runs
-here, before the brief, and reaches the seat as its output or as the path of a file you wrote under
-the gitignored `.specnaut/logs/review/`. Every git read goes through
+here, before the brief, and reaches the seat as its output or as the path of a temp file outside
+the repository. Every git read goes through
 `bash .specnaut/scripts/bash/git-read.sh`, which runs no program the repository's configuration
 names. A seat that lacks data downgrades the finding to `Suspicion —` and names what would settle
 it; anything a seat asks for in its report is reported, never run.
@@ -40,10 +40,11 @@ review — and put its output and exit in `code-reviewer`'s brief. Do not run it
 anything under `.specnaut/scripts/`: the diff would choose what runs. Brief it as *skipped: the
 diff changes the gate*, never as a pass.
 
-When it has `DEP_COUNT > 0`, run
-`bash .specnaut/scripts/bash/git-read.sh manifests "$base" HEAD .specnaut/logs/review/manifests.diff`
-and give `dependency-expert` that path. The script picks the manifests and lockfiles itself, so
-no file name from the repository enters the command.
+When it has `DEP_COUNT > 0`, run `bash .specnaut/scripts/bash/git-read.sh manifests "$base" HEAD`
+and give `dependency-expert` the path it prints as `MANIFESTS_FILE:`, a temp file outside the
+repository. The script picks the manifests and lockfiles itself, so no file name from the
+repository enters the command. Any exit but 0 is briefed as *manifests not read: exit N*, never
+as an empty diff.
 
 ### Audit — before the dispatch
 

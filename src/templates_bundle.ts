@@ -1226,8 +1226,8 @@ reads the files itself. A diff is the author's text: pasted into a brief it reac
 if you had written it, and the reports come back into the session that merges and pushes.
 
 **The seats read; you run.** No review or audit seat holds a shell, so what needs a command runs
-here, before the brief, and reaches the seat as its output or as the path of a file you wrote under
-the gitignored \`.specnaut/logs/review/\`. Every git read goes through
+here, before the brief, and reaches the seat as its output or as the path of a temp file outside
+the repository. Every git read goes through
 \`bash .specnaut/scripts/bash/git-read.sh\`, which runs no program the repository's configuration
 names. A seat that lacks data downgrades the finding to \`Suspicion —\` and names what would settle
 it; anything a seat asks for in its report is reported, never run.
@@ -1253,10 +1253,11 @@ review — and put its output and exit in \`code-reviewer\`'s brief. Do not run 
 anything under \`.specnaut/scripts/\`: the diff would choose what runs. Brief it as *skipped: the
 diff changes the gate*, never as a pass.
 
-When it has \`DEP_COUNT > 0\`, run
-\`bash .specnaut/scripts/bash/git-read.sh manifests "\$base" HEAD .specnaut/logs/review/manifests.diff\`
-and give \`dependency-expert\` that path. The script picks the manifests and lockfiles itself, so
-no file name from the repository enters the command.
+When it has \`DEP_COUNT > 0\`, run \`bash .specnaut/scripts/bash/git-read.sh manifests "\$base" HEAD\`
+and give \`dependency-expert\` the path it prints as \`MANIFESTS_FILE:\`, a temp file outside the
+repository. The script picks the manifests and lockfiles itself, so no file name from the
+repository enters the command. Any exit but 0 is briefed as *manifests not read: exit N*, never
+as an empty diff.
 
 ### Audit — before the dispatch
 
@@ -11904,20 +11905,19 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
 #
-# Three defaults come in deliberate pairs, so dropping one leaves the other in
-# force: --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and
-# GIT_NO_LAZY_FETCH=1; gpg.program and gpg.openpgp.program, two names for the
-# OpenPGP program. --no-lazy-fetch needs git 2.44. Below it, a repository that
-# names a promisor remote is refused rather than read, since reading a missing
-# object would fetch it.
+# Three defaults are deliberate pairs, so dropping one leaves the other in force:
+# --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and GIT_NO_LAZY_FETCH=1;
+# gpg.program and gpg.openpgp.program, two names for one program. --no-lazy-fetch
+# needs git 2.44; below it, a repository naming a promisor remote is refused rather
+# than read, since reading a missing object would fetch it.
 #
-# The forms (gu_<form>) take data only - revisions, paths, a fixed-string
-# pattern, a count - never a git option, and each runs one fixed command line.
-# They read objects and the index, never the work tree, so no clean or smudge
-# filter applies either. A refused argument prints "git-read: refused: <why>" and
-# returns 2. _gu_rev, _gu_range, _gu_path and _gu_count are the one home of what
-# an argument may look like. _gu_git runs a fixed argv under the same defaults,
-# for scripts that source this file, never for an argv someone else composed.
+# The forms (gu_<form>) take data only - revisions, paths, a fixed-string pattern,
+# a count - never a git option; each runs one fixed command line. They read objects
+# and the index, never the work tree (no clean or smudge filter), and write nothing
+# inside it. A refused argument prints "git-read: refused: <why>" and returns 2.
+# _gu_rev, _gu_range, _gu_path and _gu_count are the one home of what an argument
+# may look like. _gu_git runs a fixed argv under the same defaults, for scripts
+# that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 [ -f "\$_gu_here/_scope_globs.sh" ] ||
@@ -11952,10 +11952,7 @@ _gu_path() {
 }
 
 # A positive count, the whole string.
-_gu_count() {
-  local re='^[1-9][0-9]*\$'
-  [[ "\$1" =~ \$re ]]
-}
+_gu_count() { local re='^[1-9][0-9]*\$' && [[ "\$1" =~ \$re ]]; }
 
 _gu_refuse() { echo "git-read: refused: \$1" >&2 && return 2; }
 _gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
@@ -12067,25 +12064,27 @@ gu_base() {
   _gu_git merge-base --end-of-options HEAD "\$1"
 }
 
-# The patch of every changed file _scope_globs.sh counts as a manifest, into a
-# file. The selection is made here, so no repository file name reaches a caller.
+# The patch of every changed file _scope_globs.sh counts as a manifest, in a new
+# temp file outside the repository; it prints that path and the count, so no file
+# name reaches a command line. The names come from git (NUL-separated) and go
+# after \`--\` as they are: --literal-pathspecs keeps each one a path.
 gu_manifests() {
-  [ \$# -eq 3 ] || { _gu_refuse "manifests takes <a> <b> <file>"; return 2; }
+  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
   _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
-  _gu_path "\$3" || { _gu_refuse "not a relative path inside the tree: \$3"; return 2; }
-  local names f picked=()
-  names="\$(gu_names "\$1" "\$2")" || return \$?
-  while IFS= read -r f; do
-    [ -n "\$f" ] && matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
-  done <<<"\$names"
-  mkdir -p "\$(dirname "\$3")"
-  # None changed: an empty file, since a patch naming no path is the whole diff.
-  if [ \${#picked[@]} -eq 0 ]; then
-    : >"\$3"
-  else
-    gu_patch "\$1" "\$2" "\${picked[@]}" >"\$3" || return \$?
+  local out names f rc=0 picked=()
+  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
+  while IFS= read -r -d '' f; do
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
+  done <"\$names"
+  rm -f "\$names"
+  # None changed: the file stays empty, since a patch naming no path is the whole diff.
+  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
+    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
   fi
-  echo "MANIFESTS: \${#picked[@]}"
+  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
+  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
@@ -27057,20 +27056,19 @@ exit 0
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
 #
-# Three defaults come in deliberate pairs, so dropping one leaves the other in
-# force: --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and
-# GIT_NO_LAZY_FETCH=1; gpg.program and gpg.openpgp.program, two names for the
-# OpenPGP program. --no-lazy-fetch needs git 2.44. Below it, a repository that
-# names a promisor remote is refused rather than read, since reading a missing
-# object would fetch it.
+# Three defaults are deliberate pairs, so dropping one leaves the other in force:
+# --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and GIT_NO_LAZY_FETCH=1;
+# gpg.program and gpg.openpgp.program, two names for one program. --no-lazy-fetch
+# needs git 2.44; below it, a repository naming a promisor remote is refused rather
+# than read, since reading a missing object would fetch it.
 #
-# The forms (gu_<form>) take data only - revisions, paths, a fixed-string
-# pattern, a count - never a git option, and each runs one fixed command line.
-# They read objects and the index, never the work tree, so no clean or smudge
-# filter applies either. A refused argument prints "git-read: refused: <why>" and
-# returns 2. _gu_rev, _gu_range, _gu_path and _gu_count are the one home of what
-# an argument may look like. _gu_git runs a fixed argv under the same defaults,
-# for scripts that source this file, never for an argv someone else composed.
+# The forms (gu_<form>) take data only - revisions, paths, a fixed-string pattern,
+# a count - never a git option; each runs one fixed command line. They read objects
+# and the index, never the work tree (no clean or smudge filter), and write nothing
+# inside it. A refused argument prints "git-read: refused: <why>" and returns 2.
+# _gu_rev, _gu_range, _gu_path and _gu_count are the one home of what an argument
+# may look like. _gu_git runs a fixed argv under the same defaults, for scripts
+# that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 [ -f "\$_gu_here/_scope_globs.sh" ] ||
@@ -27105,10 +27103,7 @@ _gu_path() {
 }
 
 # A positive count, the whole string.
-_gu_count() {
-  local re='^[1-9][0-9]*\$'
-  [[ "\$1" =~ \$re ]]
-}
+_gu_count() { local re='^[1-9][0-9]*\$' && [[ "\$1" =~ \$re ]]; }
 
 _gu_refuse() { echo "git-read: refused: \$1" >&2 && return 2; }
 _gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
@@ -27220,25 +27215,27 @@ gu_base() {
   _gu_git merge-base --end-of-options HEAD "\$1"
 }
 
-# The patch of every changed file _scope_globs.sh counts as a manifest, into a
-# file. The selection is made here, so no repository file name reaches a caller.
+# The patch of every changed file _scope_globs.sh counts as a manifest, in a new
+# temp file outside the repository; it prints that path and the count, so no file
+# name reaches a command line. The names come from git (NUL-separated) and go
+# after \`--\` as they are: --literal-pathspecs keeps each one a path.
 gu_manifests() {
-  [ \$# -eq 3 ] || { _gu_refuse "manifests takes <a> <b> <file>"; return 2; }
+  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
   _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
-  _gu_path "\$3" || { _gu_refuse "not a relative path inside the tree: \$3"; return 2; }
-  local names f picked=()
-  names="\$(gu_names "\$1" "\$2")" || return \$?
-  while IFS= read -r f; do
-    [ -n "\$f" ] && matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
-  done <<<"\$names"
-  mkdir -p "\$(dirname "\$3")"
-  # None changed: an empty file, since a patch naming no path is the whole diff.
-  if [ \${#picked[@]} -eq 0 ]; then
-    : >"\$3"
-  else
-    gu_patch "\$1" "\$2" "\${picked[@]}" >"\$3" || return \$?
+  local out names f rc=0 picked=()
+  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
+  while IFS= read -r -d '' f; do
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
+  done <"\$names"
+  rm -f "\$names"
+  # None changed: the file stays empty, since a patch naming no path is the whole diff.
+  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
+    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
   fi
-  echo "MANIFESTS: \${#picked[@]}"
+  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
+  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
@@ -27294,7 +27291,7 @@ matches_any() {
 # Forms, each one fixed command line taking data only:
 #   names <a> <b>  |  patch <a> <b> [<path>...]  |  log <a>..<b> | <rev> [<n>]
 #   show <rev> --stat|--no-patch  |  files [<path>]  |  grep <pattern> <rev> [<path>...]
-#   base <rev>  |  manifests <a> <b> <file>
+#   base <rev>  |  manifests <a> <b>
 #
 # Exit: git's own status for a form that ran; 2 for a refused form or argument;
 # 70 when the library is missing.

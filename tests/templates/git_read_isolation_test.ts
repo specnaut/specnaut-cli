@@ -4,7 +4,7 @@ import { git } from "./collect_audit_scope_fixture.ts";
 import {
   gitRead,
   plainGit,
-  Plants,
+  Programs,
   signedCommit,
   slash,
   twoCommitRepo,
@@ -14,7 +14,7 @@ import {
  * The git library keeps a read inside the one repository and the objects it
  * already holds: no submodule is entered, no missing object is fetched, and on a
  * git too old to forbid the fetch, a repository that could trigger one is refused.
- * The last case runs every form with every planted program in place.
+ * The last case runs every form with every configured program in place.
  */
 
 /** The git on PATH knows --no-lazy-fetch (2.44 or later). */
@@ -57,7 +57,12 @@ Deno.test("git-read grep never enters a submodule, whatever the repository sets"
   inSubmoduleRepo(async (dir) => {
     const control = await plainGit(["grep", "-F", "-e", "needle", "HEAD"], dir);
     assertStringIncludes(control.stdout, "sub/inside.txt", "the recursion must be live");
+    await Deno.writeTextFile(`${dir}/top.txt`, "needle at the top\n");
+    await git(["add", "top.txt"], dir);
+    await git(["commit", "-m", "chore: a top-level match"], dir);
     const g = await gitRead(["grep", "needle", "HEAD"], dir);
+    assertEquals(g.code, 0, g.stderr);
+    assertStringIncludes(g.stdout, "HEAD:top.txt:1:needle at the top", "the top-level match");
     assert(!g.stdout.includes("sub/inside.txt"), `grep entered the submodule:\n${g.stdout}`);
   }));
 
@@ -71,15 +76,15 @@ Deno.test("git-read patch never reads a submodule's log, whatever the repository
     assert(!d.stdout.includes("submodule subject two"), `read the submodule's log:\n${d.stdout}`);
   }));
 
-/** Makes `dir` a partial clone missing HEAD's `notes.txt`; its fetch is a planted program. */
-async function promisor(dir: string, p: Plants): Promise<string> {
+/** Makes `dir` a partial clone missing HEAD's `notes.txt`; its fetch is a configured program. */
+async function promisor(dir: string, p: Programs): Promise<string> {
   const blob = (await git(["rev-parse", "HEAD:notes.txt"], dir)).trim();
   await Deno.remove(`${dir}/.git/objects/${blob.slice(0, 2)}/${blob.slice(2)}`);
   await git(["config", "core.repositoryformatversion", "1"], dir);
   await git(["config", "extensions.partialClone", "origin"], dir);
   await git(["config", "remote.origin.url", slash(`${p.dir}/nowhere`)], dir);
   await git(["config", "remote.origin.promisor", "true"], dir);
-  await git(["config", "remote.origin.uploadpack", await p.plant("upload-pack")], dir);
+  await git(["config", "remote.origin.uploadpack", await p.program("upload-pack")], dir);
   return blob;
 }
 
@@ -89,7 +94,7 @@ Deno.test({
   ignore: !LAZY_FLAG,
   fn: async () => {
     const dir = await twoCommitRepo();
-    const p = await Plants.create();
+    const p = await Programs.create();
     try {
       const blob = await promisor(dir, p);
       await plainGit(["diff", "HEAD~1", "HEAD"], dir);
@@ -125,7 +130,7 @@ Deno.test({
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const dir = await twoCommitRepo();
-    const p = await Plants.create();
+    const p = await Programs.create();
     const shim = await Deno.makeTempDir({ prefix: "git-read-shim-" });
     try {
       const env = await olderGit(shim, "2.43.0");
@@ -145,16 +150,16 @@ Deno.test({
 });
 
 /** Every program and setting git could be made to run, configured in `dir`. */
-async function plantEverything(dir: string, p: Plants): Promise<void> {
+async function configureEverything(dir: string, p: Programs): Promise<void> {
   for (const kind of ["openpgp", "ssh", "x509"] as const) await signedCommit(dir, kind);
   await Deno.writeTextFile(`${dir}/.gitattributes`, "*.txt diff=conv\n*.bin diff=ext\n");
   await Deno.writeTextFile(`${p.dir}/allowed`, "");
   for (const hook of ["post-index-change", "reference-transaction"]) {
-    await p.plant(hook, `${p.dir}/${hook}`);
+    await p.program(hook, `${p.dir}/${hook}`);
   }
   const programs = ["core.fsmonitor", "diff.conv.textconv", "diff.ext.command", "diff.external"]
     .concat(["core.pager", "gpg.program", "gpg.ssh.program", "gpg.x509.program"]);
-  for (const key of programs) await git(["config", key, await p.plant(key)], dir);
+  for (const key of programs) await git(["config", key, await p.program(key)], dir);
   for (
     const [k, v] of [
       ["gpg.ssh.allowedSignersFile", slash(`${p.dir}/allowed`)],
@@ -177,19 +182,19 @@ const FORMS = [
   ["files"],
   ["grep", "version", "HEAD"],
   ["base", "main"],
-  ["manifests", "HEAD~1", "HEAD", "out/manifests.diff"],
+  ["manifests", "HEAD~1", "HEAD"],
 ];
 
-Deno.test("every git-read form runs with every planted program in place, and none of them runs", async () => {
+Deno.test("every git-read form runs with every configured program in place, and none of them runs", async () => {
   const dir = await twoCommitRepo();
-  const p = await Plants.create();
+  const p = await Programs.create();
   try {
-    await plantEverything(dir, p);
+    await configureEverything(dir, p);
     for (const form of FORMS) {
       const r = await gitRead(form, dir);
       assertEquals(r.code, 0, `git-read ${form.join(" ")}: ${r.stderr}`);
       assert(r.stdout.length > 0, `git-read ${form.join(" ")} printed nothing`);
-      assertEquals(await p.ran(), [], `git-read ${form.join(" ")} ran a planted program`);
+      assertEquals(await p.ran(), [], `git-read ${form.join(" ")} ran a configured program`);
     }
   } finally {
     await Deno.remove(dir, { recursive: true });

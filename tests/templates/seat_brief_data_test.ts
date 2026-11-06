@@ -42,10 +42,10 @@ Deno.test("review's Phase 0 runs the fast gate for code-reviewer, unless the dif
 
 Deno.test("review's Phase 0 hands the manifests' patch over as a path no file name composed", async () => {
   const s = flat(await read(SEATS));
-  assert(
-    s.includes('git-read.sh manifests "$base" HEAD .specnaut/logs/review/manifests.diff'),
-    "the fixed form writes the patch",
-  );
+  assert(s.includes('git-read.sh manifests "$base" HEAD`'), "the fixed form, given no path");
+  assert(s.includes("the path it prints as `MANIFESTS_FILE:`"), "the brief carries its temp file");
+  assert(s.includes("*manifests not read: exit N*, never as an empty diff"), "a failure is said");
+  assert(!s.includes(".specnaut/logs/review"), "nothing is written in the work tree for a seat");
   assert(!/git-read\.sh patch "\$base" HEAD </.test(s), "no command built from file names");
 });
 
