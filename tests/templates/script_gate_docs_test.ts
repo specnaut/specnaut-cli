@@ -2,52 +2,75 @@ import { assert, assertStringIncludes } from "@std/assert";
 import { flat, phase } from "./task_docs.ts";
 
 /**
- * The merge's side of the script check (§ 6 M2, M4; S-F2): it verifies before any script of the
- * tree runs and again before landing, an untrusted verdict lands only on the user's yes, and every
- * other outcome lands nothing. Pinned on the phases as the bundle ships them.
+ * The merge's side of the script check: it verifies before any script of the tree runs, again
+ * right after a rebase and before landing; an untrusted verdict lands only on the user's yes, which
+ * covers one digest; a reason that names no script stops; every other outcome lands nothing.
+ * Pinned on the phases as the bundle ships them.
  */
 
-Deno.test("merge verifies before its first script and before land-feature.sh, and re-verifies", () => {
+/** Where merge.md's step 0 begins and where step 1 begins. */
+function steps(merge: string) {
+  const zero = merge.indexOf("0. **Check the helper scripts");
+  const one = merge.indexOf("1. **Shape the history.**");
+  assert(zero >= 0 && one > zero, "merge.md has no step 0 before step 1");
+  return { zero, one };
+}
+
+Deno.test("merge's step 0 verifies before the first script and again after a rebase", () => {
   const merge = phase("merge").content;
-  const verify = merge.indexOf("specnaut verify-scripts");
-  assert(verify >= 0, "merge.md never runs the verifier");
+  const { zero, one } = steps(merge);
+  assert(merge.indexOf("specnaut verify-scripts", zero) < one, "step 0 does not run the verifier");
+  // Nothing before step 0 names a script of the tree; every one the steps run comes after it.
+  assert(!/\.specnaut\/scripts\/|\.sh\b/.test(merge.slice(0, zero)), "a script before step 0");
   for (const script of ["epic-status.sh", "run-gate.sh", "land-feature.sh", "move.sh"]) {
-    const at = merge.indexOf(`bash .specnaut/scripts/bash/${script}`);
-    const first = at >= 0 ? at : merge.indexOf(script);
-    assert(first > verify, `${script} is named before the verifier runs`);
+    assert(merge.indexOf(script, one) > one, `${script} is not run after step 0`);
   }
   const m = flat(merge);
-  assertStringIncludes(m, "and again before step 3 and after every commit this phase makes");
+  assertStringIncludes(m, "again right after every `git rebase` this phase runs (before the gates");
   assertStringIncludes(m, "**Land it** — after step 0 ran again on the history as it now stands");
-  assertStringIncludes(m, "A row that rebases runs step 0 again before it lands again.");
+  assertStringIncludes(m, "A row that rebases runs step 0 right after its `git rebase`");
+  assertStringIncludes(m, "Applies cleanly → step 0 at once, then re-run the gates");
 });
 
-Deno.test("an untrusted verdict at merge is a stop, in either merge mode, and nothing else lands", () => {
+Deno.test("an untrusted verdict is a stop whose yes covers one digest; other outcomes land nothing", () => {
   const m = flat(phase("merge").content);
   assertStringIncludes(
     m,
     "this run's merge mode is `manual`, whatever `phases/auto-chain.md` read",
   );
   assertStringIncludes(m, "Yes lands these scripts and runs them to land.");
+  assertStringIncludes(m, "The yes covers that run's `SCRIPTS_DIGEST` and its `UNTRUSTED` paths");
+  assertStringIncludes(m, "or an `UNTRUSTED` path outside that set, asks again");
+  assertStringIncludes(
+    m,
+    "at least one `UNTRUSTED` line and the last line `VERDICT scripts untrusted`",
+  );
+  assertStringIncludes(m, "An `UNTRUSTED` path outside `.specnaut/scripts/`");
+  assertStringIncludes(m, "Never asked: no yes makes it hold.");
   assertStringIncludes(m, "anything else stays on the branch, nothing landed");
-  assertStringIncludes(m, "output without the three trusted parts: stop on the branch");
   assertStringIncludes(m, "Nothing lands.");
-  assertStringIncludes(m, "every reason `behind base: rebase`");
+  assertStringIncludes(m, "Every reason `behind base: rebase`");
 });
 
-Deno.test("auto-chain reads an untrusted verdict, or a changed workflow.yml, as manual", () => {
+Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one question", () => {
   const a = flat(phase("auto-chain").content);
-  const verify = a.indexOf("specnaut verify-scripts");
-  assert(verify >= 0 && verify < a.indexOf("bash .specnaut/scripts/bash/merge-mode.sh"));
-  assertStringIncludes(a, "or a `NAMES_FILE` that lists `.specnaut/workflow.yml`, means `manual`");
+  const step0 = a.indexOf("run `phases/merge.md` step 0, which alone decides");
+  assert(step0 >= 0 && step0 < a.indexOf("bash .specnaut/scripts/bash/merge-mode.sh"));
+  assertStringIncludes(a, 'asked instead of "Ready to merge?", so nothing is asked twice');
+  assertStringIncludes(a, "A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`");
+  assertStringIncludes(a, "is never `auto`");
+  const m = flat(phase("merge").content);
+  assertStringIncludes(m, "A `NAMES_FILE` listing `.specnaut/workflow.yml`, on any run");
 });
 
-Deno.test("merge-close stops before any backlog write when the branch changed backlog-config.yml", () => {
-  const c = flat(phase("merge-close").content);
-  const stop = c.indexOf("lists `.specnaut/backlog-config.yml`, **stop before any backlog write**");
-  assert(stop >= 0, "merge-close.md has no backlog-config stop");
-  assert(stop < c.indexOf("cascade-check.sh"), "the stop comes after a backlog script");
-  assertStringIncludes(c, "run them only while `HEAD` is the commit `LANDED` ends at");
+Deno.test("the board fence is stated once, before any backlog script of the merge", () => {
+  const merge = phase("merge").content;
+  const fence = merge.indexOf("lists `.specnaut/backlog-config.yml`, no backlog");
+  assert(fence >= 0, "merge.md has no board fence");
+  assert(fence < merge.indexOf("move.sh"), "move.sh is named before the fence");
+  const close = flat(phase("merge-close").content);
+  assert(!close.includes("backlog-config.yml"), "merge-close.md restates the fence");
+  assertStringIncludes(close, "only past the board fence of `phases/merge.md` step 5");
 });
 
 Deno.test("review runs the gate block first and never falls back to a script of the tree", () => {
@@ -59,4 +82,5 @@ Deno.test("review runs the gate block first and never falls back to a script of 
   const seats = flat(phase("review-seats").content);
   assertStringIncludes(seats, "briefs every step below as `NOT RUN: <reason>`");
   assertStringIncludes(seats, "every signal-gated seat is dispatched");
+  assertStringIncludes(seats, "`TEST_COUNT` is unknown, counted as above 0");
 });

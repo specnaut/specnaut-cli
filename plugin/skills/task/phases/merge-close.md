@@ -14,9 +14,8 @@ confirmed closed.
 ## The procedure
 
 The scripts below are the ones `phases/merge.md` step 0 verified, or the user approved, before
-`land-feature.sh` ran: run them only while `HEAD` is the commit `LANDED` ends at. When that
-verification's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, **stop before any backlog write**
-and name the file: the branch chose which board these scripts write to. Report the merge as landed.
+`land-feature.sh` ran: run them only while `HEAD` is the commit `LANDED` ends at, and only past
+the board fence of `phases/merge.md` step 5.
 
 1. **What shipped.** Standalone: `linked_issue` from `.specnaut/feature.json` (absent → skip this
    file; a tree from before the field existed). Epic: the children are the `CHILD` lines, and the

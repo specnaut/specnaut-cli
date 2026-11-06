@@ -8,7 +8,7 @@ import { DENO_DIR } from "./spawn_env.ts";
 import { commitAll, fixture, git, LOCK, write } from "./verify_scripts_fixture.ts";
 
 /**
- * R8: review step 1's gate block, taken from the review phase as the bundle renders it and run with
+ * Review step 1's gate block, taken from the review phase as the bundle renders it and run with
  * this tree's CLI, runs the scope script only when the scripts match the base. The same marker
  * edit is made twice: committed on the base, it runs (the control that proves the edit is live);
  * made on the branch alone, it does not run, and the output names the path.

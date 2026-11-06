@@ -17,9 +17,12 @@ plan → implement → review → merge → push
    rest is `phases/plan.md` step 6. Nothing open → a report, then `implement`.
 2. **The review verdict — only under `manual`.** The merge mode is read here and nowhere else,
    the per-run instruction first: `--manual-merge`, or "stop before merging" / "do not push", means
-   `manual`; "merge it" means `auto`. Then `specnaut verify-scripts`: any outcome but the trusted
-   one (`phases/merge.md` step 0), or a `NAMES_FILE` that lists `.specnaut/workflow.yml`, means
-   `manual` for this run — say which, and do not run the script below. Otherwise:
+   `manual`; "merge it" means `auto`. Then run `phases/merge.md` step 0, which alone decides an
+   untrusted verdict: behind the base only, it rebases and the mode is read below; any other
+   untrusted reason is step 0's one question, asked instead of "Ready to merge?", so nothing is
+   asked twice; anything else stops. A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`
+   and the script below does not run. A dirty tree (`git -c core.fsmonitor=false status
+   --porcelain` prints a line) is never `auto`: say so. Otherwise:
 
    ```
    bash .specnaut/scripts/bash/merge-mode.sh

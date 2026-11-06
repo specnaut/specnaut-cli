@@ -180,8 +180,7 @@ left at all".
 
 ## An epic's children, and a missing seat
 
-On an epic branch only the last child's review is a stop (`phases/epic-loop.md` § A child's
-review). A seat that did not report stops the run before the merge (`phases/review-seats.md`
+On an epic branch only the last child's review is a stop (`phases/epic-loop.md` § The loop). A seat that did not report stops the run before the merge (`phases/review-seats.md`
 § A missing seat stops the run).
 
 ## Phase 4 — Final report

@@ -20,7 +20,8 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   assertStringIncludes(merge, "never assume `main`");
   // D6: merge never asks about the push (run by land-feature.sh); D4: it does not read the mode.
   assertStringIncludes(merge, "pushes without asking, in either merge mode");
-  assert(!merge.includes("workflow.yml"), "merge.md must not read the merge mode (one reader)");
+  // It reacts to a branch that changes workflow.yml (a NAMES_FILE fence), never reads the mode.
+  assert(!merge.includes("merge-mode.sh"), "merge.md must not read the merge mode (one reader)");
   // D7: a rejected push is never forced; nothing closes until a landing pushes (cli#711).
   assertStringIncludes(merge, "quote the remote's message — never `--force`");
   assertStringIncludes(merge, "The close does not run until a landing pushes");

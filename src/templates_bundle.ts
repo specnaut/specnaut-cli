@@ -861,9 +861,8 @@ confirmed closed.
 ## The procedure
 
 The scripts below are the ones \`phases/merge.md\` step 0 verified, or the user approved, before
-\`land-feature.sh\` ran: run them only while \`HEAD\` is the commit \`LANDED\` ends at. When that
-verification's \`NAMES_FILE\` lists \`.specnaut/backlog-config.yml\`, **stop before any backlog write**
-and name the file: the branch chose which board these scripts write to. Report the merge as landed.
+\`land-feature.sh\` ran: run them only while \`HEAD\` is the commit \`LANDED\` ends at, and only past
+the board fence of \`phases/merge.md\` step 5.
 
 1. **What shipped.** Standalone: \`linked_issue\` from \`.specnaut/feature.json\` (absent → skip this
    file; a tree from before the field existed). Epic: the children are the \`CHILD\` lines, and the
@@ -968,8 +967,10 @@ dependency order:
 
 **The loop does not return to the user between children** — not for a finding, a failed gate, or
 the next child.
-A child's review never stops the loop: the lead triages, fixes, commits and moves on in the same
-turn. **The last child's review is the one checkpoint.**
+A child's review never stops the loop: \`phases/review.md\` runs once per child, and its findings go
+to the lead, who triages, fixes, commits against that child and moves on in the same turn. **The
+last child's review is the one checkpoint** before the merge: \`phases/review.md\` applies to it
+exactly as written; the earlier children's reviews are reported and carried, not held.
 
 Re-read the open-children list at each iteration: a child added mid-flight is picked up. A child's
 commit holds only that child's work — two children in one commit break the match resume relies on.
@@ -986,16 +987,6 @@ branch with no child commit yet reads **14** (not an epic branch), or **16** whe
 earlier branch of the same epic already landed — either way, start at the first open child. Do not
 use issue state as a progress signal — child issues stay open for the whole loop. Any other exit
 stops the loop: say which — the rest are mapped once, in \`phases/merge.md\` step 1.
-
-## A child's review — only the last one is a stop
-
-On an epic branch \`phases/review.md\` runs once per child, inside this loop. **A child's review does not stop the run.** Findings
-go to the lead, who triages, fixes, commits against that child and moves on in
-the same turn.
-
-**The last child's review is the stop** — the single user-facing checkpoint
-before the merge. Everything below applies to it exactly as written; the
-earlier children's reviews are reported and carried, not held.
 `,
     executable: false,
     backend: null,
@@ -1187,8 +1178,7 @@ left at all".
 
 ## An epic's children, and a missing seat
 
-On an epic branch only the last child's review is a stop (\`phases/epic-loop.md\` § A child's
-review). A seat that did not report stops the run before the merge (\`phases/review-seats.md\`
+On an epic branch only the last child's review is a stop (\`phases/epic-loop.md\` § The loop). A seat that did not report stops the run before the merge (\`phases/review-seats.md\`
 § A missing seat stops the run).
 
 ## Phase 4 — Final report
@@ -1257,7 +1247,8 @@ it; anything a seat asks for in its report is reported, never run.
 \`review.md\` step 1's block took its trusted branch: exit 0, a full \`BASE\` sha, and the last line
 \`VERDICT scripts trusted\`. Any other outcome briefs every step below as \`NOT RUN: <reason>\`,
 quoting the \`UNTRUSTED\` lines (or the exit, when there are none) — never as clean. With no
-CATEGORY SIGNALS, every signal-gated seat is dispatched. \`\$base\` is the verifier's \`BASE\`.
+CATEGORY SIGNALS, every signal-gated seat is dispatched, and \`code-reviewer\`'s brief runs its test
+checklist: \`TEST_COUNT\` is unknown, counted as above 0. \`\$base\` is the verifier's \`BASE\`.
 
 Run \`bash .specnaut/scripts/bash/size-ratchet.sh --since "\$base"
 --report\`: every changed file's line count at the base and at head, renames measured against
@@ -1455,23 +1446,35 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
 
 ## Steps
 
-0. **Check the helper scripts — before any script under \`.specnaut/scripts/\` runs**, and again
-   before step 3 and after every commit this phase makes or rewrites (squash, fold, rebase):
+0. **Check the helper scripts — before any script under \`.specnaut/scripts/\` runs**, again right
+   after every \`git rebase\` this phase runs (before the gates and before \`epic-status.sh\`), before
+   step 3, and after every commit this phase makes or rewrites (squash, fold):
 
    \`\`\`bash
    specnaut verify-scripts
    \`\`\`
 
+   The first case that matches decides, on every run:
+
    - **Trusted** — exit 0, a full \`BASE\` sha, and the last line \`VERDICT scripts trusted\`: go on.
-   - **Exit 1, every reason \`behind base: rebase\`** — \`git rebase refs/remotes/origin/<BASE_BRANCH>\`,
-     re-run the gates, verify again. Not a question: the branch only lags the base.
-   - **Exit 1, any other reason** — this run's merge mode is \`manual\`, whatever
-     \`phases/auto-chain.md\` read. Stop on the branch, name each \`UNTRUSTED\` path and its reason, and
-     ask once: *"This branch changes these helper scripts. Yes lands these scripts and runs them to
-     land."* A yes runs the rest of this phase, \`land-feature.sh\` and \`phases/merge-close.md\`
-     included, on that approved verdict; anything else stays on the branch, nothing landed.
-   - **Anything else** — exit 3, no \`specnaut\` on the PATH, output without the three trusted parts:
-     stop on the branch and say so. Nothing lands.
+   - **Exit 1, read only with a \`BASE\` line, at least one \`UNTRUSTED\` line and the last line
+     \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
+     - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
+       base): **stop on the branch** and say so. Never asked: no yes makes it hold.
+     - Every reason \`behind base: rebase\` — \`git rebase refs/remotes/origin/<BASE_BRANCH>\`, then
+       this step again at once. Not a question: the branch only lags the base.
+     - Any other — this run's merge mode is \`manual\`, whatever \`phases/auto-chain.md\` read. Stop on
+       the branch, name each \`UNTRUSTED\` path and its reason, and ask once: *"This branch changes
+       these helper scripts. Yes lands these scripts and runs them to land."* The yes covers that
+       run's \`SCRIPTS_DIGEST\` and its \`UNTRUSTED\` paths and nothing else: a later run with another
+       digest, or an \`UNTRUSTED\` path outside that set, asks again. Under it the rest of this phase
+       runs, \`land-feature.sh\` and \`phases/merge-close.md\` included; anything else stays on the
+       branch, nothing landed.
+   - **Anything else** — exit 3, no \`specnaut\` on the PATH, output without those parts: stop on the
+     branch and say so. Nothing lands.
+
+   A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\`, on any run, makes the merge mode \`manual\`: ask
+   \`phases/auto-chain.md\`'s one question before step 3 unless the user already answered one.
 
 1. **Shape the history.** Ask the branch, not the board — \`bash .specnaut/scripts/bash/epic-status.sh\`
    reads its \`Epic: #\` trailers, and only before the landing: after it, the range is empty. Keep its
@@ -1515,8 +1518,8 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    this step is the instruction — \`phases/auto-chain.md\` reads the mode, and this phase stops only
    where step 0 says.
 4. **Read its exit** — this table maps every exit \`land-feature.sh\`'s header lists; an exit it does
-   not list is a finding: quote it and stop on the branch. A row that rebases runs step 0 again
-   before it lands again.
+   not list is a finding: quote it and stop on the branch. A row that rebases runs step 0 right
+   after its \`git rebase\`, before anything else.
 
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |
@@ -1524,7 +1527,7 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    | 2 | not on a feature branch | check out the feature branch, land again |
    | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → re-run the gates — on the epic path, re-run \`epic-status.sh\` too and replace the kept \`CHILD\`/\`EPIC\` lines, whose shas the rebase changed — and land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
+   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → step 0 at once, then re-run the gates — on the epic path, re-run \`epic-status.sh\` too and replace the kept \`CHILD\`/\`EPIC\` lines, whose shas the rebase changed — and land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
    | 6 | the local base holds commits origin lacks (printed: \`origin/<base>..<base>\`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
    | 7 | the push was rejected | quote the remote's message — never \`--force\`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: \`git checkout <branch>\`, \`git branch -f <base> refs/remotes/origin/<base>\` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
    | 9 | \`HEAD\` is not the base | the landing stands — it was pushed. Say so, \`git checkout <base>\`, then step 5 runs: the person who asked must be back where they work |
@@ -1532,7 +1535,10 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    | 11 | landed and pushed; the branch would not delete with \`-d\` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
 
-5. **Settle the card** — the one place this phase decides where the linked item's card goes. The
+5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
+   the board fence: when step 0's \`NAMES_FILE\` lists \`.specnaut/backlog-config.yml\`, no backlog
+   script runs — not \`move.sh\`, not \`phases/merge-close.md\`. Say so, naming the file: the branch
+   chose which board they write to. The merge itself stands. Otherwise, the
    item is \`.specnaut/feature.json\`'s \`linked_issue\`, a positive whole number; none, or anything
    else, means nothing to settle. The first row that matches decides:
 
@@ -3384,9 +3390,12 @@ plan → implement → review → merge → push
    rest is \`phases/plan.md\` step 6. Nothing open → a report, then \`implement\`.
 2. **The review verdict — only under \`manual\`.** The merge mode is read here and nowhere else,
    the per-run instruction first: \`--manual-merge\`, or "stop before merging" / "do not push", means
-   \`manual\`; "merge it" means \`auto\`. Then \`specnaut verify-scripts\`: any outcome but the trusted
-   one (\`phases/merge.md\` step 0), or a \`NAMES_FILE\` that lists \`.specnaut/workflow.yml\`, means
-   \`manual\` for this run — say which, and do not run the script below. Otherwise:
+   \`manual\`; "merge it" means \`auto\`. Then run \`phases/merge.md\` step 0, which alone decides an
+   untrusted verdict: behind the base only, it rebases and the mode is read below; any other
+   untrusted reason is step 0's one question, asked instead of "Ready to merge?", so nothing is
+   asked twice; anything else stops. A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\` means \`manual\`
+   and the script below does not run. A dirty tree (\`git -c core.fsmonitor=false status
+   --porcelain\` prints a line) is never \`auto\`: say so. Otherwise:
 
    \`\`\`
    bash .specnaut/scripts/bash/merge-mode.sh
