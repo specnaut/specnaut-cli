@@ -130,6 +130,11 @@ export function parseArgs(argv: string[]): Intent {
 
   if (command === "scan") return parseScan(parsed, rest);
 
+  if (command === "verify-scripts") {
+    if (rest.length > 0) return { kind: "unknown", received: "verify-scripts takes no argument" };
+    return { kind: "verify-scripts" };
+  }
+
   if (command === "self-update") {
     return { kind: "self-update", checkOnly: Boolean(parsed.check) };
   }

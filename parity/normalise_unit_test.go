@@ -17,6 +17,7 @@ func TestNormaliseRules(t *testing.T) {
 		{"adjacent versions", "7.0.2 7.0.2", "<VERSION> <VERSION>", true},
 		{"a longer number is not the version", "17.0.2 and 7.0.21 and v7.0.2.1", "17.0.2 and 7.0.21 and v7.0.2.1", true},
 		{"a tag is", "release v7.0.2.", "release v<VERSION>.", true},
+		{"names file", "NAMES_FILE <WORK>/.tmp/specnaut-names-1e6744c3e6b44c1e", "NAMES_FILE <WORK>/.tmp/specnaut-names-<RANDOM>", false},
 		{"anything else is left alone", "random 1234 text", "random 1234 text", true},
 	}
 	for _, c := range cases {

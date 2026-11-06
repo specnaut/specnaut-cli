@@ -125,6 +125,14 @@ func parseDiff(_ Args, rest []string) Intent {
 	return Intent{Kind: "diff"}
 }
 
+// parseVerifyScripts: the command takes no argument.
+func parseVerifyScripts(_ Args, rest []string) Intent {
+	if len(rest) > 0 {
+		return unknown("verify-scripts takes no argument")
+	}
+	return Intent{Kind: "verify-scripts"}
+}
+
 func parseReconcile(a Args, rest []string) Intent {
 	upstream, current := truthy(a, "accept-upstream"), truthy(a, "accept-current")
 	if truthy(a, "status") {

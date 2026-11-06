@@ -161,4 +161,6 @@ export type Intent =
     task: number | null;
     apiUrl: string | null;
   }
-  | ScanIntent;
+  | ScanIntent
+  /** `specnaut verify-scripts`: whether `.specnaut/scripts/` matches the base (verify_scripts_handler.ts). */
+  | { kind: "verify-scripts" };

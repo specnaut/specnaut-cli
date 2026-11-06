@@ -1,0 +1,31 @@
+# verify-scripts: a branch whose helper scripts match the base is trusted; one
+# that edits a helper the branch also runs is not, with the path and its reason;
+# a repository with no base it can name exits 3. Compared TypeScript against
+# TypeScript: the Go port answers "not ported" (excluded.go, PortedToGo).
+exec git init -q --bare origin.git
+mkdir project
+cd project
+exec git init -q -b main
+exec git remote add origin file://$WORK/origin.git
+specnaut init --here --ai claude --backlog local --scheme semver --spec-backend local
+exec git add -A
+exec git commit -q -m base
+exec git push -q origin main
+exec git remote set-head origin main
+exec git checkout -q -b feature
+specnaut verify-scripts
+cp $WORK/edited.sh .specnaut/scripts/bash/git-read.sh
+exec git commit -q -am edit
+! specnaut verify-scripts
+cd $WORK
+mkdir loose
+cd loose
+exec git init -q
+! specnaut verify-scripts
+mkdir .specnaut
+! specnaut verify-scripts
+! specnaut verify-scripts extra
+
+-- edited.sh --
+#!/usr/bin/env bash
+echo edited

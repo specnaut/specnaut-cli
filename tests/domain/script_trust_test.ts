@@ -168,3 +168,14 @@ Deno.test("a folder on the way that is a link stops the walk: the whole folder i
 Deno.test("no scripts on base and none in the tree: nothing to run, nothing untrusted", () => {
   assertEquals(judge({ entries: [], tip: [], mergeBase: [] }), TRUSTED);
 });
+
+Deno.test("a local base holding commits origin lacks is untrusted: the base is origin's copy", () => {
+  const verdict = judgeScripts({
+    tree: { kind: "walked", entries: [file(P, BASE)] },
+    tip: [blob(P, BASE)],
+    mergeBase: [blob(P, BASE)],
+    bundle: mapped({ [P]: BASE }),
+    localBaseAhead: "main",
+  });
+  assertEquals(verdict, untrusted("refs/heads/main", "local main ahead of origin"));
+});

@@ -58,6 +58,8 @@ export type TrustInput = {
   /** The merge base: read only to say a file is behind the base rather than edited. */
   readonly mergeBase: readonly BaseEntry[];
   readonly bundle: BundleRule;
+  /** The base's name when its local branch holds commits origin's copy lacks, else `null`. */
+  readonly localBaseAhead?: string | null;
 };
 
 export type Untrusted = { readonly path: string; readonly reason: string };
@@ -84,6 +86,10 @@ export const BASE_LOCK = ".specnaut/installed.lock";
 
 export function judgeScripts(input: TrustInput): ScriptVerdict {
   const untrusted: Untrusted[] = [];
+  const ahead = input.localBaseAhead ?? null;
+  if (ahead !== null) {
+    untrusted.push({ path: `refs/heads/${ahead}`, reason: `local ${ahead} ahead of origin` });
+  }
   if (input.bundle.kind === "unavailable") {
     untrusted.push({ path: BASE_LOCK, reason: `at base: ${input.bundle.why}` });
   }

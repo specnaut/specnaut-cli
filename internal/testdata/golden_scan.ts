@@ -1,5 +1,5 @@
-// The `specnaut scan` cases of the parse golden (cli#747): parser.ts's own answer for each command
-// line, which internal/cli/parse_test.go holds the Go parser to. A file of its own because
+// The `specnaut scan` (cli#747) and `specnaut verify-scripts` cases of the parse golden: parser.ts's
+// own answer for each command line, which internal/cli/parse_test.go holds the Go parser to. A file of its own because
 // golden.ts is over its size target and must not grow.
 //
 // Regenerate after changing a case or the TypeScript side (CI regenerates it and fails on a diff):
@@ -28,6 +28,9 @@ const argv: string[][] = [
   ["scan", "--path.x", "a"], ["scan", "--no-path"],
   ["scan", "--path", "src", "--top", "3", "--format", "json"], ["scan", "x", "--format", "bogus"],
   ["scan", "--format", "bogus", "--top", "x"], ["scan", "--top", "x", "--path", "/a"],
+  // `specnaut verify-scripts`: no argument, and the global flags ignored as every command ignores them.
+  ["verify-scripts"], ["verify-scripts", "x"], ["verify-scripts", "--path", "x"],
+  ["verify-scripts", "--help"], ["verify-scripts", "a", "b"], ["--force", "verify-scripts"],
 ];
 
 function intentOf(args: string[]): unknown {

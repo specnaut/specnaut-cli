@@ -58,3 +58,9 @@
 {"args":["scan","x","--format","bogus"],"intent":{"kind":"unknown","received":"scan takes no positional argument; name a subtree with --path"}}
 {"args":["scan","--format","bogus","--top","x"],"intent":{"kind":"unknown","received":"scan --format takes text, json or mermaid"}}
 {"args":["scan","--top","x","--path","/a"],"intent":{"kind":"unknown","received":"scan --top takes a whole number or all"}}
+{"args":["verify-scripts"],"intent":{"kind":"verify-scripts"}}
+{"args":["verify-scripts","x"],"intent":{"kind":"unknown","received":"verify-scripts takes no argument"}}
+{"args":["verify-scripts","--path","x"],"intent":{"kind":"verify-scripts"}}
+{"args":["verify-scripts","--help"],"intent":{"kind":"help"}}
+{"args":["verify-scripts","a","b"],"intent":{"kind":"unknown","received":"verify-scripts takes no argument"}}
+{"args":["--force","verify-scripts"],"intent":{"kind":"verify-scripts"}}

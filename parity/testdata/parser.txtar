@@ -39,3 +39,6 @@ specnaut scan --format bogus
 specnaut scan --top -1
 specnaut scan --path ../x
 specnaut scan --path /etc
+# verify-scripts refusals: it takes no argument.
+specnaut verify-scripts extra
+specnaut verify-scripts a b

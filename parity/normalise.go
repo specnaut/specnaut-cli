@@ -57,6 +57,12 @@ var Rules = []Rule{
 		Why:         "installed.lock records installed_at per entry and the upgrade marker records `at`, both from the wall clock",
 	},
 	{
+		Name:        "names-file",
+		Pattern:     `specnaut-names-[0-9a-f]+`,
+		Replacement: `specnaut-names-<RANDOM>`,
+		Why:         "verify-scripts writes the changed paths to a new temp file per run, named by the runtime",
+	},
+	{
 		Name:        "binary-version",
 		Pattern:     versionEdge + `{{VERSION}}` + versionTail,
 		Replacement: `${1}<VERSION>${2}`,

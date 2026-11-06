@@ -8,7 +8,7 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
  */
 export async function runSpecnaut(
   args: string[],
-  opts: { cwd?: string } = {},
+  opts: { cwd?: string; env?: Record<string, string> } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const p = new Deno.Command("deno", {
     args: [
@@ -21,6 +21,7 @@ export async function runSpecnaut(
       ...args,
     ],
     cwd: opts.cwd,
+    ...(opts.env ? { env: opts.env } : {}),
     stdout: "piped",
     stderr: "piped",
   });

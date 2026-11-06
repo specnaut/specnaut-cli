@@ -22,6 +22,9 @@ const helpTemplate = `{bold:specnaut} — AI project scaffolding CLI with auto-c
   specnaut scan [--path <dir>] [--format text|json|mermaid] [--top <n|all>]
                                       Map file, function and class sizes against the size limits
                                       (read-only, offline, no agent): where to look, not a verdict
+  specnaut verify-scripts             Check .specnaut/scripts/ against a copy the branch does not carry,
+                                      before a review or a merge runs them (read-only). Exit 0 trusted,
+                                      1 untrusted, 3 no base
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
