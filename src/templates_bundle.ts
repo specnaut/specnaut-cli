@@ -11630,9 +11630,19 @@ done
 #                             (SCOPE: last-N)
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
+#
+# Every git call goes through _git_untrusted.sh, installed beside this script: the
+# repository is unvetted, so no program its configuration names may run. The reads
+# use the library's forms; the fixed probes (rev-parse, rev-list, describe,
+# hash-object) run their fixed argv through its runner, under the same defaults.
 set -euo pipefail
-# Unvetted repository: no fsmonitor, pager or signature program it names runs; a path is literal.
-git() { command git --no-pager --literal-pathspecs -c core.fsmonitor=false -c log.showSignature=false "\$@"; }
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+[ -f "\$here/_git_untrusted.sh" ] || {
+  echo "error: \$here/_git_untrusted.sh is missing; nothing was read" >&2
+  exit 70
+}
+# shellcheck source=SCRIPTDIR/_git_untrusted.sh
+. "\$here/_git_untrusted.sh"
 
 PATH_ARG=""
 RANGE_ARG=""
@@ -11707,7 +11717,7 @@ while [ \$# -gt 0 ]; do
 done
 
 # Git-repo guard — abort with a clear message, no block on stdout.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
@@ -11778,7 +11788,7 @@ if [ -n "\$PATH_ARG" ]; then
   SCOPE="path"
   SCOPE_LABEL="\$PATH_ARG"
   # Tracked files under the subtree; no commit list for a path scope.
-  FILES="\$(git ls-files -- "\$PATH_ARG" 2>/dev/null || true)"
+  FILES="\$(gu_files "\$PATH_ARG" 2>/dev/null || true)"
   COMMITS=""
   if [ -z "\$FILES" ]; then
     echo "warning: --path '\$PATH_ARG' matched no tracked files (empty scope)" >&2
@@ -11786,27 +11796,26 @@ if [ -n "\$PATH_ARG" ]; then
 elif [ -n "\$RANGE_ARG" ]; then
   SCOPE="range"
   SCOPE_LABEL="\$RANGE_ARG"
-  # Trailing \`--\` ends option/revision parsing so a ref-shaped value can never
-  # be mistaken for a pathspec (matches the \`git ls-files --\` call above).
-  FILES="\$(git diff --name-only "\$RANGE_ARG" -- 2>/dev/null || true)"
-  COMMITS="\$(git log --oneline "\$RANGE_ARG" -- 2>/dev/null || true)"
-elif git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  local_count="\$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
+  # The library takes the two endpoints apart; each is validated again there.
+  FILES="\$(gu_names "\${RANGE_ARG%%..*}" "\${RANGE_ARG#*..}" 2>/dev/null || true)"
+  COMMITS="\$(gu_log "\$RANGE_ARG" 2>/dev/null || true)"
+elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
+  local_count="\$(_gu_git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
   [ "\$local_count" -gt 0 ]; then
   # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
   SCOPE_LABEL="origin/main..HEAD (\${local_count} commits)"
-  FILES="\$(git diff --name-only origin/main..HEAD 2>/dev/null || true)"
-  COMMITS="\$(git log --oneline origin/main..HEAD 2>/dev/null || true)"
-elif TAG="\$(git describe --tags --abbrev=0 2>/dev/null)" && [ -n "\$TAG" ]; then
+  FILES="\$(gu_names origin/main HEAD 2>/dev/null || true)"
+  COMMITS="\$(gu_log origin/main..HEAD 2>/dev/null || true)"
+elif TAG="\$(_gu_git describe --tags --abbrev=0 2>/dev/null)" && [ -n "\$TAG" ]; then
   SCOPE="since-tag"
   SCOPE_LABEL="\${TAG}..HEAD"
-  FILES="\$(git diff --name-only "\${TAG}..HEAD" 2>/dev/null || true)"
-  COMMITS="\$(git log --oneline "\${TAG}..HEAD" 2>/dev/null || true)"
+  FILES="\$(gu_names "\$TAG" HEAD 2>/dev/null || true)"
+  COMMITS="\$(gu_log "\${TAG}..HEAD" 2>/dev/null || true)"
 else
   SCOPE="last-N"
   # Clamp N to the available history so HEAD~N never points before the root.
-  AVAIL="\$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+  AVAIL="\$(_gu_git rev-list --count HEAD 2>/dev/null || echo 1)"
   N="\$LAST_N"
   if [ "\$N" -gt "\$AVAIL" ]; then
     N="\$AVAIL"
@@ -11815,12 +11824,12 @@ else
   if [ "\$N" -ge "\$AVAIL" ]; then
     # The window covers all of history; HEAD~N would precede the root, so diff
     # against the empty tree to surface every file the history touched.
-    EMPTY_TREE="\$(git hash-object -t tree /dev/null)"
-    FILES="\$(git diff --name-only "\$EMPTY_TREE" HEAD 2>/dev/null || true)"
+    EMPTY_TREE="\$(_gu_git hash-object -t tree /dev/null)"
+    FILES="\$(gu_names "\$EMPTY_TREE" HEAD 2>/dev/null || true)"
   else
-    FILES="\$(git diff --name-only "HEAD~\${N}..HEAD" 2>/dev/null || true)"
+    FILES="\$(gu_names "HEAD~\${N}" HEAD 2>/dev/null || true)"
   fi
-  COMMITS="\$(git log --oneline -n "\$N" 2>/dev/null || true)"
+  COMMITS="\$(gu_log HEAD "\$N" 2>/dev/null || true)"
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.
@@ -11854,6 +11863,194 @@ echo "FRONTEND_COUNT: \${FRONTEND_COUNT}"
 echo "TEST_COUNT: \${TEST_COUNT}"
 echo "DEP_COUNT: \${DEP_COUNT}"
 echo "INFRA_COUNT: \${INFRA_COUNT}"
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/audit/_git_untrusted.sh",
+    content: `# shellcheck shell=bash
+# _git_untrusted.sh - git with hardened defaults, for reading a repository whose
+# configuration nobody vetted. Sourced, never run: git-read.sh is its command
+# line, and collect-audit-scope.sh sources it beside itself.
+#
+# The one home of how git reads such a repository. Every call drops the GIT_*
+# environment and runs with these defaults, each turning off a program or a
+# redirection the repository's own configuration could otherwise name:
+#
+#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch
+#   -c core.fsmonitor=false           no fsmonitor program
+#   -c core.hooksPath=/dev/null       no hook
+#   -c log.showSignature=false        and every gpg.*program a path that cannot
+#                                     exist: no signature program, for any format
+#   -c submodule.recurse=false -c diff.submodule=short
+#   --no-textconv --no-ext-diff --no-color on every form that diffs
+#
+# --no-lazy-fetch needs git 2.44. Below it, a repository that names a promisor
+# remote is refused rather than read, since reading a missing object would fetch it.
+#
+# The forms take data only - revisions, paths, a fixed-string pattern, a count -
+# never a git option, and each runs one fixed command line. They read objects and
+# the index, never the work tree, so no clean or smudge filter applies either.
+#
+#   gu_names <a> <b>               files that differ between two revisions
+#   gu_patch <a> <b> [<path>...]   the patch between two revisions
+#   gu_log <a>..<b> | <rev> [<n>]  one line per commit: short hash, subject
+#   gu_show <rev> --stat|--no-patch
+#   gu_files [<path>]              tracked files, under <path> when given
+#   gu_grep <pattern> <rev> [<path>...]
+#   gu_base <rev>                  the merge base of HEAD and <rev>
+#
+# A refused argument prints "git-read: refused: <why>" and returns 2.
+# _gu_git runs a fixed argv under the same defaults; it is for this file and for
+# scripts that source it, never for an argv someone else composed.
+
+# A revision: ref-name characters only, never an option, never a range. \`+\` is
+# there for a tag carrying SemVer build metadata (v1.0.0+build.7).
+_gu_rev() {
+  case "\$1" in
+    '' | -* | *..*) return 1 ;;
+  esac
+  printf '%s' "\$1" | grep -Eq '^[A-Za-z0-9._/@^~+-]+\$'
+}
+
+# A path: relative, inside the tree, forward slashes.
+_gu_path() {
+  case "\$1" in
+    '' | /* | [A-Za-z]:* | *\\\\* | .. | ../* | */../* | */..) return 1 ;;
+  esac
+  return 0
+}
+
+_gu_refuse() {
+  echo "git-read: refused: \$1" >&2
+  return 2
+}
+
+_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
+
+_gu_need_paths() {
+  local p
+  for p in "\$@"; do
+    _gu_path "\$p" || {
+      _gu_refuse "not a relative path inside the tree: \$p"
+      return 2
+    }
+  done
+}
+
+# True when this git knows --no-lazy-fetch (2.44 or later). Cached.
+_gu_lazy_flag() {
+  if [ -z "\${_GU_LAZY:-}" ]; then
+    local v major minor
+    v="\$(_gu_env_run version 2>/dev/null)" || v=""
+    if [[ "\$v" =~ ([0-9]+)\\.([0-9]+) ]]; then
+      major="\${BASH_REMATCH[1]}"
+      minor="\${BASH_REMATCH[2]}"
+      if [ "\$major" -gt 2 ] || { [ "\$major" -eq 2 ] && [ "\$minor" -ge 44 ]; }; then
+        _GU_LAZY=yes
+      else
+        _GU_LAZY=no
+      fi
+    else
+      _GU_LAZY=no
+    fi
+  fi
+  [ "\$_GU_LAZY" = yes ]
+}
+
+# git with no GIT_* variable from the caller, and the three this file sets.
+_gu_env_run() (
+  local name
+  for name in \$(compgen -e); do
+    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+  done
+  export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  command git "\$@"
+)
+
+_gu_git() {
+  local lazy=()
+  if _gu_lazy_flag; then
+    lazy=(--no-lazy-fetch)
+  elif _gu_env_run config --get-regexp '^(extensions\\.partialclone|remote\\..*\\.promisor)\$' >/dev/null 2>&1; then
+    _gu_refuse "a promisor remote is configured and this git predates --no-lazy-fetch (2.44)"
+    return 2
+  fi
+  _gu_env_run --no-pager --no-optional-locks --literal-pathspecs \${lazy[@]+"\${lazy[@]}"} \\
+    -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
+    -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
+    -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
+    -c submodule.recurse=false -c diff.submodule=short "\$@"
+}
+
+gu_names() {
+  [ \$# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  _gu_git diff --name-only --no-textconv --no-ext-diff --no-color --end-of-options "\$1" "\$2" --
+}
+
+gu_patch() {
+  [ \$# -ge 2 ] || { _gu_refuse "patch takes <a> <b> [<path>...]"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  local a="\$1" b="\$2"
+  shift 2
+  _gu_need_paths "\$@" || return 2
+  _gu_git diff --no-textconv --no-ext-diff --no-color --end-of-options "\$a" "\$b" -- "\$@"
+}
+
+gu_log() {
+  [ \$# -ge 1 ] && [ \$# -le 2 ] || { _gu_refuse "log takes <a>..<b> | <rev> [<n>]"; return 2; }
+  local spec="\$1"
+  case "\$spec" in
+    *...*) _gu_refuse "a three-dot range: \$spec"; return 2 ;;
+    *..*) _gu_need_rev "\${spec%%..*}" && _gu_need_rev "\${spec#*..}" || return 2 ;;
+    *) _gu_need_rev "\$spec" || return 2 ;;
+  esac
+  local max=()
+  if [ \$# -eq 2 ]; then
+    printf '%s' "\$2" | grep -Eq '^[1-9][0-9]*\$' || { _gu_refuse "not a count: \$2"; return 2; }
+    max=("--max-count=\$2")
+  fi
+  _gu_git log \${max[@]+"\${max[@]}"} --format='%h %s' --no-notes --no-textconv --no-ext-diff --no-color \\
+    --end-of-options "\$spec" --
+}
+
+gu_show() {
+  [ \$# -eq 2 ] || { _gu_refuse "show takes <rev> --stat|--no-patch"; return 2; }
+  _gu_need_rev "\$1" || return 2
+  case "\$2" in
+    --stat | --no-patch) ;;
+    *) _gu_refuse "show takes --stat or --no-patch, not: \$2"; return 2 ;;
+  esac
+  _gu_git show "\$2" --format=medium --no-notes --no-textconv --no-ext-diff --no-color \\
+    --end-of-options "\$1" --
+}
+
+gu_files() {
+  [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
+  _gu_need_paths "\$@" || return 2
+  _gu_git ls-files -- "\$@"
+}
+
+gu_grep() {
+  [ \$# -ge 2 ] || { _gu_refuse "grep takes <pattern> <rev> [<path>...]"; return 2; }
+  [ -n "\$1" ] || { _gu_refuse "an empty pattern"; return 2; }
+  _gu_need_rev "\$2" || return 2
+  local pattern="\$1" rev="\$2"
+  shift 2
+  _gu_need_paths "\$@" || return 2
+  _gu_git grep -n -I -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
+}
+
+gu_base() {
+  [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
+  _gu_need_rev "\$1" || return 2
+  _gu_git merge-base --end-of-options HEAD "\$1"
+}
 `,
     executable: true,
     backend: null,
@@ -26760,6 +26957,240 @@ if [ "\${#violations[@]}" -gt 0 ]; then
 fi
 echo "\$NAME: \${#files[@]} file(s) under domain: clean of \${#patterns[@]} pattern(s)"
 exit 0
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_git_untrusted.sh",
+    content: `# shellcheck shell=bash
+# _git_untrusted.sh - git with hardened defaults, for reading a repository whose
+# configuration nobody vetted. Sourced, never run: git-read.sh is its command
+# line, and collect-audit-scope.sh sources it beside itself.
+#
+# The one home of how git reads such a repository. Every call drops the GIT_*
+# environment and runs with these defaults, each turning off a program or a
+# redirection the repository's own configuration could otherwise name:
+#
+#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch
+#   -c core.fsmonitor=false           no fsmonitor program
+#   -c core.hooksPath=/dev/null       no hook
+#   -c log.showSignature=false        and every gpg.*program a path that cannot
+#                                     exist: no signature program, for any format
+#   -c submodule.recurse=false -c diff.submodule=short
+#   --no-textconv --no-ext-diff --no-color on every form that diffs
+#
+# --no-lazy-fetch needs git 2.44. Below it, a repository that names a promisor
+# remote is refused rather than read, since reading a missing object would fetch it.
+#
+# The forms take data only - revisions, paths, a fixed-string pattern, a count -
+# never a git option, and each runs one fixed command line. They read objects and
+# the index, never the work tree, so no clean or smudge filter applies either.
+#
+#   gu_names <a> <b>               files that differ between two revisions
+#   gu_patch <a> <b> [<path>...]   the patch between two revisions
+#   gu_log <a>..<b> | <rev> [<n>]  one line per commit: short hash, subject
+#   gu_show <rev> --stat|--no-patch
+#   gu_files [<path>]              tracked files, under <path> when given
+#   gu_grep <pattern> <rev> [<path>...]
+#   gu_base <rev>                  the merge base of HEAD and <rev>
+#
+# A refused argument prints "git-read: refused: <why>" and returns 2.
+# _gu_git runs a fixed argv under the same defaults; it is for this file and for
+# scripts that source it, never for an argv someone else composed.
+
+# A revision: ref-name characters only, never an option, never a range. \`+\` is
+# there for a tag carrying SemVer build metadata (v1.0.0+build.7).
+_gu_rev() {
+  case "\$1" in
+    '' | -* | *..*) return 1 ;;
+  esac
+  printf '%s' "\$1" | grep -Eq '^[A-Za-z0-9._/@^~+-]+\$'
+}
+
+# A path: relative, inside the tree, forward slashes.
+_gu_path() {
+  case "\$1" in
+    '' | /* | [A-Za-z]:* | *\\\\* | .. | ../* | */../* | */..) return 1 ;;
+  esac
+  return 0
+}
+
+_gu_refuse() {
+  echo "git-read: refused: \$1" >&2
+  return 2
+}
+
+_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
+
+_gu_need_paths() {
+  local p
+  for p in "\$@"; do
+    _gu_path "\$p" || {
+      _gu_refuse "not a relative path inside the tree: \$p"
+      return 2
+    }
+  done
+}
+
+# True when this git knows --no-lazy-fetch (2.44 or later). Cached.
+_gu_lazy_flag() {
+  if [ -z "\${_GU_LAZY:-}" ]; then
+    local v major minor
+    v="\$(_gu_env_run version 2>/dev/null)" || v=""
+    if [[ "\$v" =~ ([0-9]+)\\.([0-9]+) ]]; then
+      major="\${BASH_REMATCH[1]}"
+      minor="\${BASH_REMATCH[2]}"
+      if [ "\$major" -gt 2 ] || { [ "\$major" -eq 2 ] && [ "\$minor" -ge 44 ]; }; then
+        _GU_LAZY=yes
+      else
+        _GU_LAZY=no
+      fi
+    else
+      _GU_LAZY=no
+    fi
+  fi
+  [ "\$_GU_LAZY" = yes ]
+}
+
+# git with no GIT_* variable from the caller, and the three this file sets.
+_gu_env_run() (
+  local name
+  for name in \$(compgen -e); do
+    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+  done
+  export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  command git "\$@"
+)
+
+_gu_git() {
+  local lazy=()
+  if _gu_lazy_flag; then
+    lazy=(--no-lazy-fetch)
+  elif _gu_env_run config --get-regexp '^(extensions\\.partialclone|remote\\..*\\.promisor)\$' >/dev/null 2>&1; then
+    _gu_refuse "a promisor remote is configured and this git predates --no-lazy-fetch (2.44)"
+    return 2
+  fi
+  _gu_env_run --no-pager --no-optional-locks --literal-pathspecs \${lazy[@]+"\${lazy[@]}"} \\
+    -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
+    -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
+    -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
+    -c submodule.recurse=false -c diff.submodule=short "\$@"
+}
+
+gu_names() {
+  [ \$# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  _gu_git diff --name-only --no-textconv --no-ext-diff --no-color --end-of-options "\$1" "\$2" --
+}
+
+gu_patch() {
+  [ \$# -ge 2 ] || { _gu_refuse "patch takes <a> <b> [<path>...]"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  local a="\$1" b="\$2"
+  shift 2
+  _gu_need_paths "\$@" || return 2
+  _gu_git diff --no-textconv --no-ext-diff --no-color --end-of-options "\$a" "\$b" -- "\$@"
+}
+
+gu_log() {
+  [ \$# -ge 1 ] && [ \$# -le 2 ] || { _gu_refuse "log takes <a>..<b> | <rev> [<n>]"; return 2; }
+  local spec="\$1"
+  case "\$spec" in
+    *...*) _gu_refuse "a three-dot range: \$spec"; return 2 ;;
+    *..*) _gu_need_rev "\${spec%%..*}" && _gu_need_rev "\${spec#*..}" || return 2 ;;
+    *) _gu_need_rev "\$spec" || return 2 ;;
+  esac
+  local max=()
+  if [ \$# -eq 2 ]; then
+    printf '%s' "\$2" | grep -Eq '^[1-9][0-9]*\$' || { _gu_refuse "not a count: \$2"; return 2; }
+    max=("--max-count=\$2")
+  fi
+  _gu_git log \${max[@]+"\${max[@]}"} --format='%h %s' --no-notes --no-textconv --no-ext-diff --no-color \\
+    --end-of-options "\$spec" --
+}
+
+gu_show() {
+  [ \$# -eq 2 ] || { _gu_refuse "show takes <rev> --stat|--no-patch"; return 2; }
+  _gu_need_rev "\$1" || return 2
+  case "\$2" in
+    --stat | --no-patch) ;;
+    *) _gu_refuse "show takes --stat or --no-patch, not: \$2"; return 2 ;;
+  esac
+  _gu_git show "\$2" --format=medium --no-notes --no-textconv --no-ext-diff --no-color \\
+    --end-of-options "\$1" --
+}
+
+gu_files() {
+  [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
+  _gu_need_paths "\$@" || return 2
+  _gu_git ls-files -- "\$@"
+}
+
+gu_grep() {
+  [ \$# -ge 2 ] || { _gu_refuse "grep takes <pattern> <rev> [<path>...]"; return 2; }
+  [ -n "\$1" ] || { _gu_refuse "an empty pattern"; return 2; }
+  _gu_need_rev "\$2" || return 2
+  local pattern="\$1" rev="\$2"
+  shift 2
+  _gu_need_paths "\$@" || return 2
+  _gu_git grep -n -I -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
+}
+
+gu_base() {
+  [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
+  _gu_need_rev "\$1" || return 2
+  _gu_git merge-base --end-of-options HEAD "\$1"
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/git-read.sh",
+    content: `#!/usr/bin/env bash
+# git-read.sh <form> <args...> - read a repository through the git library with
+# hardened defaults (_git_untrusted.sh, beside this file). The phases run their
+# git reads here, so no program the repository's configuration names runs.
+#
+# Forms, each one fixed command line taking data only:
+#   names <a> <b>  |  patch <a> <b> [<path>...]  |  log <a>..<b> | <rev> [<n>]
+#   show <rev> --stat|--no-patch  |  files [<path>]  |  grep <pattern> <rev> [<path>...]
+#   base <rev>
+#
+# Exit: git's own status for a form that ran; 2 for a refused form or argument;
+# 70 when the library is missing.
+set -euo pipefail
+
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+[ -f "\$here/_git_untrusted.sh" ] || {
+  echo "git-read: \$here/_git_untrusted.sh is missing; nothing was read" >&2
+  exit 70
+}
+# shellcheck source=SCRIPTDIR/_git_untrusted.sh
+. "\$here/_git_untrusted.sh"
+
+form="\${1:-}"
+[ \$# -gt 0 ] && shift
+case "\$form" in
+  names) gu_names "\$@" ;;
+  patch) gu_patch "\$@" ;;
+  log) gu_log "\$@" ;;
+  show) gu_show "\$@" ;;
+  files) gu_files "\$@" ;;
+  grep) gu_grep "\$@" ;;
+  base) gu_base "\$@" ;;
+  *)
+    echo "usage: git-read.sh names|patch|log|show|files|grep|base <args...>" >&2
+    exit 2
+    ;;
+esac
 `,
     executable: true,
     backend: null,

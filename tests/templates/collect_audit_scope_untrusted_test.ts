@@ -1,14 +1,23 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { count, fixtureRepo, git, gitRun, scope } from "./collect_audit_scope_fixture.ts";
+import { assert, assertEquals, assertStrictEquals, assertStringIncludes } from "@std/assert";
+import {
+  count,
+  fixtureRepo,
+  git,
+  gitRun,
+  scope,
+  SCOPE_SOURCE,
+} from "./collect_audit_scope_fixture.ts";
 
 /**
  * `collect-audit-scope.sh` runs git inside a repository nobody vetted (#747).
  * Two of git's own features would let that repository act through it: a
  * `core.fsmonitor` value names a program git runs on an index read, a
  * `gpg.program` is run to verify a signed commit when `log.showSignature` is
- * on, and pathspec magic turns a `--path` into a pattern. The script turns all
- * three off on every git call; these cases plant each one, show an unguarded
- * git running it (the control), and watch the script leave it inert.
+ * on, and pathspec magic turns a `--path` into a pattern. The script reads
+ * through the git library installed beside it (`_git_untrusted.sh`), which turns
+ * all three off; these cases plant each one, show an unguarded git running it
+ * (the control), and watch the script leave it inert. The library's own cases
+ * are in `git_read_test.ts`.
  */
 
 /** A program that leaves `<dir>/ran` behind when run, and the marker's path. */
@@ -82,6 +91,46 @@ Deno.test("collect-audit-scope reads --path literally, never as a pathspec patte
     assertEquals(r.code, 0, r.stderr);
     assertStringIncludes(r.stdout, "SCOPE: path");
     assertEquals(count(r.stdout, "TOTAL_FILES"), 0, "`*.json` matched deno.json as a glob");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope reads nothing when the git library beside it is missing", async () => {
+  const dir = await fixtureRepo();
+  const alone = await Deno.makeTempDir({ prefix: "scope-alone-" });
+  try {
+    await Deno.copyFile(SCOPE_SOURCE, `${alone}/collect-audit-scope.sh`);
+    const r = await new Deno.Command("bash", {
+      args: [`${alone}/collect-audit-scope.sh`, "--path", "src"],
+      cwd: dir,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assertEquals(r.code, 70, new TextDecoder().decode(r.stderr));
+    assertStrictEquals(
+      new TextDecoder().decode(r.stdout),
+      "",
+      "no scope block without the library",
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(alone, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope scopes since a tag whose name carries build metadata", async () => {
+  const dir = await fixtureRepo();
+  try {
+    await git(["tag", "v1.0.0+build.7"], dir);
+    await Deno.writeTextFile(`${dir}/src/after.ts`, "export const after = 1;\n");
+    await git(["add", "."], dir);
+    await git(["commit", "-m", "feat: after the tag"], dir);
+    const r = await scope(dir, []);
+    assertEquals(r.code, 0, r.stderr);
+    assertStringIncludes(r.stdout, "SCOPE: since-tag");
+    assertStringIncludes(r.stdout, "src/after.ts", "the tag's range must have been read");
+    assertStringIncludes(r.stdout, "feat: after the tag");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

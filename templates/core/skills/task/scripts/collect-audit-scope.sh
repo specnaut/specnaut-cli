@@ -17,9 +17,19 @@
 #                             (SCOPE: last-N)
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
+#
+# Every git call goes through _git_untrusted.sh, installed beside this script: the
+# repository is unvetted, so no program its configuration names may run. The reads
+# use the library's forms; the fixed probes (rev-parse, rev-list, describe,
+# hash-object) run their fixed argv through its runner, under the same defaults.
 set -euo pipefail
-# Unvetted repository: no fsmonitor, pager or signature program it names runs; a path is literal.
-git() { command git --no-pager --literal-pathspecs -c core.fsmonitor=false -c log.showSignature=false "$@"; }
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+[ -f "$here/_git_untrusted.sh" ] || {
+  echo "error: $here/_git_untrusted.sh is missing; nothing was read" >&2
+  exit 70
+}
+# shellcheck source=SCRIPTDIR/_git_untrusted.sh
+. "$here/_git_untrusted.sh"
 
 PATH_ARG=""
 RANGE_ARG=""
@@ -94,7 +104,7 @@ while [ $# -gt 0 ]; do
 done
 
 # Git-repo guard — abort with a clear message, no block on stdout.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
@@ -165,7 +175,7 @@ if [ -n "$PATH_ARG" ]; then
   SCOPE="path"
   SCOPE_LABEL="$PATH_ARG"
   # Tracked files under the subtree; no commit list for a path scope.
-  FILES="$(git ls-files -- "$PATH_ARG" 2>/dev/null || true)"
+  FILES="$(gu_files "$PATH_ARG" 2>/dev/null || true)"
   COMMITS=""
   if [ -z "$FILES" ]; then
     echo "warning: --path '$PATH_ARG' matched no tracked files (empty scope)" >&2
@@ -173,27 +183,26 @@ if [ -n "$PATH_ARG" ]; then
 elif [ -n "$RANGE_ARG" ]; then
   SCOPE="range"
   SCOPE_LABEL="$RANGE_ARG"
-  # Trailing `--` ends option/revision parsing so a ref-shaped value can never
-  # be mistaken for a pathspec (matches the `git ls-files --` call above).
-  FILES="$(git diff --name-only "$RANGE_ARG" -- 2>/dev/null || true)"
-  COMMITS="$(git log --oneline "$RANGE_ARG" -- 2>/dev/null || true)"
-elif git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  local_count="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
+  # The library takes the two endpoints apart; each is validated again there.
+  FILES="$(gu_names "${RANGE_ARG%%..*}" "${RANGE_ARG#*..}" 2>/dev/null || true)"
+  COMMITS="$(gu_log "$RANGE_ARG" 2>/dev/null || true)"
+elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
+  local_count="$(_gu_git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
   [ "$local_count" -gt 0 ]; then
   # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
   SCOPE_LABEL="origin/main..HEAD (${local_count} commits)"
-  FILES="$(git diff --name-only origin/main..HEAD 2>/dev/null || true)"
-  COMMITS="$(git log --oneline origin/main..HEAD 2>/dev/null || true)"
-elif TAG="$(git describe --tags --abbrev=0 2>/dev/null)" && [ -n "$TAG" ]; then
+  FILES="$(gu_names origin/main HEAD 2>/dev/null || true)"
+  COMMITS="$(gu_log origin/main..HEAD 2>/dev/null || true)"
+elif TAG="$(_gu_git describe --tags --abbrev=0 2>/dev/null)" && [ -n "$TAG" ]; then
   SCOPE="since-tag"
   SCOPE_LABEL="${TAG}..HEAD"
-  FILES="$(git diff --name-only "${TAG}..HEAD" 2>/dev/null || true)"
-  COMMITS="$(git log --oneline "${TAG}..HEAD" 2>/dev/null || true)"
+  FILES="$(gu_names "$TAG" HEAD 2>/dev/null || true)"
+  COMMITS="$(gu_log "${TAG}..HEAD" 2>/dev/null || true)"
 else
   SCOPE="last-N"
   # Clamp N to the available history so HEAD~N never points before the root.
-  AVAIL="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+  AVAIL="$(_gu_git rev-list --count HEAD 2>/dev/null || echo 1)"
   N="$LAST_N"
   if [ "$N" -gt "$AVAIL" ]; then
     N="$AVAIL"
@@ -202,12 +211,12 @@ else
   if [ "$N" -ge "$AVAIL" ]; then
     # The window covers all of history; HEAD~N would precede the root, so diff
     # against the empty tree to surface every file the history touched.
-    EMPTY_TREE="$(git hash-object -t tree /dev/null)"
-    FILES="$(git diff --name-only "$EMPTY_TREE" HEAD 2>/dev/null || true)"
+    EMPTY_TREE="$(_gu_git hash-object -t tree /dev/null)"
+    FILES="$(gu_names "$EMPTY_TREE" HEAD 2>/dev/null || true)"
   else
-    FILES="$(git diff --name-only "HEAD~${N}..HEAD" 2>/dev/null || true)"
+    FILES="$(gu_names "HEAD~${N}" HEAD 2>/dev/null || true)"
   fi
-  COMMITS="$(git log --oneline -n "$N" 2>/dev/null || true)"
+  COMMITS="$(gu_log HEAD "$N" 2>/dev/null || true)"
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.

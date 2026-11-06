@@ -1,5 +1,5 @@
 import { assert } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 
 /**
  * The throwaway-repo fixture the `collect-audit-scope.sh` behaviour tests share.
@@ -8,12 +8,22 @@ import { fromFileUrl } from "@std/path";
  * definition of how the script is run.
  */
 
-const SCRIPT = fromFileUrl(
-  new URL(
-    "../../templates/core/skills/task/scripts/collect-audit-scope.sh",
-    import.meta.url,
-  ),
+export const SCOPE_SOURCE = fromFileUrl(
+  new URL("../../templates/core/skills/task/scripts/collect-audit-scope.sh", import.meta.url),
 );
+const LIBRARY = fromFileUrl(
+  new URL("../../templates/core/specnaut/scripts/bash/_git_untrusted.sh", import.meta.url),
+);
+
+/**
+ * The script runs from a folder laid out as `init` installs it: the git library
+ * beside it, as the manifest puts both under `.specnaut/scripts/audit/`.
+ */
+const INSTALLED = await Deno.makeTempDir({ prefix: "code-audit-scripts-" });
+await Deno.copyFile(SCOPE_SOURCE, join(INSTALLED, "collect-audit-scope.sh"));
+await Deno.copyFile(LIBRARY, join(INSTALLED, "_git_untrusted.sh"));
+globalThis.addEventListener("unload", () => Deno.removeSync(INSTALLED, { recursive: true }));
+const SCRIPT = join(INSTALLED, "collect-audit-scope.sh");
 
 /** Runs a command in `cwd`, returning {code, stdout, stderr}. */
 async function run(
