@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { linkEntryProblems } from "../../scripts/bundle-templates.ts";
+import { linkEntryProblems } from "../../scripts/bundle-link-entries.ts";
 
 /** The bundler refuses a context-link entry that could not do its job (cli#680). */
 
