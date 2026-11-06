@@ -1,13 +1,18 @@
-**The approval hooks are gone.** Merging and releasing no longer wait on a typed phrase, on Claude
-Code or on Codex: telling your agent to ship is the approval. They stopped delivery more often than
-they prevented a mistake: an approval lasted one message, and two hooks could each demand a
-different phrase for the same push.
+**`specnaut scan` maps a repository without a model.** It measures every tracked file's lines and
+bytes, the files and lines in each folder, a folder tree, and the functions and classes it can
+estimate, then ranks the hot spots against your size limits, in text, JSON or Mermaid. It exits 0
+when nothing is over a ceiling and 1 when a file is; an estimate never sets the exit code.
+`/task audit` now starts from that map, and `/task audit --scan` gives you the map alone. Read it as
+a pointer to where to look, never as a verdict on your architecture.
 
-Run `specnaut upgrade` and there is nothing else to do: it removes the hooks and their registrations
-from your project, and the release prompts from your Claude settings. It keeps your own hooks and
-rules. On Codex, trust the hooks again with `/hooks`, because the remaining ones changed.
+**The default size limits are Clean Code's:** file 200 / 500 lines, function 20 / 50, and a new
+`class` unit at 100 / 200. A project that sets its own values in `.specnaut/size-limits.yml` keeps
+them. A file already over its target may stay, but must not grow.
 
-`merge: manual` in `.specnaut/workflow.yml` still stops the chain once to ask before a merge; no
-hook enforces it. `/ship` no longer asks before it pushes. The refusal to edit
-`.specnaut/installed.lock` stays. To protect your base branch against anything, use your forge's
-branch protection.
+**Gates can run only what a change affects.** Declare your project's owners in
+`.specnaut/impact.json`, and `run-gate <tier> --base <rev>` runs the checks of the owners a change
+touches and of those that depend on them, and says what it skipped and why. Without the declaration,
+nothing changes.
+
+**`/specnaut issue <brief>`** reports a Specnaut problem or proposal upstream, with the exact text
+you approved.
