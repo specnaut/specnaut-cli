@@ -42,6 +42,7 @@
     "packaging/",
     "plugin/skills/",
     "plugin/agents/",
-    ".opencode/"
+    ".opencode/",
+    ".specnaut/release/history/"
   ]
 }
