@@ -30,7 +30,7 @@ ARGS=(issue edit "$NUM" --repo "$REPO")
 [ "$HAS_TITLE" = false ] || ARGS+=(--title "$TITLE")
 if [ -n "$APPEND" ]; then
   BODY=$(gh issue view "$NUM" --repo "$REPO" --json body --jq '.body') || { echo "edit.sh: could not read #$NUM's body" >&2; exit 3; }
-  DIR=$(mktemp -d "${TMPDIR:-/tmp}/specnaut-edit.XXXXXXXX")
+  DIR=$(mktemp -d "${TMPDIR:-/tmp}/backlog-edit.XXXXXXXX")
   trap 'rm -rf "$DIR"' EXIT
   chmod 700 "$DIR"
   { [ -z "$BODY" ] || printf '%s\n\n' "$BODY"; cat -- "$APPEND"; } >"$DIR/body.md"

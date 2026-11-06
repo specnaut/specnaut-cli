@@ -7658,7 +7658,7 @@ done
 [ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
 
 TMP=\${TMPDIR:-/tmp}
-DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+DIR=\$(mktemp -d "\${TMP%/}/backlog-items.XXXXXXXX") || die "could not make a temporary directory"
 trap 'rm -rf "\$DIR"' EXIT
 chmod 700 "\$DIR"
 case "\$(cd "\$DIR" && pwd -P)/" in
@@ -8341,7 +8341,7 @@ printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 stop_if_refused
 
 TMP=\${TMPDIR:-/tmp}
-WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+WORK=\$(mktemp -d "\${TMP%/}/backlog-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
 trap 'rm -rf "\$WORK"' EXIT
 chmod 700 "\$WORK"
 printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
@@ -10717,7 +10717,7 @@ done
 [ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
 
 TMP=\${TMPDIR:-/tmp}
-DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+DIR=\$(mktemp -d "\${TMP%/}/backlog-items.XXXXXXXX") || die "could not make a temporary directory"
 trap 'rm -rf "\$DIR"' EXIT
 chmod 700 "\$DIR"
 case "\$(cd "\$DIR" && pwd -P)/" in
@@ -10941,7 +10941,7 @@ ARGS=(issue edit "\$NUM" --repo "\$REPO")
 [ "\$HAS_TITLE" = false ] || ARGS+=(--title "\$TITLE")
 if [ -n "\$APPEND" ]; then
   BODY=\$(gh issue view "\$NUM" --repo "\$REPO" --json body --jq '.body') || { echo "edit.sh: could not read #\$NUM's body" >&2; exit 3; }
-  DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/specnaut-edit.XXXXXXXX")
+  DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-edit.XXXXXXXX")
   trap 'rm -rf "\$DIR"' EXIT
   chmod 700 "\$DIR"
   { [ -z "\$BODY" ] || printf '%s\\n\\n' "\$BODY"; cat -- "\$APPEND"; } >"\$DIR/body.md"
@@ -11411,7 +11411,7 @@ printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 stop_if_refused
 
 TMP=\${TMPDIR:-/tmp}
-WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+WORK=\$(mktemp -d "\${TMP%/}/backlog-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
 trap 'rm -rf "\$WORK"' EXIT
 chmod 700 "\$WORK"
 printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
@@ -12979,7 +12979,7 @@ done
 [ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
 
 TMP=\${TMPDIR:-/tmp}
-DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+DIR=\$(mktemp -d "\${TMP%/}/backlog-items.XXXXXXXX") || die "could not make a temporary directory"
 trap 'rm -rf "\$DIR"' EXIT
 chmod 700 "\$DIR"
 case "\$(cd "\$DIR" && pwd -P)/" in
@@ -13704,7 +13704,7 @@ printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 stop_if_refused
 
 TMP=\${TMPDIR:-/tmp}
-WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+WORK=\$(mktemp -d "\${TMP%/}/backlog-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
 trap 'rm -rf "\$WORK"' EXIT
 chmod 700 "\$WORK"
 printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
@@ -14746,7 +14746,7 @@ done
 [ -n "\$NONCE" ] || die "could not draw a nonce the issue text does not hold"
 
 TMP=\${TMPDIR:-/tmp}
-DIR=\$(mktemp -d "\${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+DIR=\$(mktemp -d "\${TMP%/}/backlog-items.XXXXXXXX") || die "could not make a temporary directory"
 trap 'rm -rf "\$DIR"' EXIT
 chmod 700 "\$DIR"
 case "\$(cd "\$DIR" && pwd -P)/" in
@@ -15287,7 +15287,7 @@ printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 stop_if_refused
 
 TMP=\${TMPDIR:-/tmp}
-WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+WORK=\$(mktemp -d "\${TMP%/}/backlog-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
 trap 'rm -rf "\$WORK"' EXIT
 chmod 700 "\$WORK"
 printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"

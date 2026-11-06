@@ -107,7 +107,7 @@ printf '%s' "$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \(.)"'
 stop_if_refused
 
 TMP=${TMPDIR:-/tmp}
-WORK=$(mktemp -d "${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+WORK=$(mktemp -d "${TMP%/}/backlog-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
 chmod 700 "$WORK"
 printf '%s' "$RESULT" | jq_lf -c '.ops[]' >"$WORK/ops.jsonl"

@@ -112,7 +112,7 @@ done
 [ -n "$NONCE" ] || die "could not draw a nonce the issue text does not hold"
 
 TMP=${TMPDIR:-/tmp}
-DIR=$(mktemp -d "${TMP%/}/specnaut-items.XXXXXXXX") || die "could not make a temporary directory"
+DIR=$(mktemp -d "${TMP%/}/backlog-items.XXXXXXXX") || die "could not make a temporary directory"
 trap 'rm -rf "$DIR"' EXIT
 chmod 700 "$DIR"
 case "$(cd "$DIR" && pwd -P)/" in
