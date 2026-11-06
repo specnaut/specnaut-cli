@@ -48,12 +48,20 @@ const denied = (path: string) =>
 Deno.test("deny: the shipped settings deny exactly the credential and secret env reads", () => {
   assertEquals(SHIPPED, [
     "Read(~/.config/gh/**)",
+    "Read(~/.config/glab-cli/**)",
     "Read(~/.specnaut/credentials*)",
     "Read(**/.env)",
     "Read(**/.env.local)",
     "Read(**/.env.*.local)",
     "Read(**/.env.production)",
   ]);
+});
+
+Deno.test("deny: the GitHub and GitLab CLIs' credential directories are denied", () => {
+  for (const p of ["~/.config/gh/hosts.yml", "~/.config/glab-cli/config.yml"]) {
+    assert(denied(p), `${p} should be denied`);
+  }
+  assert(!denied("~/.config/other/config.yml"), "another tool's config stays readable");
 });
 
 Deno.test("deny: a secret env file is denied, a committed template env file stays readable", () => {

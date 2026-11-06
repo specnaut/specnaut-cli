@@ -34487,6 +34487,7 @@ prompts cost more tokens and drift out of relevance.
   "permissions": {
     "deny": [
       "Read(~/.config/gh/**)",
+      "Read(~/.config/glab-cli/**)",
       "Read(~/.specnaut/credentials*)",
       "Read(**/.env)",
       "Read(**/.env.local)",
