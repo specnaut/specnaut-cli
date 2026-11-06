@@ -11,8 +11,9 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_config.sh
 . "$here/_config.sh"
 
-# GitLab records no reason for closing an issue (item-record.sh).
-PLAN_CANNOT='["close:not_planned"]'
+# GitLab records no reason for closing an issue (item-record.sh), and its
+# set-field.sh writes scoped labels: no date or estimate.
+PLAN_CANNOT='["close:not_planned", "classify:StartDate", "classify:TargetDate", "classify:Estimate"]'
 CLOSE_IS_MOVE=0
 
 # The columns move.sh accepts.

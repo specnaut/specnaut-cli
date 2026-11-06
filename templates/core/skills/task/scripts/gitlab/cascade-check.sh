@@ -11,6 +11,10 @@
 #          3  the parent could not be read, OR its children could not be read
 #          2  usage error — no argument, or an argument that is not a number
 #
+# --numbers <n>  lists the children instead: every child's number, open or
+#          closed, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A `close <id>` read passes them to read-items.sh.
+#
 # EVERY non-zero exit means "do not close". Exit 3 covers a failed
 # enumeration: this script answers a safety question, and a question it could
 # not answer must never read as a yes. It does NOT cover being called wrong —
@@ -21,8 +25,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
+NUMBERS=false
+if [ "${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <issue-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <issue-number>' >&2
   exit 2
 fi
 NUM=$(require_issue_number "$1") || exit 2
@@ -58,7 +64,7 @@ if [ -z "$PARENT_STATE" ]; then
   exit 3
 fi
 
-if [ "$PARENT_STATE" = "closed" ]; then
+if [ "$PARENT_STATE" = "closed" ] && [ "$NUMBERS" = false ]; then
   echo "ℹ #$NUM is already closed — nothing to gate"
   exit 12
 fi
@@ -89,6 +95,10 @@ TOTAL=$(printf '%s' "$CHILDREN" | jq_lf 'length' 2>/dev/null || echo "")
 if [ -z "$TOTAL" ]; then
   echo "✗ the child listing for #$NUM was not readable JSON — refusing to answer" >&2
   exit 3
+fi
+if [ "$NUMBERS" = true ]; then
+  printf '%s' "$CHILDREN" | jq_lf -r '.[] | .iid | numbers | tostring' | grep -E '^[1-9][0-9]{0,9}$' || true
+  exit 0
 fi
 OPEN_LIST=$(printf '%s' "$CHILDREN" \
   | jq_lf -r '.[] | select(.state == "opened") | "  - #\(.iid) — \(.title)"')

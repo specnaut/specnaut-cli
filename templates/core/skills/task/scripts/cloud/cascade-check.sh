@@ -10,6 +10,10 @@
 #          3  the parent does not exist, or the lookup failed
 #          2  usage error
 #
+# --numbers <n>  lists the children instead: every child's number, whatever
+#          its column, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A `close <id>` read passes them to read-items.sh.
+#
 # --- Which column means "done" -------------------------------------------
 # The hosted board's columns are the project's own: an order and a name, and
 # nothing that declares one terminal. So this takes the LAST column by order
@@ -24,8 +28,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
+NUMBERS=false
+if [ "${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <task-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <task-number>' >&2
   exit 2
 fi
 NUM=$(require_issue_number "$1") || exit 2
@@ -45,7 +51,7 @@ if [ -z "$TERMINAL_ID" ]; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
 fi
-echo "  terminal column: \"$TERMINAL_NAME\" (order $TERMINAL_ORDER of $COLUMN_COUNT)"
+[ "$NUMBERS" = true ] || echo "  terminal column: \"$TERMINAL_NAME\" (order $TERMINAL_ORDER of $COLUMN_COUNT)"
 
 rc=0
 PARENT=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM") || rc=$?
@@ -55,7 +61,7 @@ if [ "$rc" -ne 0 ] || [ -z "$PARENT" ]; then
 fi
 
 PARENT_COL=$(printf '%s' "$PARENT" | jq_lf -r '.task.columnId // empty')
-if [ "$PARENT_COL" = "$TERMINAL_ID" ]; then
+if [ "$PARENT_COL" = "$TERMINAL_ID" ] && [ "$NUMBERS" = false ]; then
   echo "ℹ #$NUM is already in \"$TERMINAL_NAME\" — nothing to gate"
   exit 12
 fi
@@ -74,6 +80,10 @@ if ! printf '%s' "$KIDS" | jq_lf -e '.tasks | type == "array"' >/dev/null 2>&1; 
   exit 3
 fi
 
+if [ "$NUMBERS" = true ]; then
+  printf '%s' "$KIDS" | jq_lf -r '.tasks[] | .number | numbers | tostring' | grep -E '^[1-9][0-9]{0,9}$' || true
+  exit 0
+fi
 OPEN_LIST=$(printf '%s' "$KIDS" | jq_lf -r --arg term "$TERMINAL_ID" --argjson cols "$COLS" '
   ($cols.columns | map({ (.id): .name }) | add) as $names
   | .tasks // []

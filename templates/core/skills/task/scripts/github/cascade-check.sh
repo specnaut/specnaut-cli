@@ -12,6 +12,10 @@
 #             meaning "the gate could not answer"
 #          2  usage error — no argument, or an argument that is not a number
 #
+# --numbers <n>  lists the children instead: every child's number, open or
+#          closed, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A `close <id>` read passes them to read-items.sh.
+#
 # EVERY non-zero exit means "do not close". Exit 3 covers a failed
 # enumeration: this script answers a safety question, and a question it could
 # not answer must never read as a yes. It does NOT cover being called wrong —
@@ -22,8 +26,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
+NUMBERS=false
+if [ "${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <issue-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <issue-number>' >&2
   exit 2
 fi
 NUM=$(require_issue_number "$1") || exit 2
@@ -57,7 +63,7 @@ fi
 # Already-closed short-circuit: callers that trust exit 0 would issue a
 # redundant `gh issue close` and get a 422. Surface this explicitly so
 # wrappers (PO agent, CI) treat non-zero as "stop, don't close again".
-if [ "$PARENT_STATE" = "closed" ]; then
+if [ "$PARENT_STATE" = "closed" ] && [ "$NUMBERS" = false ]; then
   echo "ℹ #$NUM is already closed — nothing to gate"
   exit 12
 fi
@@ -77,13 +83,23 @@ fi
 # The parent lookup above already fails closed, and the `cloud` backend's
 # sibling is written this way throughout (`rc=0; cmd || rc=$?`, then a check).
 # This call was the one that failed open.
+#
+# One child a line: a newline in a title would otherwise read as a child of its
+# own, so it is folded to a space. --numbers asks for the number alone.
+JQ='.[] | "\(.state)\t#\(.number) — \(.title | gsub("[\r\n]"; " "))"'
+[ "$NUMBERS" = false ] || JQ='.[] | .number'
 rc=0
 CHILDREN=$(gh api --paginate "repos/$REPO_OWNER/$REPO_NAME/issues/$NUM/sub_issues" \
-  --jq '.[] | "\(.state)\t#\(.number) — \(.title)"' 2>/dev/null) || rc=$?
+  --jq "$JQ" 2>/dev/null) || rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "✗ could not read the children of #$NUM — refusing to answer" >&2
   echo "  This is not a verdict: the gate could not see the sub-issues." >&2
   exit 3
+fi
+
+if [ "$NUMBERS" = true ]; then
+  printf '%s\n' "$CHILDREN" | tr -d '\r' | grep -E '^[1-9][0-9]{0,9}$' || true
+  exit 0
 fi
 
 # One read, both uses. The blocked path used to issue a SECOND unpaginated

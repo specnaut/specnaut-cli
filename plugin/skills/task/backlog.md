@@ -27,9 +27,10 @@ and `view.sh` inspect state.
 1. **Read.** `bash .specnaut/scripts/backlog/read-items.sh <verb> [--id <n>] [<n>... | --status
    <column>]`. `<verb>` is one `scope_for` lists in `_backlog_scope.sh` (`add`, `edit`, `estimate`,
    `close`, `groom`, `tech-debt`, `next`, `status`, `brief`); `--id` is the item it acts on (for
-   `add`, the parent the user named); for `close <id>`, pass the children's numbers too. A
-   column's numbers are `list.sh --numbers <column>`. Keep only the `ITEMS_FILE:` path, and never
-   open that file. Exit 2: report its stderr and dispatch nothing.
+   `add`, the parent the user named). A column's numbers are `list.sh --numbers <column>`;
+   `close <id>` also passes its children, `cascade-check.sh --numbers <id>` (a non-zero exit: stop).
+   Keep only the `ITEMS_FILE:` path, and never open that file. Exit 2: report its stderr and
+   dispatch nothing.
 2. **Dispatch** the `product-owner` with the verb, the user's request and that path — no item text.
 3. **Take only its last `BACKLOG PLAN` block** and Write the lines between its fences, verbatim,
    with the Write tool, to `plan.jsonl` in a fresh directory (`d=$(mktemp -d) && chmod 700 "$d"`) —

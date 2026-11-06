@@ -9,13 +9,19 @@
 #          12 the parent is already done — nothing to gate
 #          3  the parent does not exist
 #          2  usage error
+#
+# --numbers <n>  lists the children instead: every child's number, whatever
+#          its status, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A `close <id>` read passes them to read-items.sh.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
+NUMBERS=false
+if [ "${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <task-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <task-number>' >&2
   exit 2
 fi
 NUM=$(require_issue_number "$1") || exit 2
@@ -53,7 +59,7 @@ fi
 # trusts exit 0 would otherwise close it a second time.
 # move.sh writes `Done`; the check is case-blind, so `done` reads the same.
 PARENT_STATUS=$(_fm "$PARENT_FILE" status | tr '[:upper:]' '[:lower:]')
-if [ "$PARENT_STATUS" = "done" ]; then
+if [ "$PARENT_STATUS" = "done" ] && [ "$NUMBERS" = false ]; then
   echo "ℹ #$NUM is already done — nothing to gate"
   exit 12
 fi
@@ -72,6 +78,12 @@ for f in "$BACKLOG_DIR"/*.md; do
   p=$(_fm "$f" parent)
   [[ $p =~ ^[0-9]{1,10}$ ]] && [ "$((10#$p))" = "$NUM" ] || continue
   TOTAL=$((TOTAL + 1))
+  if [ "$NUMBERS" = true ]; then
+    n=${f##*/}
+    n=${n%%-*}
+    [[ $n =~ ^[0-9]{1,10}$ ]] && [ "$((10#$n))" -gt 0 ] && echo "$((10#$n))"
+    continue
+  fi
   st=$(_fm "$f" status | tr '[:upper:]' '[:lower:]')
   case "$st" in
     done | deferred) continue ;;
@@ -81,6 +93,7 @@ for f in "$BACKLOG_DIR"/*.md; do
 "
 done
 
+[ "$NUMBERS" = false ] || exit 0
 if [ "$OPEN" -gt 0 ]; then
   echo "✗ #$NUM has $OPEN open child task(s) of $TOTAL — close them first"
   printf '%s' "$OPEN_LIST"

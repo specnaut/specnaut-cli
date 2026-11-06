@@ -3,8 +3,9 @@
 # bundled executor. The checks, the operations, the output lines and the exit
 # table are the shared body, `_apply_plan.sh`, beside this file; the plan's
 # vocabulary is `_backlog_plan.sh`. This file supplies only what the task files
-# answer differently: no labels, no issue type, and a close that is the move
-# to Done. Its RECEIPT names the files it changed, for the caller to stage.
+# answer differently: no labels, no issue type, date or estimate, and a close
+# that is the move to Done. Its RECEIPT names the files it changed, for the
+# caller to stage.
 #
 # Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
 set -euo pipefail
@@ -12,7 +13,8 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_config.sh
 . "$here/_config.sh"
 
-PLAN_CANNOT='["label", "create:labels", "classify:IssueType"]'
+PLAN_CANNOT='["label", "create:labels", "classify:IssueType", "classify:StartDate", "classify:TargetDate",
+  "classify:Estimate"]'
 CLOSE_IS_MOVE=1
 
 # The columns move.sh accepts.

@@ -16,14 +16,15 @@ _SCOPE_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 #   edit <id>        {id}
 #   estimate <id>    {id}, classification only
 #   close <id>       {id}, and its children among the items read once the
-#                    executor's own cascade-check.sh <id> exits 0
+#                    executor's own cascade-check.sh <id> exits 0: the
+#                    numbers its --numbers mode lists, the read's too
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
-#   tech-debt        create only
+#   tech-debt        create; classify and label only the items it creates
 #   next, status     nothing: a read, whose plan is empty
 #   brief <id>       nothing, for {id}
 scope_for() {
-  local verb=${1:-} id=${2:-} n p
+  local verb=${1:-} id=${2:-} n kids
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
   case $verb in
     add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=$id ;;
@@ -31,7 +32,7 @@ scope_for() {
     estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=$id ;;
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=${ITEMS_READ:-} ;;
-    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    tech-debt) SCOPE_OPS="create classify label" SCOPE_REFS=true ;;
     next | status | brief) ;;
     *) return 2 ;;
   esac
@@ -40,11 +41,11 @@ scope_for() {
     tech-debt | next | status) [ -z "$id" ] || return 2 ;;
   esac
   if [ "$verb" = close ] && [ -n "${ITEMS_READ:-}" ] &&
-    bash "$_SCOPE_DIR/cascade-check.sh" "$id" >/dev/null 2>&1; then
+    bash "$_SCOPE_DIR/cascade-check.sh" "$id" >/dev/null 2>&1 &&
+    kids=$(bash "$_SCOPE_DIR/cascade-check.sh" --numbers "$id" 2>/dev/null); then
     for n in $ITEMS_READ; do
       [ "$n" != "$id" ] || continue
-      p=$(bash "$_SCOPE_DIR/parent-of.sh" "$n" 2>/dev/null) || continue
-      [ "${p#"${p%%[!0]*}"}" != "$id" ] || SCOPE_TARGETS="$SCOPE_TARGETS $n"
+      printf '%s\n' "$kids" | tr -d '\r' | grep -qxF "$n" && SCOPE_TARGETS="$SCOPE_TARGETS $n"
     done
   fi
   return 0

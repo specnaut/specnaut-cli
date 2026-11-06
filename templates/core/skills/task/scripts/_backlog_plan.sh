@@ -25,6 +25,9 @@
 #   status          one of the board's own columns, never Done: an item reaches
 #                   Done through `close`, behind its cascade check
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
+#                   number 0 to 9999, at most two decimals. A backend without an
+#                   axis answers UNSUPPORTED (its PLAN_CANNOT `classify:<axis>`)
 #   labels          1 to 10 of the repository's existing labels
 #   reason          completed or not_planned
 #   title           one line, 1 to 256 characters, every one `inert` (_issue_text.sh)
@@ -77,7 +80,12 @@ PLAN_JQ='
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
     link: {target: "target", parent: "target"} };
-  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
+    StartDate: "date", TargetDate: "date", Estimate: "number"};
+  def axis_value($a): (axes[$a]) as $s
+    | if $s == "date" then type == "string" and test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")
+      elif $s == "number" then type == "number" and . >= 0 and . <= 9999 and (tostring | test("^[0-9]+(\\.[0-9]{1,2})?$"))
+      else . as $v | any($s[]; . == $v) end;
   def shown: if type == "string" and test("^[a-z_]{1,32}$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}$");
@@ -95,7 +103,8 @@ PLAN_JQ='
     elif $kind == "status" then (if ($v | type) == "string" and ($v | ascii_downcase) != "done"
       and any($statuses[]; . == $v) then null else "status" end)
     elif $kind == "axis" then (if ($v | type) == "string" and (axes | has($v)) then null else "axis" end)
-    elif $kind == "value" then ((axes[$o.axis | strings] // []) as $vs | if any($vs[]; . == $v) then null else "value" end)
+    elif $kind == "value" then (if ($o.axis | type) == "string" and (axes | has($o.axis)) and ($v | axis_value($o.axis))
+      then null else "value" end)
     elif $kind == "labels" then (if ($v | type) == "array" and ($v | length) >= 1 and ($v | length) <= 10
       and all($v[]; type == "string" and plan_title and (index(",") == null) and (. as $l | any($labels[]; . == $l)))
       then null else "label" end)

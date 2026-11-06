@@ -68,9 +68,9 @@ The PO will:
      GitHub backend only; the session runs `detect-fields.sh` once per run,
      which emits `TARGETDATE_FIELD_ID=` / `STARTDATE_FIELD_ID=` **empty** when
      the field is absent, and hands them to the PO in the dispatch.
-     **Both IDs empty → say nothing.** A field present: the plan has no date
-     operation, so the report carries `⚠ no target date set` /
-     `⚠ no start date set` for the item, and the run moves on.
+     **Both IDs empty → say nothing.** A field present: a `classify` line
+     (`TargetDate` / `StartDate`) when the item fixes a date; else the report
+     carries `⚠ no target date set` / `⚠ no start date set`, and moves on.
   4. **Decide the outcome:**
      - **Promote to the ready column** (a `move` line to `$READY`) when the
        body is clear, both labels are applied, AND no scope decisions remain.

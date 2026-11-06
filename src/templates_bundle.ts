@@ -2148,9 +2148,10 @@ and \`view.sh\` inspect state.
 1. **Read.** \`bash .specnaut/scripts/backlog/read-items.sh <verb> [--id <n>] [<n>... | --status
    <column>]\`. \`<verb>\` is one \`scope_for\` lists in \`_backlog_scope.sh\` (\`add\`, \`edit\`, \`estimate\`,
    \`close\`, \`groom\`, \`tech-debt\`, \`next\`, \`status\`, \`brief\`); \`--id\` is the item it acts on (for
-   \`add\`, the parent the user named); for \`close <id>\`, pass the children's numbers too. A
-   column's numbers are \`list.sh --numbers <column>\`. Keep only the \`ITEMS_FILE:\` path, and never
-   open that file. Exit 2: report its stderr and dispatch nothing.
+   \`add\`, the parent the user named). A column's numbers are \`list.sh --numbers <column>\`;
+   \`close <id>\` also passes its children, \`cascade-check.sh --numbers <id>\` (a non-zero exit: stop).
+   Keep only the \`ITEMS_FILE:\` path, and never open that file. Exit 2: report its stderr and
+   dispatch nothing.
 2. **Dispatch** the \`product-owner\` with the verb, the user's request and that path — no item text.
 3. **Take only its last \`BACKLOG PLAN\` block** and Write the lines between its fences, verbatim,
    with the Write tool, to \`plan.jsonl\` in a fresh directory (\`d=\$(mktemp -d) && chmod 700 "\$d"\`) —
@@ -2462,9 +2463,9 @@ The PO will:
      GitHub backend only; the session runs \`detect-fields.sh\` once per run,
      which emits \`TARGETDATE_FIELD_ID=\` / \`STARTDATE_FIELD_ID=\` **empty** when
      the field is absent, and hands them to the PO in the dispatch.
-     **Both IDs empty → say nothing.** A field present: the plan has no date
-     operation, so the report carries \`⚠ no target date set\` /
-     \`⚠ no start date set\` for the item, and the run moves on.
+     **Both IDs empty → say nothing.** A field present: a \`classify\` line
+     (\`TargetDate\` / \`StartDate\`) when the item fixes a date; else the report
+     carries \`⚠ no target date set\` / \`⚠ no start date set\`, and moves on.
   4. **Decide the outcome:**
      - **Promote to the ready column** (a \`move\` line to \`\$READY\`) when the
        body is clear, both labels are applied, AND no scope decisions remain.
@@ -4883,12 +4884,12 @@ ones.
 5. **Bounded context** (soft) — a \`domain:<context>\` label; optional on mono-domain projects, but
    every brief's \`## Domain Model\` carries a \`Bounded context:\` field. An item touching ≥ 2
    contexts → the epic detection heuristic, reason "cross-bounded-context".
-6. **Target date** (soft, GitHub only) — the plan has no date operation. **Gated:** the dispatch
-   carries the session's field-detection lines, whose \`TARGETDATE_FIELD_ID\` is *empty* on a
-   board with no such field — the axis does not exist there: say nothing. Otherwise
-   \`⚠ no target date set\`, never a block.
-7. **Start date** (soft, GitHub only) — the same gate on \`STARTDATE_FIELD_ID\`; empty → silent.
-   Otherwise \`⚠ no start date set\`, never a block. **Estimate** has no operation either.
+6. **Target date** (soft, GitHub only) — a \`classify\` line, axis \`TargetDate\`. **Gated:** the
+   dispatch carries the session's field-detection lines, whose \`TARGETDATE_FIELD_ID\` is *empty* on
+   a board with no such field — the axis does not exist there: say nothing. Otherwise, with no
+   date to set, \`⚠ no target date set\`, never a block.
+7. **Start date** (soft, GitHub only) — axis \`StartDate\`, the same gate on \`STARTDATE_FIELD_ID\`;
+   empty → silent. Otherwise \`⚠ no start date set\`. **Estimate** — axis \`Estimate\`, gated alike.
 
 A hard axis your plan cannot set, or a \`FAILED classify\` the session hands back, MUST appear as
 \`⚠ classification incomplete\` — a silent skip is a contract violation.
@@ -4966,9 +4967,9 @@ A developer report's \`Tech debt surfaced\` block, one line per item:
 the open items the items file holds (list the duplicates), and \`create\` the rest: label
 \`tech-debt\`, priority **P0 or P1** — the \`task\` skill's \`phases/review.md\` (§ 🔒 Route by the cost
 of the FIX) says why anything that cleared that bar is never lower. Body: \`Surfaced by #<id>.\`, the
-quoted one-liner, \`Location: <path>:<line>\`, \`Deferred because: <reason>\`. The verb creates only, so
-the summary names each new item's Type, Size and Priority for a later \`edit\`, or says "all covered
-by #X, #Y". The numbers created are the executor's \`APPLIED create\` lines.
+quoted one-liner, \`Location: <path>:<line>\`, \`Deferred because: <reason>\`. Each \`create\` names a
+\`ref\`, and the plan classifies and labels that ref — the verb touches no existing item. Or the
+summary says "all covered by #X, #Y". The numbers created are the executor's \`APPLIED create\` lines.
 `,
     executable: false,
     backend: null,
@@ -7305,13 +7306,19 @@ exit 0
 #          12 the parent is already done — nothing to gate
 #          3  the parent does not exist
 #          2  usage error
+#
+# --numbers <n>  lists the children instead: every child's number, whatever
+#          its status, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A \`close <id>\` read passes them to read-items.sh.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "\$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <task-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <task-number>' >&2
   exit 2
 fi
 NUM=\$(require_issue_number "\$1") || exit 2
@@ -7349,7 +7356,7 @@ fi
 # trusts exit 0 would otherwise close it a second time.
 # move.sh writes \`Done\`; the check is case-blind, so \`done\` reads the same.
 PARENT_STATUS=\$(_fm "\$PARENT_FILE" status | tr '[:upper:]' '[:lower:]')
-if [ "\$PARENT_STATUS" = "done" ]; then
+if [ "\$PARENT_STATUS" = "done" ] && [ "\$NUMBERS" = false ]; then
   echo "ℹ #\$NUM is already done — nothing to gate"
   exit 12
 fi
@@ -7368,6 +7375,12 @@ for f in "\$BACKLOG_DIR"/*.md; do
   p=\$(_fm "\$f" parent)
   [[ \$p =~ ^[0-9]{1,10}\$ ]] && [ "\$((10#\$p))" = "\$NUM" ] || continue
   TOTAL=\$((TOTAL + 1))
+  if [ "\$NUMBERS" = true ]; then
+    n=\${f##*/}
+    n=\${n%%-*}
+    [[ \$n =~ ^[0-9]{1,10}\$ ]] && [ "\$((10#\$n))" -gt 0 ] && echo "\$((10#\$n))"
+    continue
+  fi
   st=\$(_fm "\$f" status | tr '[:upper:]' '[:lower:]')
   case "\$st" in
     done | deferred) continue ;;
@@ -7377,6 +7390,7 @@ for f in "\$BACKLOG_DIR"/*.md; do
 "
 done
 
+[ "\$NUMBERS" = false ] || exit 0
 if [ "\$OPEN" -gt 0 ]; then
   echo "✗ #\$NUM has \$OPEN open child task(s) of \$TOTAL — close them first"
   printf '%s' "\$OPEN_LIST"
@@ -7762,8 +7776,9 @@ ISSUE_TEXT_JQ='
 # bundled executor. The checks, the operations, the output lines and the exit
 # table are the shared body, \`_apply_plan.sh\`, beside this file; the plan's
 # vocabulary is \`_backlog_plan.sh\`. This file supplies only what the task files
-# answer differently: no labels, no issue type, and a close that is the move
-# to Done. Its RECEIPT names the files it changed, for the caller to stage.
+# answer differently: no labels, no issue type, date or estimate, and a close
+# that is the move to Done. Its RECEIPT names the files it changed, for the
+# caller to stage.
 #
 # Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
 set -euo pipefail
@@ -7771,7 +7786,8 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_config.sh
 . "\$here/_config.sh"
 
-PLAN_CANNOT='["label", "create:labels", "classify:IssueType"]'
+PLAN_CANNOT='["label", "create:labels", "classify:IssueType", "classify:StartDate", "classify:TargetDate",
+  "classify:Estimate"]'
 CLOSE_IS_MOVE=1
 
 # The columns move.sh accepts.
@@ -7982,6 +7998,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   status          one of the board's own columns, never Done: an item reaches
 #                   Done through \`close\`, behind its cascade check
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
+#                   number 0 to 9999, at most two decimals. A backend without an
+#                   axis answers UNSUPPORTED (its PLAN_CANNOT \`classify:<axis>\`)
 #   labels          1 to 10 of the repository's existing labels
 #   reason          completed or not_planned
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
@@ -8034,7 +8053,12 @@ PLAN_JQ='
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
     link: {target: "target", parent: "target"} };
-  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
+    StartDate: "date", TargetDate: "date", Estimate: "number"};
+  def axis_value(\$a): (axes[\$a]) as \$s
+    | if \$s == "date" then type == "string" and test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\$")
+      elif \$s == "number" then type == "number" and . >= 0 and . <= 9999 and (tostring | test("^[0-9]+(\\\\.[0-9]{1,2})?\$"))
+      else . as \$v | any(\$s[]; . == \$v) end;
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
@@ -8052,7 +8076,8 @@ PLAN_JQ='
     elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
       and any(\$statuses[]; . == \$v) then null else "status" end)
     elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
-    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "value" then (if (\$o.axis | type) == "string" and (axes | has(\$o.axis)) and (\$v | axis_value(\$o.axis))
+      then null else "value" end)
     elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
       and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
       then null else "label" end)
@@ -8133,14 +8158,15 @@ _SCOPE_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #   edit <id>        {id}
 #   estimate <id>    {id}, classification only
 #   close <id>       {id}, and its children among the items read once the
-#                    executor's own cascade-check.sh <id> exits 0
+#                    executor's own cascade-check.sh <id> exits 0: the
+#                    numbers its --numbers mode lists, the read's too
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
-#   tech-debt        create only
+#   tech-debt        create; classify and label only the items it creates
 #   next, status     nothing: a read, whose plan is empty
 #   brief <id>       nothing, for {id}
 scope_for() {
-  local verb=\${1:-} id=\${2:-} n p
+  local verb=\${1:-} id=\${2:-} n kids
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
   case \$verb in
     add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
@@ -8148,7 +8174,7 @@ scope_for() {
     estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
-    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    tech-debt) SCOPE_OPS="create classify label" SCOPE_REFS=true ;;
     next | status | brief) ;;
     *) return 2 ;;
   esac
@@ -8157,11 +8183,11 @@ scope_for() {
     tech-debt | next | status) [ -z "\$id" ] || return 2 ;;
   esac
   if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
-    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1 &&
+    kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$id" 2>/dev/null); then
     for n in \$ITEMS_READ; do
       [ "\$n" != "\$id" ] || continue
-      p=\$(bash "\$_SCOPE_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
-      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+      printf '%s\\n' "\$kids" | tr -d '\\r' | grep -qxF "\$n" && SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
     done
   fi
   return 0
@@ -10297,6 +10323,10 @@ echo "done."
 #             meaning "the gate could not answer"
 #          2  usage error — no argument, or an argument that is not a number
 #
+# --numbers <n>  lists the children instead: every child's number, open or
+#          closed, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A \`close <id>\` read passes them to read-items.sh.
+#
 # EVERY non-zero exit means "do not close". Exit 3 covers a failed
 # enumeration: this script answers a safety question, and a question it could
 # not answer must never read as a yes. It does NOT cover being called wrong —
@@ -10307,8 +10337,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "\$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <issue-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <issue-number>' >&2
   exit 2
 fi
 NUM=\$(require_issue_number "\$1") || exit 2
@@ -10342,7 +10374,7 @@ fi
 # Already-closed short-circuit: callers that trust exit 0 would issue a
 # redundant \`gh issue close\` and get a 422. Surface this explicitly so
 # wrappers (PO agent, CI) treat non-zero as "stop, don't close again".
-if [ "\$PARENT_STATE" = "closed" ]; then
+if [ "\$PARENT_STATE" = "closed" ] && [ "\$NUMBERS" = false ]; then
   echo "ℹ #\$NUM is already closed — nothing to gate"
   exit 12
 fi
@@ -10362,13 +10394,23 @@ fi
 # The parent lookup above already fails closed, and the \`cloud\` backend's
 # sibling is written this way throughout (\`rc=0; cmd || rc=\$?\`, then a check).
 # This call was the one that failed open.
+#
+# One child a line: a newline in a title would otherwise read as a child of its
+# own, so it is folded to a space. --numbers asks for the number alone.
+JQ='.[] | "\\(.state)\\t#\\(.number) — \\(.title | gsub("[\\r\\n]"; " "))"'
+[ "\$NUMBERS" = false ] || JQ='.[] | .number'
 rc=0
 CHILDREN=\$(gh api --paginate "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM/sub_issues" \\
-  --jq '.[] | "\\(.state)\\t#\\(.number) — \\(.title)"' 2>/dev/null) || rc=\$?
+  --jq "\$JQ" 2>/dev/null) || rc=\$?
 if [ "\$rc" -ne 0 ]; then
   echo "✗ could not read the children of #\$NUM — refusing to answer" >&2
   echo "  This is not a verdict: the gate could not see the sub-issues." >&2
   exit 3
+fi
+
+if [ "\$NUMBERS" = true ]; then
+  printf '%s\\n' "\$CHILDREN" | tr -d '\\r' | grep -E '^[1-9][0-9]{0,9}\$' || true
+  exit 0
 fi
 
 # One read, both uses. The blocked path used to issue a SECOND unpaginated
@@ -11014,6 +11056,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   status          one of the board's own columns, never Done: an item reaches
 #                   Done through \`close\`, behind its cascade check
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
+#                   number 0 to 9999, at most two decimals. A backend without an
+#                   axis answers UNSUPPORTED (its PLAN_CANNOT \`classify:<axis>\`)
 #   labels          1 to 10 of the repository's existing labels
 #   reason          completed or not_planned
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
@@ -11066,7 +11111,12 @@ PLAN_JQ='
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
     link: {target: "target", parent: "target"} };
-  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
+    StartDate: "date", TargetDate: "date", Estimate: "number"};
+  def axis_value(\$a): (axes[\$a]) as \$s
+    | if \$s == "date" then type == "string" and test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\$")
+      elif \$s == "number" then type == "number" and . >= 0 and . <= 9999 and (tostring | test("^[0-9]+(\\\\.[0-9]{1,2})?\$"))
+      else . as \$v | any(\$s[]; . == \$v) end;
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
@@ -11084,7 +11134,8 @@ PLAN_JQ='
     elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
       and any(\$statuses[]; . == \$v) then null else "status" end)
     elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
-    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "value" then (if (\$o.axis | type) == "string" and (axes | has(\$o.axis)) and (\$v | axis_value(\$o.axis))
+      then null else "value" end)
     elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
       and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
       then null else "label" end)
@@ -11165,14 +11216,15 @@ _SCOPE_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #   edit <id>        {id}
 #   estimate <id>    {id}, classification only
 #   close <id>       {id}, and its children among the items read once the
-#                    executor's own cascade-check.sh <id> exits 0
+#                    executor's own cascade-check.sh <id> exits 0: the
+#                    numbers its --numbers mode lists, the read's too
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
-#   tech-debt        create only
+#   tech-debt        create; classify and label only the items it creates
 #   next, status     nothing: a read, whose plan is empty
 #   brief <id>       nothing, for {id}
 scope_for() {
-  local verb=\${1:-} id=\${2:-} n p
+  local verb=\${1:-} id=\${2:-} n kids
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
   case \$verb in
     add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
@@ -11180,7 +11232,7 @@ scope_for() {
     estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
-    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    tech-debt) SCOPE_OPS="create classify label" SCOPE_REFS=true ;;
     next | status | brief) ;;
     *) return 2 ;;
   esac
@@ -11189,11 +11241,11 @@ scope_for() {
     tech-debt | next | status) [ -z "\$id" ] || return 2 ;;
   esac
   if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
-    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1 &&
+    kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$id" 2>/dev/null); then
     for n in \$ITEMS_READ; do
       [ "\$n" != "\$id" ] || continue
-      p=\$(bash "\$_SCOPE_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
-      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+      printf '%s\\n' "\$kids" | tr -d '\\r' | grep -qxF "\$n" && SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
     done
   fi
   return 0
@@ -12525,6 +12577,10 @@ echo "done."
 #          3  the parent could not be read, OR its children could not be read
 #          2  usage error — no argument, or an argument that is not a number
 #
+# --numbers <n>  lists the children instead: every child's number, open or
+#          closed, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A \`close <id>\` read passes them to read-items.sh.
+#
 # EVERY non-zero exit means "do not close". Exit 3 covers a failed
 # enumeration: this script answers a safety question, and a question it could
 # not answer must never read as a yes. It does NOT cover being called wrong —
@@ -12535,8 +12591,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "\$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <issue-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <issue-number>' >&2
   exit 2
 fi
 NUM=\$(require_issue_number "\$1") || exit 2
@@ -12572,7 +12630,7 @@ if [ -z "\$PARENT_STATE" ]; then
   exit 3
 fi
 
-if [ "\$PARENT_STATE" = "closed" ]; then
+if [ "\$PARENT_STATE" = "closed" ] && [ "\$NUMBERS" = false ]; then
   echo "ℹ #\$NUM is already closed — nothing to gate"
   exit 12
 fi
@@ -12603,6 +12661,10 @@ TOTAL=\$(printf '%s' "\$CHILDREN" | jq_lf 'length' 2>/dev/null || echo "")
 if [ -z "\$TOTAL" ]; then
   echo "✗ the child listing for #\$NUM was not readable JSON — refusing to answer" >&2
   exit 3
+fi
+if [ "\$NUMBERS" = true ]; then
+  printf '%s' "\$CHILDREN" | jq_lf -r '.[] | .iid | numbers | tostring' | grep -E '^[1-9][0-9]{0,9}\$' || true
+  exit 0
 fi
 OPEN_LIST=\$(printf '%s' "\$CHILDREN" \\
   | jq_lf -r '.[] | select(.state == "opened") | "  - #\\(.iid) — \\(.title)"')
@@ -13019,8 +13081,9 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_config.sh
 . "\$here/_config.sh"
 
-# GitLab records no reason for closing an issue (item-record.sh).
-PLAN_CANNOT='["close:not_planned"]'
+# GitLab records no reason for closing an issue (item-record.sh), and its
+# set-field.sh writes scoped labels: no date or estimate.
+PLAN_CANNOT='["close:not_planned", "classify:StartDate", "classify:TargetDate", "classify:Estimate"]'
 CLOSE_IS_MOVE=0
 
 # The columns move.sh accepts.
@@ -13269,6 +13332,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   status          one of the board's own columns, never Done: an item reaches
 #                   Done through \`close\`, behind its cascade check
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
+#                   number 0 to 9999, at most two decimals. A backend without an
+#                   axis answers UNSUPPORTED (its PLAN_CANNOT \`classify:<axis>\`)
 #   labels          1 to 10 of the repository's existing labels
 #   reason          completed or not_planned
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
@@ -13321,7 +13387,12 @@ PLAN_JQ='
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
     link: {target: "target", parent: "target"} };
-  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
+    StartDate: "date", TargetDate: "date", Estimate: "number"};
+  def axis_value(\$a): (axes[\$a]) as \$s
+    | if \$s == "date" then type == "string" and test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\$")
+      elif \$s == "number" then type == "number" and . >= 0 and . <= 9999 and (tostring | test("^[0-9]+(\\\\.[0-9]{1,2})?\$"))
+      else . as \$v | any(\$s[]; . == \$v) end;
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
@@ -13339,7 +13410,8 @@ PLAN_JQ='
     elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
       and any(\$statuses[]; . == \$v) then null else "status" end)
     elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
-    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "value" then (if (\$o.axis | type) == "string" and (axes | has(\$o.axis)) and (\$v | axis_value(\$o.axis))
+      then null else "value" end)
     elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
       and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
       then null else "label" end)
@@ -13420,14 +13492,15 @@ _SCOPE_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #   edit <id>        {id}
 #   estimate <id>    {id}, classification only
 #   close <id>       {id}, and its children among the items read once the
-#                    executor's own cascade-check.sh <id> exits 0
+#                    executor's own cascade-check.sh <id> exits 0: the
+#                    numbers its --numbers mode lists, the read's too
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
-#   tech-debt        create only
+#   tech-debt        create; classify and label only the items it creates
 #   next, status     nothing: a read, whose plan is empty
 #   brief <id>       nothing, for {id}
 scope_for() {
-  local verb=\${1:-} id=\${2:-} n p
+  local verb=\${1:-} id=\${2:-} n kids
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
   case \$verb in
     add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
@@ -13435,7 +13508,7 @@ scope_for() {
     estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
-    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    tech-debt) SCOPE_OPS="create classify label" SCOPE_REFS=true ;;
     next | status | brief) ;;
     *) return 2 ;;
   esac
@@ -13444,11 +13517,11 @@ scope_for() {
     tech-debt | next | status) [ -z "\$id" ] || return 2 ;;
   esac
   if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
-    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1 &&
+    kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$id" 2>/dev/null); then
     for n in \$ITEMS_READ; do
       [ "\$n" != "\$id" ] || continue
-      p=\$(bash "\$_SCOPE_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
-      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+      printf '%s\\n' "\$kids" | tr -d '\\r' | grep -qxF "\$n" && SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
     done
   fi
   return 0
@@ -14260,6 +14333,10 @@ fi
 #          3  the parent does not exist, or the lookup failed
 #          2  usage error
 #
+# --numbers <n>  lists the children instead: every child's number, whatever
+#          its column, one a line and nothing else, then exit 0 (3 and 2 as
+#          above). A \`close <id>\` read passes them to read-items.sh.
+#
 # --- Which column means "done" -------------------------------------------
 # The hosted board's columns are the project's own: an order and a name, and
 # nothing that declares one terminal. So this takes the LAST column by order
@@ -14274,8 +14351,10 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+NUMBERS=false
+if [ "\${1:-}" = --numbers ]; then NUMBERS=true; shift; fi
 if [ "\$#" -lt 1 ]; then
-  echo 'usage: cascade-check.sh <task-number>' >&2
+  echo 'usage: cascade-check.sh [--numbers] <task-number>' >&2
   exit 2
 fi
 NUM=\$(require_issue_number "\$1") || exit 2
@@ -14295,7 +14374,7 @@ if [ -z "\$TERMINAL_ID" ]; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
 fi
-echo "  terminal column: \\"\$TERMINAL_NAME\\" (order \$TERMINAL_ORDER of \$COLUMN_COUNT)"
+[ "\$NUMBERS" = true ] || echo "  terminal column: \\"\$TERMINAL_NAME\\" (order \$TERMINAL_ORDER of \$COLUMN_COUNT)"
 
 rc=0
 PARENT=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM") || rc=\$?
@@ -14305,7 +14384,7 @@ if [ "\$rc" -ne 0 ] || [ -z "\$PARENT" ]; then
 fi
 
 PARENT_COL=\$(printf '%s' "\$PARENT" | jq_lf -r '.task.columnId // empty')
-if [ "\$PARENT_COL" = "\$TERMINAL_ID" ]; then
+if [ "\$PARENT_COL" = "\$TERMINAL_ID" ] && [ "\$NUMBERS" = false ]; then
   echo "ℹ #\$NUM is already in \\"\$TERMINAL_NAME\\" — nothing to gate"
   exit 12
 fi
@@ -14324,6 +14403,10 @@ if ! printf '%s' "\$KIDS" | jq_lf -e '.tasks | type == "array"' >/dev/null 2>&1;
   exit 3
 fi
 
+if [ "\$NUMBERS" = true ]; then
+  printf '%s' "\$KIDS" | jq_lf -r '.tasks[] | .number | numbers | tostring' | grep -E '^[1-9][0-9]{0,9}\$' || true
+  exit 0
+fi
 OPEN_LIST=\$(printf '%s' "\$KIDS" | jq_lf -r --arg term "\$TERMINAL_ID" --argjson cols "\$COLS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
   | .tasks // []
@@ -14790,6 +14873,9 @@ receipt_snapshot() { :; }
 #   status          one of the board's own columns, never Done: an item reaches
 #                   Done through \`close\`, behind its cascade check
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
+#                   number 0 to 9999, at most two decimals. A backend without an
+#                   axis answers UNSUPPORTED (its PLAN_CANNOT \`classify:<axis>\`)
 #   labels          1 to 10 of the repository's existing labels
 #   reason          completed or not_planned
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
@@ -14842,7 +14928,12 @@ PLAN_JQ='
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
     link: {target: "target", parent: "target"} };
-  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
+    StartDate: "date", TargetDate: "date", Estimate: "number"};
+  def axis_value(\$a): (axes[\$a]) as \$s
+    | if \$s == "date" then type == "string" and test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\$")
+      elif \$s == "number" then type == "number" and . >= 0 and . <= 9999 and (tostring | test("^[0-9]+(\\\\.[0-9]{1,2})?\$"))
+      else . as \$v | any(\$s[]; . == \$v) end;
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
@@ -14860,7 +14951,8 @@ PLAN_JQ='
     elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
       and any(\$statuses[]; . == \$v) then null else "status" end)
     elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
-    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "value" then (if (\$o.axis | type) == "string" and (axes | has(\$o.axis)) and (\$v | axis_value(\$o.axis))
+      then null else "value" end)
     elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
       and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
       then null else "label" end)
@@ -14941,14 +15033,15 @@ _SCOPE_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #   edit <id>        {id}
 #   estimate <id>    {id}, classification only
 #   close <id>       {id}, and its children among the items read once the
-#                    executor's own cascade-check.sh <id> exits 0
+#                    executor's own cascade-check.sh <id> exits 0: the
+#                    numbers its --numbers mode lists, the read's too
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
-#   tech-debt        create only
+#   tech-debt        create; classify and label only the items it creates
 #   next, status     nothing: a read, whose plan is empty
 #   brief <id>       nothing, for {id}
 scope_for() {
-  local verb=\${1:-} id=\${2:-} n p
+  local verb=\${1:-} id=\${2:-} n kids
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
   case \$verb in
     add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
@@ -14956,7 +15049,7 @@ scope_for() {
     estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
-    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    tech-debt) SCOPE_OPS="create classify label" SCOPE_REFS=true ;;
     next | status | brief) ;;
     *) return 2 ;;
   esac
@@ -14965,11 +15058,11 @@ scope_for() {
     tech-debt | next | status) [ -z "\$id" ] || return 2 ;;
   esac
   if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
-    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    bash "\$_SCOPE_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1 &&
+    kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$id" 2>/dev/null); then
     for n in \$ITEMS_READ; do
       [ "\$n" != "\$id" ] || continue
-      p=\$(bash "\$_SCOPE_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
-      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+      printf '%s\\n' "\$kids" | tr -d '\\r' | grep -qxF "\$n" && SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
     done
   fi
   return 0

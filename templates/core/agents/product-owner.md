@@ -87,12 +87,12 @@ ones.
 5. **Bounded context** (soft) — a `domain:<context>` label; optional on mono-domain projects, but
    every brief's `## Domain Model` carries a `Bounded context:` field. An item touching ≥ 2
    contexts → the epic detection heuristic, reason "cross-bounded-context".
-6. **Target date** (soft, GitHub only) — the plan has no date operation. **Gated:** the dispatch
-   carries the session's field-detection lines, whose `TARGETDATE_FIELD_ID` is *empty* on a
-   board with no such field — the axis does not exist there: say nothing. Otherwise
-   `⚠ no target date set`, never a block.
-7. **Start date** (soft, GitHub only) — the same gate on `STARTDATE_FIELD_ID`; empty → silent.
-   Otherwise `⚠ no start date set`, never a block. **Estimate** has no operation either.
+6. **Target date** (soft, GitHub only) — a `classify` line, axis `TargetDate`. **Gated:** the
+   dispatch carries the session's field-detection lines, whose `TARGETDATE_FIELD_ID` is *empty* on
+   a board with no such field — the axis does not exist there: say nothing. Otherwise, with no
+   date to set, `⚠ no target date set`, never a block.
+7. **Start date** (soft, GitHub only) — axis `StartDate`, the same gate on `STARTDATE_FIELD_ID`;
+   empty → silent. Otherwise `⚠ no start date set`. **Estimate** — axis `Estimate`, gated alike.
 
 A hard axis your plan cannot set, or a `FAILED classify` the session hands back, MUST appear as
 `⚠ classification incomplete` — a silent skip is a contract violation.
@@ -170,6 +170,6 @@ A developer report's `Tech debt surfaced` block, one line per item:
 the open items the items file holds (list the duplicates), and `create` the rest: label
 `tech-debt`, priority **P0 or P1** — the `task` skill's `phases/review.md` (§ 🔒 Route by the cost
 of the FIX) says why anything that cleared that bar is never lower. Body: `Surfaced by #<id>.`, the
-quoted one-liner, `Location: <path>:<line>`, `Deferred because: <reason>`. The verb creates only, so
-the summary names each new item's Type, Size and Priority for a later `edit`, or says "all covered
-by #X, #Y". The numbers created are the executor's `APPLIED create` lines.
+quoted one-liner, `Location: <path>:<line>`, `Deferred because: <reason>`. Each `create` names a
+`ref`, and the plan classifies and labels that ref — the verb touches no existing item. Or the
+summary says "all covered by #X, #Y". The numbers created are the executor's `APPLIED create` lines.
