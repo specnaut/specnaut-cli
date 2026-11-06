@@ -17,7 +17,7 @@ export class GitObjects implements GitObjectReader {
   readonly #git: UntrustedGit;
 
   /** `prefix` is the project's folder under git's top level: `""`, or `sub/dir/`. */
-  private constructor(cwd: string, private readonly prefix: string) {
+  private constructor(cwd: string, readonly projectPrefix: string) {
     this.#git = new UntrustedGit(cwd);
   }
 
@@ -58,7 +58,7 @@ export class GitObjects implements GitObjectReader {
   }
 
   async listTree(commit: string, dir: string): Promise<BaseEntry[]> {
-    const records = await this.#lsTree(commit, ["-r", "--", `${this.prefix}${dir}`]);
+    const records = await this.#lsTree(commit, ["-r", "--", `${this.projectPrefix}${dir}`]);
     const blobs = records.filter((r) => r.kind === "blob");
     const bytes = await this.#catFiles(blobs.map((r) => r.sha));
     return records.map((r): BaseEntry =>
@@ -67,15 +67,15 @@ export class GitObjects implements GitObjectReader {
   }
 
   async readFile(commit: string, path: string): Promise<BaseFile> {
-    const [record] = await this.#lsTree(commit, ["--", `${this.prefix}${path}`]);
+    const [record] = await this.#lsTree(commit, ["--", `${this.projectPrefix}${path}`]);
     if (record === undefined || record.path !== path) return { kind: "absent" };
     if (record.kind !== "blob") return { kind: "not_regular" };
     return { kind: "blob", bytes: (await this.#catFiles([record.sha])).get(record.sha)! };
   }
 
-  async changedNames(from: string, to: string): Promise<Uint8Array> {
-    const args = ["-r", "--name-only", "--no-renames", ...PLAIN_DIFF_FLAGS, from, to];
-    return await this.#git.run("diff-tree", args);
+  async changedNames(from: string, to: string): Promise<string[]> {
+    const args = ["-r", "-z", "--name-only", "--no-renames", ...PLAIN_DIFF_FLAGS, from, to];
+    return decode(await this.#git.run("diff-tree", args)).split("\0").filter(Boolean);
   }
 
   /** `ls-tree -z --full-tree`, paths made project-relative; a tree entry is not listed. */
@@ -84,8 +84,8 @@ export class GitObjects implements GitObjectReader {
     const records: TreeRecord[] = [];
     for (const line of out.split("\0")) {
       const m = /^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s.exec(line);
-      if (m === null || !m[4].startsWith(this.prefix)) continue;
-      const path = m[4].slice(this.prefix.length);
+      if (m === null || !m[4].startsWith(this.projectPrefix)) continue;
+      const path = m[4].slice(this.projectPrefix.length);
       if (m[1] === "160000") records.push({ kind: "submodule", path });
       else if (m[1] === "120000") records.push({ kind: "link", path });
       else if (m[2] === "blob") records.push({ kind: "blob", path, sha: m[3] });

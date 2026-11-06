@@ -18,8 +18,11 @@ import { findHarness } from "../harnesses.ts";
  *
  * Exits 0 and 1 print, in order, `BASE <merge-base sha>`, `BASE_TIP <sha>`, `BASE_BRANCH <name>`,
  * `NAMES_FILE <path>` (the paths changed since BASE, one per line, in a new temp file outside the
- * repository), the `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. Every other
- * exit ends with `VERDICT scripts untrusted` too. A caller trusts the scripts only on exit 0 with
+ * repository), `NAMES_RELATIVE_TO <folder>` (those paths are relative to the project's folder,
+ * named from the repository's top, `.` at the top), `SCRIPTS_DIGEST <sha256>` (the folder's bytes
+ * as walked: what a user's approval covers), the `UNTRUSTED` lines, and last
+ * `VERDICT scripts trusted|untrusted`. Every other exit, a crash included, ends with
+ * `VERDICT scripts untrusted` too. A caller trusts the scripts only on exit 0 with
  * that final `trusted` line and a full `BASE` sha; anything else, the binary missing included, is
  * untrusted. `scripts` names the class checked, so others can be added without breaking a caller.
  */
@@ -31,7 +34,7 @@ export type VerifyScriptsDeps = {
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
   readonly open: (cwd: string) => Promise<{ git: GitObjectReader; walker: ScriptTreeWalker }>;
-  readonly writeNames: (names: Uint8Array) => Promise<string>;
+  readonly writeNames: (names: string) => Promise<string>;
 };
 
 function defaultDeps(): VerifyScriptsDeps {
@@ -42,17 +45,17 @@ function defaultDeps(): VerifyScriptsDeps {
     open: async (cwd) => ({ git: await GitObjects.open(cwd), walker: new FsScriptTreeWalker(cwd) }),
     writeNames: async (names) => {
       const path = await Deno.makeTempFile({ prefix: "specnaut-names-" });
-      await Deno.writeFile(path, names);
+      await Deno.writeTextFile(path, names);
       return path;
     },
   };
 }
 
 export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()): Promise<number> {
-  if (!await exists(`${deps.cwd}/.specnaut`)) {
-    return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
-  }
   try {
+    if (!await exists(`${deps.cwd}/.specnaut`)) {
+      return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
+    }
     const { git, walker } = await deps.open(deps.cwd);
     const outcome = await verifyScripts({ git, walker, core: CORE_BUNDLE, findHarness });
     return await answer(outcome, deps);
@@ -66,11 +69,14 @@ async function answer(outcome: VerifyOutcome, deps: VerifyScriptsDeps): Promise<
   if (outcome.kind === "base_unknown") {
     return refuse(deps, EXIT.couldNotRun, `the base is unknown: ${outcome.why}`);
   }
+  const names = outcome.names.map((n) => `${terminalText(n)}\n`).join("");
   const lines = [
     `BASE ${outcome.base}`,
     `BASE_TIP ${outcome.baseTip}`,
     `BASE_BRANCH ${outcome.baseBranch}`,
-    `NAMES_FILE ${terminalText(await deps.writeNames(outcome.names))}`,
+    `NAMES_FILE ${terminalText(await deps.writeNames(names))}`,
+    `NAMES_RELATIVE_TO ${terminalText(outcome.namesRelativeTo)}`,
+    `SCRIPTS_DIGEST ${outcome.digest}`,
     ...outcome.verdict.untrusted.map((u) =>
       `UNTRUSTED ${terminalText(u.path)} ${terminalText(u.reason)}`
     ),

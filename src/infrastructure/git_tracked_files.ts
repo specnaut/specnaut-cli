@@ -17,7 +17,7 @@ import { DenoFsReader } from "./fs_reader.ts";
 import { GitRefused, UntrustedGit } from "./untrusted_git.ts";
 
 /**
- * Reads an unvetted repository safely (plan § 5): the one home of whether a tracked path may be
+ * Reads an unvetted repository safely: the one home of whether a tracked path may be
  * opened, and of where its root is. How git runs against it is `untrusted_git.ts`'s; the scan asks
  * it three subcommands, `rev-parse`, `ls-files` and `check-attr`.
  */

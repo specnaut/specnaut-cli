@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch } from "@std/assert";
+import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
 import { join } from "@std/path";
 import {
   advanceBase,
@@ -30,6 +30,8 @@ Deno.test("a branch that leaves the helpers alone is trusted, and every field is
   assertMatch(v.field("BASE")!, SHA);
   assertEquals(v.field("BASE_TIP"), v.field("BASE"));
   assertEquals(v.field("BASE_BRANCH"), "main");
+  assertEquals(v.field("NAMES_RELATIVE_TO"), ".");
+  assertMatch(v.field("SCRIPTS_DIGEST")!, /^[0-9a-f]{64}$/);
   assertEquals(await Deno.readTextFile(v.field("NAMES_FILE")!), "src/a.ts\n");
   assertEquals(v.field("NAMES_FILE")!.startsWith(root), false, "NAMES_FILE is inside the repo");
 });
@@ -42,6 +44,8 @@ Deno.test("a branch that edits a helper is untrusted, names it, and still prints
   assertEquals([v.code, v.lines.at(-1)], [1, "VERDICT scripts untrusted"], v.stderr);
   assertEquals(v.untrusted, [`${GIT_READ} differs from base`]);
   assertMatch(v.field("BASE")!, SHA);
+  const clean = await fixture();
+  assertNotEquals(v.field("SCRIPTS_DIGEST"), (await verify(clean.root)).field("SCRIPTS_DIGEST"));
   assertEquals(await Deno.readTextFile(v.field("NAMES_FILE")!), `${GIT_READ}\n`);
 });
 
@@ -109,7 +113,11 @@ Deno.test("a project in a folder under the repository's top is judged at its own
   await commitAll(root, "edit");
   const v = await verify(project);
   assertEquals(v.untrusted, [`${GIT_READ} differs from base`]);
-  assertEquals(await Deno.readTextFile(v.field("NAMES_FILE")!), `app/${GIT_READ}\n`);
+  await write(root, { "lib/x.ts": "x\n" });
+  await commitAll(root, "outside the project");
+  const after = await verify(project);
+  assertEquals(after.field("NAMES_RELATIVE_TO"), "app");
+  assertEquals(await Deno.readTextFile(after.field("NAMES_FILE")!), `${GIT_READ}\n../lib/x.ts\n`);
 });
 
 Deno.test("no base it can name: exit 3, and the last line is still untrusted", async () => {

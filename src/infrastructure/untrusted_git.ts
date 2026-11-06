@@ -137,25 +137,28 @@ export function untrustedGitEnv(
 
 /** The one spawn of git in the binary's reads of an unvetted repository. */
 async function spawnGit(cwd: string, args: string[], input?: Uint8Array): Promise<GitResult> {
+  const child = start(cwd, args, input !== undefined);
+  const [out] = await Promise.all([child.output(), input && writeAll(child.stdin, input)]);
+  const why = new TextDecoder().decode(out.stderr).trim().split("\n")[0].slice(0, 300);
+  return { code: out.code, stdout: out.stdout, why };
+}
+
+function start(cwd: string, args: string[], piped: boolean): Deno.ChildProcess {
   const command = new Deno.Command("git", {
     args,
     cwd,
     clearEnv: true,
     env: untrustedGitEnv((name) => Deno.env.get(name)),
-    stdin: input === undefined ? "null" : "piped",
+    stdin: piped ? "piped" : "null",
     stdout: "piped",
     stderr: "piped",
   });
-  let child: Deno.ChildProcess;
   try {
-    child = command.spawn();
+    return command.spawn();
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) throw new GitRefused("git is not on the PATH");
     throw err;
   }
-  const [out] = await Promise.all([child.output(), input && writeAll(child.stdin, input)]);
-  const why = new TextDecoder().decode(out.stderr).trim().split("\n")[0].slice(0, 300);
-  return { code: out.code, stdout: out.stdout, why };
 }
 
 async function writeAll(stream: WritableStream<Uint8Array>, bytes: Uint8Array): Promise<void> {

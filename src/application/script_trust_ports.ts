@@ -16,6 +16,8 @@ export type BaseFile =
  * repository's configuration names. Paths in and out are relative to the project's folder.
  */
 export interface GitObjectReader {
+  /** The project's folder under git's top level: `""` at the top, else `sub/dir/`. */
+  readonly projectPrefix: string;
   /** The full ref `refs/remotes/origin/HEAD` points at, or `null`. */
   originHead(): Promise<string | null>;
   /** The user's global `init.defaultBranch`, includes not followed, or `null`. */
@@ -29,8 +31,8 @@ export interface GitObjectReader {
   /** Every entry under `dir` at `commit`, recursively. */
   listTree(commit: string, dir: string): Promise<BaseEntry[]>;
   readFile(commit: string, path: string): Promise<BaseFile>;
-  /** The paths changed between two commits, from the repository's top, one per line. */
-  changedNames(from: string, to: string): Promise<Uint8Array>;
+  /** The paths changed between two commits, from the repository's top. */
+  changedNames(from: string, to: string): Promise<string[]>;
 }
 
 /** Walks the scripts folder of the work tree, following no link. */
