@@ -28,7 +28,7 @@ Deno.test("the bundle ships the seats these cases read", () => {
   assert(seats.some((s) => isReadOnlyGrant(toolsOf(s.content))), "no read-only seat to check");
 });
 
-Deno.test("Codex runs every seat whose grant has no write, edit or shell in its read-only sandbox", () => {
+Deno.test("Codex runs every bundled seat with a read-only grant in its read-only sandbox", () => {
   const out = new CodexHarness().mapBundle(seats, OPTS);
   for (const seat of seats) {
     const toml = parseToml(out[`.codex/agents/${seat.name}.toml`].content);
@@ -62,32 +62,28 @@ function agentEntry(name: string, tools: string | null): CoreBundle[number] {
   };
 }
 
-Deno.test("CodexHarness runs a grant with no write, edit or shell in the read-only sandbox", () => {
-  const agent = agentEntry;
+Deno.test("CodexHarness runs only a grant of tools that run and write nothing read-only", () => {
   const mapped = new CodexHarness().mapBundle([
-    agent("reader", "Read, Grep, Glob"),
-    agent("fetcher", "Read, WebFetch"),
-    agent("shell", "Read, Bash"),
-    agent("patterned", "Read, Bash(echo *)"),
-    agent("writer", "Read, Write"),
-    agent("editor", "Read, Edit"),
-    agent("untooled", null),
-  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+    agentEntry("agented", "Read, Agent(developer)"),
+    agentEntry("reader", "Read, Grep, Glob"),
+    agentEntry("fetcher", "Read, WebFetch"),
+    agentEntry("shell", "Read, Bash"),
+    agentEntry("patterned", "Read, Bash(echo *)"),
+    agentEntry("writer", "Read, Write"),
+    agentEntry("editor", "Read, Edit"),
+    agentEntry("untooled", null),
+  ], OPTS);
   const sandbox = (name: string) =>
     parseToml(mapped[`.codex/agents/${name}.toml`].content).sandbox_mode;
   assertEquals(sandbox("reader"), "read-only");
   assertEquals(sandbox("fetcher"), "read-only");
-  for (const name of ["shell", "patterned", "writer", "editor", "untooled"]) {
+  for (const name of ["agented", "shell", "patterned", "writer", "editor", "untooled"]) {
     assertEquals(sandbox(name), undefined, `${name} must keep the session's sandbox`);
   }
 });
 
 Deno.test("agent with a read-only grant denies write, edit and the shell by name", () => {
-  const bundle = new OpenCodeHarness().mapBundle([agentEntry("seat", "Read, Grep, Glob")], {
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
-  });
+  const bundle = new OpenCodeHarness().mapBundle([agentEntry("seat", "Read, Grep, Glob")], OPTS);
   const content = bundle[".opencode/agents/specnaut-seat.md"].content;
   assertStringIncludes(content, "read: allow");
   for (const key of ["write", "edit", "bash", "webfetch", "websearch"]) {
@@ -96,18 +92,14 @@ Deno.test("agent with a read-only grant denies write, edit and the shell by name
 });
 
 Deno.test("agent maps NotebookEdit to edit", () => {
-  const bundle = new OpenCodeHarness().mapBundle([agentEntry("nb", "Read, NotebookEdit")], {
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
-  });
+  const bundle = new OpenCodeHarness().mapBundle([agentEntry("nb", "Read, NotebookEdit")], OPTS);
   assertStringIncludes(bundle[".opencode/agents/specnaut-nb.md"].content, "edit: allow");
 });
 
 Deno.test("agent grants nothing for Grep/Glob/Task/TodoWrite and unknowns, and denies the rest", () => {
   const bundle = new OpenCodeHarness().mapBundle([
     agentEntry("dev", "Grep, Glob, Task, TodoWrite, Mystery"),
-  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  ], OPTS);
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.includes("allow"), false);
   for (const key of ["write", "edit", "bash", "webfetch", "websearch"]) {

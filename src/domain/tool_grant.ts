@@ -8,8 +8,8 @@
  * - **Claude Code** enforces the list itself: a tool not named is not there.
  * - **OpenCode** gets an explicit `deny` for every capability not granted,
  *   rather than silence, which would leave OpenCode's own default in force.
- * - **Codex** has no per-tool list; a grant with no write, edit or shell runs
- *   in its `read-only` sandbox. That sandbox stops writes and network, not
+ * - **Codex** has no per-tool list; a grant naming only tools that run and
+ *   write nothing runs in its `read-only` sandbox. That sandbox stops writes and network, not
  *   command execution, and a parent session started with full access may
  *   override it.
  * - **Antigravity** receives the line verbatim; what it enforces is its own.
@@ -34,8 +34,21 @@ const TOOL_TO_CAPABILITY: Readonly<Record<string, Capability>> = {
   WebSearch: "websearch",
 };
 
-/** The tool names of a `tools:` value, split at depth 0, each specifier dropped. */
-export function toolNames(tools: string): string[] {
+/**
+ * Tools that run nothing and write nothing. A grant is read-only only when every
+ * tool it names is one of these: an unknown name, or `Agent`, which spawns seats
+ * whose own grants this line does not bound, is not.
+ */
+const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  "Read",
+  "Grep",
+  "Glob",
+  "WebFetch",
+  "WebSearch",
+]);
+
+/** The entries of a `tools:` value, split at depth 0, each specifier kept. */
+export function toolEntries(tools: string): string[] {
   const out: string[] = [];
   let depth = 0;
   let current = "";
@@ -50,7 +63,12 @@ export function toolNames(tools: string): string[] {
     }
   }
   out.push(current);
-  return out.map((t) => t.replace(/\(.*$/s, "").trim()).filter((t) => t.length > 0);
+  return out.map((t) => t.trim()).filter((t) => t.length > 0);
+}
+
+/** The tool names of a `tools:` value, each specifier dropped. */
+export function toolNames(tools: string): string[] {
+  return toolEntries(tools).map((t) => t.replace(/\(.*$/s, "").trim());
 }
 
 /**
@@ -68,9 +86,8 @@ export function grantedCapabilities(tools: string | null): ReadonlySet<Capabilit
   return out;
 }
 
-/** True when a `tools:` value is present and grants no write, edit or shell. */
+/** True when a `tools:` value is present and names only tools that run and write nothing. */
 export function isReadOnlyGrant(tools: string | null): boolean {
-  const granted = grantedCapabilities(tools);
-  if (granted === null) return false;
-  return !granted.has("write") && !granted.has("edit") && !granted.has("bash");
+  if (tools === null || tools.trim().length === 0) return false;
+  return toolNames(tools).every((name) => READ_ONLY_TOOLS.has(name));
 }

@@ -14,13 +14,13 @@ import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
 import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
-import { CAPABILITIES, grantedCapabilities } from "../../domain/tool_grant.ts";
+import { CAPABILITIES, type Capability, grantedCapabilities } from "../../domain/tool_grant.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
 
 /** How OpenCode allows each capability a seat is granted. */
-const ALLOWED: Readonly<Record<string, PermissionValue>> = {
+const ALLOWED: Readonly<Record<Capability, PermissionValue>> = {
   read: "allow",
   write: "allow",
   edit: "allow",

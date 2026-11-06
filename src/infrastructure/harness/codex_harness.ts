@@ -58,8 +58,8 @@ function toCodexSubagentToml(entry: CoreEntry): string {
     name: entry.name,
     description: description || `Specnaut ${entry.name} agent`,
     ...(reasoning ? { model_reasoning_effort: reasoning } : {}),
-    // Codex has no per-tool list: a grant with no write, edit or shell is its
-    // read-only sandbox (`src/domain/tool_grant.ts` says what that does not stop).
+    // Codex has no per-tool list: a grant naming only tools that run and write
+    // nothing is its read-only sandbox (`src/domain/tool_grant.ts` says what that does not stop).
     ...(isReadOnlyGrant(tools) ? { sandbox_mode: "read-only" } : {}),
     developer_instructions: body,
   });

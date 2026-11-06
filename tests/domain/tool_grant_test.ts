@@ -4,6 +4,7 @@ import {
   type Capability,
   grantedCapabilities,
   isReadOnlyGrant,
+  toolEntries,
   toolNames,
 } from "../../src/domain/tool_grant.ts";
 
@@ -39,12 +40,25 @@ Deno.test("no tools line is not an empty grant: the harness default applies", ()
   assertEquals(isReadOnlyGrant(null), false);
 });
 
-Deno.test("a grant is read-only only when it holds no write, edit or shell", () => {
+Deno.test("a grant is read-only only when every tool it names runs and writes nothing", () => {
   assert(isReadOnlyGrant("Read, Grep, Glob"));
   assert(isReadOnlyGrant("Read, WebFetch, Grep"));
   for (const tools of ["Read, Bash", "Read, Bash(echo *)", "Read, Write", "Edit", "NotebookEdit"]) {
     assertEquals(isReadOnlyGrant(tools), false, tools);
   }
+});
+
+Deno.test("an unknown tool or an Agent grant is never read-only", () => {
+  for (
+    const tools of ["Read, Mystery", "Read, Agent(developer)", "Read, Agent", "Read, TodoWrite"]
+  ) {
+    assertEquals(isReadOnlyGrant(tools), false, tools);
+  }
+});
+
+Deno.test("toolEntries keeps each specifier; toolNames drops it", () => {
+  assertEquals(toolEntries("Read, Agent(a, b), Bash(x *)"), ["Read", "Agent(a, b)", "Bash(x *)"]);
+  assertEquals(toolNames("Read, Agent(a, b), Bash(x *)"), ["Read", "Agent", "Bash"]);
 });
 
 Deno.test("the enforceable capabilities are the six a renderer can deny", () => {
