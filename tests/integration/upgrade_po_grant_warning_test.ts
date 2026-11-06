@@ -43,7 +43,8 @@ const CASES = [
   {
     harness: "opencode",
     path: agentFile(AGENT_FOLDERS.opencode, "product-owner"),
-    from: '  "*": deny\n',
+    // An older copy: no wildcard, and no named deny for the shell or a write.
+    from: '  "*": deny\n  bash: deny\n  edit: deny\n  write: deny\n',
     to: "",
     grants: "Bash, Write, Edit",
   },
