@@ -14,57 +14,13 @@ import { readAdmitted } from "./bounded_file_read.ts";
 import { NAME, parseStage } from "./git_stage_listing.ts";
 import { resolveProjectRoot } from "./fs_containment.ts";
 import { DenoFsReader } from "./fs_reader.ts";
+import { GitRefused, UntrustedGit } from "./untrusted_git.ts";
 
 /**
- * Reads an unvetted repository safely (plan § 5): the one home of how git runs against it, of
- * whether a tracked path may be opened, and of where its root is.
- *
- * "Read-only" git still runs programs a repository names: a plain `git ls-files` spawns whatever
- * `core.fsmonitor` says (probed 2026-11-05). So every call turns that off, takes pathspecs
- * literally, asks for no optional lock, and is one of three subcommands; `safe.directory` is never
- * passed, so a refusal stays a refusal.
+ * Reads an unvetted repository safely (plan § 5): the one home of whether a tracked path may be
+ * opened, and of where its root is. How git runs against it is `untrusted_git.ts`'s; the scan asks
+ * it three subcommands, `rev-parse`, `ls-files` and `check-attr`.
  */
-
-/** The repository cannot be scanned at all: no work tree, no git, a refused root. Exit 3. */
-class ScanRefused extends Error {}
-
-const GIT = [
-  "--no-pager",
-  "--literal-pathspecs",
-  "-c",
-  "core.fsmonitor=false",
-  "-c",
-  "core.quotePath=false",
-];
-type Subcommand = "rev-parse" | "ls-files" | "check-attr";
-
-async function git(cwd: string, sub: Subcommand, args: string[], input?: Uint8Array) {
-  const child = spawnGit(cwd, [...GIT, sub, ...args], input !== undefined);
-  const [out] = await Promise.all([child.output(), input && writeAll(child.stdin, input)]);
-  if (out.success) return out.stdout;
-  const why = new TextDecoder().decode(out.stderr).trim().split("\n")[0].slice(0, 300);
-  throw new ScanRefused(`git ${sub} failed: ${why || `exit ${out.code}`}`);
-}
-
-/** The one spawn of git in the scan, with no optional lock taken. */
-function spawnGit(cwd: string, args: string[], piped: boolean): Deno.ChildProcess {
-  const stdin = piped ? "piped" : "null";
-  const env = { GIT_OPTIONAL_LOCKS: "0" };
-  const out = "piped";
-  const command = new Deno.Command("git", { args, cwd, env, stdin, stdout: out, stderr: out });
-  try {
-    return command.spawn();
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) throw new ScanRefused("git is not on the PATH");
-    throw err;
-  }
-}
-
-async function writeAll(stream: WritableStream<Uint8Array>, bytes: Uint8Array): Promise<void> {
-  const writer = stream.getWriter();
-  await writer.write(bytes);
-  await writer.close();
-}
 
 /**
  * The repository `cwd` is in, rooted at git's top level and never at `cwd`: run from a
@@ -76,18 +32,18 @@ export async function openGitRepository(
   cwd: string,
   warn: (message: string) => void = () => {},
 ): Promise<GitTrackedFiles> {
-  const out = await git(cwd, "rev-parse", ["--show-toplevel"]);
+  const out = await new UntrustedGit(cwd).run("rev-parse", ["--show-toplevel"]);
   let top: string;
   try {
     top = NAME.decode(out).replace(/\r?\n$/, "");
   } catch (err) {
-    throw new ScanRefused(`the work tree's path is not valid UTF-8 (${err})`);
+    throw new GitRefused(`the work tree's path is not valid UTF-8 (${err})`);
   }
   try {
     await Deno.lstat(join(top, ".git"));
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) throw err;
-    throw new ScanRefused("no .git directly under the work tree's top level");
+    throw new GitRefused("no .git directly under the work tree's top level");
   }
   return new GitTrackedFiles(await resolveProjectRoot(top), warn);
 }
@@ -100,8 +56,11 @@ type Admission = "ok" | "link" | "missing" | "unreadable";
 export class GitTrackedFiles implements ScanRepository {
   readonly #folders = new Map<string, Promise<Admission>>();
   readonly #reader = new DenoFsReader();
+  readonly #git: UntrustedGit;
 
-  constructor(readonly root: string, private readonly warn: (message: string) => void = () => {}) {}
+  constructor(readonly root: string, private readonly warn: (message: string) => void = () => {}) {
+    this.#git = new UntrustedGit(root);
+  }
 
   async sizeConfig(): Promise<SizeConfig> {
     return sizeConfigFromEntry(await this.#reader.readEntry(this.root, SIZE_LIMITS_CONFIG_PATH));
@@ -122,7 +81,7 @@ export class GitTrackedFiles implements ScanRepository {
 
   async listTracked(path: string | null): Promise<TrackedListing> {
     const scope = path === null ? [] : ["--", path];
-    return parseStage(await git(this.root, "ls-files", ["-z", "--stage", ...scope]));
+    return parseStage(await this.#git.run("ls-files", ["-z", "--stage", ...scope]));
   }
 
   /** A path outside the root is never asked about: git refuses the whole call over one. */
@@ -130,7 +89,7 @@ export class GitTrackedFiles implements ScanRepository {
     const paths = all.filter((p) => !OUTSIDE_ROOT.test(p));
     if (paths.length === 0) return new Map();
     const input = new TextEncoder().encode(paths.join("\0") + "\0");
-    const out = await git(this.root, "check-attr", ["-z", "--stdin", "diff"], input);
+    const out = await this.#git.run("check-attr", ["-z", "--stdin", "diff"], input);
     // Lossy: the paths are the ones sent, and a value not UTF-8 is a driver name, never `unset`.
     const fields = new TextDecoder().decode(out).split("\0");
     const attributes = new Map<string, string>();
