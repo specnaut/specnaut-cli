@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { versionsIn } from "../../scripts/check-release-commit.ts";
 import { writeVersions } from "../../scripts/bump-version.ts";
+import { git, H, LEAD, repoAt, repoWithHighlights, run } from "./release_commit_fixture.ts";
 
 /**
  * The gate between the release commit and `git tag`.
@@ -10,90 +11,6 @@ import { writeVersions } from "../../scripts/bump-version.ts";
  * reported it — which is the problem: only luck separated "the bump rode along
  * with a feature" from "the tag captured half a feature".
  */
-
-const SCRIPT = new URL("../../scripts/check-release-commit.ts", import.meta.url).pathname;
-
-async function run(cwd: string, tag: string): Promise<{ code: number; err: string }> {
-  const out = await new Deno.Command("deno", {
-    args: ["run", "--allow-read", "--allow-run", SCRIPT, tag],
-    cwd,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  return { code: out.code, err: new TextDecoder().decode(out.stderr) };
-}
-
-async function git(cwd: string, ...args: string[]) {
-  const out = await new Deno.Command("git", { args, cwd, stdout: "null", stderr: "null" }).output();
-  assert(out.success, `git ${args.join(" ")} failed`);
-}
-
-/** A repo carrying every version file at `version`, committed with `subject`. */
-async function repoAt(
-  version: string,
-  subject: string,
-  opts: { desync?: string; staleRef?: string } = {},
-) {
-  const dir = await Deno.makeTempDir();
-  await git(dir, "init", "-q");
-  await git(dir, "config", "user.email", "t@t");
-  await git(dir, "config", "user.name", "t");
-  const json = (v: string) => JSON.stringify({ version: v }, null, 2);
-  await Deno.writeTextFile(`${dir}/deno.json`, json(version));
-  await Deno.mkdir(`${dir}/src/domain`, { recursive: true });
-  await Deno.writeTextFile(
-    `${dir}/src/domain/version.ts`,
-    `export const VERSION = "${opts.desync ?? version}";\n`,
-  );
-  for (
-    const p of [
-      "plugin/.claude-plugin/plugin.json",
-      "templates/manifest.json",
-      ".codex-plugin/plugin.json",
-      ".cursor-plugin/plugin.json",
-      "mods/specnaut-cockpit/.claude-plugin/plugin.json",
-    ]
-  ) {
-    await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
-    await Deno.writeTextFile(`${dir}/${p}`, json(version));
-  }
-  // Two entries per catalog: the second can be left on an older tag, the
-  // case a "does any ref match" check would wave through.
-  const catalog = JSON.stringify(
-    {
-      name: "m",
-      plugins: [
-        { name: "a", source: { ref: `v${version}` } },
-        { name: "b", source: { ref: `v${opts.staleRef ?? version}` } },
-      ],
-    },
-    null,
-    2,
-  );
-  for (
-    const p of [
-      "packaging/marketplace/.claude-plugin/marketplace.json",
-      "packaging/marketplace/.github/plugin/marketplace.json",
-    ]
-  ) {
-    await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
-    await Deno.writeTextFile(`${dir}/${p}`, catalog);
-  }
-  await Deno.mkdir(`${dir}/templates/harness-specific/claude`, { recursive: true });
-  await Deno.writeTextFile(
-    `${dir}/templates/harness-specific/claude/settings.json`,
-    JSON.stringify({
-      extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: `v${version}` } } },
-    }),
-  );
-  await Deno.writeTextFile(
-    `${dir}/README.md`,
-    `\`"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v${version}"]\`\n`,
-  );
-  await git(dir, "add", "-A");
-  await git(dir, "commit", "-q", "-m", subject);
-  return dir;
-}
 
 Deno.test("a correct release commit passes", async () => {
   const dir = await repoAt("3.0.0", "chore: release v3.0.0");
@@ -160,31 +77,6 @@ Deno.test("versionsIn finds both the JSON field and the TS constant", () => {
  * whitespace-insensitively — because reflowing is exactly the edit that must not
  * count as rewriting, and `deno fmt` performs it unasked.
  */
-
-const H = ".specnaut/release/HIGHLIGHTS.md";
-const LEAD = "**A thing shipped.**\n\nIt does the thing, and here is why that matters to you.\n";
-
-/** A repo tagged at `prev` carrying `lead`, then bumped to `next`. */
-async function repoWithHighlights(
-  prev: string,
-  next: string,
-  lead: string,
-  after: (dir: string) => Promise<void>,
-): Promise<string> {
-  const dir = await repoAt(prev.slice(1), `chore: release ${prev}`);
-  await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
-  await Deno.writeTextFile(`${dir}/${H}`, lead);
-  await git(dir, "add", "-A");
-  await git(dir, "commit", "-q", "-m", "docs(release): the lead");
-  await git(dir, "tag", "-a", prev, "-m", prev);
-  await after(dir);
-  // The bump to `next`, in its own commit, written by the pipeline's own
-  // writer: a second list of version files here would drift from the real one.
-  await writeVersions(next.slice(1), dir);
-  await git(dir, "add", "-A");
-  await git(dir, "commit", "-q", "-m", `chore: release ${next}`);
-  return dir;
-}
 
 Deno.test("highlights already published at the previous tag are refused", async () => {
   const dir = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async () => {});
