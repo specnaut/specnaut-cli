@@ -82,6 +82,11 @@ const SCENARIOS: Array<{ label: string; input: Input; slug: string }> = [
     input: { description: "anything", shortName: "foo -- bar baz" },
     slug: "foo-bar-baz",
   },
+  {
+    label: "a newline in the short name becomes a hyphen",
+    input: { description: "anything", shortName: "foo\nbar" },
+    slug: "foo-bar",
+  },
 ];
 
 async function withRepo(fn: (dir: string) => Promise<void>): Promise<void> {

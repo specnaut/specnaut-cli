@@ -28335,11 +28335,12 @@ check_existing_branches() {
     echo \$((max_num + 1)) # the next free number
 }
 
-# Function to clean and format a branch name
+# A branch slug: every character outside [a-z0-9] becomes \`-\`, a newline too
+# (cli#756) — \`tr -c\` reads the whole input, where sed never sees a newline.
 clean_branch_name() {
     local name="\$1"
     # \`--*\`, not \`-\\+\`: BSD sed has no \`\\+\`, and macOS was left with the hyphens.
-    echo "\$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-\$//'
+    printf '%s' "\$name" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/--*/-/g; s/^-//; s/-\$//'
 }
 
 # Function to generate branch name with stop word filtering and length filtering.
