@@ -100,10 +100,8 @@ check "the review may not present its own checking as a seat report" \
 # refusal is invisible and an automatic retry creeps back in.
 check "no automatic re-dispatch: zero findings stays a legitimate result" \
   'grep -q "zero findings can be a" .claude/skills/task/phases/review-seats.md'
-# The consumer of the gate. Since cd458ffd the stop lives in review-seats.md
-# § A missing seat stops the run, and review.md carries only its pointer. One
-# anchor holds the trigger and the consequence together: the sentence wraps,
-# so the file is flattened first, and a mutant of either half turns this red.
+# The stop lives in review-seats.md (cd458ffd); review.md only points at it.
+# One anchor holds trigger and consequence; the file is flattened, it wraps.
 check "the review phase stops the run when a seat did not report" \
   'tr "\n" " " <.claude/skills/task/phases/review-seats.md | grep -qF "\`SEATS_REPORTED < SEATS_EXPECTED\`, the run **does not reach the merge prompt**" &&
    grep -qF "A seat that did not report stops the run before the merge" .claude/skills/task/phases/review.md'
@@ -131,8 +129,7 @@ check "workflow-contract .claude/skills/workflow-contract/SKILL.md is not user-i
 check "workflow-contract defines WORKFLOW STATUS with only its parsed keys" \
   'f=.claude/skills/workflow-contract/SKILL.md; grep -q "WORKFLOW STATUS" $f && grep -q "^DONE_CRITERIA_MET:" $f && grep -q "^STATE:" $f && grep -q "^HANDOFF_TARGET:" $f && grep -q "^BLOCKERS:" $f && ! grep -qE "^(SUMMARY|ARTIFACTS|FILES_CHANGED|VALIDATION|NEXT_ACTION):" $f'
 # #678: blocks nothing parsed, and a triage mode nothing dispatched. Its gh-api
-# allowlist was the only limit on security-expert's Bash, so the grant left too;
-# that grant is pinned in tests/templates/agent_tools_pinned_test.ts, not here.
+# allowlist was security-expert's only Bash limit; its grant is pinned in tests/.
 for retired in alert-triage-contract qa-report-contract handoff-protocol; do
   check "retired contract $retired is neither scaffolded nor preloaded" \
     "[ ! -e .claude/skills/$retired ] && ! grep -q '^skills:.*$retired' .claude/agents/*.md"
