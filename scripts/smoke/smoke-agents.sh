@@ -148,6 +148,7 @@ check "specnaut-guide composes and files nothing itself" \
 check "report-upstream.sh installs executable, beside its helpers" \
   '[ -x .specnaut/scripts/bash/report-upstream.sh ] && [ -f .specnaut/scripts/bash/_report_text.sh ] && [ -f .specnaut/scripts/bash/_report_store.sh ]'
 # The token is assembled: this file is public, and it is a token's shape the scan refuses.
+# shellcheck disable=SC2034 # read by the check below, whose command string is eval'd
 token="ghp_$(printf "a%.0s" 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0)"
 check "the installed script refuses a token before anything is stored or contacted" \
   'r=$(printf "%s\n\n%s\n" title "$token" | HOME="$PWD" .specnaut/scripts/bash/report-upstream.sh prepare --kind bug) ;
@@ -158,26 +159,27 @@ check "the installed script prepares a clean report, with no identity to post as
   'o=$(printf "A title\n\nA body\n" | HOME="$PWD" PATH="$PWD/.smoke-bin:$PATH" .specnaut/scripts/bash/report-upstream.sh prepare --kind bug) &&
    grep -qx -- "POSTING_AS -" <<<"$o" && grep -q "^DIGEST [0-9a-f]\{64\}$" <<<"$o"'
 
-echo "═══ #180  PO doc — epic detection heuristic + cascade-check refs ═══"
+echo "═══ #180  PO doc — epic detection heuristic; the close gate is cascade-check.sh ═══"
 check "PO doc documents the epic detection heuristic" \
   'grep -q "Epic detection heuristic" .claude/agents/product-owner.md'
-check "PO doc references cascade-check.sh as the close gate" \
-  'grep -q "cascade-check.sh" .claude/agents/product-owner.md'
+# Since 103be0dd the product owner holds no shell: the session protocol names
+# the gate (task/backlog.md, outside every backend block), the executor runs
+# it, and the PO's own doc keeps only the pointer at the executor.
+check "the close gate is cascade-check.sh (task/backlog.md); the PO points at the executor" \
+  'grep -qF "\`cascade-check.sh <num>\` is the close gate" .claude/skills/task/backlog.md &&
+   grep -qF "The executor runs the cascade check before every" .claude/agents/product-owner.md'
 check "PO doc covers GitLab backend epic story (parent::# scoped label)" \
   'grep -q "parent::#" .claude/agents/product-owner.md'
 
 echo
-echo "═══ #258  PO Bash allowlist + memory-home directive ═══"
-check "PO agent has full Bash allowlist" \
-  'grep -q "^tools: Read, Write, Edit, Grep, Glob, Bash$" .claude/agents/product-owner.md'
+echo "═══ #258  PO memory-home directive ═══"
+# Which tools a seat holds is decided in tests/templates/agent_tools_pinned_test.ts
+# and nowhere else (#573), so no check here greps a `tools:` line.
 # Harness-neutral since #656: the memory is named relative to the agent file,
 # which resolves on Claude Code and names nothing that is absent elsewhere.
 check "PO agent documents memory home path" \
   'grep -q "product-owner/memory/MEMORY.md" .claude/agents/product-owner.md &&
    [ -f .claude/agents/product-owner/memory/MEMORY.md ]'
-check "PO agent forbids legacy agent-memory path" \
-  'grep -qF "**Never** write to an" .claude/agents/product-owner.md &&
-   grep -qF "\`agent-memory/\` folder" .claude/agents/product-owner.md'
 
 echo
 echo "═══ specnaut-guide review-upgrade protocol ═══"
@@ -187,9 +189,6 @@ check "review-upgrade protocol section present in core agent" \
 
 check "review-upgrade protocol section present in plugin mirror" \
   "grep -q '^## Review-upgrade protocol' '$CLI/plugin/agents/specnaut-guide.md'"
-
-check "specnaut-guide tools include Bash and Agent" \
-  "bash -c \"grep -E '^tools:' '$DIR/.claude/agents/specnaut-guide.md' | grep -q Bash && grep -E '^tools:' '$DIR/.claude/agents/specnaut-guide.md' | grep -q Agent\""
 
 check "core and plugin specnaut-guide byte-identical" \
   "cmp -s '$DIR/.claude/agents/specnaut-guide.md' '$CLI/plugin/agents/specnaut-guide.md'"

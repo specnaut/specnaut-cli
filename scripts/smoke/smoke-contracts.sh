@@ -100,12 +100,15 @@ check "the review may not present its own checking as a seat report" \
 # refusal is invisible and an automatic retry creeps back in.
 check "no automatic re-dispatch: zero findings stays a legitimate result" \
   'grep -q "zero findings can be a" .claude/skills/task/phases/review-seats.md'
-# The consumer of the gate. Without this the aggregation can say fail and the
-# chain still reaches the merge prompt.
+# The consumer of the gate. Since cd458ffd the stop lives in review-seats.md
+# § A missing seat stops the run, and review.md carries only its pointer. One
+# anchor holds the trigger and the consequence together: the sentence wraps,
+# so the file is flattened first, and a mutant of either half turns this red.
 check "the review phase stops the run when a seat did not report" \
-  'grep -qF "SEATS_REPORTED <" .claude/skills/task/phases/review.md'
+  'tr "\n" " " <.claude/skills/task/phases/review-seats.md | grep -qF "\`SEATS_REPORTED < SEATS_EXPECTED\`, the run **does not reach the merge prompt**" &&
+   grep -qF "A seat that did not report stops the run before the merge" .claude/skills/task/phases/review.md'
 check "and re-dispatching narrower is allowed, repeating the brief is not" \
-  'grep -qF "repeating the same brief is not a remedy" .claude/skills/task/phases/review-seats.md && grep -qF "§ Your own checking, and re-dispatch" .claude/skills/task/phases/review.md'
+  'f=.claude/skills/task/phases/review-seats.md; grep -qF "repeating the same brief is not a remedy" $f && grep -qF "**narrower** brief second" $f && grep -qF "The remedy is § Your own checking, and re-dispatch." $f'
 # #678 — the coordinator's fan-out moved into the review phase itself.
 check "the review fans its seats out by name under the concurrency cap" \
   'grep -qF "in flight, and never more than the harness" .claude/skills/task/phases/review.md && grep -qF "collect-audit-scope.sh --range" .claude/skills/task/phases/review.md'
@@ -128,13 +131,12 @@ check "workflow-contract .claude/skills/workflow-contract/SKILL.md is not user-i
 check "workflow-contract defines WORKFLOW STATUS with only its parsed keys" \
   'f=.claude/skills/workflow-contract/SKILL.md; grep -q "WORKFLOW STATUS" $f && grep -q "^DONE_CRITERIA_MET:" $f && grep -q "^STATE:" $f && grep -q "^HANDOFF_TARGET:" $f && grep -q "^BLOCKERS:" $f && ! grep -qE "^(SUMMARY|ARTIFACTS|FILES_CHANGED|VALIDATION|NEXT_ACTION):" $f'
 # #678: blocks nothing parsed, and a triage mode nothing dispatched. Its gh-api
-# allowlist was the only limit on security-expert's Bash, so the grant left too.
+# allowlist was the only limit on security-expert's Bash, so the grant left too;
+# that grant is pinned in tests/templates/agent_tools_pinned_test.ts, not here.
 for retired in alert-triage-contract qa-report-contract handoff-protocol; do
   check "retired contract $retired is neither scaffolded nor preloaded" \
     "[ ! -e .claude/skills/$retired ] && ! grep -q '^skills:.*$retired' .claude/agents/*.md"
 done
-check "security-expert grants no Bash once its allowlist is gone" \
-  'grep -q "^tools: " .claude/agents/security-expert.md && ! grep -q "^tools:.*Bash" .claude/agents/security-expert.md'
 # #562 — sections split out of seats; each ships preloaded, not user-invoked.
 check "backlog-frontmatter ships and is preloaded, not user-invocable" \
   'grep -q "user-invocable: false" .claude/skills/backlog-frontmatter/SKILL.md'
