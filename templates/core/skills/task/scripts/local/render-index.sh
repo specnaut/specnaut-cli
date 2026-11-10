@@ -89,7 +89,7 @@ created: ...
 ---
 ```
 
-The PO assigns size + priority during the `/task groom` pass.
+Size and priority are set when an item is filed or groomed.
 
 ---
 
