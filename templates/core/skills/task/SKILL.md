@@ -84,7 +84,9 @@ The product owner proposes; a bundled executor applies. Every create, edit, move
 including the ones `plan` makes — follows `backlog.md`'s "The session protocol" (`read-items.sh`, the
 dispatch, `apply-plan.sh`), its one home;
 `merge`'s close after a push is the one write it names itself (`phases/merge-close.md`). The
-read-only scripts (`list.sh`, `view.sh`) may be run directly.
+read-only scripts (`list.sh`, `view.sh`) may be run directly. The product owner decides what its
+"What you decide" section lists: the session neither asks the user those calls nor makes them
+(`backlog.md`, step 2).
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)

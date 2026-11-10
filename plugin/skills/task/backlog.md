@@ -32,6 +32,8 @@ main session runs no writing script itself; the read-only `list.sh` and `view.sh
    Keep only the `ITEMS_FILE:` path, and never open that file. Exit 2: report its stderr and
    dispatch nothing.
 2. **Dispatch** the `product-owner` with the verb, the user's request and that path — no item text.
+   None of the calls `product-owner.md`'s "What you decide" gives it is asked of the user, and the
+   dispatch carries one only when the user stated it.
 3. **Take only its last `BACKLOG PLAN` block.** Make a fresh directory, `d=$(mktemp -d) && chmod
    700 "$d" && echo "$d"`, and keep the absolute path it prints: a shell variable does not outlive
    its Bash call, so every later step writes that literal path. Write the lines between the block's
@@ -250,9 +252,8 @@ A parent **epic** cannot close while any **sub-task** is open.
 **Creating a child:** `add.sh --parent <num>` on every backend — writes the link,
 attaches to the board, exits 3 if the parent does not exist.
 
-**Closing a parent:** `cascade-check.sh <num>` is the close gate — exits 11
-listing the open children, 0 when all are closed. The executor runs it before
-every close it applies.
+**Closing a parent:** `cascade-check.sh <num>` is the close gate — exits 11 listing the open
+children, 0 when all are closed. The executor runs it before every close it applies.
 
 **Finding a child's parent:** `parent-of.sh <num>` (github + gitlab) prints the
 parent's number and exits 0, exits **10** when the item has no parent, and exits 3
@@ -264,5 +265,4 @@ when it could not ask — never treat 3 as "no parent".
 
 - The user is implementing a backlog item — that's `/task implement`; return
   here only to update the item's status afterwards.
-- The user asks about another project's backlog — these verbs are wired to
-  this project only.
+- The user asks about another project's backlog — these verbs are wired to this project only.

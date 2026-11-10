@@ -194,8 +194,8 @@ order:
 3. **the open questions — only what only the user can answer**: business rules, thresholds, what
    happens to existing data, scope — and always: the base branch, anything irreversible or
    destructive, breaking a public surface, a new external service, vendor or cost — the answer that
-   invalidates the most others first;
-4. anything you decided yourself, one line each.
+   invalidates the most others first; never a call `product-owner.md`'s "What you decide" lists;
+4. anything you decided yourself, one line each, those calls included.
 
 Record each answer in `plan.md` with its date. With nothing open, report 1, 2 and 4 and go on.
 <!-- BEGIN: spec-backend=cloud -->

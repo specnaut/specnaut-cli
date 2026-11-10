@@ -30,6 +30,7 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // And again when its step 1 began running the scope script that Phase 0 and Seat selection read.
 // And again when step 1 became the verify-scripts gate block, and its epic and missing-seat
 // sections moved to epic-loop.md and review-seats.md behind a pointer.
+// cli#744 re-captured plan's: step 7 points at the product owner's "What you decide" calls.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
