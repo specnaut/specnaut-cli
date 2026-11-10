@@ -32,6 +32,18 @@ const NOT_CODE = /src\/templates_bundle\.ts$/;
 const NOT_A_FUNCTION = new Set(["if", "while", "for", "switch", "catch", "do", "try"]);
 
 /**
+ * The guard that may stand in front of a sink. A removal or a rename acts on the
+ * entry itself, so the entry check `assertRemovableInProject` covers it as well
+ * as `assertInsideProject` (cli#751); a write lands through the path, so only
+ * `assertInsideProject` does.
+ */
+function guardFor(sink: string): RegExp {
+  return /^Deno\.(remove|rename)\(/.test(sink)
+    ? /assertInsideProject|assertRemovableInProject/
+    : /assertInsideProject/;
+}
+
+/**
  * Attributes each mutating call to the method it sits in, lexically.
  *
  * No brace parsing and no AST: for every mutating call, walk BACKWARDS to the
@@ -60,9 +72,7 @@ function unguardedSinks(src: string): string[] {
       if (s2.at < call) owner = s2;
       else break;
     }
-    const entry = /^Deno\.(remove|rename)\(/.test(m[0]);
-    const guard = entry ? /assertInsideProject|assertRemovableInProject/ : /assertInsideProject/;
-    if (!guard.test(src.slice(owner.at, call))) out.add(owner.name);
+    if (!guardFor(m[0]).test(src.slice(owner.at, call))) out.add(owner.name);
   }
   return [...out];
 }

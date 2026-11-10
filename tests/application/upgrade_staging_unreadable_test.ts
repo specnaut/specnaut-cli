@@ -52,6 +52,14 @@ async function initProject(dir: string): Promise<void> {
   }).execute({ targetDir: dir, initGit: false, force: false, dryRun: false });
 }
 
+/** An initialised project whose staging holds one stale copy and one folder no one can list. */
+async function seedUnreadableStaging(dir: string, staging: string): Promise<void> {
+  await initProject(dir);
+  await Deno.mkdir(join(staging, "locked"), { recursive: true });
+  await Deno.writeTextFile(join(staging, "stale.md"), "old upstream\n");
+  await Deno.chmod(join(staging, "locked"), 0o000);
+}
+
 function upgrade(dir: string, content: string) {
   return new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
@@ -72,10 +80,7 @@ for (const [content, status] of [["v1\n", "up-to-date"], ["v2\n", "applied"]] as
       const dir = await Deno.makeTempDir({ prefix: "staging-unreadable-" });
       const staging = join(dir, ".specnaut/upgrade-staging");
       try {
-        await initProject(dir);
-        await Deno.mkdir(join(staging, "locked"), { recursive: true });
-        await Deno.writeTextFile(join(staging, "stale.md"), "old upstream\n");
-        await Deno.chmod(join(staging, "locked"), 0o000);
+        await seedUnreadableStaging(dir, staging);
         const result = await upgrade(dir, content);
         assertEquals(result.status, status);
         assert("refusals" in result);

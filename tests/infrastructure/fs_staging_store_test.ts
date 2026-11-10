@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { resolve } from "@std/path";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 
@@ -65,7 +65,7 @@ Deno.test("FsStagingStore.delete: a nested copy goes with its emptied folders, n
     const s = new FsStagingStore();
     const staging = resolve(dir, ".specnaut/upgrade-staging");
     assertEquals(await s.delete(dir, ".claude/agents/x.md"), []);
-    assertEquals(await Deno.lstat(resolve(staging, ".claude")).catch(() => null), null);
+    await assertRejects(() => Deno.lstat(resolve(staging, ".claude")), Deno.errors.NotFound);
     assert((await Deno.stat(staging)).isDirectory, "the staging root was removed");
     assertEquals(await s.delete(dir, ".claude/agents/x.md"), []);
   });

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { basename, join } from "@std/path";
 import { pruneEmptyParents } from "../../src/infrastructure/fs_prune.ts";
 import { makeLink, symlinkTest } from "../helpers/link_text.ts";
 
@@ -21,6 +21,24 @@ symlinkTest("the walk never removes a folder whose real path is outside stopAt",
     await pruneEmptyParents(join(staging, "a/b"), staging, notes);
     assert((await Deno.stat(join(tmp, "outside/b"))).isDirectory, "the outside folder was removed");
     assert((await Deno.lstat(join(staging, "a"))).isSymlink, "the staging link was removed");
+    assertEquals(notes, []);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+symlinkTest("the walk never removes stopAt reached through a link to its parent", async () => {
+  // stopAt's own spelling differs from the folder's, so the loop's text check
+  // does not stop it; only the real-path comparison against stopAt does. An
+  // empty stopAt is the case where nothing else would.
+  const tmp = await Deno.makeTempDir({ prefix: "prune-real-bound-" });
+  try {
+    const staging = join(tmp, "proj/.specnaut/upgrade-staging");
+    await Deno.mkdir(staging, { recursive: true });
+    await makeLink(join(tmp, "proj/.specnaut"), join(tmp, "elsewhere"), "dir");
+    const notes: string[] = [];
+    await pruneEmptyParents(join(tmp, "elsewhere", basename(staging)), staging, notes);
+    assert((await Deno.stat(staging)).isDirectory, "stopAt was removed through the link");
     assertEquals(notes, []);
   } finally {
     await Deno.remove(tmp, { recursive: true });
