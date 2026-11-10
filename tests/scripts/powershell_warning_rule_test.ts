@@ -47,10 +47,10 @@ function pwsh(dir: string, body: string, path?: string, preference = ""): Promis
   const script = `${setPath}${preference}. '.specnaut/scripts/powershell/common.ps1'\n${body}`;
   return run("pwsh", ["-NoProfile", "-Command", script], dir);
 }
-
+/** `slashes` on a path value only: it lowercases on Windows, and `False` is PowerShell's. */
+const fold = (l: string) => /^(root|first|second)=/.test(l) ? slashes(l) : l;
 const results = (r: Run) =>
-  r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) => slashes(l.slice(7)));
-
+  r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) => fold(l.slice(7)));
 const warnings = (r: Run) => r.stderr.split(/\r?\n/).filter((l) => l.startsWith("WARNING:"));
 
 function test(name: string, fn: (dir: string) => Promise<void>, ignore = false): void {
