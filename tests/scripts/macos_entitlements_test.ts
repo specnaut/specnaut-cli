@@ -55,3 +55,19 @@ Deno.test("release.yml signs with that file and no other", async () => {
     assertEquals(files, [ENTITLEMENTS], "the signing step must name the pinned entitlements file");
   }
 });
+
+Deno.test("sign-macos checks the entitlements against a pinned sha256 before signing", async () => {
+  // The file reaches sign-macos inside an artifact built by a job that runs
+  // repository code. The pin makes any change to it a reviewed diff here.
+  const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as {
+    jobs: Record<string, { env?: Record<string, string>; steps?: { run?: string }[] }>;
+  };
+  const job = wf.jobs["sign-macos"];
+  const bytes = await Deno.readFile(`${ROOT}${ENTITLEMENTS}`);
+  const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+  assertEquals(job.env?.MACOS_ENTITLEMENTS_SHA256, digest, "the pin is not the file's sha256");
+  const sign = (job.steps ?? []).find((s) => (s.run ?? "").includes("rcodesign sign"))?.run ?? "";
+  const check = sign.indexOf(`"$MACOS_ENTITLEMENTS_SHA256  ${ENTITLEMENTS}" | sha256sum -c -`);
+  assert(check >= 0 && check < sign.indexOf("rcodesign sign"), "not checked before signing");
+});

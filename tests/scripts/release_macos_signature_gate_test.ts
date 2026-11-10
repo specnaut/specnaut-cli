@@ -3,185 +3,178 @@ import { fromFileUrl, join } from "@std/path";
 import { parse } from "@std/yaml";
 
 /**
- * The two checks that a published macOS binary carries the Developer ID
- * signature (cli#428), run against stubbed signing tools.
+ * `build`'s refusal of an unsigned macOS binary (cli#428), run against REAL
+ * `rcodesign print-signature-info` output.
  *
- * `build` reads each macOS binary with `rcodesign` on Linux before it attests
- * anything: in the canonical repository an unsigned binary fails the release,
- * because the attestation and checksums would otherwise bless it; in a fork it
- * passes with a warning. `postflight.sh` reads the PUBLISHED assets with
- * Apple's `codesign`. The designated requirement must name the identifier and
- * the Team ID, never a cdhash: a cdhash requirement is the ad-hoc signature
- * that made the Keychain forget "Always Allow" on every update.
+ * `build` runs on Linux, so it reads the signature as text: the embedded leaf
+ * certificate must be a Developer ID Application of the team, and the
+ * designated requirement must name the identifier and the team, never a cdhash.
+ * It does not verify the chain — macos-smoke does, with Apple's `codesign` —
+ * and its message says "signed", nothing stronger.
+ *
+ * The fixture is the rehearsal binary's real output (its header says how it was
+ * made). Its identity is a throwaway "Apple Development" certificate, so the
+ * Developer ID cases are derived from it by replacing exactly the subject or
+ * the requirement line: each case isolates one clause and asserts the line
+ * that names it, not only an exit code.
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
+const SCRIPT = "scripts/release/require-macos-signed.sh";
 const ignore = Deno.build.os === "windows"; // bash stubs, as in postflight_catalog_test.ts
 const TEAM = "H87Y8Z6YPS";
+const REAL = await Deno.readTextFile(`${ROOT}tests/fixtures/rcodesign/rehearsal-signed-arm64.yml`);
+const REHEARSAL_SUBJECT =
+  "CN=Apple Development: Rehearsal (ABCDE12345), OU=ABCDE12345, O=Rehearsal, C=XX";
+const REHEARSAL_DR =
+  `(identifier "com.specnaut.cli") and (certificate root = H"a043b5448edc9889b24cc78bb6336ce66943f7d4")`;
+const DEVID_SUBJECT =
+  `CN=Developer ID Application: Example Maintainer (${TEAM}), OU=${TEAM}, O=Example, C=US`;
+const devidDr = (id: string, team: string) =>
+  `(identifier "${id}") and ((anchor apple generic) and ((certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */) and ((certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */) and (certificate leaf[subject.OU] = "${team}"))))`;
 
-const SIGNED_INFO = `        code_requirements:
-        - 'designated(3): 0: (identifier "com.specnaut.cli") and ((anchor apple generic) and ((certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */) and ((certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */) and (certificate leaf[subject.OU] = "${TEAM}"))));'
-        cms:
-          certificates:
-          - subject: CN=Developer ID Certification Authority, OU=Apple Certification Authority, O=Apple Inc., C=US
-          - subject: 'CN=Developer ID Application: Example Maintainer (${TEAM}), OU=${TEAM}, O=Example, C=US'
-`;
-const ADHOC_INFO = `        code_directory:
-          flags: CodeSignatureFlags(ADHOC | LINKER_SIGNED)
-          identifier: a.out
-        cms: null
-`;
+function variant(subject: string, dr: string): string {
+  assert(REAL.includes(REHEARSAL_SUBJECT) && REAL.includes(REHEARSAL_DR), "the fixture changed");
+  return REAL.replaceAll(REHEARSAL_SUBJECT, subject).replace(REHEARSAL_DR, dr);
+}
+const SIGNED = variant(DEVID_SUBJECT, devidDr("com.specnaut.cli", TEAM));
 
-async function stubbed<T>(
-  tools: Record<string, string>,
-  fn: (dir: string, path: string) => Promise<T>,
-): Promise<T> {
-  const dir = await Deno.makeTempDir({ prefix: "specnaut-428-" });
-  try {
-    await Deno.mkdir(join(dir, "bin"));
-    for (const [name, body] of Object.entries(tools)) {
-      await Deno.writeTextFile(join(dir, "bin", name), `#!/usr/bin/env bash\n${body}\n`);
-      await Deno.chmod(join(dir, "bin", name), 0o755);
-    }
-    return await fn(dir, `${join(dir, "bin")}:/usr/bin:/bin`);
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
+/** The host's own copy of a tool, linked into the stub dir so PATH holds nothing else. */
+async function hostTool(name: string): Promise<string> {
+  const out = await new Deno.Command("bash", { args: ["-c", `command -v ${name}`] }).output();
+  const path = new TextDecoder().decode(out.stdout).trim();
+  assert(out.success && path, `${name} is not installed on this host`);
+  return path;
 }
 
-async function bash(script: string, cwd: string, env: Record<string, string>) {
-  const { code, stdout, stderr } = await new Deno.Command("bash", {
-    args: ["-c", script],
+async function stubDir(dir: string, info: string): Promise<string> {
+  const bin = join(dir, "bin");
+  await Deno.mkdir(bin);
+  for (const tool of ["jq", "grep", "cat"]) {
+    await Deno.symlink(await hostTool(tool), join(bin, tool));
+  }
+  await Deno.writeTextFile(join(dir, "info.yml"), info);
+  await Deno.writeTextFile(join(bin, "rcodesign"), `#!/bin/bash\ncat ${join(dir, "info.yml")}\n`);
+  await Deno.chmod(join(bin, "rcodesign"), 0o755);
+  return bin;
+}
+
+/** Runs /bin/bash with exactly `env`, returning its exit code and combined output. */
+async function bashIn(args: string[], cwd: string, env: Record<string, string>) {
+  const r = await new Deno.Command("/bin/bash", {
+    args,
     cwd,
     env,
     clearEnv: true,
     stdout: "piped",
     stderr: "piped",
   }).output();
-  return { code, out: new TextDecoder().decode(stdout) + new TextDecoder().decode(stderr) };
+  return {
+    code: r.code,
+    out: new TextDecoder().decode(r.stdout) + new TextDecoder().decode(r.stderr),
+  };
 }
 
-// ── build: rcodesign on the signed set, before attest ───────────────────────
+async function gate(info: string, canonical: boolean, names = ["x64", "arm64"]) {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-428-gate-" });
+  try {
+    const env = {
+      PATH: await stubDir(dir, info),
+      MACOS_JSON: JSON.stringify(names.map((a) => ({ outName: `specnaut-macos-${a}` }))),
+      CANONICAL: String(canonical),
+      MACOS_TEAM_ID: TEAM,
+      MACOS_IDENTIFIER: "com.specnaut.cli",
+    };
+    return await bashIn([`${ROOT}${SCRIPT}`], dir, env);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
 
-async function buildGate(info: string, canonical: boolean, macos = "x64 arm64") {
+Deno.test("build runs the gate before attest, with the workflow's identity", async () => {
   const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as {
     env: Record<string, string>;
     jobs: Record<string, { steps?: { name?: string; run?: string }[] }>;
   };
   const steps = wf.jobs.build.steps ?? [];
-  const at = steps.findIndex((s) => /rcodesign print-signature-info/.test(s.run ?? ""));
-  assert(at >= 0, "build does not read the macOS signatures");
+  const at = steps.findIndex((s) => s.run?.trim() === `bash ${SCRIPT}`);
+  assert(at >= 0, `build does not run ${SCRIPT}`);
   assert(at < steps.findIndex((s) => s.name === "Attest build provenance"), "checked after attest");
-  const json = JSON.stringify(
-    macos.split(" ").filter(Boolean).map((a) => ({ outName: `specnaut-macos-${a}` })),
-  );
-  return await stubbed(
-    { rcodesign: `cat <<'EOF'\n${info}EOF` },
-    (dir, path) =>
-      bash(steps[at].run!, dir, {
-        PATH: path,
-        MACOS_JSON: json,
-        CANONICAL: String(canonical),
-        MACOS_TEAM_ID: wf.env.MACOS_TEAM_ID,
-        MACOS_IDENTIFIER: wf.env.MACOS_IDENTIFIER,
-      }),
-  );
-}
+  assertEquals([wf.env.MACOS_TEAM_ID, wf.env.MACOS_IDENTIFIER], [TEAM, "com.specnaut.cli"]);
+});
 
-Deno.test({ name: "build: a Developer ID signature naming the team passes", ignore }, async () => {
-  const r = await buildGate(SIGNED_INFO, true);
+Deno.test({
+  name: "gate: a Developer ID subject and the team's requirement pass, as 'signed'",
+  ignore,
+}, async () => {
+  const r = await gate(SIGNED, true);
   assertEquals(r.code, 0, r.out);
-  assertStringIncludes(r.out, `specnaut-macos-arm64: Developer ID (${TEAM})`);
+  assertStringIncludes(
+    r.out,
+    `specnaut-macos-arm64: signed by a Developer ID Application certificate of ${TEAM}`,
+  );
+  assertStringIncludes(r.out, "the chain is verified by macos-smoke, not here");
 });
 
 Deno.test(
-  { name: "build: the canonical repository refuses an unsigned macOS binary", ignore },
+  { name: "gate: the real rehearsal output (Apple Development) is refused", ignore },
   async () => {
-    const r = await buildGate(ADHOC_INFO, true);
+    const r = await gate(REAL, true);
     assertEquals(r.code, 1, r.out);
-    assertStringIncludes(r.out, "::error::specnaut-macos-x64");
-  },
-);
-
-Deno.test({ name: "build: another team's signature is refused", ignore }, async () => {
-  const r = await buildGate(SIGNED_INFO.replaceAll(TEAM, "ZZZZZZZZZZ"), true);
-  assertEquals(r.code, 1, r.out);
-});
-
-Deno.test(
-  { name: "build: a fork passes unsigned binaries through, with a warning", ignore },
-  async () => {
-    const r = await buildGate(ADHOC_INFO, false);
-    assertEquals(r.code, 0, r.out);
-    assertStringIncludes(r.out, "::warning::specnaut-macos-x64");
-  },
-);
-
-Deno.test(
-  { name: "build: an empty macOS target list is a failure, not a pass", ignore },
-  async () => {
-    const r = await buildGate(SIGNED_INFO, true, "");
-    assertEquals(r.code, 1, r.out);
-  },
-);
-
-// ── postflight: Apple's codesign on the published assets ─────────────────────
-
-async function postflight(dr: string | null, verify = 0) {
-  const src = (await Deno.readTextFile(`${ROOT}.specnaut/release/postflight.sh`))
-    .replaceAll("\r\n", "\n");
-  const m = src.match(/# BEGIN macos-signature-check\n([\s\S]*?)# END macos-signature-check/);
-  assert(m, "postflight.sh has no macos-signature-check block");
-  const tools: Record<string, string> = dr === null ? {} : {
-    codesign: `case "$1" in --verify) exit ${verify} ;; -d) echo 'designated => ${dr}' >&2 ;; esac`,
-  };
-  return await stubbed(tools, async (dir, path) => {
-    const assets = join(dir, "assets");
-    await Deno.mkdir(assets);
-    for (const f of ["specnaut-macos-arm64", "specnaut-macos-arm64.sha256", "specnaut-linux-x64"]) {
-      await Deno.writeTextFile(join(assets, f), "");
-    }
-    // `codesign` must come from the stub dir alone, or a real macOS host's
-    // binary answers instead of the stub; `rm` is in /bin.
-    const p = dr === null ? "/nonexistent:/bin" : path.replace(":/usr/bin", "");
-    return await bash(
-      `set -euo pipefail\nverify_tmp=${assets}\n${m[1]}\necho "skipped=$macsig_skipped"`,
-      dir,
-      { PATH: p },
+    assertStringIncludes(
+      r.out,
+      `::error::specnaut-macos-x64: no Developer ID Application certificate of ${TEAM}`,
     );
-  });
-}
-
-const GOOD_DR =
-  `identifier "com.specnaut.cli" and anchor apple generic and certificate leaf[subject.OU] = ${TEAM}`;
-
-Deno.test(
-  { name: "postflight: a published binary with the team's requirement passes", ignore },
-  async () => {
-    const r = await postflight(GOOD_DR);
-    assertEquals(r.code, 0, r.out);
-    assertStringIncludes(r.out, "specnaut-macos-arm64: valid");
-    assertStringIncludes(r.out, "skipped=0");
   },
 );
 
-Deno.test({ name: "postflight: an ad-hoc (cdhash) requirement fails hard", ignore }, async () => {
-  const r = await postflight(`cdhash H"0123456789abcdef0123456789abcdef01234567"`);
-  assertEquals(r.code, 1, r.out);
-  assertStringIncludes(r.out, "❌");
-});
+Deno.test(
+  { name: "gate: the right requirement under the wrong subject is refused", ignore },
+  async () => {
+    const r = await gate(variant(REHEARSAL_SUBJECT, devidDr("com.specnaut.cli", TEAM)), true);
+    assertEquals(r.code, 1, r.out);
+    assertStringIncludes(r.out, `no Developer ID Application certificate of ${TEAM}`);
+  },
+);
 
-Deno.test({ name: "postflight: a signature that does not verify fails hard", ignore }, async () => {
-  const r = await postflight(GOOD_DR, 1);
+Deno.test({ name: "gate: a cdhash requirement is refused", ignore }, async () => {
+  const r = await gate(
+    variant(DEVID_SUBJECT, `cdhash H"25140fb76f3194dd11ef0d6ee096ee6260dbe463"`),
+    true,
+  );
   assertEquals(r.code, 1, r.out);
+  assertStringIncludes(r.out, "the designated requirement pins a cdhash");
 });
 
 Deno.test(
-  { name: "postflight: without codesign the check says it was skipped", ignore },
+  { name: "gate: a requirement naming another identifier is refused", ignore },
   async () => {
-    const r = await postflight(null);
+    const r = await gate(variant(DEVID_SUBJECT, devidDr("com.example.other", TEAM)), true);
+    assertEquals(r.code, 1, r.out);
+    assertStringIncludes(r.out, "the designated requirement does not name com.specnaut.cli");
+  },
+);
+
+Deno.test({ name: "gate: a requirement naming another team is refused", ignore }, async () => {
+  const r = await gate(variant(DEVID_SUBJECT, devidDr("com.specnaut.cli", "ZZZZZZZZZZ")), true);
+  assertEquals(r.code, 1, r.out);
+  assertStringIncludes(r.out, `the designated requirement does not name team ${TEAM}`);
+});
+
+Deno.test(
+  { name: "gate: a fork passes unsigned binaries through, with a warning", ignore },
+  async () => {
+    const r = await gate(REAL, false);
     assertEquals(r.code, 0, r.out);
-    assertStringIncludes(r.out, "NOT checked");
-    assertStringIncludes(r.out, "skipped=1");
+    assertStringIncludes(r.out, "::warning::specnaut-macos-x64 is NOT signed");
+  },
+);
+
+Deno.test(
+  { name: "gate: an empty macOS target list is a failure, not a pass", ignore },
+  async () => {
+    const r = await gate(SIGNED, true, []);
+    assertEquals(r.code, 1, r.out);
+    assertStringIncludes(r.out, "::error::the target table lists no macOS binary");
   },
 );

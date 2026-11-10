@@ -58,6 +58,10 @@ worse than a section that is visibly missing.
 
 **None.** This repository holds no Actions secrets, and must not.
 
+The macOS signing material is not a repository secret either: it lives in Google Cloud and is
+reached keylessly by release.yml's `sign-macos` job. Its setup and the gate to pass before the first
+signed tag are in [`infra/README.md`](../../infra/README.md).
+
 It is public. A secret here is a credential in a public repository, and the three that used to live
 here all pointed outward — write access to the Homebrew tap, to the marketplace catalog, and to a
 plugin fork. A repository publishing a release does not need write access to everything that

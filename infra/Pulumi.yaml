@@ -1,42 +1,59 @@
 # The cloud side of macOS release signing (cli#428): how release.yml's
 # `sign-macos` job reaches the Developer ID material without this public
-# repository storing a secret. See infra/README.md for the operator steps.
+# repository storing a secret. See infra/README.md for the operator steps,
+# including the IAM gate to pass before the first signed tag.
 #
 # It lives in the existing GCP project `specnaut`, which serves another
-# workload too. So this stack OWNS NOTHING project-wide: it does not manage the
-# project, and it enables or disables no API (Secret Manager, IAM Credentials,
-# STS and Cloud Resource Manager are already on). It references the project
-# and scopes everything below it: its own pool with one provider, its own
-# service account, and access granted per secret, never at project level.
+# workload too. This stack does not manage the project and enables or disables
+# no API (Secret Manager, IAM Credentials, STS and Cloud Resource Manager are
+# already on). It scopes everything else below the project: its own pool with
+# one provider, its own service account, access granted per secret.
+#
+# The ONE project-wide thing it owns: the project's Secret Manager audit
+# config (`secretManagerDataRead`, DATA_READ). An IAMAuditConfig is
+# authoritative for its service, so this stack is the only place that config
+# may be written; it is protected against deletion.
 #
 # Not here, on purpose: secret VERSIONS (added out of band from a file, so no
 # credential ever enters Pulumi state) and any service-account key (none is
 # ever created; the job authenticates through Workload Identity Federation).
+#
+# The provider plugin is pinned (`gcp` below) and every resource names it, so
+# a preview never runs against whatever plugin version is newest that day.
 name: specnaut-cli-release-signing
 runtime: yaml
 description: Keyless macOS release signing for specnaut/specnaut-cli
-
-config:
-  gcp:project: specnaut
 
 variables:
   # Public ids of specnaut/specnaut-cli and its owner. Ids, not names: a
   # renamed or re-created repository does not inherit the trust.
   githubRepositoryId: "1218483524"
   githubOwnerId: "294480954"
+  # The maintainer's numeric GitHub id: the only actor whose tag push may sign.
+  githubMaintainerId: "6215184"
 
 resources:
+  gcp:
+    type: pulumi:providers:gcp
+    properties:
+      project: specnaut
+    options:
+      version: 10.2.2
+
   pool:
     type: gcp:iam:WorkloadIdentityPool
     properties:
       workloadIdentityPoolId: github-release-signing
       displayName: GitHub release signing
       description: specnaut-cli release.yml only; one provider
+    options:
+      provider: ${gcp}
 
   # The only provider in the pool. Its condition is the whole trust decision:
   # this repository and owner (by id), a `v*` tag push of release.yml, the
-  # `macos-signing` environment, a GitHub-hosted runner. go-dry-run.yml and
-  # every other workflow stay outside it; do not widen it.
+  # `macos-signing` environment, a GitHub-hosted runner, and the maintainer as
+  # the actor (by id). go-dry-run.yml and every other workflow stay outside it;
+  # do not widen it. tests/scripts/release_signing_infra_test.ts pins it.
   provider:
     type: gcp:iam:WorkloadIdentityPoolProvider
     properties:
@@ -54,9 +71,12 @@ resources:
         assertion.ref_type == 'tag' &&
         assertion.workflow_ref.startsWith('specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/v') &&
         assertion.environment == 'macos-signing' &&
-        assertion.runner_environment == 'github-hosted'
+        assertion.runner_environment == 'github-hosted' &&
+        assertion.actor_id == '${githubMaintainerId}'
       oidc:
         issuerUri: https://token.actions.githubusercontent.com
+    options:
+      provider: ${gcp}
 
   signer:
     type: gcp:serviceaccount:Account
@@ -64,6 +84,8 @@ resources:
       accountId: macos-release-signer
       displayName: macOS release signer (specnaut-cli)
       description: Reads the three macOS signing secrets; nothing else
+    options:
+      provider: ${gcp}
 
   # Impersonation only through the repository-id attribute, never `/*`.
   signerWorkloadIdentityUser:
@@ -72,6 +94,8 @@ resources:
       serviceAccountId: ${signer.name}
       role: roles/iam.workloadIdentityUser
       member: principalSet://iam.googleapis.com/${pool.name}/attribute.repository_id/${githubRepositoryId}
+    options:
+      provider: ${gcp}
 
   # The Developer ID Application certificate and key, as a .p12.
   developerIdP12:
@@ -81,6 +105,7 @@ resources:
       replication:
         auto: {}
     options:
+      provider: ${gcp}
       protect: true
   developerIdP12Accessor:
     type: gcp:secretmanager:SecretIamMember
@@ -88,6 +113,8 @@ resources:
       secretId: ${developerIdP12.id}
       role: roles/secretmanager.secretAccessor
       member: serviceAccount:${signer.email}
+    options:
+      provider: ${gcp}
 
   # The .p12's password, one line.
   developerIdP12Password:
@@ -97,6 +124,7 @@ resources:
       replication:
         auto: {}
     options:
+      provider: ${gcp}
       protect: true
   developerIdP12PasswordAccessor:
     type: gcp:secretmanager:SecretIamMember
@@ -104,6 +132,8 @@ resources:
       secretId: ${developerIdP12Password.id}
       role: roles/secretmanager.secretAccessor
       member: serviceAccount:${signer.email}
+    options:
+      provider: ${gcp}
 
   # The App Store Connect API key (Developer role, the lowest that notarizes),
   # as the single JSON `rcodesign encode-app-store-connect-api-key` writes.
@@ -114,6 +144,7 @@ resources:
       replication:
         auto: {}
     options:
+      provider: ${gcp}
       protect: true
   appStoreConnectApiKeyAccessor:
     type: gcp:secretmanager:SecretIamMember
@@ -121,8 +152,11 @@ resources:
       secretId: ${appStoreConnectApiKey.id}
       role: roles/secretmanager.secretAccessor
       member: serviceAccount:${signer.email}
+    options:
+      provider: ${gcp}
 
-  # Every read of a secret is logged. Authoritative for this one service only.
+  # Every read of a secret is logged. This stack OWNS the project's Secret
+  # Manager audit config: an IAMAuditConfig is authoritative for its service.
   secretManagerDataRead:
     type: gcp:projects:IAMAuditConfig
     properties:
@@ -130,6 +164,9 @@ resources:
       service: secretmanager.googleapis.com
       auditLogConfigs:
         - logType: DATA_READ
+    options:
+      provider: ${gcp}
+      protect: true
 
 outputs:
   workloadIdentityProvider: ${provider.name}

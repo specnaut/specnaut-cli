@@ -136,15 +136,18 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: projects/93906418112/locations/global/workloadIdentityPools/github-release-signing/providers/specnaut-cli-release
       GCP_SERVICE_ACCOUNT: macos-release-signer@specnaut.iam.gserviceaccount.com
       MACOS_JSON: ${{ needs.compile.outputs.macos }}
+      # The entitlements arrive in an artifact a job running repository code
+      # built; this pin is checked before signing (macos_entitlements_test.ts).
+      MACOS_ENTITLEMENTS_SHA256: d3caf7b18ce9d0f5cec8282c4d25866d5829ec636b09a1e248e858bc9d39dbc3
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: compiled
       - name: A fork passes the macOS binaries through unsigned
-        if: github.repository != 'specnaut/specnaut-cli'
-        run: echo "::warning::$GITHUB_REPOSITORY is a fork; the macOS binaries are NOT signed. Only specnaut/specnaut-cli can reach the signing identity."
+        if: github.repository_id != '1218483524'
+        run: echo "::warning::$GITHUB_REPOSITORY is a fork; the macOS binaries are NOT signed. Only specnaut/specnaut-cli (repository id 1218483524) can reach the signing identity."
       - id: auth
-        if: github.repository == 'specnaut/specnaut-cli'
+        if: github.repository_id == '1218483524'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -154,28 +157,32 @@ jobs:
           export_environment_variables: false
           access_token_lifetime: 300s
       - name: Fetch the signing material into files only this user can read
-        if: github.repository == 'specnaut/specnaut-cli'
+        if: github.repository_id == '1218483524'
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-        # Files, never a variable or an argument; on failure only the status
-        # is printed, never gcloud's message.
+        # Secret Manager's REST API, no SDK. The bearer header and every value
+        # go to 0600 files, never a variable or an argument; each payload is
+        # base64-decoded straight into its file. On failure: the HTTP status.
         run: |
           set -euo pipefail
           umask 077
           dir="$RUNNER_TEMP/signing"
           mkdir "$dir"
-          printf '%s' "$ACCESS_TOKEN" > "$dir/token"
+          printf 'Authorization: Bearer %s\n' "$ACCESS_TOKEN" > "$dir/auth-header"
+          api="https://secretmanager.googleapis.com/v1/projects/$GCP_PROJECT/secrets"
           for name in macos-developer-id-p12 macos-developer-id-p12-password app-store-connect-api-key; do
-            if ! gcloud secrets versions access latest --secret="$name" --project="$GCP_PROJECT" \
-              --access-token-file="$dir/token" --out-file="$dir/$name" --quiet 2>"$dir/err"; then
-              status="$(grep -oE '\b[45][0-9]{2}\b|[A-Z]+_[A-Z_]+' "$dir/err" | head -1 || true)"
-              echo "::error::could not read $name from Secret Manager (status: ${status:-unknown})"
+            status="$(curl -sS -o "$dir/response" -w '%{http_code}' -H @"$dir/auth-header" \
+              "$api/$name/versions/latest:access" 2>/dev/null)" || status="${status:-unreachable}"
+            if [ "$status" != 200 ]; then
+              echo "::error::could not read $name from Secret Manager (HTTP $status)"
               exit 1
             fi
+            jq -j '.payload.data' "$dir/response" | base64 -d > "$dir/$name"
+            rm -f "$dir/response"
           done
-          rm -f "$dir/token" "$dir/err"
+          rm -f "$dir/auth-header"
       - name: Install rcodesign (pinned version and sha256)
-        if: github.repository == 'specnaut/specnaut-cli'
+        if: github.repository_id == '1218483524'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/rcodesign" && cd "$RUNNER_TEMP/rcodesign"
@@ -185,9 +192,10 @@ jobs:
           chmod +x rcodesign
           echo "$PWD" >> "$GITHUB_PATH"
       - name: Sign with the Developer ID, hardened runtime, identifier com.specnaut.cli
-        if: github.repository == 'specnaut/specnaut-cli'
+        if: github.repository_id == '1218483524'
         run: |
           set -euo pipefail
+          echo "$MACOS_ENTITLEMENTS_SHA256  packaging/macos/entitlements.plist" | sha256sum -c -
           for name in $(jq -r '.[].outName' <<<"$MACOS_JSON"); do
             rcodesign sign --for-notarization --code-signature-flags runtime \
               --p12-file "$RUNNER_TEMP/signing/macos-developer-id-p12" \
@@ -195,8 +203,11 @@ jobs:
               --entitlements-xml-file packaging/macos/entitlements.plist \
               --binary-identifier "$MACOS_IDENTIFIER" "dist/$name"
           done
+          # Notarization needs only the API key: the key and its password go now.
+          rm -f "$RUNNER_TEMP/signing/macos-developer-id-p12" \
+            "$RUNNER_TEMP/signing/macos-developer-id-p12-password"
       - name: Notarize (no stapling — a bare Mach-O cannot hold a ticket)
-        if: github.repository == 'specnaut/specnaut-cli'
+        if: github.repository_id == '1218483524'
         # Apple's notary service refuses a bare Mach-O, so each binary goes up
         # in a throwaway zip; the ticket binds to its cdhash, so it covers the
         # bytes in dist/. A rejection exits non-zero.
@@ -227,8 +238,13 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.compile.outputs.macos) }}
     runs-on: ${{ matrix.runner }}
-    permissions: {}
+    # Checks out the tag for the shared check script; holds no credential.
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signed
@@ -236,7 +252,7 @@ jobs:
       - name: Run, verify and assess the signed binary
         env:
           BIN: dist/${{ matrix.outName }}
-          CANONICAL: ${{ github.repository == 'specnaut/specnaut-cli' }}
+          CANONICAL: ${{ github.repository_id == '1218483524' }}
         run: |
           set -euo pipefail
           chmod +x "$BIN"
@@ -246,11 +262,7 @@ jobs:
             echo "::warning::$BIN is unsigned in a fork; Gatekeeper is not assessed."
             exit 0
           fi
-          codesign -dv --verbose=4 "$BIN" 2>&1 | tee "$RUNNER_TEMP/info"
-          grep -q "^Authority=Developer ID Application: .*($MACOS_TEAM_ID)$" "$RUNNER_TEMP/info"
-          codesign -d -r- "$BIN" 2>&1 | tee "$RUNNER_TEMP/dr"
-          grep -qF "identifier \"$MACOS_IDENTIFIER\"" "$RUNNER_TEMP/dr"
-          grep -qF "certificate leaf[subject.OU] = $MACOS_TEAM_ID" "$RUNNER_TEMP/dr"
+          bash scripts/release/check-macos-signature.sh "$MACOS_TEAM_ID" "$MACOS_IDENTIFIER" "$BIN"
           spctl -a -vvv -t install "$BIN"
 
   build:
@@ -336,26 +348,8 @@ jobs:
         # unsigned binary. A fork passes through with a warning.
         env:
           MACOS_JSON: ${{ needs.compile.outputs.macos }}
-          CANONICAL: ${{ github.repository == 'specnaut/specnaut-cli' }}
-        run: |
-          set -euo pipefail
-          names="$(jq -r '.[].outName' <<<"$MACOS_JSON")"
-          [ -n "$names" ] || { echo "::error::the target table lists no macOS binary"; exit 1; }
-          for name in $names; do
-            info="$(rcodesign print-signature-info "dist/$name")"
-            dr="$(grep -F 'designated(' <<<"$info" || true)"
-            if grep -qE "subject: '?CN=Developer ID Application: .*\($MACOS_TEAM_ID\)" <<<"$info" &&
-              grep -qF "identifier \"$MACOS_IDENTIFIER\"" <<<"$dr" &&
-              grep -qF "certificate leaf[subject.OU] = \"$MACOS_TEAM_ID\"" <<<"$dr" &&
-              ! grep -q cdhash <<<"$dr"; then
-              echo "$name: Developer ID ($MACOS_TEAM_ID), designated requirement names it"
-            elif [ "$CANONICAL" = true ]; then
-              echo "::error::$name is not signed with the Developer ID of $MACOS_TEAM_ID. The canonical repository never publishes an unsigned macOS binary."
-              exit 1
-            else
-              echo "::warning::$name is unsigned: a fork cannot reach the signing identity."
-            fi
-          done
+          CANONICAL: ${{ github.repository_id == '1218483524' }}
+        run: bash scripts/release/require-macos-signed.sh
       - name: Attest build provenance
         id: attest
         # Pinned to a commit, and this is the pin that must not float. The

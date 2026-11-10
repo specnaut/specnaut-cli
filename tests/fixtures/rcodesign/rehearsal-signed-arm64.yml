@@ -1,0 +1,143 @@
+# REAL `rcodesign print-signature-info` output, apple-codesign 0.29.0 (the
+# version release.yml pins), captured 2026-11-10 on macOS arm64 from a
+# `deno compile --target aarch64-apple-darwin` build of src/main.ts at 9.3.0,
+# signed with the exact flags of release.yml's sign step, minus
+# `--for-notarization` and with `--timestamp-url none`:
+#   rcodesign sign --code-signature-flags runtime --p12-file test.p12 \
+#     --p12-password-file pw.txt --entitlements-xml-file \
+#     packaging/macos/entitlements.plist --binary-identifier com.specnaut.cli <bin>
+# The identity is a THROWAWAY self-signed certificate from
+# `rcodesign generate-self-signed-certificate --team-id ABCDE12345`, so its
+# subject is "Apple Development: Rehearsal (ABCDE12345)", NOT a Developer ID,
+# and its designated requirement pins a certificate root hash, not a team.
+# Only `path:` was edited (a scratch directory). Tests derive the Developer ID
+# variants from this text by substitution; see release_macos_signature_gate_test.ts.
+- path: /tmp/rehearsal/specnaut-macos-arm64
+  file_size: 74573296
+  file_sha256: d8f1f6538698533911877b9f9e49453fd8e6a177be97c8c67987f4e995400567
+  entity:
+    mach_o:
+      macho_linkedit_start_offset: 73728000 / 0x4650000
+      macho_signature_start_offset: 73988592 / 0x468f9f0
+      macho_signature_end_offset: 74569550 / 0x471d74e
+      macho_linkedit_end_offset: 74573296 / 0x471e5f0
+      macho_end_offset: 74573296 / 0x471e5f0
+      linkedit_signature_start_offset: 260592 / 0x3f9f0
+      linkedit_signature_end_offset: 841550 / 0xcd74e
+      linkedit_bytes_after_signature: 3746 / 0xea2
+      signature:
+        superblob_length: 580958 / 0x8dd5e
+        blob_count: 5
+        blobs:
+        - slot: CodeDirectory (0)
+          magic: fade0c02
+          length: 578385
+          sha1: 64e5976b03ee7a3532b61c749ac4b87ebeec55ef
+          sha256: 25140fb76f3194dd11ef0d6ee096ee6260dbe4632ea0410ee2865f147a66dc69
+        - slot: RequirementSet (2)
+          magic: fade0c01
+          length: 92
+          sha1: 0b97601d56d2891ee392a898d2292160661c9d37
+          sha256: 5101206797d24e4e2f20de59d059efca204d9d7d7107387166c56389a16c1398
+        - slot: Entitlements (5)
+          magic: fade7171
+          length: 324
+          sha1: 1a8743977e7adc8fa5aacadc79b7f5e005f3e989
+          sha256: 15fbcd7f32d965bf2c21f1086b2e2a22970490d376e04d3c4705f0c4e64ad05e
+        - slot: DER Entitlements (7)
+          magic: fade7172
+          length: 114
+          sha1: f7a9e03247f326947c5d4986c16e83194e77c4b3
+          sha256: 62d76dab767efbc8ddbe2202ef2aa20a328e0ab8d6c52e801063a5aed0393bbe
+        - slot: CMS Signature (65536)
+          magic: fade0b01
+          length: 1991
+          sha1: e29ef70ba01d345ce8ed5554b9dd2de917f5d99f
+          sha256: 4cb43bcdff396a692df0dc23b3ebf00281164575085b3e0ac8b05f79f80e25fe
+        code_directory:
+          version: '0x20500'
+          flags: CodeSignatureFlags(RUNTIME)
+          identifier: com.specnaut.cli
+          digest_type: sha256
+          platform: 0
+          signed_entity_size: 73988592
+          executable_segment_flags: ExecutableSegmentFlags(MAIN_BINARY)
+          runtime_version: 14.5.0
+          code_digests_count: 18064
+          slot_digests:
+          - 'Info (1): 0000000000000000000000000000000000000000000000000000000000000000'
+          - 'RequirementSet (2): 5101206797d24e4e2f20de59d059efca204d9d7d7107387166c56389a16c1398'
+          - 'Resources (3): 0000000000000000000000000000000000000000000000000000000000000000'
+          - 'Application (4): 0000000000000000000000000000000000000000000000000000000000000000'
+          - 'Entitlements (5): 15fbcd7f32d965bf2c21f1086b2e2a22970490d376e04d3c4705f0c4e64ad05e'
+          - 'Rep Specific (6): 0000000000000000000000000000000000000000000000000000000000000000'
+          - 'DER Entitlements (7): 62d76dab767efbc8ddbe2202ef2aa20a328e0ab8d6c52e801063a5aed0393bbe'
+        entitlements_plist:
+        - <?xml version="1.0" encoding="UTF-8"?>
+        - <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        - <plist version="1.0">
+        - <dict>
+        - '  <key>com.apple.security.cs.allow-jit</key>'
+        - '  <true/>'
+        - '  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>'
+        - '  <true/>'
+        - </dict>
+        - </plist>
+        entitlements_der_plist:
+        - <?xml version="1.0" encoding="UTF-8"?>
+        - <plist version="1.0">
+        - '  <dict>'
+        - '    <key>com.apple.security.cs.allow-jit</key>'
+        - '    <true />'
+        - '    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>'
+        - '    <true />'
+        - '  </dict>'
+        - </plist>
+        code_requirements:
+        - 'designated(3): 0: (identifier "com.specnaut.cli") and (certificate root = H"a043b5448edc9889b24cc78bb6336ce66943f7d4");'
+        cms:
+          certificates:
+          - subject: 'CN=Apple Development: Rehearsal (ABCDE12345), OU=ABCDE12345, O=Rehearsal, C=XX'
+            issuer: 'CN=Apple Development: Rehearsal (ABCDE12345), OU=ABCDE12345, O=Rehearsal, C=XX'
+            key_algorithm: RSA
+            signature_algorithm: SHA-256 with RSA encryption
+            signed_with_algorithm: SHA-256 with RSA encryption
+            is_apple_root_ca: false
+            is_apple_intermediate_ca: false
+            chains_to_apple_root_ca: false
+            apple_extended_key_usages:
+            - Code Signing
+            apple_code_signing_extensions:
+            - iPhone Developer
+            - Mac Developer
+            apple_certificate_profile: apple-development
+            apple_team_id: ABCDE12345
+          signers:
+          - issuer: 'CN=Apple Development: Rehearsal (ABCDE12345), OU=ABCDE12345, O=Rehearsal, C=XX'
+            digest_algorithm: SHA-256
+            signature_algorithm: SHA-256 with RSA encryption
+            attributes:
+            - 1.2.840.113549.1.9.3
+            - 1.2.840.113549.1.9.4
+            - 1.2.840.113549.1.9.5
+            - 1.2.840.113635.100.9.1
+            - 1.2.840.113635.100.9.2
+            content_type: 1.2.840.113549.1.7.1
+            message_digest: 25140fb76f3194dd11ef0d6ee096ee6260dbe4632ea0410ee2865f147a66dc69
+            signing_time: 2026-11-10T19:51:58Z
+            cdhash_plist:
+            - <?xml version="1.0" encoding="UTF-8"?>
+            - <plist version="1.0">
+            - '  <dict>'
+            - '    <key>cdhashes</key>'
+            - '    <array>'
+            - '      <data>'
+            - "\t\tJRQPt28xlN0R7w1u4JbuYmDb5GM="
+            - "\t\t</data>"
+            - '    </array>'
+            - '  </dict>'
+            - </plist>
+            cdhash_digests:
+            - - 2.16.840.1.101.3.4.2.1
+              - 25140fb76f3194dd11ef0d6ee096ee6260dbe4632ea0410ee2865f147a66dc69
+            signature_verifies: true

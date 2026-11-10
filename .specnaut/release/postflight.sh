@@ -318,30 +318,35 @@ if ! deno run --allow-read scripts/verify-release.ts --tag "$TAG" --dir "$verify
   exit 1
 fi
 
-# The macOS binaries carry the Developer ID of team H87Y8Z6YPS (cli#428). Their
-# designated requirement must name the identifier and the team, never a cdhash:
-# a cdhash requirement is the ad-hoc signature that made the Keychain forget
-# "Always Allow" on every update. HARD, like the attestation: an unsigned binary
-# re-prompts every macOS user. Apple's own `codesign` reads it, so the check
-# needs macOS; elsewhere it says it was skipped, never that it passed.
+# The macOS binaries carry a Developer ID signature (cli#428), checked by the
+# same script macos-smoke runs, with the team and identifier read from
+# release.yml's `env:` — the one place they are written. HARD, like the
+# attestation: an unsigned binary re-prompts every macOS user. It needs Apple's
+# `codesign`; elsewhere it says it was skipped, never that it passed.
 # BEGIN macos-signature-check
 macsig_skipped=0
 echo "▶ verifying the macOS binaries' Developer ID signature"
+release_env() {
+  local line
+  while IFS= read -r line; do
+    case "$line" in "  $1: "*) printf '%s' "${line#"  $1: "}"; return 0 ;; esac
+  done < .github/workflows/release.yml
+  return 1
+}
 if command -v codesign >/dev/null 2>&1; then
+  macsig_team="$(release_env MACOS_TEAM_ID)" && macsig_id="$(release_env MACOS_IDENTIFIER)" || {
+    rm -rf "$verify_tmp"
+    echo "❌ release.yml names no MACOS_TEAM_ID / MACOS_IDENTIFIER — nothing to check against"
+    exit 1
+  }
   macsig_found=0
   for f in "$verify_tmp"/specnaut-macos-*; do
     case "$f" in *.sha256 | *"*") continue ;; esac
     macsig_found=$((macsig_found + 1))
-    dr="$(codesign -d -r- "$f" 2>&1 || true)"
-    if codesign --verify --strict "$f" >/dev/null 2>&1 \
-      && [[ "$dr" == *'identifier "com.specnaut.cli"'* ]] \
-      && [[ "$dr" == *'certificate leaf[subject.OU] = H87Y8Z6YPS'* ]] \
-      && [[ "$dr" != *cdhash* ]]; then
-      echo "  ${f##*/}: valid, designated requirement names com.specnaut.cli and H87Y8Z6YPS"
-    else
+    if ! bash scripts/release/check-macos-signature.sh "$macsig_team" "$macsig_id" "$f"; then
       rm -rf "$verify_tmp"
-      echo "❌ ${f##*/} is not signed with the Developer ID of H87Y8Z6YPS. macOS"
-      echo "   users get a Keychain prompt on every update. Publish a patch."
+      echo "❌ ${f##*/} is not signed for release. macOS users get a Keychain prompt on"
+      echo "   every update. Publish a patch."
       exit 1
     fi
   done

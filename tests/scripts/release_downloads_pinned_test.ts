@@ -16,10 +16,18 @@ import { parse } from "@std/yaml";
  * 64-hex sha256 with `sha256sum -c`, and does so before anything is made
  * executable. Values may come from `env:` at the workflow, job or step level;
  * they are resolved before the checks, so moving a pin into `env:` neither
- * hides it nor fails it.
+ * hides it nor fails it. A step that only calls an API host (API_HOSTS) is
+ * not a download; every API URL is still required to be https.
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
+
+/**
+ * Hosts a step calls as an API, not to fetch an artefact: nothing they return
+ * is executed. Each must still be reached over https.
+ */
+const API_HOSTS = ["secretmanager.googleapis.com"];
+const isApi = (url: string) => API_HOSTS.some((h) => url.startsWith(`https://${h}/`));
 
 type Env = Record<string, unknown>;
 type Step = { name?: string; run?: string; env?: Env };
@@ -46,8 +54,10 @@ async function downloadSteps(): Promise<{ where: string; run: string }[]> {
   for (const [job, j] of Object.entries(wf.jobs)) {
     for (const s of j.steps ?? []) {
       if (!s.run || !/\b(curl|wget)\b/.test(s.run)) continue;
-      const env = { ...wf.env, ...j.env, ...s.env };
-      out.push({ where: `${job} / ${s.name ?? "(unnamed step)"}`, run: resolve(s.run, env) });
+      const run = resolve(s.run, { ...wf.env, ...j.env, ...s.env });
+      const urls = run.match(/https?:\/\/[^\s"']+/g) ?? [];
+      if (urls.length > 0 && urls.every(isApi)) continue;
+      out.push({ where: `${job} / ${s.name ?? "(unnamed step)"}`, run });
     }
   }
   return out;
@@ -79,5 +89,13 @@ Deno.test("every run-step download is checked against a literal sha256 before it
     // The check has to be able to fail: `|| true` or `set +e` around it turns
     // a mismatch into a pass.
     assertEquals(/sha256sum[^\n]*\|\|/.test(run), false, `${where}: a mismatch is swallowed`);
+  }
+});
+
+Deno.test("every API call in release.yml is https", async () => {
+  const text = await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`);
+  for (const host of API_HOSTS) {
+    assert(text.includes(`https://${host}/`), `${host} is listed but never called`);
+    assert(!text.includes(`http://${host}`), `${host} is called over plain http`);
   }
 });
