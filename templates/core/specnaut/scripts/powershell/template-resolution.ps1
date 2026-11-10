@@ -7,26 +7,37 @@
 # not buried under the template stack. Defines functions only: dot-sourcing it
 # runs nothing.
 
-# The enabled preset ids of a .registry, lowest priority number first. A file
-# that does not parse yields none, so the caller takes the alphabetical order,
-# and says so once per process: a preset order silently lost is a template
-# silently swapped (cli#719). The sentence is fixed text, because a parser's
-# message quotes the file, and this reaches a terminal and an agent's context.
+# A .registry's state and its enabled preset ids, lowest priority number first
+# (cli#757), the same three states as _preset_ids_by_priority in the bash twin:
+# 'parsed' (a JSON object whose presets is absent or an object: exactly its enabled
+# presets, possibly none), 'absent' (no file, or a blank one: directory order,
+# quietly) and 'malformed' (anything else: directory order, said once per
+# process). One object, never an empty list for two states: PowerShell unrolls @()
+# to $null on return, which is how "parsed, nothing enabled" read as "absent".
+#
+# The sentence is fixed text, because a parser's message quotes the file, and this
+# reaches a terminal and an agent's context (cli#719).
 function Get-RegistryPresetIds {
     param([Parameter(Mandatory=$true)][string]$RegistryFile)
+    $object = [System.Management.Automation.PSCustomObject]
+    $raw = if (Test-Path -LiteralPath $RegistryFile -PathType Leaf) { Get-Content -LiteralPath $RegistryFile -Raw }
+    if ([string]::IsNullOrWhiteSpace($raw)) { return [PSCustomObject]@{ State = 'absent'; Ids = @() } }
     try {
-        $presets = (Get-Content $RegistryFile -Raw | ConvertFrom-Json).presets
-        if (-not $presets) { return @() }
-        return @($presets.PSObject.Properties |
-            Where-Object { $null -eq $_.Value.enabled -or $_.Value.enabled -ne $false } |
+        $data = ConvertFrom-Json -InputObject $raw
+        if ($data -isnot $object) { throw 'not a registry: the top level is not an object' }
+        $presets = if ($data.PSObject.Properties['presets']) { $data.presets } else { [PSCustomObject]@{} }
+        if ($presets -isnot $object) { throw 'not a registry: presets is not an object' }
+        $ids = @($presets.PSObject.Properties |
+            Where-Object { $_.Value -is $object -and $_.Value.enabled -ne $false } |
             Sort-Object { if ($null -ne $_.Value.priority) { $_.Value.priority } else { 10 } } |
             ForEach-Object { $_.Name })
+        return [PSCustomObject]@{ State = 'parsed'; Ids = $ids }
     } catch {
         if (-not $script:RegistryWarned) {
             $script:RegistryWarned = $true
-            [Console]::Error.WriteLine("WARNING: .specnaut/presets/.registry could not be parsed ($($_.Exception.GetType().Name)); using alphabetical preset order")
+            [Console]::Error.WriteLine('WARNING: .specnaut/presets/.registry could not be parsed; using alphabetical preset order')
         }
-        return @()
+        return [PSCustomObject]@{ State = 'malformed'; Ids = @() }
     }
 }
 
@@ -47,24 +58,18 @@ function Resolve-Template {
     $override = Join-Path $base "overrides/$TemplateName.md"
     if (Test-Path $override) { return $override }
 
-    # Priority 2: Installed presets (sorted by priority from .registry)
+    # Priority 2: Installed presets. A registry that parses decides, even when it
+    # enables none (cli#757); absent, blank or malformed, alphabetical directory order.
     $presetsDir = Join-Path $RepoRoot '.specnaut/presets'
     if (Test-Path $presetsDir) {
-        $registryFile = Join-Path $presetsDir '.registry'
-        $sortedPresets = @()
-        if (Test-Path $registryFile) { $sortedPresets = @(Get-RegistryPresetIds -RegistryFile $registryFile) }
-
-        if ($sortedPresets.Count -gt 0) {
-            foreach ($presetId in $sortedPresets) {
-                $candidate = Join-Path $presetsDir "$presetId/templates/$TemplateName.md"
-                if (Test-Path $candidate) { return $candidate }
-            }
-        } else {
-            # Fallback: alphabetical directory order
-            foreach ($preset in Get-ChildItem -Path $presetsDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '.*' }) {
-                $candidate = Join-Path $preset.FullName "templates/$TemplateName.md"
-                if (Test-Path $candidate) { return $candidate }
-            }
+        $registry = Get-RegistryPresetIds -RegistryFile (Join-Path $presetsDir '.registry')
+        $presetIds = if ($registry.State -eq 'parsed') { $registry.Ids } else {
+            Get-ChildItem -LiteralPath $presetsDir -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notlike '.*' } | Sort-Object Name | ForEach-Object { $_.Name }
+        }
+        foreach ($presetId in $presetIds) {
+            $candidate = Join-Path $presetsDir "$presetId/templates/$TemplateName.md"
+            if (Test-Path $candidate) { return $candidate }
         }
     }
 

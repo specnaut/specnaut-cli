@@ -27631,18 +27631,27 @@ source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/templat
 # core stack. Sourced by \`common.sh\`.
 
 # The enabled preset ids of a \`.registry\`, lowest priority number first (the
-# highest precedence). Exits non-zero on a registry python3 cannot parse, so a
-# caller falls back to the directory scan.
+# highest precedence), and the registry's state as the status (cli#757), the
+# same three as Get-RegistryPresetIds: 0 parsed (a JSON object whose \`presets\`
+# is absent or an object: exactly its enabled presets, possibly none), 3 blank
+# (read as absent), 1 malformed (anything else). The ids are written as bytes
+# with \`\\n\`: a Windows python3 would end each with \`\\r\\n\` in text mode.
 _preset_ids_by_priority() {
     SPECNAUT_REGISTRY="\$1" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECNAUT_REGISTRY']) as f:
-        data = json.load(f)
-    presets = data.get('presets', {})
-    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
-        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
-            print(pid)
+    with open(os.environ['SPECNAUT_REGISTRY'], encoding='utf-8-sig') as f:
+        text = f.read()
+    if not text.strip():
+        sys.exit(3)
+    data = json.loads(text)
+    presets = data.get('presets', {}) if isinstance(data, dict) else None
+    if not isinstance(presets, dict):
+        sys.exit(1)
+    meta = lambda m: m if isinstance(m, dict) else {'enabled': False}
+    ids = [p for p, m in sorted(presets.items(), key=lambda x: meta(x[1]).get('priority', 10))
+           if meta(m).get('enabled', True) is not False]
+    sys.stdout.buffer.write(''.join(p + chr(10) for p in ids).encode('utf-8'))
 except Exception:
     sys.exit(1)
 " 2>/dev/null
@@ -27662,23 +27671,22 @@ resolve_template() {
     local override="\$base/overrides/\${template_name}.md"
     [ -f "\$override" ] && echo "\$override" && return 0
 
-    # Priority 2: Installed presets — in registry order when python3 reads
-    # \`.registry\`; otherwise (no registry, no python3, a parse error) in
-    # alphabetical directory order. The read sits in the condition so set -e
+    # Priority 2: Installed presets. A registry that parses decides, even when it
+    # enables none (cli#757); absent, blank or malformed (or no python3 to read
+    # it), alphabetical directory order. The read sits in the condition so set -e
     # does not abort the function on a registry python3 cannot parse.
     local presets_dir="\$repo_root/.specnaut/presets"
     if [ -d "\$presets_dir" ]; then
-        local registry_file="\$presets_dir/.registry"
-        local sorted_presets=""
-        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1 &&
-            sorted_presets=\$(_preset_ids_by_priority "\$registry_file"); then
-            # An empty registry has no presets to search.
-            if [ -n "\$sorted_presets" ]; then
-                while IFS= read -r preset_id; do
-                    local candidate="\$presets_dir/\$preset_id/templates/\${template_name}.md"
-                    [ -f "\$candidate" ] && echo "\$candidate" && return 0
-                done <<< "\$sorted_presets"
-            fi
+        local preset_ids="" state=3
+        if [ -f "\$presets_dir/.registry" ] && command -v python3 >/dev/null 2>&1; then
+            preset_ids=\$(_preset_ids_by_priority "\$presets_dir/.registry") && state=0 || state=\$?
+        fi
+        if [ "\$state" = 0 ]; then
+            while IFS= read -r preset_id; do
+                [ -n "\$preset_id" ] || continue
+                local candidate="\$presets_dir/\$preset_id/templates/\${template_name}.md"
+                [ -f "\$candidate" ] && echo "\$candidate" && return 0
+            done <<< "\$preset_ids"
         else
             for preset in "\$presets_dir"/*/; do
                 [ -d "\$preset" ] || continue
@@ -32502,26 +32510,37 @@ function Test-FileExists {
 # not buried under the template stack. Defines functions only: dot-sourcing it
 # runs nothing.
 
-# The enabled preset ids of a .registry, lowest priority number first. A file
-# that does not parse yields none, so the caller takes the alphabetical order,
-# and says so once per process: a preset order silently lost is a template
-# silently swapped (cli#719). The sentence is fixed text, because a parser's
-# message quotes the file, and this reaches a terminal and an agent's context.
+# A .registry's state and its enabled preset ids, lowest priority number first
+# (cli#757), the same three states as _preset_ids_by_priority in the bash twin:
+# 'parsed' (a JSON object whose presets is absent or an object: exactly its enabled
+# presets, possibly none), 'absent' (no file, or a blank one: directory order,
+# quietly) and 'malformed' (anything else: directory order, said once per
+# process). One object, never an empty list for two states: PowerShell unrolls @()
+# to \$null on return, which is how "parsed, nothing enabled" read as "absent".
+#
+# The sentence is fixed text, because a parser's message quotes the file, and this
+# reaches a terminal and an agent's context (cli#719).
 function Get-RegistryPresetIds {
     param([Parameter(Mandatory=\$true)][string]\$RegistryFile)
+    \$object = [System.Management.Automation.PSCustomObject]
+    \$raw = if (Test-Path -LiteralPath \$RegistryFile -PathType Leaf) { Get-Content -LiteralPath \$RegistryFile -Raw }
+    if ([string]::IsNullOrWhiteSpace(\$raw)) { return [PSCustomObject]@{ State = 'absent'; Ids = @() } }
     try {
-        \$presets = (Get-Content \$RegistryFile -Raw | ConvertFrom-Json).presets
-        if (-not \$presets) { return @() }
-        return @(\$presets.PSObject.Properties |
-            Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
+        \$data = ConvertFrom-Json -InputObject \$raw
+        if (\$data -isnot \$object) { throw 'not a registry: the top level is not an object' }
+        \$presets = if (\$data.PSObject.Properties['presets']) { \$data.presets } else { [PSCustomObject]@{} }
+        if (\$presets -isnot \$object) { throw 'not a registry: presets is not an object' }
+        \$ids = @(\$presets.PSObject.Properties |
+            Where-Object { \$_.Value -is \$object -and \$_.Value.enabled -ne \$false } |
             Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
             ForEach-Object { \$_.Name })
+        return [PSCustomObject]@{ State = 'parsed'; Ids = \$ids }
     } catch {
         if (-not \$script:RegistryWarned) {
             \$script:RegistryWarned = \$true
-            [Console]::Error.WriteLine("WARNING: .specnaut/presets/.registry could not be parsed (\$(\$_.Exception.GetType().Name)); using alphabetical preset order")
+            [Console]::Error.WriteLine('WARNING: .specnaut/presets/.registry could not be parsed; using alphabetical preset order')
         }
-        return @()
+        return [PSCustomObject]@{ State = 'malformed'; Ids = @() }
     }
 }
 
@@ -32542,24 +32561,18 @@ function Resolve-Template {
     \$override = Join-Path \$base "overrides/\$TemplateName.md"
     if (Test-Path \$override) { return \$override }
 
-    # Priority 2: Installed presets (sorted by priority from .registry)
+    # Priority 2: Installed presets. A registry that parses decides, even when it
+    # enables none (cli#757); absent, blank or malformed, alphabetical directory order.
     \$presetsDir = Join-Path \$RepoRoot '.specnaut/presets'
     if (Test-Path \$presetsDir) {
-        \$registryFile = Join-Path \$presetsDir '.registry'
-        \$sortedPresets = @()
-        if (Test-Path \$registryFile) { \$sortedPresets = @(Get-RegistryPresetIds -RegistryFile \$registryFile) }
-
-        if (\$sortedPresets.Count -gt 0) {
-            foreach (\$presetId in \$sortedPresets) {
-                \$candidate = Join-Path \$presetsDir "\$presetId/templates/\$TemplateName.md"
-                if (Test-Path \$candidate) { return \$candidate }
-            }
-        } else {
-            # Fallback: alphabetical directory order
-            foreach (\$preset in Get-ChildItem -Path \$presetsDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' }) {
-                \$candidate = Join-Path \$preset.FullName "templates/\$TemplateName.md"
-                if (Test-Path \$candidate) { return \$candidate }
-            }
+        \$registry = Get-RegistryPresetIds -RegistryFile (Join-Path \$presetsDir '.registry')
+        \$presetIds = if (\$registry.State -eq 'parsed') { \$registry.Ids } else {
+            Get-ChildItem -LiteralPath \$presetsDir -Directory -ErrorAction SilentlyContinue |
+                Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name | ForEach-Object { \$_.Name }
+        }
+        foreach (\$presetId in \$presetIds) {
+            \$candidate = Join-Path \$presetsDir "\$presetId/templates/\$TemplateName.md"
+            if (Test-Path \$candidate) { return \$candidate }
         }
     }
 
