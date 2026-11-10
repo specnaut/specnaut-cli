@@ -32,8 +32,6 @@ const WINDOWS = Deno.build.os === "windows";
  * on a guard that never reached its rule (cli#711).
  */
 const REFUSALS: readonly RegExp[] = [
-  /^specnaut guard-merge: merge: manual — held: .+\. Landing on the base branch \(.+\) needs the user's own `merge`\. To let it through, reply /,
-  /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /,
   /^specnaut protect-generated: denied: .+ is \.specnaut\/installed\.lock\. /,
   /^specnaut guard-dispatch-model: '[^']+' is a Specnaut agent: /,
 ];
@@ -41,9 +39,6 @@ const REFUSALS: readonly RegExp[] = [
 function verdict(r: Run): string {
   if (r.code === 2 && REFUSALS.some((re) => re.test(r.stderr))) return "deny";
   if (r.code === 0 && r.stdout === "") return "allow";
-  if (r.code === 0 && JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === "ask") {
-    return "ask";
-  }
   return `unexpected exit ${r.code}: ${r.stdout} ${r.stderr}`;
 }
 

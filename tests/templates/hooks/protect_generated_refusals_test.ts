@@ -2,9 +2,9 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { type Harness, makeRepo, payload, runHook, sandbox } from "./hook_sandbox.ts";
 
 /**
- * FR-004 — what protect-generated refuses outright, whatever approval the
- * turn holds: the lock, with the explanation that names its remedy, and an
- * edit from which no path can be read (§ 11 F5). Split from
+ * FR-004 — what protect-generated refuses outright: the lock, with the
+ * explanation that names its remedy, and an edit from which no path can be
+ * read (§ 11 F5). Split from
  * protect_generated_test.ts, which keeps the spellings and the gate.
  */
 

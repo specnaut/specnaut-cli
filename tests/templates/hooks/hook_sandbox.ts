@@ -1,4 +1,3 @@
-import { encodeHex } from "@std/encoding/hex";
 import { fromFileUrl, isAbsolute, join } from "@std/path";
 
 /**
@@ -7,10 +6,9 @@ import { fromFileUrl, isAbsolute, join } from "@std/path";
  * payload shaped like the real one into the real script, inside a real git
  * repository, and read the exit code. Nothing here reimplements a guard rule.
  *
- * Hermetic on purpose: the child gets a cleared environment with HOME,
- * XDG_STATE_HOME and the git config locations pointed into a temp dir, so the
- * developer's own `init.defaultBranch`, git aliases or approval stamps can
- * never decide a case.
+ * Hermetic on purpose: the child gets a cleared environment with HOME and the
+ * git config locations pointed into a temp dir, so the developer's own
+ * `init.defaultBranch` or git aliases can never decide a case.
  */
 
 export const HOOKS_DIR = fromFileUrl(
@@ -44,28 +42,24 @@ export interface Run {
 export interface Sandbox {
   dir: string;
   home: string;
-  state: string;
   env: Record<string, string>;
   cleanup(): Promise<void>;
 }
 
-/** A temp dir with its own HOME and state dir; `env` is what every child gets. */
+/** A temp dir with its own HOME; `env` is what every child gets. */
 export async function sandbox(): Promise<Sandbox> {
   const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "specnaut-hooks-" }));
   const home = join(dir, "home");
-  const state = join(dir, "state");
   await Deno.mkdir(home);
-  await Deno.mkdir(state);
   const env: Record<string, string> = {
     PATH: Deno.env.get("PATH") ?? "/usr/bin:/bin",
     HOME: home,
-    XDG_STATE_HOME: state,
     XDG_CONFIG_HOME: join(home, ".config"),
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: join(home, ".gitconfig"),
     LC_ALL: "C",
   };
-  return { dir, home, state, env, cleanup: () => Deno.remove(dir, { recursive: true }) };
+  return { dir, home, env, cleanup: () => Deno.remove(dir, { recursive: true }) };
 }
 
 async function exec(
@@ -113,11 +107,6 @@ export interface RepoOptions {
   head?: string;
   /** What origin/HEAD points at; `null` leaves the base unknown. */
   base?: string | null;
-  /**
-   * The skills `.specnaut/installed.lock` lists as Specnaut's — what tells a
-   * `/task merge` aimed at Specnaut from one aimed at a project's own `/task`.
-   */
-  skills?: ReadonlyArray<string>;
 }
 
 let repoCount = 0;
@@ -128,7 +117,7 @@ let repoCount = 0;
  * exactly as in a scaffolded project. origin/HEAD is set by ref, so no remote has to exist.
  */
 export async function makeRepo(sb: Sandbox, opts: RepoOptions = {}): Promise<string> {
-  const { mode = "manual", head = "feat", base = "main", skills = ["task", "ship"] } = opts;
+  const { mode = "manual", head = "feat", base = "main" } = opts;
   const repo = join(sb.dir, `repo-${++repoCount}`);
   await Deno.mkdir(join(repo, ".specnaut", "scripts", "bash"), { recursive: true });
   await git(sb, repo, "init", "-q", "-b", "main");
@@ -138,11 +127,10 @@ export async function makeRepo(sb: Sandbox, opts: RepoOptions = {}): Promise<str
   if (mode !== null) {
     await Deno.writeTextFile(join(repo, ".specnaut", "workflow.yml"), `merge: ${mode}\n`);
   }
+  const entry = (s: string) => `  .claude/skills/${s}/SKILL.md:\n    sha256: ${"0".repeat(64)}\n`;
   await Deno.writeTextFile(
     join(repo, ".specnaut", "installed.lock"),
-    `version: 2\nharness: claude\nentries:\n${
-      skills.map((s) => `  .claude/skills/${s}/SKILL.md:\n    sha256: ${"0".repeat(64)}\n`).join("")
-    }`,
+    `version: 2\nharness: claude\nentries:\n${entry("task")}${entry("ship")}`,
   );
   await Deno.writeTextFile(join(repo, "README.md"), "# my-app\n");
   await git(sb, repo, "add", "-A");
@@ -207,57 +195,9 @@ export function runScript(
 }
 
 /**
- * Where the guards keep `repo`'s approval stamps, to forge one there: the
- * store, then a hash of the toplevel as their bash spells it — `/c/…` on
- * Windows, never the `C:\…` Deno holds; elsewhere `repo` itself (the sandbox
- * is already a real path).
- */
-export async function stampDir(sb: Sandbox, repo: string): Promise<string> {
-  let root = repo;
-  if (WINDOWS) {
-    const r = await exec("bash", ["-c", 'cd -- "$1" && pwd -P', "_", bashPath(repo)], {
-      cwd: sb.dir,
-      env: sb.env,
-    });
-    if (r.code !== 0) throw new Error(`cannot resolve ${repo} in bash: ${r.stderr}`);
-    root = r.stdout.trim();
-  }
-  const hash = encodeHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(root)));
-  return join(sb.state, "specnaut", "approvals", hash);
-}
-
-/** Mint an approval the way a user prompt does: through approve-on-prompt.sh. */
-export async function approve(
-  sb: Sandbox,
-  harness: Harness,
-  repo: string,
-  prompt: string,
-  overrides: Record<string, unknown> = {},
-): Promise<Run> {
-  const p = await payload(harness, "user_prompt_submit", { cwd: repo, prompt, ...overrides });
-  return runHook(sb, "approve-on-prompt.sh", harness, p);
-}
-
-/** Every file under the sandbox's approval store (stamps), as absolute paths. */
-export async function stamps(sb: Sandbox): Promise<string[]> {
-  const out: string[] = [];
-  const root = join(sb.state, "specnaut", "approvals");
-  try {
-    for await (const proj of Deno.readDir(root)) {
-      for await (const f of Deno.readDir(join(root, proj.name))) {
-        out.push(join(root, proj.name, f.name));
-      }
-    }
-  } catch (e) {
-    if (!(e instanceof Deno.errors.NotFound)) throw e;
-  }
-  return out;
-}
-
-/**
  * Run `fn` over `items`, at most `width` at a time. The table-driven cases are
  * independent reads of their repo, and each spawns several processes; run in
- * sequence, the guard_merge table alone took two minutes.
+ * sequence, a long table is slow.
  */
 export async function pool<T, R>(
   items: readonly T[],

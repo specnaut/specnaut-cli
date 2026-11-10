@@ -23,9 +23,6 @@ const REFUSAL = /^specnaut protect-generated: denied: .+ is \.specnaut\/installe
 function verdict(r: Run): string {
   if (r.code === 2 && REFUSAL.test(r.stderr)) return "deny";
   if (r.code === 0 && r.stdout === "") return "allow";
-  if (r.code === 0 && JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === "ask") {
-    return "ask";
-  }
   return `exit ${r.code}: ${r.stdout} ${r.stderr}`;
 }
 
