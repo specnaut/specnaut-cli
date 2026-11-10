@@ -36,43 +36,6 @@ function Test-OwnedDirectory {
     return ($null -ne $item) -and ($item.User -eq [Environment]::UserName)
 }
 
-# The one git probe (cli#719): git's stdout, or $null when it did not answer. A normal "no" is
-# quiet: no .git here, or a failure -NormalIf explains (git exits 0 on it). A .git that git cannot
-# read says so, once per process, because the caller then carries on as if there were no repository.
-# The sentence is fixed text: git's stderr names paths and config, and this reaches an agent. A
-# non-zero exit stays an exit under any caller's preference: the catch is for a git that cannot start.
-function Invoke-GitProbe {
-    param(
-        [Parameter(Mandatory = $true)][string]$WorkDir,
-        [Parameter(Mandatory = $true)][string[]]$GitArgs,
-        [string[]]$NormalIf
-    )
-    $PSNativeCommandUseErrorActionPreference = $false
-    $hasMarker = Test-Path -LiteralPath (Join-Path $WorkDir '.git')
-    $problem = $null
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        try {
-            $out = & git -C $WorkDir @GitArgs 2>$null
-            $code = $LASTEXITCODE
-            if ($code -eq 0) { return $out }
-            if ($NormalIf) {
-                $null = & git -C $WorkDir @NormalIf 2>$null
-                if ($LASTEXITCODE -eq 0) { return $null }
-            }
-            if ($hasMarker) { $problem = "git exited $code reading this repository" }
-        } catch {
-            $problem = "git could not be started ($($_.Exception.GetType().Name))"
-        }
-    } elseif ($hasMarker) {
-        $problem = '.git is present but git is not on PATH'
-    }
-    if ($problem -and -not $script:GitProbeWarned) {
-        $script:GitProbeWarned = $true
-        [Console]::Error.WriteLine("WARNING: $problem; continuing without git")
-    }
-    return $null
-}
-
 # The project root: the directory holding .specnaut (cli#750). Installed, it is the
 # project this script is installed in (its own ../.. is that .specnaut), wherever it
 # runs: a .specnaut planted above the working directory cannot claim it. Run in place
@@ -103,40 +66,31 @@ function Get-CurrentBranch {
         if ($null -ne $result) { return $result }
     }
 
-    # For non-git repos, try to find the latest feature directory
-    $specsDir = Join-Path $repoRoot ".specnaut" "specs"
-    if (Test-Path $specsDir) {
-        $latestFeature = ""
-        $highest = 0
-        $latestTimestamp = ""
+    $latest = Get-LatestFeatureDir (Join-Path $repoRoot '.specnaut' 'specs')
+    if ($latest) { return $latest }
+    return 'main'
+}
 
-        Get-ChildItem -Path $specsDir -Directory | ForEach-Object {
-            if ($_.Name -match '^(\d{8}-\d{6})-') {
-                # Timestamp-based branch: compare lexicographically
-                $ts = $matches[1]
-                if ($ts -gt $latestTimestamp) {
-                    $latestTimestamp = $ts
-                    $latestFeature = $_.Name
-                }
-            } elseif ($_.Name -match '^(\d{3,})-') {
-                $num = [long]$matches[1]
-                if ($num -gt $highest) {
-                    $highest = $num
-                    # Only update if no timestamp branch found yet
-                    if (-not $latestTimestamp) {
-                        $latestFeature = $_.Name
-                    }
-                }
-            }
-        }
-
-        if ($latestFeature) {
-            return $latestFeature
+# The name of the latest feature directory under SpecsDir: the newest timestamp
+# prefix, else the highest number; $null when there is none. Mirrors
+# _latest_feature_dir in bash/common.sh.
+function Get-LatestFeatureDir {
+    param([string]$SpecsDir)
+    if (-not (Test-Path -LiteralPath $SpecsDir)) { return $null }
+    $latestFeature = $null
+    $highest = 0
+    $latestTimestamp = ''
+    foreach ($dir in Get-ChildItem -LiteralPath $SpecsDir -Directory) {
+        if ($dir.Name -match '^(\d{8}-\d{6})-') {
+            # Timestamp-based branch: compare lexicographically
+            if ($matches[1] -gt $latestTimestamp) { $latestTimestamp = $matches[1]; $latestFeature = $dir.Name }
+        } elseif ($dir.Name -match '^(\d{3,})-') {
+            $num = [long]$matches[1]
+            # A number wins only while no timestamp branch has been found
+            if ($num -gt $highest) { $highest = $num; if (-not $latestTimestamp) { $latestFeature = $dir.Name } }
         }
     }
-
-    # Final fallback
-    return "main"
+    return $latestFeature
 }
 
 # Whether the root is inside a git work tree, asked of git at the root (cli#750): a
@@ -315,6 +269,7 @@ function Test-FileExists {
     }
 }
 
-# Template resolution (Resolve-Template) lives beside this file; every caller of
-# common.ps1 keeps getting it from here.
+# The git probe (Invoke-GitProbe) and template resolution (Resolve-Template) live
+# beside this file; every caller of common.ps1 keeps getting them from here.
+. "$PSScriptRoot/_git_probe.ps1"
 . "$PSScriptRoot/template-resolution.ps1"

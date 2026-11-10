@@ -26,7 +26,13 @@ try:
     sys.stdout.buffer.write(''.join(p + chr(10) for p in ids).encode('utf-8'))
 except Exception:
     sys.exit(1)
-" 2>/dev/null
+" 2>/dev/null && return 0
+    local rc=$?
+    # The sentence Get-RegistryPresetIds prints (cli#754), fixed text: python's
+    # message quotes the file. Once per run because an entry script resolves one
+    # template; a flag here would sit in the caller's `$( … )` and be lost anyway.
+    [ "$rc" = 3 ] || echo "WARNING: .specnaut/presets/.registry could not be parsed; using alphabetical preset order" >&2
+    return "$rc"
 }
 
 # Resolve a template name to a file path using the priority stack:

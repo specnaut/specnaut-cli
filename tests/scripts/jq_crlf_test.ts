@@ -78,7 +78,7 @@ async function install(root: string, family: string): Promise<string> {
   const spec = family === "spec";
   const dir = join(root, spec ? ".specnaut/scripts/bash" : ".specnaut/scripts/backlog");
   await Deno.mkdir(dir, { recursive: true });
-  const files = spec ? ["common.sh", "template-resolution.sh"] : ["_config.sh"];
+  const files = spec ? ["common.sh", "_git_probe.sh", "template-resolution.sh"] : ["_config.sh"];
   // A backend's `_config.sh` sources the shared character rule beside it.
   for (const f of spec ? files : [...files, "../_issue_text.sh"]) {
     await Deno.copyFile(join(spec ? SPEC : join(BOARD, family), f), join(dir, basename(f)));

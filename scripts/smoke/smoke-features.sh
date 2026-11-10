@@ -25,6 +25,8 @@ check "common.sh no longer exports the deleted artefact paths (#457)" \
   '! grep -qE "RESEARCH=|DATA_MODEL=|QUICKSTART=|CONTRACTS_DIR=" .specnaut/scripts/bash/common.sh'
 check "common.sh sources template-resolution.sh, scaffolded beside it (#701)" \
   '[ -f .specnaut/scripts/bash/template-resolution.sh ] && grep -q "template-resolution.sh" .specnaut/scripts/bash/common.sh'
+check "both common scripts source their git probe, scaffolded beside them (#754)" \
+  '[ -f .specnaut/scripts/bash/_git_probe.sh ] && grep -q "_git_probe.sh" .specnaut/scripts/bash/common.sh && [ -f .specnaut/scripts/powershell/_git_probe.ps1 ] && grep -q "_git_probe.ps1" .specnaut/scripts/powershell/common.ps1'
 check ".specnaut/.gitattributes keeps Specnaut's tree LF on every platform (#701)" \
   'grep -qx "\* text=auto eol=lf" .specnaut/.gitattributes'
 check "check-prerequisites.sh no longer lists deleted artefacts (#457)" \

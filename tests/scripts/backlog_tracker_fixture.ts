@@ -86,7 +86,7 @@ export async function project(backend: Backend): Promise<Project> {
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(join(dir, ".specnaut", "backlog"));
   await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
-  for (const f of ["common.sh", "template-resolution.sh", "_report_text.sh"]) {
+  for (const f of ["common.sh", "_git_probe.sh", "template-resolution.sh", "_report_text.sh"]) {
     await Deno.copyFile(join(BASH, f), join(dir, ".specnaut", "scripts", "bash", f));
   }
   await Deno.mkdir(join(dir, "bin"));

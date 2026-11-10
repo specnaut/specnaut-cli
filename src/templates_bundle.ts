@@ -27266,85 +27266,80 @@ _owned_dir() {
     [ -O "\$1" ]
 }
 
-# The project root: the directory holding \`.specnaut\` (cli#750). Installed, it
-# is the project this script is installed in (its own \`../..\` is that
-# \`.specnaut\`), wherever it runs: a \`.specnaut\` planted above the working
+# The project root: the directory holding \`.specnaut\` (cli#750), into VAR.
+# Installed, it is the project this script is installed in (its own \`../..\` is
+# that \`.specnaut\`), wherever it runs: a \`.specnaut\` planted above the working
 # directory cannot claim it. Run in place (the templates tree), the nearest
 # \`.specnaut\` above the working directory, then git's top level, then the
 # script's own location.
-get_repo_root() {
-    local here found
-    here="\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")/../.." && pwd)"
-    if [ "\${here##*/}" = ".specnaut" ]; then
-        found="\${here%/*}"
-    elif ! found=\$(find_specnaut_root) && ! found=\$(git rev-parse --show-toplevel 2>/dev/null); then
-        found="\${here%/*}"
+_resolve_repo_root() {
+    local _rr_here _rr_found=""
+    _rr_here="\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")/../.." && pwd)"
+    if [ "\${_rr_here##*/}" = ".specnaut" ]; then
+        _rr_found="\${_rr_here%/*}"
+    elif ! _rr_found=\$(find_specnaut_root) && ! _git_probe _rr_found "\$PWD" "" rev-parse --show-toplevel; then
+        _rr_found="\${_rr_here%/*}"
     fi
-    printf '%s\\n' "\${found:-/}"
+    printf -v "\$1" '%s' "\${_rr_found:-/}"
 }
 
-# Get current branch, with fallback for non-git repositories
+# Once per run (cli#754): resolve the root and ask git in the calling shell, so
+# every later call reads both, and the probe's "warned" flag, instead of asking
+# again. The functions here are called inside \`\$( … )\`, where a flag set by a
+# probe is lost on return; each entry path primes first (get_feature_paths, and
+# create-new-feature.sh before its own first call).
+prime_repo_state() {
+    _SPECNAUT_ROOT="" _SPECNAUT_HAS_GIT=""
+    _resolve_repo_root _SPECNAUT_ROOT
+    if has_git; then _SPECNAUT_HAS_GIT=true; else _SPECNAUT_HAS_GIT=false; fi
+}
+
+get_repo_root() {
+    local root="\${_SPECNAUT_ROOT:-}"
+    [ -n "\$root" ] || _resolve_repo_root root
+    printf '%s\\n' "\$root"
+}
+
+# The current branch: \$SPECIFY_FEATURE, else git's answer at the root, else the
+# latest feature directory, else \`main\`. An unborn HEAD is a normal "no"
+# (cli#754): HEAD is still a symbolic ref, and the fallbacks answer quietly.
 get_current_branch() {
-    # First check if SPECIFY_FEATURE environment variable is set
-    if [[ -n "\${SPECIFY_FEATURE:-}" ]]; then
-        echo "\$SPECIFY_FEATURE"
-        return
-    fi
-
-    # Then git, when the root is in a work tree (see has_git)
-    local repo_root
+    if [[ -n "\${SPECIFY_FEATURE:-}" ]]; then echo "\$SPECIFY_FEATURE"; return; fi
+    local repo_root branch=""
     repo_root=\$(get_repo_root)
-    if has_git; then
-        git -C "\$repo_root" rev-parse --abbrev-ref HEAD
+    if has_git && _git_probe branch "\$repo_root" "symbolic-ref -q HEAD" rev-parse --abbrev-ref HEAD; then
+        echo "\$branch"
         return
     fi
+    _latest_feature_dir "\$repo_root/.specnaut/specs" || echo "main"
+}
 
-    # For non-git repos, try to find the latest feature directory
-    local specs_dir="\$repo_root/.specnaut/specs"
-
-    if [[ -d "\$specs_dir" ]]; then
-        local latest_feature=""
-        local highest=0
-        local latest_timestamp=""
-
-        for dir in "\$specs_dir"/*; do
-            if [[ -d "\$dir" ]]; then
-                local dirname=\$(basename "\$dir")
-                if [[ "\$dirname" =~ ^([0-9]{8}-[0-9]{6})- ]]; then
-                    # Timestamp-based branch: compare lexicographically
-                    local ts="\${BASH_REMATCH[1]}"
-                    if [[ "\$ts" > "\$latest_timestamp" ]]; then
-                        latest_timestamp="\$ts"
-                        latest_feature=\$dirname
-                    fi
-                elif [[ "\$dirname" =~ ^([0-9]{3,})- ]]; then
-                    local number=\${BASH_REMATCH[1]}
-                    number=\$((10#\$number))
-                    if [[ "\$number" -gt "\$highest" ]]; then
-                        highest=\$number
-                        # Only update if no timestamp branch found yet
-                        if [[ -z "\$latest_timestamp" ]]; then
-                            latest_feature=\$dirname
-                        fi
-                    fi
-                fi
-            fi
-        done
-
-        if [[ -n "\$latest_feature" ]]; then
-            echo "\$latest_feature"
-            return
+# The name of the latest feature directory under \$1: the newest timestamp
+# prefix, else the highest number. Nothing, and status 1, when there is none.
+_latest_feature_dir() {
+    local dir name number latest="" latest_ts="" highest=0
+    for dir in "\$1"/*; do
+        [[ -d "\$dir" ]] || continue
+        name="\${dir##*/}"
+        if [[ "\$name" =~ ^([0-9]{8}-[0-9]{6})- ]]; then
+            # Timestamp-based branch: compare lexicographically
+            if [[ "\${BASH_REMATCH[1]}" > "\$latest_ts" ]]; then latest_ts="\${BASH_REMATCH[1]}"; latest=\$name; fi
+        elif [[ "\$name" =~ ^([0-9]{3,})- ]]; then
+            number=\$((10#\${BASH_REMATCH[1]}))
+            # A number wins only while no timestamp branch has been found
+            if [[ "\$number" -gt "\$highest" ]]; then highest=\$number; [[ -n "\$latest_ts" ]] || latest=\$name; fi
         fi
-    fi
-
-    echo "main"  # Final fallback
+    done
+    [[ -n "\$latest" ]] && printf '%s\\n' "\$latest"
 }
 
 # Whether the root is inside a git work tree, asked of git at the root
 # (cli#750): a project nested in a parent repository works on its branches.
 has_git() {
-    command -v git >/dev/null 2>&1 || return 1
-    [ "\$(git -C "\$(get_repo_root)" rev-parse --is-inside-work-tree 2>/dev/null)" = true ]
+    if [ -n "\${_SPECNAUT_HAS_GIT:-}" ]; then [ "\$_SPECNAUT_HAS_GIT" = true ]; return; fi
+    local inside=""
+    _git_probe inside "\$(get_repo_root)" "" rev-parse --is-inside-work-tree || return 1
+    [ "\$inside" = true ]
 }
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
@@ -27469,83 +27464,80 @@ normalize_feature_path() {
     printf '%s' "\$_p"
 }
 
-get_feature_paths() {
-    local repo_root=\$(get_repo_root)
-    local current_branch=\$(get_current_branch)
-    local has_git_repo="false"
-
-    if has_git; then
-        has_git_repo="true"
+# The "feature_directory" of the feature.json at \$1: by jq, else python3, else a
+# single-line grep (which misses a pretty-printed file).
+_feature_json_dir() {
+    if command -v jq >/dev/null 2>&1; then
+        jq_lf -r '.feature_directory // empty' "\$1" 2>/dev/null
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$1" 2>/dev/null
+    else
+        grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$1" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/'
     fi
+}
+
+# A resolution that contradicts the branch is an error, not an output: status 0,
+# and the refusal on stderr, when the feature.json directory \$1 names another
+# feature than the branch \$2.
+#
+# \`.specnaut/feature.json\` is written by the \`plan\` phase and names the
+# feature it was writing at the time. Anything that resolves paths before
+# the CURRENT feature has been persisted reads the PREVIOUS one — and then
+# every caller receives a \`CURRENT_BRANCH\` and a \`FEATURE_DIR\` that name
+# different features, in the same breath, with nothing comparing them.
+# \`setup-plan.sh\` copied a blank template over the older feature's plan on
+# exactly that reading.
+#
+# Only the \`feature.json\` rule can contradict the branch: the env override
+# is a deliberate instruction to look elsewhere, and the prefix fallback is
+# derived from the branch, so neither can disagree with it. The comparison
+# is skipped off a feature branch, where \`check_feature_branch\` already
+# reports a better error.
+_feature_json_contradicts_branch() {
+    local branch
+    branch=\$(spec_kit_effective_branch_name "\$2")
+    is_feature_branch_name "\$branch" && [[ "\$(basename "\$1")" != "\$branch" ]] || return 1
+    echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
+    echo "  current branch:  \$branch" >&2
+    echo "  feature.json:    \$(basename "\$1")" >&2
+    echo "  resolved path:   \$1" >&2
+    echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2
+    echo "Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately." >&2
+}
+
+get_feature_paths() {
+    prime_repo_state
+    local repo_root current_branch has_git_repo="false"
+    repo_root=\$(get_repo_root)
+    current_branch=\$(get_current_branch)
+    if has_git; then has_git_repo="true"; fi
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
     #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (legacy fallback)
-    local feature_dir
-    local feature_dir_source
+    local feature_dir="" feature_dir_source="branch"
     if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
         feature_dir_source="env"
         feature_dir=\$(normalize_feature_path "\$SPECIFY_FEATURE_DIRECTORY")
-        # Normalize relative paths to absolute under repo root
-        is_absolute_path "\$feature_dir" || feature_dir="\$repo_root/\$feature_dir"
     elif [[ -f "\$repo_root/.specnaut/feature.json" ]]; then
-        feature_dir_source="feature.json"
-        local _fd
-        if command -v jq >/dev/null 2>&1; then
-            _fd=\$(jq_lf -r '.feature_directory // empty' "\$repo_root/.specnaut/feature.json" 2>/dev/null)
-        elif command -v python3 >/dev/null 2>&1; then
-            # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
-            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specnaut/feature.json" 2>/dev/null)
-        else
-            # Last resort: single-line grep fallback (won't work on multi-line JSON)
-            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specnaut/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
-        fi
-        if [[ -n "\$_fd" ]]; then
-            feature_dir=\$(normalize_feature_path "\$_fd")
-            # Normalize relative paths to absolute under repo root
-            is_absolute_path "\$feature_dir" || feature_dir="\$repo_root/\$feature_dir"
-        elif ! feature_dir=\$(find_feature_dir_by_prefix "\$repo_root" "\$current_branch"); then
-            echo "ERROR: Failed to resolve feature directory" >&2
-            return 1
-        else
-            feature_dir_source="branch"
-        fi
-    else
-        feature_dir_source="branch"
+        feature_dir=\$(_feature_json_dir "\$repo_root/.specnaut/feature.json")
+        [[ -z "\$feature_dir" ]] || feature_dir_source="feature.json"
+        feature_dir=\$(normalize_feature_path "\$feature_dir")
+    fi
+    if [[ "\$feature_dir_source" == "branch" ]]; then
         if ! feature_dir=\$(find_feature_dir_by_prefix "\$repo_root" "\$current_branch"); then
             echo "ERROR: Failed to resolve feature directory" >&2
             return 1
         fi
+    else
+        # Normalize relative paths to absolute under repo root
+        is_absolute_path "\$feature_dir" || feature_dir="\$repo_root/\$feature_dir"
     fi
 
-    # A resolution that contradicts the branch is an error, not an output.
-    #
-    # \`.specnaut/feature.json\` is written by the \`plan\` phase and names the
-    # feature it was writing at the time. Anything that resolves paths before
-    # the CURRENT feature has been persisted reads the PREVIOUS one — and then
-    # every caller receives a \`CURRENT_BRANCH\` and a \`FEATURE_DIR\` that name
-    # different features, in the same breath, with nothing comparing them.
-    # \`setup-plan.sh\` copied a blank template over the older feature's plan on
-    # exactly that reading.
-    #
-    # Only the \`feature.json\` rule can contradict the branch: the env override
-    # is a deliberate instruction to look elsewhere, and the prefix fallback is
-    # derived from the branch, so neither can disagree with it. The comparison
-    # is skipped off a feature branch, where \`check_feature_branch\` already
-    # reports a better error.
-    if [[ "\$feature_dir_source" == "feature.json" && "\$has_git_repo" == "true" ]]; then
-        local _eff_branch
-        _eff_branch=\$(spec_kit_effective_branch_name "\$current_branch")
-        if is_feature_branch_name "\$_eff_branch" && [[ "\$(basename "\$feature_dir")" != "\$_eff_branch" ]]; then
-            echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
-            echo "  current branch:  \$_eff_branch" >&2
-            echo "  feature.json:    \$(basename "\$feature_dir")" >&2
-            echo "  resolved path:   \$feature_dir" >&2
-            echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2
-            echo "Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately." >&2
-            return 1
-        fi
+    if [[ "\$feature_dir_source" == "feature.json" && "\$has_git_repo" == "true" ]] &&
+        _feature_json_contradicts_branch "\$feature_dir" "\$current_branch"; then
+        return 1
     fi
 
     # Use printf '%q' to safely quote values, preventing shell injection
@@ -27613,10 +27605,14 @@ json_escape() {
 
 check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 
-# Template resolution lives beside this file; sourced here so every caller of
-# \`common.sh\` keeps \`resolve_template\`.
+# The git probe and template resolution live beside this file; sourced here so
+# every caller of \`common.sh\` keeps \`_git_probe\` and \`resolve_template\`.
+_common_dir="\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/_git_probe.sh
+source "\$_common_dir/_git_probe.sh"
 # shellcheck source=SCRIPTDIR/template-resolution.sh
-source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/template-resolution.sh"
+source "\$_common_dir/template-resolution.sh"
+unset _common_dir
 `,
     executable: true,
     backend: null,
@@ -27654,7 +27650,13 @@ try:
     sys.stdout.buffer.write(''.join(p + chr(10) for p in ids).encode('utf-8'))
 except Exception:
     sys.exit(1)
-" 2>/dev/null
+" 2>/dev/null && return 0
+    local rc=\$?
+    # The sentence Get-RegistryPresetIds prints (cli#754), fixed text: python's
+    # message quotes the file. Once per run because an entry script resolves one
+    # template; a flag here would sit in the caller's \`\$( … )\` and be lost anyway.
+    [ "\$rc" = 3 ] || echo "WARNING: .specnaut/presets/.registry could not be parsed; using alphabetical preset order" >&2
+    return "\$rc"
 }
 
 # Resolve a template name to a file path using the priority stack:
@@ -27715,6 +27717,55 @@ resolve_template() {
     # Template not found in any location.
     # Return 1 so callers can distinguish "not found" from "found".
     # Callers running under set -e should use: TEMPLATE=\$(resolve_template ...) || true
+    return 1
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_git_probe.sh",
+    content: `# shellcheck shell=bash
+#
+# Sourced by common.sh, beside it: the bash twin's one git probe (cli#754). Its
+# rule is Invoke-GitProbe's, in _git_probe.ps1, and the two are held to the same
+# scenarios by tests/scripts/git_probe_twins_test.ts. Defines a function, and
+# clears one run's state: what prime_repo_state (common.sh) and the probe set
+# is never inherited from the environment.
+unset _SPECNAUT_ROOT _SPECNAUT_HAS_GIT _SPECNAUT_GIT_WARNED
+
+# _git_probe VAR DIR NORMAL_IF GIT_ARGS... — git's stdout into VAR, status 0,
+# when git answered; status 1, VAR untouched, when it did not. A normal "no" is
+# quiet: no .git in DIR, or a failure NORMAL_IF (a git command from this script
+# family, split on spaces, or empty) explains by exiting 0. A .git that git
+# cannot read, or no git to read it with, says so once, because the caller then
+# carries on as if there were no repository. The sentence is fixed text: git's
+# stderr names paths and config, and this reaches an agent.
+#
+# VAR, like the "warned" flag, is set in the calling shell. Inside \`\$( … )\` both
+# are lost on return, which is why an entry path primes first (prime_repo_state).
+_git_probe() {
+    local _gp_var="\$1" _gp_dir="\$2" _gp_normal="\$3" _gp_out _gp_rc=0 _gp_problem=""
+    shift 3
+    if command -v git >/dev/null 2>&1; then
+        _gp_out=\$(git -C "\$_gp_dir" "\$@" 2>/dev/null) || _gp_rc=\$?
+        [ "\$_gp_rc" = 0 ] && { printf -v "\$_gp_var" '%s' "\$_gp_out"; return 0; }
+        # shellcheck disable=SC2086 # a fixed git command, split into its words on purpose
+        [ -n "\$_gp_normal" ] && git -C "\$_gp_dir" \$_gp_normal >/dev/null 2>&1 && return 1
+        case "\$_gp_rc" in
+            126 | 127) _gp_problem="git could not be started (exit \$_gp_rc)" ;;
+            *) [ -e "\$_gp_dir/.git" ] && _gp_problem="git exited \$_gp_rc reading this repository" ;;
+        esac
+    elif [ -e "\$_gp_dir/.git" ]; then
+        _gp_problem=".git is present but git is not on PATH"
+    fi
+    if [ -n "\$_gp_problem" ] && [ -z "\${_SPECNAUT_GIT_WARNED:-}" ]; then
+        _SPECNAUT_GIT_WARNED=1
+        echo "WARNING: \$_gp_problem; continuing without git" >&2
+    fi
     return 1
 }
 `,
@@ -27854,6 +27905,7 @@ source "\$SCRIPT_DIR/common.sh"
 # shellcheck source=SCRIPTDIR/branch-naming.sh
 source "\$SCRIPT_DIR/branch-naming.sh"
 
+prime_repo_state
 REPO_ROOT=\$(get_repo_root)
 
 # Whether the root is in a git work tree, asked of git at the root (has_git)
@@ -32210,43 +32262,6 @@ function Test-OwnedDirectory {
     return (\$null -ne \$item) -and (\$item.User -eq [Environment]::UserName)
 }
 
-# The one git probe (cli#719): git's stdout, or \$null when it did not answer. A normal "no" is
-# quiet: no .git here, or a failure -NormalIf explains (git exits 0 on it). A .git that git cannot
-# read says so, once per process, because the caller then carries on as if there were no repository.
-# The sentence is fixed text: git's stderr names paths and config, and this reaches an agent. A
-# non-zero exit stays an exit under any caller's preference: the catch is for a git that cannot start.
-function Invoke-GitProbe {
-    param(
-        [Parameter(Mandatory = \$true)][string]\$WorkDir,
-        [Parameter(Mandatory = \$true)][string[]]\$GitArgs,
-        [string[]]\$NormalIf
-    )
-    \$PSNativeCommandUseErrorActionPreference = \$false
-    \$hasMarker = Test-Path -LiteralPath (Join-Path \$WorkDir '.git')
-    \$problem = \$null
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        try {
-            \$out = & git -C \$WorkDir @GitArgs 2>\$null
-            \$code = \$LASTEXITCODE
-            if (\$code -eq 0) { return \$out }
-            if (\$NormalIf) {
-                \$null = & git -C \$WorkDir @NormalIf 2>\$null
-                if (\$LASTEXITCODE -eq 0) { return \$null }
-            }
-            if (\$hasMarker) { \$problem = "git exited \$code reading this repository" }
-        } catch {
-            \$problem = "git could not be started (\$(\$_.Exception.GetType().Name))"
-        }
-    } elseif (\$hasMarker) {
-        \$problem = '.git is present but git is not on PATH'
-    }
-    if (\$problem -and -not \$script:GitProbeWarned) {
-        \$script:GitProbeWarned = \$true
-        [Console]::Error.WriteLine("WARNING: \$problem; continuing without git")
-    }
-    return \$null
-}
-
 # The project root: the directory holding .specnaut (cli#750). Installed, it is the
 # project this script is installed in (its own ../.. is that .specnaut), wherever it
 # runs: a .specnaut planted above the working directory cannot claim it. Run in place
@@ -32277,40 +32292,31 @@ function Get-CurrentBranch {
         if (\$null -ne \$result) { return \$result }
     }
 
-    # For non-git repos, try to find the latest feature directory
-    \$specsDir = Join-Path \$repoRoot ".specnaut" "specs"
-    if (Test-Path \$specsDir) {
-        \$latestFeature = ""
-        \$highest = 0
-        \$latestTimestamp = ""
+    \$latest = Get-LatestFeatureDir (Join-Path \$repoRoot '.specnaut' 'specs')
+    if (\$latest) { return \$latest }
+    return 'main'
+}
 
-        Get-ChildItem -Path \$specsDir -Directory | ForEach-Object {
-            if (\$_.Name -match '^(\\d{8}-\\d{6})-') {
-                # Timestamp-based branch: compare lexicographically
-                \$ts = \$matches[1]
-                if (\$ts -gt \$latestTimestamp) {
-                    \$latestTimestamp = \$ts
-                    \$latestFeature = \$_.Name
-                }
-            } elseif (\$_.Name -match '^(\\d{3,})-') {
-                \$num = [long]\$matches[1]
-                if (\$num -gt \$highest) {
-                    \$highest = \$num
-                    # Only update if no timestamp branch found yet
-                    if (-not \$latestTimestamp) {
-                        \$latestFeature = \$_.Name
-                    }
-                }
-            }
-        }
-
-        if (\$latestFeature) {
-            return \$latestFeature
+# The name of the latest feature directory under SpecsDir: the newest timestamp
+# prefix, else the highest number; \$null when there is none. Mirrors
+# _latest_feature_dir in bash/common.sh.
+function Get-LatestFeatureDir {
+    param([string]\$SpecsDir)
+    if (-not (Test-Path -LiteralPath \$SpecsDir)) { return \$null }
+    \$latestFeature = \$null
+    \$highest = 0
+    \$latestTimestamp = ''
+    foreach (\$dir in Get-ChildItem -LiteralPath \$SpecsDir -Directory) {
+        if (\$dir.Name -match '^(\\d{8}-\\d{6})-') {
+            # Timestamp-based branch: compare lexicographically
+            if (\$matches[1] -gt \$latestTimestamp) { \$latestTimestamp = \$matches[1]; \$latestFeature = \$dir.Name }
+        } elseif (\$dir.Name -match '^(\\d{3,})-') {
+            \$num = [long]\$matches[1]
+            # A number wins only while no timestamp branch has been found
+            if (\$num -gt \$highest) { \$highest = \$num; if (-not \$latestTimestamp) { \$latestFeature = \$dir.Name } }
         }
     }
-
-    # Final fallback
-    return "main"
+    return \$latestFeature
 }
 
 # Whether the root is inside a git work tree, asked of git at the root (cli#750): a
@@ -32489,8 +32495,9 @@ function Test-FileExists {
     }
 }
 
-# Template resolution (Resolve-Template) lives beside this file; every caller of
-# common.ps1 keeps getting it from here.
+# The git probe (Invoke-GitProbe) and template resolution (Resolve-Template) live
+# beside this file; every caller of common.ps1 keeps getting them from here.
+. "\$PSScriptRoot/_git_probe.ps1"
 . "\$PSScriptRoot/template-resolution.ps1"
 `,
     executable: false,
@@ -32589,6 +32596,57 @@ function Resolve-Template {
     \$core = Join-Path \$base "\$TemplateName.md"
     if (Test-Path \$core) { return \$core }
 
+    return \$null
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_git_probe.ps1",
+    content: `#!/usr/bin/env pwsh
+# Dot-sourced by common.ps1, beside it: the PowerShell twin's one git probe. Its
+# bash twin is _git_probe in _git_probe.sh, and the two are held to the same
+# scenarios by tests/scripts/git_probe_twins_test.ts. Defines a function only:
+# dot-sourcing it runs nothing.
+
+# The one git probe (cli#719): git's stdout, or \$null when it did not answer. A normal "no" is
+# quiet: no .git here, or a failure -NormalIf explains (git exits 0 on it). A .git that git cannot
+# read says so, once per process, because the caller then carries on as if there were no repository.
+# The sentence is fixed text: git's stderr names paths and config, and this reaches an agent. A
+# non-zero exit stays an exit under any caller's preference: the catch is for a git that cannot start.
+function Invoke-GitProbe {
+    param(
+        [Parameter(Mandatory = \$true)][string]\$WorkDir,
+        [Parameter(Mandatory = \$true)][string[]]\$GitArgs,
+        [string[]]\$NormalIf
+    )
+    \$PSNativeCommandUseErrorActionPreference = \$false
+    \$hasMarker = Test-Path -LiteralPath (Join-Path \$WorkDir '.git')
+    \$problem = \$null
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        try {
+            \$out = & git -C \$WorkDir @GitArgs 2>\$null
+            \$code = \$LASTEXITCODE
+            if (\$code -eq 0) { return \$out }
+            if (\$NormalIf) {
+                \$null = & git -C \$WorkDir @NormalIf 2>\$null
+                if (\$LASTEXITCODE -eq 0) { return \$null }
+            }
+            if (\$hasMarker) { \$problem = "git exited \$code reading this repository" }
+        } catch {
+            \$problem = "git could not be started (\$(\$_.Exception.GetType().Name))"
+        }
+    } elseif (\$hasMarker) {
+        \$problem = '.git is present but git is not on PATH'
+    }
+    if (\$problem -and -not \$script:GitProbeWarned) {
+        \$script:GitProbeWarned = \$true
+        [Console]::Error.WriteLine("WARNING: \$problem; continuing without git")
+    }
     return \$null
 }
 `,

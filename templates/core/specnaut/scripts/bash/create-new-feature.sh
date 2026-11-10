@@ -126,6 +126,7 @@ source "$SCRIPT_DIR/common.sh"
 # shellcheck source=SCRIPTDIR/branch-naming.sh
 source "$SCRIPT_DIR/branch-naming.sh"
 
+prime_repo_state
 REPO_ROOT=$(get_repo_root)
 
 # Whether the root is in a git work tree, asked of git at the root (has_git)

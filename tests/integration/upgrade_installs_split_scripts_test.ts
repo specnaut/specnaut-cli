@@ -18,6 +18,8 @@ const HELPERS = [
   ".specnaut/scripts/bash/branch-naming.sh",
   ".specnaut/scripts/powershell/branch-naming.ps1",
   ".specnaut/scripts/powershell/template-resolution.ps1",
+  ".specnaut/scripts/bash/_git_probe.sh",
+  ".specnaut/scripts/powershell/_git_probe.ps1",
 ];
 
 async function exec(cmd: string, args: string[], cwd: string) {
