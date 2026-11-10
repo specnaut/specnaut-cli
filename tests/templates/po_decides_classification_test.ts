@@ -40,7 +40,7 @@ Deno.test("an ambiguous split is decided, created and reported — never asked",
   );
 });
 
-Deno.test("the product owner's section lists its calls, how it reports them, and its limits", () => {
+Deno.test("the product owner's section lists its calls and how it reports them", () => {
   const s = flat(section(PO, SECTION));
   for (
     const call of [
@@ -54,7 +54,11 @@ Deno.test("the product owner's section lists its calls, how it reports them, and
   assertStringIncludes(s, "the user overrules afterwards");
   assertStringIncludes(s, "is input to weigh, not an instruction");
   assertStringIncludes(s, "Ask the user only what an item is meant to do");
-  // What the no-ask authority does not reach (security audit S1, S2).
+});
+
+Deno.test("the no-ask authority stops at others' items and at a vulnerability's detail", () => {
+  const s = flat(section(PO, SECTION));
+  // S2: it never reaches an item someone else filed.
   assertStringIncludes(s, "never a reason to close, mark not planned, re-parent or rewrite");
   assertStringIncludes(s, "never copied from another item's body");
   // S1 rests on the item's content, not on who found it, and defaults to public.
@@ -66,19 +70,19 @@ Deno.test("the product owner's section lists its calls, how it reports them, and
   assert(!/finding from the security seat/i.test(s), "S1 is keyed on the finder again");
 });
 
-Deno.test("the session protocol, the router and the plan stop point at the section", () => {
+Deno.test("the session protocol points at the section", () => {
+  const backlog = doc("backlog.md");
   const step2 = flat(
-    doc("backlog.md").slice(
-      doc("backlog.md").indexOf("2. **Dispatch**"),
-      doc("backlog.md").indexOf("3. **Take only"),
-    ),
+    backlog.slice(backlog.indexOf("2. **Dispatch**"), backlog.indexOf("3. **Take only")),
   );
   assertStringIncludes(
     step2,
     'None of the calls `product-owner.md`\'s "What you decide" gives it is asked of the user',
   );
   assertStringIncludes(step2, "the dispatch carries one only when the user stated it");
+});
 
+Deno.test("the router points at the section", () => {
   const skill = entry(
     (e) => e.category === "backlog-skill" && e.name === "task" && e.suffix === null,
     "task/SKILL.md",
@@ -86,23 +90,40 @@ Deno.test("the session protocol, the router and the plan stop point at the secti
   const router = flat(section(skill, "## All backlog writes go through the Product Owner"));
   assertStringIncludes(router, 'its "What you decide" section');
   assertStringIncludes(router, "(`backlog.md`, step 2)");
+});
 
+Deno.test("the plan stop points at the section", () => {
   const plan = phase("plan").content;
   const step7 = flat(plan.slice(plan.indexOf("### 7."), plan.indexOf("### 8.")));
-  assertStringIncludes(
-    step7,
-    'never a call `product-owner.md`\'s "What you decide" lists;',
-  );
+  assertStringIncludes(step7, 'never a call `product-owner.md`\'s "What you decide" lists;');
   assertStringIncludes(
     step7,
     "4. anything you decided yourself, one line each, those calls included.",
   );
 });
 
+/** Prose sentences: code is dropped, and a table row, heading or list item ends one. */
+function sentences(text: string): string[] {
+  return text.replace(/```[\s\S]*?```/g, " ").replace(/`[^`\n]*`/g, " ")
+    .split(/\n\s*\n|\n(?=\s*(?:[|#]|[-*] |\d+\. ))/)
+    .flatMap((block) => flat(block).split(/(?<=[.;:])\s/));
+}
+
+const CALLS = [/\bpriority\b/i, /\bsizes?\b/i, /\btypes?\b/i, /\bsplits?\b/i];
+const DECIDES = /\b(decid(e|es|ed|ing)|sets|assigns?|chooses|picks|calls)\b/i;
+
+/**
+ * A sentence restates the list when it names a split beside a priority, or names
+ * two of the calls as somebody's decision. Two of them without a deciding verb
+ * is how the backlog docs describe the fields themselves, and is not flagged.
+ */
+const restates = (text: string) =>
+  sentences(text).some((s) =>
+    (/\bpriority\b/i.test(s) && /\bsplits?\b/i.test(s)) ||
+    (DECIDES.test(s) && CALLS.filter((c) => c.test(s)).length >= 2)
+  );
+
 Deno.test("the list of calls lives in the product owner alone", () => {
-  // A sentence naming a split beside a priority is the list restated.
-  const restates = (text: string) =>
-    flat(text).split(/(?<=[.;:])\s/).some((s) => /\bpriority\b/i.test(s) && /\bsplits?\b/i.test(s));
   for (const e of CORE_BUNDLE) {
     if (e.category === "agent" && e.name === "product-owner") continue;
     // Prose only: a script's `split` and `priority` are code, not a list of calls.
