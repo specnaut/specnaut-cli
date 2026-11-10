@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
+import { installWriterDeps } from "./backlog_tracker_fixture.ts";
 
 /**
  * cli#603 — a project workflow that wins the race must not kill `add.sh`.
@@ -54,19 +55,9 @@ async function stubbedProject(
     await Deno.copyFile(scriptPath(`${GITHUB_DIR}/${name}`), `${scripts}/${name}`);
     await Deno.chmod(`${scripts}/${name}`, 0o755);
   }
-  // The shared write rules add.sh checks its text by, and the secret scan they run.
-  for (const name of ["_backlog_plan.sh", "_issue_text.sh"]) {
-    await Deno.copyFile(scriptPath(`${GITHUB_DIR}/../${name}`), `${scripts}/${name}`);
-  }
-  await Deno.mkdir(`${tmp}/board/scripts/bash`);
-  await Deno.copyFile(
-    scriptPath(`${GITHUB_DIR}/../../../../specnaut/scripts/bash/_report_text.sh`),
-    `${tmp}/board/scripts/bash/_report_text.sh`,
-  );
-  await Deno.writeTextFile(
-    `${tmp}/.specnaut/backlog-config.yml`,
-    'repo: "acme/my-app"\nproject_number: 7\n',
-  );
+  await installWriterDeps(scripts);
+  const config = 'repo: "acme/my-app"\nproject_number: 7\n';
+  await Deno.writeTextFile(`${tmp}/.specnaut/backlog-config.yml`, config);
 
   const fieldList = JSON.stringify({
     fields: [{

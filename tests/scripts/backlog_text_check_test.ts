@@ -1,12 +1,7 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertMatch } from "@std/assert";
 import { join } from "@std/path";
-import {
-  type Backend,
-  localItem,
-  type Project,
-  project,
-  SCRIPTS,
-} from "./backlog_tracker_fixture.ts";
+import { type Backend, localItem, type Project, project } from "./backlog_tracker_fixture.ts";
+import { WAYS, waysOf, type Writer, writers } from "./backlog_writer_ways.ts";
 import {
   CLEAN_BODY,
   CLEAN_TITLE,
@@ -23,66 +18,6 @@ import {
  * its first tracker call or file write, and is driven here through its own
  * entry point with the tracker CLIs replaced by stand-ins.
  */
-
-/** How a writer takes one text field: as an argument, or as a file it reads. */
-interface Way {
-  field: string;
-  argv?: (text: string) => string[];
-  file?: (path: string) => string[];
-}
-
-const add = (labels: boolean): Way[] => [
-  { field: "title", argv: (t) => [t, "Body."] },
-  {
-    field: "body",
-    argv: (t) => [CLEAN_TITLE, t],
-    file: (f) => [CLEAN_TITLE, "--body-file", f],
-  },
-  ...(labels ? [{ field: "label", argv: (t: string) => [CLEAN_TITLE, "Body.", t] }] : []),
-];
-const edit: Way[] = [
-  { field: "title", argv: (t) => ["1", "--title", t] },
-  { field: "append", file: (f) => ["1", "--append-file", f] },
-];
-const comment: Way[] = [
-  { field: "body", argv: (t) => ["1", t], file: (f) => ["1", "--body-file", f] },
-];
-const close: Way[] = [{ field: "body", file: (f) => ["1", "--body-file", f] }];
-const label: Way[] = [{ field: "label", argv: (t) => ["1", "bug", t] }];
-
-/** How to call each writer. Which scripts are writers is computed below, never listed. */
-const WAYS: Record<string, Way[]> = {
-  "github/add.sh": add(true),
-  "gitlab/add.sh": add(true),
-  "cloud/add.sh": add(false),
-  "local/add.sh": add(false),
-  "github/edit.sh": edit,
-  "gitlab/edit.sh": edit,
-  "local/edit.sh": edit,
-  "github/clarify-comment.sh": comment,
-  "gitlab/clarify-comment.sh": comment,
-  "cloud/clarify-comment.sh": comment,
-  "local/clarify-comment.sh": comment,
-  "github/close.sh": close,
-  "gitlab/close.sh": close,
-  "github/label.sh": label,
-  "gitlab/label.sh": label,
-};
-
-/** A script that sends caller text names it in its usage: these spellings. */
-const SENDS_TEXT = /--body-file|--append-file|--title|"<title>"|"<question>"|<label>/;
-
-async function writers(): Promise<string[]> {
-  const found: string[] = [];
-  for (const backend of ["cloud", "github", "gitlab", "local"]) {
-    for await (const f of Deno.readDir(join(SCRIPTS, backend))) {
-      if (!f.name.endsWith(".sh") || f.name === "apply-plan.sh") continue;
-      const text = await Deno.readTextFile(join(SCRIPTS, backend, f.name));
-      if (SENDS_TEXT.test(text)) found.push(`${backend}/${f.name}`);
-    }
-  }
-  return found.sort();
-}
 
 /** Every refused sample an argument can carry (no NUL), with its class; one is refused only by the environment. */
 const POOL: { text: string; cls: string; env?: Record<string, string> }[] = [
@@ -108,7 +43,10 @@ async function snapshot(p: Project): Promise<string> {
   await walk(".specnaut/backlog");
   try {
     out.push(await p.read(".specnaut/backlog.md"));
-  } catch { /* no index yet: the snapshot is the files alone */ }
+  } catch (e) {
+    // No index yet: the snapshot is the files alone. Any other error is the test's.
+    if (!(e instanceof Deno.errors.NotFound)) throw e;
+  }
   return out.sort().join("\0");
 }
 
@@ -120,95 +58,113 @@ async function setUp(backend: Backend): Promise<Project> {
   return p;
 }
 
+/** The clean text a writer's field takes: a title, a label, or a body. */
+function cleanText(field: string): string {
+  if (field === "title") return CLEAN_TITLE;
+  return field === "label" ? "tech-debt" : CLEAN_BODY;
+}
+
+/** Each way of each writer, given the next refused sample: refused by class, nothing sent or written. */
+async function assertSamplesRefused(p: Project, backend: Backend) {
+  const before = await snapshot(p);
+  let k = backend.length; // a different rotation per backend
+  for (const w of waysOf(backend)) {
+    for (const viaFile of [false, true]) {
+      const make = viaFile ? w.way.file : w.way.argv;
+      if (!make) continue;
+      const s = POOL[k++ % POOL.length];
+      await p.write("text.md", s.text);
+      const r = await p.run(w.name, make(viaFile ? join(p.dir, "text.md") : s.text), s.env);
+      const seen = `${w.script} ${w.way.field} ${JSON.stringify(s.text)}\n${r.stdout}${r.stderr}`;
+      assertEquals(
+        [r.code, r.stderr, r.calls],
+        [14, `REFUSED ${s.cls} ${w.way.field}\n`, ""],
+        seen,
+      );
+      assert(!r.stdout.includes(s.text) && !r.stderr.includes(s.text), seen);
+      assertEquals(await snapshot(p), before, seen);
+    }
+  }
+}
+
+/**
+ * Every writer, given plain words, stops with status 2 and the one line `why`
+ * on stderr (from whichever script judged the text): nothing refused by name,
+ * nothing sent, nothing written.
+ */
+async function assertEveryWriterStops(p: Project, backend: Backend, why: string) {
+  const before = await snapshot(p);
+  await p.write("text.md", "plain words");
+  for (const w of waysOf(backend)) {
+    const args = w.way.argv ? w.way.argv("plain words") : w.way.file!(join(p.dir, "text.md"));
+    const r = await p.run(w.name, args);
+    assertEquals([r.code, r.calls], [2, ""], `${w.script}\n${r.stderr}`);
+    assertMatch(r.stderr, new RegExp(`^[a-z-]+\\.sh: ${why}\\n$`), w.script);
+  }
+  assertEquals(await snapshot(p), before);
+}
+
+/** One way of one writer, given clean text in a fresh project: the text reaches the tracker or task file intact. */
+async function assertSentAsWritten(backend: Backend, w: Writer, viaFile: boolean) {
+  // A fresh project each time: an earlier call's text must not answer for this one.
+  const p = await setUp(backend);
+  try {
+    const text = cleanText(w.way.field);
+    await p.write("text.md", text);
+    const args = viaFile ? w.way.file!(join(p.dir, "text.md")) : w.way.argv!(text);
+    const r = await p.run(w.name, args);
+    assertEquals(r.code, 0, `${w.script} ${w.way.field}\n${r.stdout}${r.stderr}`);
+    const sent = backend === "local" ? await snapshot(p) : r.raw;
+    assert(reached(sent, text), `${w.script} ${w.way.field}: not sent as written\n${r.raw}`);
+  } finally {
+    await p.cleanup();
+  }
+}
+
+/** `check` run against a fresh project of `backend`, removed afterwards. */
+async function withProject(backend: Backend, check: (p: Project) => Promise<void>) {
+  const p = await setUp(backend);
+  try {
+    await check(p);
+  } finally {
+    await p.cleanup();
+  }
+}
+
 Deno.test("the backlog writers are exactly the scripts whose usage takes text", async () => {
   assertEquals(await writers(), Object.keys(WAYS).sort());
   assertEquals(Object.keys(WAYS).length, 15);
 });
 
 for (const backend of ["github", "gitlab", "cloud", "local"] as const) {
-  Deno.test(`every ${backend} backlog writer refuses a secret-shaped text and writes nothing`, async () => {
-    const p = await setUp(backend);
-    let k = backend.length; // a different rotation per backend
-    try {
-      const before = await snapshot(p);
-      for (const w of WAYS_OF(backend)) {
-        for (const viaFile of [false, true]) {
-          const make = viaFile ? w.way.file : w.way.argv;
-          if (!make) continue;
-          const s = POOL[k++ % POOL.length];
-          await p.write("text.md", s.text);
-          const r = await p.run(w.name, make(viaFile ? join(p.dir, "text.md") : s.text), s.env);
-          const seen = `${w.script} ${w.way.field} ${
-            JSON.stringify(s.text)
-          }\n${r.stdout}${r.stderr}`;
-          assertEquals([r.code, r.stderr], [14, `REFUSED ${s.cls} ${w.way.field}\n`], seen);
-          assertEquals(r.calls, "", seen);
-          assert(!r.stdout.includes(s.text) && !r.stderr.includes(s.text), seen);
-          assertEquals(await snapshot(p), before, seen);
-        }
-      }
-      // A NUL in a file is refused hidden, though no argument could carry it.
+  Deno.test(`every ${backend} backlog writer refuses a secret-shaped text and writes nothing`, () =>
+    withProject(backend, (p) => assertSamplesRefused(p, backend)));
+
+  Deno.test(`every ${backend} backlog writer refuses a NUL in a text file as hidden`, () =>
+    withProject(backend, async (p) => {
+      // No argument could carry it; a file can.
       await p.write("text.md", "a\u0000b");
-      for (const w of WAYS_OF(backend)) {
+      for (const w of waysOf(backend)) {
         if (!w.way.file) continue;
         const r = await p.run(w.name, w.way.file(join(p.dir, "text.md")));
-        assertEquals(
-          [r.code, r.stderr, r.calls],
-          [14, `REFUSED hidden ${w.way.field}\n`, ""],
-          w.script,
-        );
+        const want = [14, `REFUSED hidden ${w.way.field}\n`, ""];
+        assertEquals([r.code, r.stderr, r.calls], want, w.script);
       }
-      // No scan installed: every writer stops with status 2, refusing nothing by name.
+    }));
+
+  Deno.test(`every ${backend} backlog writer stops when no secret scan is installed`, () =>
+    withProject(backend, async (p) => {
       await Deno.remove(join(p.dir, ".specnaut/scripts/bash/_report_text.sh"));
-      for (const w of WAYS_OF(backend)) {
-        const args = w.way.argv ? w.way.argv("plain words") : w.way.file!(join(p.dir, "text.md"));
-        const r = await p.run(w.name, args);
-        assertEquals([r.code, r.calls], [2, ""], `${w.script}\n${r.stderr}`);
-        assert(!r.stderr.includes("REFUSED"), r.stderr);
-      }
-      assertEquals(await snapshot(p), before);
-    } finally {
-      await p.cleanup();
-    }
-  });
+      await assertEveryWriterStops(p, backend, "the secret scan is missing");
+    }));
 
   Deno.test(`every ${backend} backlog writer sends clean text byte for byte`, async () => {
-    const p = await setUp(backend);
-    try {
-      for (const w of WAYS_OF(backend)) {
-        const text = ({ title: CLEAN_TITLE, label: "tech-debt" } as Record<string, string>)[
-          w.way.field
-        ] ??
-          CLEAN_BODY;
-        for (const viaFile of [false, true]) {
-          // A fresh local backlog each time: an earlier call's text must not answer for this one.
-          const q = backend === "local" ? await setUp(backend) : p;
-          try {
-            await q.write("text.md", text);
-            const args = viaFile ? w.way.file?.(join(q.dir, "text.md")) : w.way.argv?.(text);
-            if (!args) continue;
-            const r = await q.run(w.name, args);
-            assertEquals(r.code, 0, `${w.script} ${w.way.field}\n${r.stdout}${r.stderr}`);
-            const sent = backend === "local" ? await snapshot(q) : r.raw;
-            assert(
-              reached(sent, text),
-              `${w.script} ${w.way.field}: not sent as written\n${r.raw}`,
-            );
-          } finally {
-            if (q !== p) await q.cleanup();
-          }
-        }
+    for (const w of waysOf(backend)) {
+      for (const viaFile of [false, true]) {
+        if (viaFile ? w.way.file : w.way.argv) await assertSentAsWritten(backend, w, viaFile);
       }
-    } finally {
-      await p.cleanup();
     }
   });
-}
-
-function WAYS_OF(backend: Backend) {
-  return Object.entries(WAYS).filter(([s]) => s.startsWith(`${backend}/`)).flatMap((
-    [script, ways],
-  ) => ways.map((way) => ({ script, name: script.slice(backend.length + 1), way })));
 }
 
 /** The text arrived intact: inside an argument or a body file, or as a string of a JSON payload. */
@@ -216,9 +172,11 @@ function reached(sent: string, text: string): boolean {
   if (sent.includes(text)) return true;
   return sent.split("\0").some((a) => {
     try {
-      return Object.values(JSON.parse(a)).includes(text);
-    } catch {
-      return false;
+      return Object.values(JSON.parse(a) ?? {}).includes(text);
+    } catch (e) {
+      // Most arguments are not JSON; only a parse error means "not this one".
+      if (e instanceof SyntaxError) return false;
+      throw e;
     }
   });
 }

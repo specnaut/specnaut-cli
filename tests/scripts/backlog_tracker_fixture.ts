@@ -140,6 +140,21 @@ export async function project(backend: Backend): Promise<Project> {
   };
 }
 
+/**
+ * Installs what every backlog writer needs beside its own scripts: the shared
+ * write rules (`_backlog_plan.sh`, and the `_issue_text.sh` it sources) in
+ * `scriptsDir`, and the secret scan they run, `_report_text.sh`, in the
+ * `../bash` directory where `_backlog_plan.sh` looks for it.
+ */
+export async function installWriterDeps(scriptsDir: string): Promise<void> {
+  for (const name of ["_backlog_plan.sh", "_issue_text.sh"]) {
+    await Deno.copyFile(join(SCRIPTS, name), join(scriptsDir, name));
+  }
+  const bash = join(scriptsDir, "..", "bash");
+  await Deno.mkdir(bash, { recursive: true });
+  await Deno.copyFile(join(BASH, "_report_text.sh"), join(bash, "_report_text.sh"));
+}
+
 /** A local backlog item file, as `add.sh` writes it. */
 export function localItem(num: string, title: string, body = "Body.\n"): string {
   return `---\nnumber: ${num}\ntitle: ${title}\nstatus: Ready\nsize:\npriority:\ncreated: 2026-01-01T00:00:00Z\n---\n\n${body}`;

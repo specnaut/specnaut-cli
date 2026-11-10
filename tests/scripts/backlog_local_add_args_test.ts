@@ -9,6 +9,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { installWriterDeps } from "./backlog_tracker_fixture.ts";
 
 const LOCAL = "../../templates/core/skills/task/scripts/local";
 
@@ -23,20 +24,8 @@ async function sandbox(): Promise<{ root: string; add: string }> {
     );
   }
   // The shared files every backend installs beside its own: add.sh checks its title there.
-  for (const name of ["_backlog_plan.sh", "_issue_text.sh"]) {
-    await Deno.copyFile(
-      fromFileUrl(new URL(`${LOCAL}/../${name}`, import.meta.url)),
-      join(scripts, name),
-    );
-  }
-  // ...and the secret scan it checks every text with, where every install puts it.
-  await Deno.mkdir(join(root, ".specnaut", "scripts", "bash"));
-  await Deno.copyFile(
-    fromFileUrl(
-      new URL(`${LOCAL}/../../../../specnaut/scripts/bash/_report_text.sh`, import.meta.url),
-    ),
-    join(root, ".specnaut", "scripts", "bash", "_report_text.sh"),
-  );
+  // ...and the secret scan it checks every text with.
+  await installWriterDeps(scripts);
   return { root, add: bashPath(join(scripts, "add.sh")) };
 }
 

@@ -17,32 +17,29 @@ import {
  * judged in one bash process.
  */
 
+/** Every sample, with the verdict text_refusal prints for it: its status, then its class. */
+const CASES: [string, string][] = [
+  ...SECRET_SAMPLES.map((t): [string, string] => [t, "1 secret"]),
+  ...HIDDEN_SAMPLES.map((t): [string, string] => [t, "1 hidden"]),
+  ...[...SURVIVORS, CLEAN_BODY, CLEAN_TITLE].map((t): [string, string] => [t, "0 "]),
+];
+
+/** Each line is labelled: a sample's index, or the variable that holds the value. */
+const JUDGE_ALL = `
+  for i in $(seq 0 ${CASES.length - 1}); do c=$(text_refusal <"samples/$i"); echo "$i $? $c"; done
+  for n in ${SECRET_NAMES.join(" ")}; do
+    c=$(export "$n=${ENV_VALUE}"; text_refusal <env-sample); echo "$n $? $c"
+  done`;
+
 Deno.test("text_refusal names the class of every refused sample, and passes clean text", async () => {
   const p = await project("local");
   try {
-    const cases: [string, string][] = [
-      ...SECRET_SAMPLES.map((t): [string, string] => [t, "1 secret"]),
-      ...HIDDEN_SAMPLES.map((t): [string, string] => [t, "1 hidden"]),
-      ...[...SURVIVORS, CLEAN_BODY, CLEAN_TITLE].map((
-        t,
-      ): [string, string] => [t, "0 "]),
-    ];
     await Deno.mkdir(join(p.dir, "samples"));
-    for (const [i, [t]] of cases.entries()) await p.write(`samples/${i}`, t);
+    for (const [i, [t]] of CASES.entries()) await p.write(`samples/${i}`, t);
     await p.write("env-sample", `see ${ENV_VALUE} here`);
-    // Each line is labelled: a sample's index, or the variable that holds the value.
-    const out = await verdicts(
-      p,
-      `
-      for i in $(seq 0 ${
-        cases.length - 1
-      }); do c=$(text_refusal <"samples/$i"); echo "$i $? $c"; done
-      for n in ${SECRET_NAMES.join(" ")}; do
-        c=$(export "$n=${ENV_VALUE}"; text_refusal <env-sample); echo "$n $? $c"
-      done`,
-    );
+    const out = await verdicts(p, JUDGE_ALL);
     const want = [
-      ...cases.map(([, v], i) => `${i} ${v}`),
+      ...CASES.map(([, v], i) => `${i} ${v}`),
       ...SECRET_NAMES.map((n) => `${n} 1 secret`),
     ];
     assertEquals(out.lines, want, out.stderr);

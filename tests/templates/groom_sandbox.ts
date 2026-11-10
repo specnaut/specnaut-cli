@@ -1,4 +1,5 @@
 import { DELIMITER, dirname, fromFileUrl, join } from "@std/path";
+import { installWriterDeps } from "../scripts/backlog_tracker_fixture.ts";
 
 /**
  * Shared harness for the groom-completeness tests (US4 / FR-005).
@@ -70,14 +71,12 @@ export async function project(backend: string, files: string[], config?: string)
     await Deno.copyFile(join(BOARD_SCRIPTS, backend, f), join(scripts, f));
   }
   // The shared files installed beside every backend: the character rule cloud's
-  // `_config.sh` sources, and the plan rules the local add.sh checks a title by.
-  for (const f of ["_issue_text.sh", "_backlog_plan.sh"]) {
-    await Deno.copyFile(join(BOARD_SCRIPTS, f), join(scripts, f));
-  }
+  // `_config.sh` sources, the plan rules the local add.sh checks a title by, and
+  // the secret scan the writers run.
+  await installWriterDeps(scripts);
   // groom-rules.sh sources common.sh (its CR-safe jq), which sources the
   // template resolver: the three are installed side by side.
-  // The writers' secret scan, `_report_text.sh`, sits beside them too.
-  for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh", "_report_text.sh"]) {
+  for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh"]) {
     await Deno.copyFile(join(dirname(RULES), f), join(bash, f));
   }
   if (config) await Deno.writeTextFile(join(dir, ".specnaut/backlog-config.yml"), config);
