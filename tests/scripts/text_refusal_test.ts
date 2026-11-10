@@ -48,24 +48,40 @@ Deno.test("text_refusal names the class of every refused sample, and passes clea
   }
 });
 
-Deno.test("text_refusal never passes a scan that could not run", async () => {
+/**
+ * A scan that could not run is neither clean nor a refusal: status 2, no class,
+ * and one fixed line on stderr naming why. Each case breaks one tool with a
+ * stand-in first on PATH.
+ */
+const UNSCANNED: { why: string; tool: string; status: number; line: string }[] = [
+  { why: "a grep that fails", tool: "grep", status: 2, line: "the secret scan could not run" },
+  { why: "a text that cannot be read", tool: "tr", status: 1, line: "the text could not be read" },
+];
+
+for (const { why, tool, status, line } of UNSCANNED) {
+  Deno.test(`text_refusal stops on ${why}, and gives no verdict`, async () => {
+    const p = await project("local");
+    try {
+      await Deno.mkdir(join(p.dir, "broken"));
+      await p.write(`broken/${tool}`, `#!/usr/bin/env bash\nexit ${status}\n`);
+      const out = await verdicts(
+        p,
+        `chmod +x broken/${tool}
+        c=$(PATH="$PWD/broken:$PATH" text_refusal <<<"plain words"); echo "$? $c"`,
+      );
+      assertEquals([out.lines, out.stderr], [["2 "], `bash: ${line}\n`]);
+    } finally {
+      await p.cleanup();
+    }
+  });
+}
+
+Deno.test("text_refusal stops when no secret scan is installed, and gives no verdict", async () => {
   const p = await project("local");
   try {
-    // A grep that fails is a scan that did not run: refused, never clean.
-    await Deno.mkdir(join(p.dir, "broken"));
-    await p.write("broken/grep", "#!/usr/bin/env bash\nexit 2\n");
-    const failing = await verdicts(
-      p,
-      `
-      chmod +x broken/grep
-      c=$(PATH="$PWD/broken:$PATH" text_refusal <<<"plain words"); echo "$? $c"`,
-    );
-    assertEquals(failing.lines, ["1 hidden"]);
-    // No scan installed: status 2 and one line on stderr, never a verdict.
     await Deno.remove(join(p.dir, ".specnaut/scripts/bash/_report_text.sh"));
     const missing = await verdicts(p, `c=$(text_refusal <<<"plain words"); echo "$? $c"`);
-    assertEquals(missing.lines, ["2 "]);
-    assertEquals(missing.stderr, "bash: the secret scan is missing\n");
+    assertEquals([missing.lines, missing.stderr], [["2 "], "bash: the secret scan is missing\n"]);
   } finally {
     await p.cleanup();
   }

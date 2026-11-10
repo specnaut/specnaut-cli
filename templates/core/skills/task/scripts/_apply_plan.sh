@@ -29,8 +29,8 @@
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
-# written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or a secret scan that could not run · 3 refused,
+# nothing written · 4 an operation failed
 # shellcheck disable=SC2154  # `here` is the caller's.
 
 # Every failure below is handled where it happens: `set -e` from `_config.sh`

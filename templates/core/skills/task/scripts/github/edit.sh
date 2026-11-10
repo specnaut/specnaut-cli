@@ -36,6 +36,7 @@ ARGS=(issue edit "$NUM" --repo "$REPO")
 [ "$HAS_TITLE" = false ] || ARGS+=(--title "$TITLE")
 if [ -n "$APPEND" ]; then
   BODY=$(gh issue view "$NUM" --repo "$REPO" --json body --jq '.body') || { echo "edit.sh: could not read #$NUM's body" >&2; exit 3; }
+  clean_work_dir
   { [ -z "$BODY" ] || printf '%s\n\n' "$BODY"; cat -- "$APPEND"; } >"$CLEAN_DIR/body.md"
   ARGS+=(--body-file "$CLEAN_DIR/body.md")
 fi

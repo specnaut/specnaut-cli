@@ -1,14 +1,10 @@
 # shellcheck shell=bash disable=SC2154
-# Sourced by report-upstream.sh, and by `text_refusal` in the backlog scripts'
-# `_backlog_plan.sh`, which runs `scan_hard` over every text a backlog write
-# sends: what is done to text, and nothing that talks to a tracker. What these
-# scans refuse is stated in report-upstream.sh's header, the one home of the
-# list; a pattern added here is added there. It uses the caller's `refuse`, and
-# report-upstream.sh's $DIR and $here; every scan refuses by exiting, it never
-# returns a verdict.
-# The patterns are bytes: in a UTF-8 locale grep rejects HIDDEN_RE as an
-# illegal byte sequence, and that error would refuse every text.
-export LC_ALL=C
+# Sourced by report-upstream.sh (its $DIR and $here used here) and by `text_refusal` in
+# _backlog_plan.sh: what is done to text, nothing that talks to a tracker. What the scans
+# refuse is listed once, in report-upstream.sh's header: a pattern added here is added there.
+# Every scan refuses by exiting through the caller's `refuse`, never by a verdict; a grep that
+# cannot run calls `refuse <class> error` (report-upstream.sh: the class; text_refusal: 2).
+export LC_ALL=C # The patterns are bytes: under UTF-8, grep's error on HIDDEN_RE would refuse all.
 NL=$'\n'
 CR=$'\r'
 SECRET_RE='gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.|-----BEGIN|[A-Za-z][A-Za-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@'
@@ -22,9 +18,9 @@ HIDDEN_RE=$'[\x01-\x08\x0b-\x1f\x7f]|\xc2[\x80-\x9f\xad]|\xcd\x8f|\xd8\x9c|\xe1\
 ADDRESSING_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+|/(Users|home)/[^/[:space:]]+|(^|[^A-Za-z0-9])[A-Za-z]:\\|(^|[^A-Za-z0-9_.~-])~/|(^|[^A-Za-z0-9_./-])/(srv|workspaces|builds)/|(^|[^A-Za-z0-9_.-])@[A-Za-z0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+|(^|[^0-9.A-Za-z])(10\.[0-9]{1,3}|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]{1,3}\.[0-9]{1,3}'
 BARE_HOST_RE='(^|[^A-Za-z0-9_./@-])([A-Za-z0-9-]+\.)+(internal|local|corp|lan|com|net|org|io|dev|cloud)[^[:space:]]*'
 
-# Read in two steps: a NUL would vanish from a bash variable, so it becomes a
-# control character the hidden scan refuses, and the `x` keeps trailing newlines.
-read_bytes() { tr '\000' '\001'; printf x; }
+# A NUL would vanish from a bash variable: it becomes a control character the hidden scan
+# refuses. The `x` keeps trailing newlines; a failed read returns 2 without it, never as ''.
+read_bytes() { tr '\000' '\001' || return 2; printf x; }
 
 digest_of() {
   local out
@@ -38,20 +34,18 @@ digest_of() {
 # grep says 0 hit, 1 no hit; anything else is a scan that did not run, and that refuses.
 hit() {
   local class=$1 rc
-  shift
-  grep -aq "$@"
+  grep -aq "${@:2}"
   rc=$?
-  [ "$rc" -le 1 ] || refuse "$class"
+  [ "$rc" -le 1 ] || refuse "$class" error
   return "$rc"
 }
 
 # Sets FOUND to what grep -o prints, under the same rule.
 found() {
   local class=$1 rc
-  shift
-  FOUND=$(grep -ao "$@")
+  FOUND=$(grep -ao "${@:2}")
   rc=$?
-  [ "$rc" -le 1 ] || refuse "$class"
+  [ "$rc" -le 1 ] || refuse "$class" error
 }
 
 # The value never reaches argv: a `case`, so a process listing cannot show it.

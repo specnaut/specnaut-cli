@@ -8107,7 +8107,8 @@ echo "linked #\$CHILD under #\$PARENT"
     category: "backlog-script",
     name: "_backlog_plan",
     suffix: "_backlog_plan.sh",
-    content: `# shellcheck shell=bash
+    content:
+      `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
 # applies it; every script that sends text to a tracker asks \`text_refusal\`
@@ -8281,7 +8282,9 @@ require_title() {
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 no scan to run, one line on stderr. Never 0 unscanned.
+# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# the text could not be read, or a grep of the scan failed: a scan that did not
+# run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
@@ -8289,10 +8292,15 @@ text_refusal() (
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
-  # The scans' verdict: every one refuses by calling this, and it ends the subshell.
+  # The scans' verdict: every one refuses by calling this, and it ends the
+  # subshell; \`error\` as the second word is a grep that could not run.
   # shellcheck disable=SC2329
-  refuse() { printf '%s' "\$1"; exit 1; }
-  bytes=\$(read_bytes)
+  refuse() {
+    [ "\${2-}" != error ] || { echo "\${0##*/}: the secret scan could not run" >&2; exit 2; }
+    printf '%s' "\$1"
+    exit 1
+  }
+  bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
   scan_hard "\${bytes%x}"
   exit 0
 )
@@ -8308,17 +8316,25 @@ require_clean_text() {
   _clean_or_exit "\$1" "\$rc" "\$class"
 }
 
+# clean_work_dir -- the writer's private work directory, made on first call: a
+# fresh directory only the user can open, removed when the script exits.
+# CLEAN_DIR names it; a writer builds what it sends from a judged text there.
+# It sets the script's EXIT trap, so a writer that calls it sets none of its
+# own. Call it from the script's own shell, never in \`\$(…)\`.
+clean_work_dir() {
+  [ -z "\${CLEAN_DIR:-}" ] || return 0
+  CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
+  chmod 700 "\$CLEAN_DIR"
+  trap 'rm -rf "\$CLEAN_DIR"' EXIT
+}
+
 # require_clean_file <field> <path> -- require_clean_text for a file's bytes. The
-# file is copied first into a fresh directory only the user can open, removed
-# when the script exits; CLEAN_FILE names the copy, the one the writer then
-# sends, so the bytes sent are the bytes judged.
+# file is copied first into clean_work_dir, which owns the script's EXIT trap;
+# CLEAN_FILE names the copy, the one the writer then sends, so the bytes sent
+# are the bytes judged.
 require_clean_file() {
   local class rc=0
-  if [ -z "\${CLEAN_DIR:-}" ]; then
-    CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
-    chmod 700 "\$CLEAN_DIR"
-    trap 'rm -rf "\$CLEAN_DIR"' EXIT
-  fi
+  clean_work_dir
   CLEAN_FILE="\$CLEAN_DIR/\$1"
   cp -- "\$2" "\$CLEAN_FILE" || { echo "\${0##*/}: could not read the \$1 file" >&2; exit 2; }
   class=\$(text_refusal <"\$CLEAN_FILE") || rc=\$?
@@ -8442,8 +8458,8 @@ epic_cleared() {
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
-# written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or a secret scan that could not run · 3 refused,
+# nothing written · 4 an operation failed
 # shellcheck disable=SC2154  # \`here\` is the caller's.
 
 # Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
@@ -11140,6 +11156,7 @@ ARGS=(issue edit "\$NUM" --repo "\$REPO")
 [ "\$HAS_TITLE" = false ] || ARGS+=(--title "\$TITLE")
 if [ -n "\$APPEND" ]; then
   BODY=\$(gh issue view "\$NUM" --repo "\$REPO" --json body --jq '.body') || { echo "edit.sh: could not read #\$NUM's body" >&2; exit 3; }
+  clean_work_dir
   { [ -z "\$BODY" ] || printf '%s\\n\\n' "\$BODY"; cat -- "\$APPEND"; } >"\$CLEAN_DIR/body.md"
   ARGS+=(--body-file "\$CLEAN_DIR/body.md")
 fi
@@ -11261,7 +11278,8 @@ echo "linked #\$CHILD under #\$PARENT"
     category: "backlog-script",
     name: "_backlog_plan",
     suffix: "_backlog_plan.sh",
-    content: `# shellcheck shell=bash
+    content:
+      `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
 # applies it; every script that sends text to a tracker asks \`text_refusal\`
@@ -11435,7 +11453,9 @@ require_title() {
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 no scan to run, one line on stderr. Never 0 unscanned.
+# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# the text could not be read, or a grep of the scan failed: a scan that did not
+# run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
@@ -11443,10 +11463,15 @@ text_refusal() (
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
-  # The scans' verdict: every one refuses by calling this, and it ends the subshell.
+  # The scans' verdict: every one refuses by calling this, and it ends the
+  # subshell; \`error\` as the second word is a grep that could not run.
   # shellcheck disable=SC2329
-  refuse() { printf '%s' "\$1"; exit 1; }
-  bytes=\$(read_bytes)
+  refuse() {
+    [ "\${2-}" != error ] || { echo "\${0##*/}: the secret scan could not run" >&2; exit 2; }
+    printf '%s' "\$1"
+    exit 1
+  }
+  bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
   scan_hard "\${bytes%x}"
   exit 0
 )
@@ -11462,17 +11487,25 @@ require_clean_text() {
   _clean_or_exit "\$1" "\$rc" "\$class"
 }
 
+# clean_work_dir -- the writer's private work directory, made on first call: a
+# fresh directory only the user can open, removed when the script exits.
+# CLEAN_DIR names it; a writer builds what it sends from a judged text there.
+# It sets the script's EXIT trap, so a writer that calls it sets none of its
+# own. Call it from the script's own shell, never in \`\$(…)\`.
+clean_work_dir() {
+  [ -z "\${CLEAN_DIR:-}" ] || return 0
+  CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
+  chmod 700 "\$CLEAN_DIR"
+  trap 'rm -rf "\$CLEAN_DIR"' EXIT
+}
+
 # require_clean_file <field> <path> -- require_clean_text for a file's bytes. The
-# file is copied first into a fresh directory only the user can open, removed
-# when the script exits; CLEAN_FILE names the copy, the one the writer then
-# sends, so the bytes sent are the bytes judged.
+# file is copied first into clean_work_dir, which owns the script's EXIT trap;
+# CLEAN_FILE names the copy, the one the writer then sends, so the bytes sent
+# are the bytes judged.
 require_clean_file() {
   local class rc=0
-  if [ -z "\${CLEAN_DIR:-}" ]; then
-    CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
-    chmod 700 "\$CLEAN_DIR"
-    trap 'rm -rf "\$CLEAN_DIR"' EXIT
-  fi
+  clean_work_dir
   CLEAN_FILE="\$CLEAN_DIR/\$1"
   cp -- "\$2" "\$CLEAN_FILE" || { echo "\${0##*/}: could not read the \$1 file" >&2; exit 2; }
   class=\$(text_refusal <"\$CLEAN_FILE") || rc=\$?
@@ -11596,8 +11629,8 @@ epic_cleared() {
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
-# written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or a secret scan that could not run · 3 refused,
+# nothing written · 4 an operation failed
 # shellcheck disable=SC2154  # \`here\` is the caller's.
 
 # Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
@@ -13645,7 +13678,8 @@ echo "linked #\$CHILD under #\$PARENT"
     category: "backlog-script",
     name: "_backlog_plan",
     suffix: "_backlog_plan.sh",
-    content: `# shellcheck shell=bash
+    content:
+      `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
 # applies it; every script that sends text to a tracker asks \`text_refusal\`
@@ -13819,7 +13853,9 @@ require_title() {
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 no scan to run, one line on stderr. Never 0 unscanned.
+# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# the text could not be read, or a grep of the scan failed: a scan that did not
+# run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
@@ -13827,10 +13863,15 @@ text_refusal() (
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
-  # The scans' verdict: every one refuses by calling this, and it ends the subshell.
+  # The scans' verdict: every one refuses by calling this, and it ends the
+  # subshell; \`error\` as the second word is a grep that could not run.
   # shellcheck disable=SC2329
-  refuse() { printf '%s' "\$1"; exit 1; }
-  bytes=\$(read_bytes)
+  refuse() {
+    [ "\${2-}" != error ] || { echo "\${0##*/}: the secret scan could not run" >&2; exit 2; }
+    printf '%s' "\$1"
+    exit 1
+  }
+  bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
   scan_hard "\${bytes%x}"
   exit 0
 )
@@ -13846,17 +13887,25 @@ require_clean_text() {
   _clean_or_exit "\$1" "\$rc" "\$class"
 }
 
+# clean_work_dir -- the writer's private work directory, made on first call: a
+# fresh directory only the user can open, removed when the script exits.
+# CLEAN_DIR names it; a writer builds what it sends from a judged text there.
+# It sets the script's EXIT trap, so a writer that calls it sets none of its
+# own. Call it from the script's own shell, never in \`\$(…)\`.
+clean_work_dir() {
+  [ -z "\${CLEAN_DIR:-}" ] || return 0
+  CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
+  chmod 700 "\$CLEAN_DIR"
+  trap 'rm -rf "\$CLEAN_DIR"' EXIT
+}
+
 # require_clean_file <field> <path> -- require_clean_text for a file's bytes. The
-# file is copied first into a fresh directory only the user can open, removed
-# when the script exits; CLEAN_FILE names the copy, the one the writer then
-# sends, so the bytes sent are the bytes judged.
+# file is copied first into clean_work_dir, which owns the script's EXIT trap;
+# CLEAN_FILE names the copy, the one the writer then sends, so the bytes sent
+# are the bytes judged.
 require_clean_file() {
   local class rc=0
-  if [ -z "\${CLEAN_DIR:-}" ]; then
-    CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
-    chmod 700 "\$CLEAN_DIR"
-    trap 'rm -rf "\$CLEAN_DIR"' EXIT
-  fi
+  clean_work_dir
   CLEAN_FILE="\$CLEAN_DIR/\$1"
   cp -- "\$2" "\$CLEAN_FILE" || { echo "\${0##*/}: could not read the \$1 file" >&2; exit 2; }
   class=\$(text_refusal <"\$CLEAN_FILE") || rc=\$?
@@ -13980,8 +14029,8 @@ epic_cleared() {
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
-# written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or a secret scan that could not run · 3 refused,
+# nothing written · 4 an operation failed
 # shellcheck disable=SC2154  # \`here\` is the caller's.
 
 # Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
@@ -15296,7 +15345,8 @@ receipt_snapshot() { :; }
     category: "backlog-script",
     name: "_backlog_plan",
     suffix: "_backlog_plan.sh",
-    content: `# shellcheck shell=bash
+    content:
+      `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
 # applies it; every script that sends text to a tracker asks \`text_refusal\`
@@ -15470,7 +15520,9 @@ require_title() {
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 no scan to run, one line on stderr. Never 0 unscanned.
+# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# the text could not be read, or a grep of the scan failed: a scan that did not
+# run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
@@ -15478,10 +15530,15 @@ text_refusal() (
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
-  # The scans' verdict: every one refuses by calling this, and it ends the subshell.
+  # The scans' verdict: every one refuses by calling this, and it ends the
+  # subshell; \`error\` as the second word is a grep that could not run.
   # shellcheck disable=SC2329
-  refuse() { printf '%s' "\$1"; exit 1; }
-  bytes=\$(read_bytes)
+  refuse() {
+    [ "\${2-}" != error ] || { echo "\${0##*/}: the secret scan could not run" >&2; exit 2; }
+    printf '%s' "\$1"
+    exit 1
+  }
+  bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
   scan_hard "\${bytes%x}"
   exit 0
 )
@@ -15497,17 +15554,25 @@ require_clean_text() {
   _clean_or_exit "\$1" "\$rc" "\$class"
 }
 
+# clean_work_dir -- the writer's private work directory, made on first call: a
+# fresh directory only the user can open, removed when the script exits.
+# CLEAN_DIR names it; a writer builds what it sends from a judged text there.
+# It sets the script's EXIT trap, so a writer that calls it sets none of its
+# own. Call it from the script's own shell, never in \`\$(…)\`.
+clean_work_dir() {
+  [ -z "\${CLEAN_DIR:-}" ] || return 0
+  CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
+  chmod 700 "\$CLEAN_DIR"
+  trap 'rm -rf "\$CLEAN_DIR"' EXIT
+}
+
 # require_clean_file <field> <path> -- require_clean_text for a file's bytes. The
-# file is copied first into a fresh directory only the user can open, removed
-# when the script exits; CLEAN_FILE names the copy, the one the writer then
-# sends, so the bytes sent are the bytes judged.
+# file is copied first into clean_work_dir, which owns the script's EXIT trap;
+# CLEAN_FILE names the copy, the one the writer then sends, so the bytes sent
+# are the bytes judged.
 require_clean_file() {
   local class rc=0
-  if [ -z "\${CLEAN_DIR:-}" ]; then
-    CLEAN_DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
-    chmod 700 "\$CLEAN_DIR"
-    trap 'rm -rf "\$CLEAN_DIR"' EXIT
-  fi
+  clean_work_dir
   CLEAN_FILE="\$CLEAN_DIR/\$1"
   cp -- "\$2" "\$CLEAN_FILE" || { echo "\${0##*/}: could not read the \$1 file" >&2; exit 2; }
   class=\$(text_refusal <"\$CLEAN_FILE") || rc=\$?
@@ -15631,8 +15696,8 @@ epic_cleared() {
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
-# written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or a secret scan that could not run · 3 refused,
+# nothing written · 4 an operation failed
 # shellcheck disable=SC2154  # \`here\` is the caller's.
 
 # Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
@@ -30689,16 +30754,12 @@ esac
     name: "specify",
     suffix: "scripts/bash/_report_text.sh",
     content: `# shellcheck shell=bash disable=SC2154
-# Sourced by report-upstream.sh, and by \`text_refusal\` in the backlog scripts'
-# \`_backlog_plan.sh\`, which runs \`scan_hard\` over every text a backlog write
-# sends: what is done to text, and nothing that talks to a tracker. What these
-# scans refuse is stated in report-upstream.sh's header, the one home of the
-# list; a pattern added here is added there. It uses the caller's \`refuse\`, and
-# report-upstream.sh's \$DIR and \$here; every scan refuses by exiting, it never
-# returns a verdict.
-# The patterns are bytes: in a UTF-8 locale grep rejects HIDDEN_RE as an
-# illegal byte sequence, and that error would refuse every text.
-export LC_ALL=C
+# Sourced by report-upstream.sh (its \$DIR and \$here used here) and by \`text_refusal\` in
+# _backlog_plan.sh: what is done to text, nothing that talks to a tracker. What the scans
+# refuse is listed once, in report-upstream.sh's header: a pattern added here is added there.
+# Every scan refuses by exiting through the caller's \`refuse\`, never by a verdict; a grep that
+# cannot run calls \`refuse <class> error\` (report-upstream.sh: the class; text_refusal: 2).
+export LC_ALL=C # The patterns are bytes: under UTF-8, grep's error on HIDDEN_RE would refuse all.
 NL=\$'\\n'
 CR=\$'\\r'
 SECRET_RE='gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}\\.|-----BEGIN|[A-Za-z][A-Za-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@'
@@ -30712,9 +30773,9 @@ HIDDEN_RE=\$'[\\x01-\\x08\\x0b-\\x1f\\x7f]|\\xc2[\\x80-\\x9f\\xad]|\\xcd\\x8f|\\
 ADDRESSING_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\\.[A-Za-z0-9.-]+|/(Users|home)/[^/[:space:]]+|(^|[^A-Za-z0-9])[A-Za-z]:\\\\|(^|[^A-Za-z0-9_.~-])~/|(^|[^A-Za-z0-9_./-])/(srv|workspaces|builds)/|(^|[^A-Za-z0-9_.-])@[A-Za-z0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+|(^|[^0-9.A-Za-z])(10\\.[0-9]{1,3}|192\\.168|172\\.(1[6-9]|2[0-9]|3[01]))\\.[0-9]{1,3}\\.[0-9]{1,3}'
 BARE_HOST_RE='(^|[^A-Za-z0-9_./@-])([A-Za-z0-9-]+\\.)+(internal|local|corp|lan|com|net|org|io|dev|cloud)[^[:space:]]*'
 
-# Read in two steps: a NUL would vanish from a bash variable, so it becomes a
-# control character the hidden scan refuses, and the \`x\` keeps trailing newlines.
-read_bytes() { tr '\\000' '\\001'; printf x; }
+# A NUL would vanish from a bash variable: it becomes a control character the hidden scan
+# refuses. The \`x\` keeps trailing newlines; a failed read returns 2 without it, never as ''.
+read_bytes() { tr '\\000' '\\001' || return 2; printf x; }
 
 digest_of() {
   local out
@@ -30728,20 +30789,18 @@ digest_of() {
 # grep says 0 hit, 1 no hit; anything else is a scan that did not run, and that refuses.
 hit() {
   local class=\$1 rc
-  shift
-  grep -aq "\$@"
+  grep -aq "\${@:2}"
   rc=\$?
-  [ "\$rc" -le 1 ] || refuse "\$class"
+  [ "\$rc" -le 1 ] || refuse "\$class" error
   return "\$rc"
 }
 
 # Sets FOUND to what grep -o prints, under the same rule.
 found() {
   local class=\$1 rc
-  shift
-  FOUND=\$(grep -ao "\$@")
+  FOUND=\$(grep -ao "\${@:2}")
   rc=\$?
-  [ "\$rc" -le 1 ] || refuse "\$class"
+  [ "\$rc" -le 1 ] || refuse "\$class" error
 }
 
 # The value never reaches argv: a \`case\`, so a process listing cannot show it.

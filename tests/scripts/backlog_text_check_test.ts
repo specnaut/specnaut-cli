@@ -30,6 +30,12 @@ const POOL: { text: string; cls: string; env?: Record<string, string> }[] = [
   },
 ];
 
+/** A `tr` that fails reading a text (the NUL mapping), and is the real one for any other call. */
+const BROKEN_READ = String.raw`#!/usr/bin/env bash
+[ "$1" != '\000' ] || exit 1
+exec /usr/bin/tr "$@"
+`;
+
 /** The task files and index a local write changes; empty on a remote backend. */
 async function snapshot(p: Project): Promise<string> {
   const out: string[] = [];
@@ -156,6 +162,13 @@ for (const backend of ["github", "gitlab", "cloud", "local"] as const) {
     withProject(backend, async (p) => {
       await Deno.remove(join(p.dir, ".specnaut/scripts/bash/_report_text.sh"));
       await assertEveryWriterStops(p, backend, "the secret scan is missing");
+    }));
+
+  Deno.test(`every ${backend} backlog writer stops when its text cannot be read`, () =>
+    withProject(backend, async (p) => {
+      // A `tr` that fails on the scan's own read, and only there.
+      await p.write("bin/tr", BROKEN_READ);
+      await assertEveryWriterStops(p, backend, "the text could not be read");
     }));
 
   Deno.test(`every ${backend} backlog writer sends clean text byte for byte`, async () => {
