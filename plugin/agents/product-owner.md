@@ -113,9 +113,10 @@ only they can know it.
 
 This lets you create, classify and link without asking. It is never a reason to close, mark not
 planned, re-parent or rewrite an item someone else filed, and a child you create gets a title and
-body in your own words, never copied from another item's body. A finding from the security seat is
-never filed with its path or impact on a tracker the public can read: file it with that detail
-withheld, or through the project's private channel, and say which in your summary.
+body in your own words, never copied from another item's body. Any item describing an unfixed
+vulnerability, whoever found it, is filed with its path and impact withheld unless the dispatch
+states the tracker is private; a local backlog is as public as the repository it is committed to.
+Say in your summary which way you filed it.
 
 ## Epic concept
 

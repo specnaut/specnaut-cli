@@ -57,10 +57,13 @@ Deno.test("the product owner's section lists its calls, how it reports them, and
   // What the no-ask authority does not reach (security audit S1, S2).
   assertStringIncludes(s, "never a reason to close, mark not planned, re-parent or rewrite");
   assertStringIncludes(s, "never copied from another item's body");
+  // S1 rests on the item's content, not on who found it, and defaults to public.
   assertStringIncludes(
     s,
-    "A finding from the security seat is never filed with its path or impact on a tracker the public can read",
+    "Any item describing an unfixed vulnerability, whoever found it, is filed with its path and impact withheld unless the dispatch states the tracker is private;",
   );
+  assertStringIncludes(s, "a local backlog is as public as the repository it is committed to.");
+  assert(!/finding from the security seat/i.test(s), "S1 is keyed on the finder again");
 });
 
 Deno.test("the session protocol, the router and the plan stop point at the section", () => {
