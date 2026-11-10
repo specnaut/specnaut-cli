@@ -63,6 +63,12 @@ var Rules = []Rule{
 		Why:         "verify-scripts writes the changed paths to a new temp file per run, named by the runtime",
 	},
 	{
+		Name:        "verify-scripts-commit",
+		Pattern:     `(?m)^(BASE|BASE_TIP) [0-9a-f]{40}$`,
+		Replacement: `$1 <COMMIT>`,
+		Why:         "verify-scripts prints the base's commit ids, and a commit hashes its tree, whose installed.lock carries installed_at from the wall clock; only these two labels, so no other id is hidden",
+	},
+	{
 		Name:        "binary-version",
 		Pattern:     versionEdge + `{{VERSION}}` + versionTail,
 		Replacement: `${1}<VERSION>${2}`,

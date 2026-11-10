@@ -25,6 +25,12 @@ exec git init -q
 mkdir .specnaut
 ! specnaut verify-scripts
 ! specnaut verify-scripts extra
+# The two repositories are git's, not the binary's, and no two runs agree on
+# them: the index holds each file's stat times, and every object hashes the
+# committed installed.lock, whose installed_at is the wall clock. verify-scripts
+# only reads them, so they leave the record; its output above is what it says.
+rm $WORK/project/.git
+rm $WORK/origin.git
 
 -- edited.sh --
 #!/usr/bin/env bash

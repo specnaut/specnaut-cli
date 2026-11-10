@@ -18,6 +18,9 @@ func TestNormaliseRules(t *testing.T) {
 		{"a longer number is not the version", "17.0.2 and 7.0.21 and v7.0.2.1", "17.0.2 and 7.0.21 and v7.0.2.1", true},
 		{"a tag is", "release v7.0.2.", "release v<VERSION>.", true},
 		{"names file", "NAMES_FILE <WORK>/.tmp/specnaut-names-1e6744c3e6b44c1e", "NAMES_FILE <WORK>/.tmp/specnaut-names-<RANDOM>", false},
+		{"verify-scripts' commit ids", "BASE 58851615bbffffd1bbdeb5f79a076e7c008b9fb2\nBASE_TIP 2daac5495318b33715f39c33da9ead66462c6217\n", "BASE <COMMIT>\nBASE_TIP <COMMIT>\n", false},
+		{"a commit id under another label is left alone", "HEAD 58851615bbffffd1bbdeb5f79a076e7c008b9fb2", "HEAD 58851615bbffffd1bbdeb5f79a076e7c008b9fb2", false},
+		{"a shorter hex after BASE is left alone", "BASE 5885161", "BASE 5885161", false},
 		{"anything else is left alone", "random 1234 text", "random 1234 text", true},
 	}
 	for _, c := range cases {
