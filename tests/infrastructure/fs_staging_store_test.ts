@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { resolve } from "@std/path";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 
@@ -54,6 +54,20 @@ Deno.test("FsStagingStore.delete: removes file, idempotent", async () => {
     assertEquals(await s.read(dir, ".claude/agents/developer.md"), null);
     // No throw on second delete:
     await s.delete(dir, ".claude/agents/developer.md");
+  });
+});
+
+Deno.test("FsStagingStore.delete: a nested copy goes with its emptied folders, not the root", async () => {
+  // A positive control for cli#751's bounds: a plain copy in plain folders is
+  // still deleted, and the walk still climbs to the staging folder and stops.
+  await withTempDir(async (dir) => {
+    await seed(dir, ".claude/agents/x.md", "UP\n");
+    const s = new FsStagingStore();
+    const staging = resolve(dir, ".specnaut/upgrade-staging");
+    assertEquals(await s.delete(dir, ".claude/agents/x.md"), []);
+    assertEquals(await Deno.lstat(resolve(staging, ".claude")).catch(() => null), null);
+    assert((await Deno.stat(staging)).isDirectory, "the staging root was removed");
+    assertEquals(await s.delete(dir, ".claude/agents/x.md"), []);
   });
 });
 

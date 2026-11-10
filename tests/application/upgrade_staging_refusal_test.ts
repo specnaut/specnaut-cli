@@ -6,9 +6,9 @@ import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 import { fakeStagingStore } from "./upgrade_fakes.ts";
 
 /**
- * A staged copy Specnaut refused to delete because its path leaves the project
- * is not "safe to delete by hand" (cli#687): it is a link, and deleting by hand
- * what it points at deletes a file outside the project.
+ * A staged path Specnaut refused to delete because it is a link, or lies behind
+ * one, is not "safe to delete by hand" (cli#687, cli#751): deleting by hand what
+ * it points at deletes a file Specnaut never wrote.
  */
 
 const assertRefusalWording = (refusal: string) => {
@@ -55,7 +55,8 @@ Deno.test({
       assertEquals(await Deno.readTextFile(outside), "not the project's\n");
       assert((await Deno.lstat(join(project, ".specnaut/upgrade-staging/x.md"))).isSymlink);
       assertEquals(refusals.length, 1, refusals.join("\n"));
-      assertStringIncludes(refusals[0], "leaves the project");
+      // Judged by the entry, a link, not by where it lands (cli#751).
+      assertStringIncludes(refusals[0], "refusing to delete a staged path");
       assertRefusalWording(refusals[0]);
     } finally {
       await Deno.remove(root, { recursive: true });

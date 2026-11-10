@@ -2,9 +2,9 @@ import { PathRefusal } from "../application/path_refusal.ts";
 import type { Containment } from "./fs_containment.ts";
 
 /**
- * The refusals `fs_containment.ts` throws, each naming the path it refused and
- * the project it was judged against. Their own module so the containment
- * checks read as checks.
+ * The refusals the containment checks throw (`fs_containment.ts`, and the
+ * staging store's own bounds), each naming the path it refused and the project
+ * it was judged against. Their own module so the checks read as checks.
  */
 
 /** A path refused because it loops or leaves the project: a reader may report it instead of aborting. */
@@ -113,4 +113,21 @@ export const linkedStagingRefusal = (root: string, abs: string) =>
       `  project: ${root}\n` +
       `Specnaut stages its own copies there and deletes them; through a link, it would ` +
       `delete whatever the link points at.`,
+  );
+
+/**
+ * A staged path that is not a plain staged copy (cli#751): a link itself, or
+ * behind one whose entry lands outside the staging folder, inside the project.
+ * Which refusal a staging delete throws: a path whose entry leaves the project
+ * gets `leavesRefusal`'s words, judged first; this one covers the rest. Being a
+ * `PathRefusal`, `pruneStaging` reports it in `leftAlone`'s words, which say to
+ * remove the link itself, never what it points at.
+ */
+export const stagedEntryRefusal = (root: string, abs: string, resolved: string) =>
+  new ContainmentRefusal(
+    `refusing to delete a staged path that is a link or lies behind one:\n` +
+      `  path:     ${abs}\n` +
+      `  resolves: ${resolved}\n` +
+      `  project:  ${root}\n` +
+      `Specnaut deletes only the plain copies it staged inside the staging folder.`,
   );

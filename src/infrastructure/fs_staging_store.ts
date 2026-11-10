@@ -1,10 +1,15 @@
-import { dirname, relative, resolve } from "@std/path";
+import { dirname, join, relative, resolve } from "@std/path";
 import { walk } from "@std/fs/walk";
 import type { StagingStore } from "../application/ports.ts";
 import { assertSafeDestination } from "../domain/template.ts";
-import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
+import {
+  assertInsideProject,
+  assertRemovableInProject,
+  resolvedRelative,
+  resolveProjectRoot,
+} from "./fs_containment.ts";
 import { pruneEmptyParents } from "./fs_prune.ts";
-import { linkedStagingRefusal } from "./fs_refusals.ts";
+import { linkedStagingRefusal, stagedEntryRefusal } from "./fs_refusals.ts";
 
 const STAGING_REL = ".specnaut/upgrade-staging";
 
@@ -22,6 +27,30 @@ async function assertStagingNotLinked(projectDir: string): Promise<void> {
       if (err instanceof Deno.errors.NotFound) return;
       throw err;
     }
+  }
+}
+
+/**
+ * Throws unless `full` is a plain staged entry (cli#751): what removing it acts
+ * on — its folders resolved, its last component as is — lies strictly inside the
+ * real staging folder, and it is not itself a link.
+ *
+ * The staging folder, not the project: a link under staging that leads to the
+ * project's own `src/` stays inside the project, so a project bound would let a
+ * delete remove a user file there. `root` + `STAGING_REL` is the real staging
+ * folder only because `assertStagingNotLinked` has refused a link at either
+ * level, and the trailing `/` keeps a sibling like `upgrade-staging-old/` out.
+ * A leaf link is refused although removing it touches nothing outside: Specnaut
+ * never stages one, so it is not a copy, and cli#687 leaves it in place.
+ *
+ * For the layout on disk at check time. A concurrent writer inside staging is out
+ * of scope (Deno has no dirfd-relative unlink), so this is the last await before
+ * the removal.
+ */
+async function assertPlainStagedEntry(root: string, full: string): Promise<void> {
+  const rel = await resolvedRelative(root, full);
+  if (!rel.startsWith(`${STAGING_REL}/`) || (await Deno.lstat(full)).isSymlink) {
+    throw stagedEntryRefusal(root, full, join(root, rel));
   }
 }
 
@@ -64,9 +93,12 @@ export class FsStagingStore implements StagingStore {
   async delete(projectDir: string, relPath: string): Promise<string[]> {
     assertSafeDestination(relPath);
     await assertStagingNotLinked(projectDir);
+    const root = await resolveProjectRoot(projectDir);
     const full = resolve(projectDir, STAGING_REL, relPath);
-    await assertInsideProject(await resolveProjectRoot(projectDir), full);
+    // The entry it unlinks, never where that leads: judge one, remove another (cli#751).
+    await assertRemovableInProject(root, full);
     try {
+      await assertPlainStagedEntry(root, full);
       await Deno.remove(full);
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) return [];

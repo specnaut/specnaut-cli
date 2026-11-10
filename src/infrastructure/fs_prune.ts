@@ -1,5 +1,5 @@
 import { dirname } from "@std/path";
-import { isInside } from "../domain/template.ts";
+import { locate } from "./fs_containment.ts";
 
 /**
  * Removes `dir` and each now-empty ancestor, stopping below `stopAt`.
@@ -11,12 +11,13 @@ import { isInside } from "../domain/template.ts";
  * listed. `FsStagingStore.delete` prunes its own parents through this walk too;
  * the real tree once did not, and the asymmetry is what let the ghost through.
  *
- * Containment via `isInside`, not a string prefix. The first version tested
- * `current.startsWith(stopAt + "/")`, which hardcodes the POSIX separator: on
- * Windows `resolve` yields `C:\a\b`, the prefix never matched, and the prune
- * silently never ran. The equality case is the `while` condition's: `isInside`
- * counts a root as inside itself, and stopping AT `stopAt` is this walk's own
- * business.
+ * Containment by REAL path, not path text (cli#751): each folder, resolved,
+ * must lie strictly inside `stopAt`, resolved (`insideRealBound`). Compared as
+ * text, a folder reached through a link under `stopAt` counted as inside it and
+ * was removed where it really lies, outside. Checked before each `readDir`, on
+ * the folder about to be removed; a folder outside, or `stopAt` itself, ends
+ * the walk without a note, as a link does. A resolution that fails ends it too,
+ * never falling back to text.
  *
  * A symlink stops the walk (cli#665): a link is the project's own choice, never
  * an emptied folder, and `Deno.remove` on it would delete the link it committed.
@@ -34,9 +35,9 @@ export async function pruneEmptyParents(
 ): Promise<void> {
   let current = dir;
   while (current !== stopAt) {
-    if (!isInside(stopAt, current)) return;
     try {
       if ((await Deno.lstat(current)).isSymlink) return;
+      if (!(await insideRealBound(stopAt, current))) return;
       for await (const _ of Deno.readDir(current)) return; // still in use — stop
       await Deno.remove(current);
     } catch (err) {
@@ -48,4 +49,16 @@ export async function pruneEmptyParents(
     if (parent === current) return; // filesystem root; `dirname` is a fixpoint there
     current = parent;
   }
+}
+
+/**
+ * Whether the folder `current` really lies strictly inside `stopAt`, both
+ * resolved: the containment rule's own `locate`, so this walk keeps no second
+ * real-path comparison. `"entry"` resolves `current`'s folders and keeps its
+ * name, which is the folder itself, since the walk stops at a link first.
+ */
+async function insideRealBound(stopAt: string, current: string): Promise<boolean> {
+  const realStop = await Deno.realPath(stopAt);
+  const verdict = await locate(realStop, current, "entry");
+  return verdict.kind === "inside" && verdict.resolved !== realStop;
 }

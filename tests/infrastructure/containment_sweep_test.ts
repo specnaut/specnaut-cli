@@ -35,10 +35,12 @@ const NOT_A_FUNCTION = new Set(["if", "while", "for", "switch", "catch", "do", "
  * Attributes each mutating call to the method it sits in, lexically.
  *
  * No brace parsing and no AST: for every mutating call, walk BACKWARDS to the
- * nearest preceding signature and ask whether `assertInsideProject` appears
- * between the two. That is enough to answer the only question this test asks —
- * "did anybody put a guard in front of this sink" — and it fails toward a false
- * ALARM (a name in the report that turns out fine) rather than a false clean.
+ * nearest preceding signature and ask whether its guard appears between the two:
+ * `assertInsideProject`, or for a removal or a rename, which act on the entry,
+ * `assertRemovableInProject` too (cli#751). That answers the only question asked —
+ * "did anybody put a guard in front of this sink" — failing toward a false ALARM
+ * (a name that turns out fine) rather than a false clean. A FLOOR, not a proof:
+ * whether the guard checks the right path is `sink_containment_test.ts`'s job.
  */
 function unguardedSinks(src: string): string[] {
   const sig =
@@ -58,10 +60,17 @@ function unguardedSinks(src: string): string[] {
       if (s2.at < call) owner = s2;
       else break;
     }
-    if (!src.slice(owner.at, call).includes("assertInsideProject")) out.add(owner.name);
+    const entry = /^Deno\.(remove|rename)\(/.test(m[0]);
+    const guard = entry ? /assertInsideProject|assertRemovableInProject/ : /assertInsideProject/;
+    if (!guard.test(src.slice(owner.at, call))) out.add(owner.name);
   }
   return [...out];
 }
+
+Deno.test("unguardedSinks: an entry check guards a removal or a rename, never a write", () => {
+  const f = (s: string) => unguardedSinks(`function f() { assertRemovableInProject(); ${s}(); }`);
+  assertEquals([f("Deno.remove"), f("Deno.rename"), f("Deno.writeTextFile")], [[], [], ["f"]]);
+});
 
 Deno.test("unguardedSinks: a sink is charged to the method it sits in, modifiers and all", () => {
   // A `private async` method the signature pattern cannot see hands its sinks
@@ -138,12 +147,6 @@ Deno.test("every mutating module is guarded or excused with a reason", async () 
     // `FsUpgradeMarkerStore.write` guarded while `.delete` did not, and
     // `FsStagingStore.cleanupIfEmpty` reached a `Deno.remove` with nothing in
     // front of it. Both sat in files this test called covered.
-    //
-    // The rule is crude on purpose and it is a FLOOR, not a proof: every
-    // mutating call must have an `assertInsideProject` somewhere above it in
-    // the same function body. It cannot tell that the guard checks the right
-    // path — only `sink_containment_test.ts`'s per-site refusals do that — but
-    // it does catch the sink nobody put a guard in front of at all.
     for (const fn of unguardedSinks(src)) {
       const key = `${rel}::${fn}`;
       if (!excused.has(key)) unguarded.push(key);
