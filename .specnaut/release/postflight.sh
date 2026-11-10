@@ -311,14 +311,51 @@ if ! gh release download "$TAG" --repo "$REPO" --dir "$verify_tmp" --clobber >/d
   echo "❌ could not download the published assets for $TAG — the release could NOT be verified"
   exit 1
 fi
-if deno run --allow-read scripts/verify-release.ts --tag "$TAG" --dir "$verify_tmp"; then
-  rm -rf "$verify_tmp"
-else
+if ! deno run --allow-read scripts/verify-release.ts --tag "$TAG" --dir "$verify_tmp"; then
   rm -rf "$verify_tmp"
   echo "❌ $TAG does not verify. Installed clients run this same check and will"
   echo "   refuse this release. Publish a patch, or unpublish."
   exit 1
 fi
+
+# The macOS binaries carry the Developer ID of team H87Y8Z6YPS (cli#428). Their
+# designated requirement must name the identifier and the team, never a cdhash:
+# a cdhash requirement is the ad-hoc signature that made the Keychain forget
+# "Always Allow" on every update. HARD, like the attestation: an unsigned binary
+# re-prompts every macOS user. Apple's own `codesign` reads it, so the check
+# needs macOS; elsewhere it says it was skipped, never that it passed.
+# BEGIN macos-signature-check
+macsig_skipped=0
+echo "▶ verifying the macOS binaries' Developer ID signature"
+if command -v codesign >/dev/null 2>&1; then
+  macsig_found=0
+  for f in "$verify_tmp"/specnaut-macos-*; do
+    case "$f" in *.sha256 | *"*") continue ;; esac
+    macsig_found=$((macsig_found + 1))
+    dr="$(codesign -d -r- "$f" 2>&1 || true)"
+    if codesign --verify --strict "$f" >/dev/null 2>&1 \
+      && [[ "$dr" == *'identifier "com.specnaut.cli"'* ]] \
+      && [[ "$dr" == *'certificate leaf[subject.OU] = H87Y8Z6YPS'* ]] \
+      && [[ "$dr" != *cdhash* ]]; then
+      echo "  ${f##*/}: valid, designated requirement names com.specnaut.cli and H87Y8Z6YPS"
+    else
+      rm -rf "$verify_tmp"
+      echo "❌ ${f##*/} is not signed with the Developer ID of H87Y8Z6YPS. macOS"
+      echo "   users get a Keychain prompt on every update. Publish a patch."
+      exit 1
+    fi
+  done
+  if [ "$macsig_found" -eq 0 ]; then
+    rm -rf "$verify_tmp"
+    echo "❌ no macOS binary among the published assets"
+    exit 1
+  fi
+else
+  echo "⚠ codesign is not available here — the macOS signatures were NOT checked"
+  macsig_skipped=1
+fi
+# END macos-signature-check
+rm -rf "$verify_tmp"
 
 # The attestation proves the bytes are the ones the workflow built; it does not
 # prove they RUN. Everything else that exercises the CLI — the test suite, the
@@ -369,6 +406,7 @@ warnings=()
 [ "$docs_warned" -eq 1 ] && warnings+=("docs site stale, specnaut.com/version.json not updated") || true
 [ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale or rejected, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
+[ "$macsig_skipped" -eq 1 ] && warnings+=("macOS signatures NOT checked — run postflight on macOS") || true
 [ "$publishedsmoke_skipped" -eq 1 ] && warnings+=("published binary NOT smoke-tested — run .specnaut/release/smoke-published.sh $TAG once updated") || true
 [ -n "$upgradesmoke_skip" ] && warnings+=("upgrade from the previous release NOT smoke-tested ($upgradesmoke_skip)") || true
 

@@ -74,19 +74,14 @@ brew tap specnaut/tap
 brew install specnaut
 ```
 
-(The tap is updated manually at release time for v0.1.)
-
 ### Manual
 
 Download the binary for your OS/arch from
 [GitHub Releases](https://github.com/specnaut/specnaut-cli/releases), run `chmod +x` and place it in
 your `$PATH`.
 
-On macOS, you may need to clear the quarantine attribute after download:
-
-```bash
-xattr -d com.apple.quarantine /path/to/specnaut
-```
+The macOS binaries are signed with a Developer ID and notarized by Apple: Gatekeeper accepts a
+browser download, and the Keychain keeps an "Always Allow" across `specnaut self-update`.
 
 ## Install as a plugin / extension (five harnesses)
 

@@ -1,0 +1,136 @@
+# The cloud side of macOS release signing (cli#428): how release.yml's
+# `sign-macos` job reaches the Developer ID material without this public
+# repository storing a secret. See infra/README.md for the operator steps.
+#
+# It lives in the existing GCP project `specnaut`, which serves another
+# workload too. So this stack OWNS NOTHING project-wide: it does not manage the
+# project, and it enables or disables no API (Secret Manager, IAM Credentials,
+# STS and Cloud Resource Manager are already on). It references the project
+# and scopes everything below it: its own pool with one provider, its own
+# service account, and access granted per secret, never at project level.
+#
+# Not here, on purpose: secret VERSIONS (added out of band from a file, so no
+# credential ever enters Pulumi state) and any service-account key (none is
+# ever created; the job authenticates through Workload Identity Federation).
+name: specnaut-cli-release-signing
+runtime: yaml
+description: Keyless macOS release signing for specnaut/specnaut-cli
+
+config:
+  gcp:project: specnaut
+
+variables:
+  # Public ids of specnaut/specnaut-cli and its owner. Ids, not names: a
+  # renamed or re-created repository does not inherit the trust.
+  githubRepositoryId: "1218483524"
+  githubOwnerId: "294480954"
+
+resources:
+  pool:
+    type: gcp:iam:WorkloadIdentityPool
+    properties:
+      workloadIdentityPoolId: github-release-signing
+      displayName: GitHub release signing
+      description: specnaut-cli release.yml only; one provider
+
+  # The only provider in the pool. Its condition is the whole trust decision:
+  # this repository and owner (by id), a `v*` tag push of release.yml, the
+  # `macos-signing` environment, a GitHub-hosted runner. go-dry-run.yml and
+  # every other workflow stay outside it; do not widen it.
+  provider:
+    type: gcp:iam:WorkloadIdentityPoolProvider
+    properties:
+      workloadIdentityPoolId: ${pool.workloadIdentityPoolId}
+      workloadIdentityPoolProviderId: specnaut-cli-release
+      displayName: specnaut-cli release.yml
+      attributeMapping:
+        google.subject: assertion.sub
+        attribute.repository_id: assertion.repository_id
+      attributeCondition: >-
+        assertion.repository_id == '${githubRepositoryId}' &&
+        assertion.repository_owner_id == '${githubOwnerId}' &&
+        assertion.repository == 'specnaut/specnaut-cli' &&
+        assertion.event_name == 'push' &&
+        assertion.ref_type == 'tag' &&
+        assertion.workflow_ref.startsWith('specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/v') &&
+        assertion.environment == 'macos-signing' &&
+        assertion.runner_environment == 'github-hosted'
+      oidc:
+        issuerUri: https://token.actions.githubusercontent.com
+
+  signer:
+    type: gcp:serviceaccount:Account
+    properties:
+      accountId: macos-release-signer
+      displayName: macOS release signer (specnaut-cli)
+      description: Reads the three macOS signing secrets; nothing else
+
+  # Impersonation only through the repository-id attribute, never `/*`.
+  signerWorkloadIdentityUser:
+    type: gcp:serviceaccount:IAMMember
+    properties:
+      serviceAccountId: ${signer.name}
+      role: roles/iam.workloadIdentityUser
+      member: principalSet://iam.googleapis.com/${pool.name}/attribute.repository_id/${githubRepositoryId}
+
+  # The Developer ID Application certificate and key, as a .p12.
+  developerIdP12:
+    type: gcp:secretmanager:Secret
+    properties:
+      secretId: macos-developer-id-p12
+      replication:
+        auto: {}
+    options:
+      protect: true
+  developerIdP12Accessor:
+    type: gcp:secretmanager:SecretIamMember
+    properties:
+      secretId: ${developerIdP12.id}
+      role: roles/secretmanager.secretAccessor
+      member: serviceAccount:${signer.email}
+
+  # The .p12's password, one line.
+  developerIdP12Password:
+    type: gcp:secretmanager:Secret
+    properties:
+      secretId: macos-developer-id-p12-password
+      replication:
+        auto: {}
+    options:
+      protect: true
+  developerIdP12PasswordAccessor:
+    type: gcp:secretmanager:SecretIamMember
+    properties:
+      secretId: ${developerIdP12Password.id}
+      role: roles/secretmanager.secretAccessor
+      member: serviceAccount:${signer.email}
+
+  # The App Store Connect API key (Developer role, the lowest that notarizes),
+  # as the single JSON `rcodesign encode-app-store-connect-api-key` writes.
+  appStoreConnectApiKey:
+    type: gcp:secretmanager:Secret
+    properties:
+      secretId: app-store-connect-api-key
+      replication:
+        auto: {}
+    options:
+      protect: true
+  appStoreConnectApiKeyAccessor:
+    type: gcp:secretmanager:SecretIamMember
+    properties:
+      secretId: ${appStoreConnectApiKey.id}
+      role: roles/secretmanager.secretAccessor
+      member: serviceAccount:${signer.email}
+
+  # Every read of a secret is logged. Authoritative for this one service only.
+  secretManagerDataRead:
+    type: gcp:projects:IAMAuditConfig
+    properties:
+      project: specnaut
+      service: secretmanager.googleapis.com
+      auditLogConfigs:
+        - logType: DATA_READ
+
+outputs:
+  workloadIdentityProvider: ${provider.name}
+  serviceAccount: ${signer.email}
