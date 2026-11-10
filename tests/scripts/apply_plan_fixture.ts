@@ -129,12 +129,15 @@ export interface Applied extends Result {
   lines: string[];
 }
 
-/** read-items.sh <readArgs>, then apply-plan.sh <verb> [--id] <plan> <items>; `between` runs in the gap. */
+/**
+ * read-items.sh <readArgs>, then apply-plan.sh <verb> [--id] <plan> <items>; `between` runs in the
+ * gap, and `env` is added to apply-plan.sh's environment.
+ */
 export async function readThenApply(
   p: Project,
   readArgs: string[],
   plan: string,
-  o: { apply?: string[]; between?: () => Promise<void> } = {},
+  o: { apply?: string[]; between?: () => Promise<void>; env?: Record<string, string> } = {},
 ): Promise<Applied> {
   const { r, read } = await readItems(p, readArgs);
   assert(read, `read-items failed: ${r.stderr}`);
@@ -144,7 +147,11 @@ export async function readThenApply(
     await o.between?.();
     const at = readArgs.indexOf("--id");
     const verbAndId = o.apply ?? [readArgs[0], ...(at >= 0 ? ["--id", readArgs[at + 1]] : [])];
-    const out = await p.run("apply-plan.sh", [...verbAndId, join(dir, "plan.jsonl"), read.path]);
+    const out = await p.run(
+      "apply-plan.sh",
+      [...verbAndId, join(dir, "plan.jsonl"), read.path],
+      o.env,
+    );
     return { ...out, lines: out.stdout.trimEnd().split("\n") };
   } finally {
     await Deno.remove(dir, { recursive: true });

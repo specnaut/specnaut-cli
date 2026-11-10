@@ -12,6 +12,8 @@
 # No labels argument: the task file has no labels field, so a third positional
 # is refused rather than dropped — the other backends take one, and a caller
 # that passed it must not believe it was recorded (cli#697).
+# Exit: 0 created · 2 usage or a refused title · 3 no such parent · 14 a text
+# its secret check refused (require_clean_text, _backlog_plan.sh), nothing written
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
@@ -67,12 +69,13 @@ fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
-# The title is written into YAML frontmatter: one line, or it would be a key.
 # shellcheck source=../_backlog_plan.sh
 . "$(dirname "$0")/_backlog_plan.sh"
+require_clean_text title "$TITLE"
+# The title is written into YAML frontmatter: one line, or it would be a key.
 require_title "$TITLE" || exit 2
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
-if [ -n "$BODY_FILE" ]; then BODY=$(cat -- "$BODY_FILE"); fi
+if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
 RENDER="$(dirname "$0")/render-index.sh"
 mkdir -p "$BACKLOG_DIR"
 

@@ -10,6 +10,8 @@
 #
 # `--body-file` reads the body from a file, in place of the positional one
 # (pass "" there to give labels); it reaches glab as one argument, no shell.
+# Exit: 0 created · 2 usage · 14 a text its secret check refused
+# (require_clean_text, _backlog_plan.sh), nothing sent · other glab's
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so `--help` and unknown-flag
@@ -63,8 +65,13 @@ fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
-if [ -n "$BODY_FILE" ]; then BODY=$(cat -- "$BODY_FILE"); fi
+require_clean_text title "$TITLE"
+if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
+# GitLab creates a label it does not know, from its name: a label is text it keeps.
+require_clean_text label "$EXTRA_LABELS"
 
 LABELS="Status::Backlog"
 if [ -n "$EXTRA_LABELS" ]; then

@@ -67,8 +67,10 @@ async function layOut(dir: string, apiUrl: string, opts: RunOptions) {
   for await (const f of Deno.readDir(CLOUD)) {
     await Deno.copyFile(join(CLOUD, f.name), join(scripts, f.name));
   }
-  // The shared character rule cloud's `_config.sh` sources, installed beside it.
+  // The shared files installed beside it: the character rule cloud's `_config.sh`
+  // sources, and the write rules its writers check a text by.
   await Deno.copyFile(TEXT_RULE, join(scripts, "_issue_text.sh"));
+  await Deno.copyFile(join(CLOUD, "../_backlog_plan.sh"), join(scripts, "_backlog_plan.sh"));
   for await (const f of Deno.readDir(BASH)) {
     if (f.isFile) {
       await Deno.copyFile(join(BASH, f.name), join(dir, ".specnaut", "scripts", "bash", f.name));

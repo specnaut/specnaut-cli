@@ -6,7 +6,8 @@
 #
 # A title passes the plan's title rule (_backlog_plan.sh): one line, so it can
 # never add a frontmatter key.
-# Exit: 0 edited · 1 no such item · 2 usage or a refused title
+# Exit: 0 edited · 1 no such item · 2 usage or a refused title · 14 a text its
+# secret check refused (require_clean_text), nothing written
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -27,6 +28,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ "$HAS_TITLE" = true ] || [ -n "$APPEND" ] || { echo "$USAGE" >&2; exit 2; }
+# The caller's text is judged, never the file it is appended to.
+[ "$HAS_TITLE" = false ] || require_clean_text title "$TITLE"
+if [ -n "$APPEND" ]; then require_clean_file append "$APPEND"; APPEND=$CLEAN_FILE; fi
 [ "$HAS_TITLE" = false ] || require_title "$TITLE" || exit 2
 
 FILE=$(item_file "$NUM") || { echo "no backlog item #$NUM" >&2; exit 1; }

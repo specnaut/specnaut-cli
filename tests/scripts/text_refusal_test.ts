@@ -1,0 +1,115 @@
+import { assertEquals } from "@std/assert";
+import { join } from "@std/path";
+import { type Project, project } from "./backlog_tracker_fixture.ts";
+import {
+  CLEAN_BODY,
+  CLEAN_TITLE,
+  ENV_VALUE,
+  HIDDEN_SAMPLES,
+  SECRET_NAMES,
+  SECRET_SAMPLES,
+  SURVIVORS,
+} from "./secret_samples.ts";
+
+/**
+ * `text_refusal`, the one rule every backlog write meets, sourced from a real
+ * install of `_backlog_plan.sh`: the function the writers call, every sample
+ * judged in one bash process.
+ */
+
+Deno.test("text_refusal names the class of every refused sample, and passes clean text", async () => {
+  const p = await project("local");
+  try {
+    const cases: [string, string][] = [
+      ...SECRET_SAMPLES.map((t): [string, string] => [t, "1 secret"]),
+      ...HIDDEN_SAMPLES.map((t): [string, string] => [t, "1 hidden"]),
+      ...[...SURVIVORS, CLEAN_BODY, CLEAN_TITLE].map((
+        t,
+      ): [string, string] => [t, "0 "]),
+    ];
+    await Deno.mkdir(join(p.dir, "samples"));
+    for (const [i, [t]] of cases.entries()) await p.write(`samples/${i}`, t);
+    await p.write("env-sample", `see ${ENV_VALUE} here`);
+    // Each line is labelled: a sample's index, or the variable that holds the value.
+    const out = await verdicts(
+      p,
+      `
+      for i in $(seq 0 ${
+        cases.length - 1
+      }); do c=$(text_refusal <"samples/$i"); echo "$i $? $c"; done
+      for n in ${SECRET_NAMES.join(" ")}; do
+        c=$(export "$n=${ENV_VALUE}"; text_refusal <env-sample); echo "$n $? $c"
+      done`,
+    );
+    const want = [
+      ...cases.map(([, v], i) => `${i} ${v}`),
+      ...SECRET_NAMES.map((n) => `${n} 1 secret`),
+    ];
+    assertEquals(out.lines, want, out.stderr);
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("text_refusal never passes a scan that could not run", async () => {
+  const p = await project("local");
+  try {
+    // A grep that fails is a scan that did not run: refused, never clean.
+    await Deno.mkdir(join(p.dir, "broken"));
+    await p.write("broken/grep", "#!/usr/bin/env bash\nexit 2\n");
+    const failing = await verdicts(
+      p,
+      `
+      chmod +x broken/grep
+      c=$(PATH="$PWD/broken:$PATH" text_refusal <<<"plain words"); echo "$? $c"`,
+    );
+    assertEquals(failing.lines, ["1 hidden"]);
+    // No scan installed: status 2 and one line on stderr, never a verdict.
+    await Deno.remove(join(p.dir, ".specnaut/scripts/bash/_report_text.sh"));
+    const missing = await verdicts(p, `c=$(text_refusal <<<"plain words"); echo "$? $c"`);
+    assertEquals(missing.lines, ["2 "]);
+    assertEquals(missing.stderr, "bash: the secret scan is missing\n");
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("text_refusal judges the same in a UTF-8 locale", async () => {
+  const p = await project("local");
+  try {
+    const clean = [...SURVIVORS, CLEAN_BODY, CLEAN_TITLE];
+    await Deno.mkdir(join(p.dir, "samples"));
+    for (const [i, t] of clean.entries()) await p.write(`samples/${i}`, t);
+    await p.write("hidden", HIDDEN_SAMPLES.find((t) => t.includes("\u200b"))!);
+    const script = `
+      for i in $(seq 0 ${clean.length - 1}); do c=$(text_refusal <"samples/$i"); echo "$? $c"; done
+      c=$(text_refusal <hidden); echo "$? $c"`;
+    const want = [...clean.map(() => "0 "), "1 hidden"];
+    const locales: Record<string, string>[] = [
+      { LC_ALL: "en_US.UTF-8" },
+      { LC_ALL: "", LC_CTYPE: "", LANG: "C.UTF-8" },
+    ];
+    for (const env of locales) {
+      const out = await verdicts(p, script, env);
+      assertEquals(out.lines, want, `${JSON.stringify(env)}\n${out.stderr}`);
+    }
+  } finally {
+    await p.cleanup();
+  }
+});
+
+/** `script` run in one bash process, after sourcing the installed `_backlog_plan.sh`. */
+async function verdicts(p: Project, script: string, env: Record<string, string> = {}) {
+  const out = await new Deno.Command("bash", {
+    args: ["-c", `. .specnaut/scripts/backlog/_backlog_plan.sh\n${script}`],
+    cwd: p.dir,
+    env,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  const dec = new TextDecoder();
+  return {
+    lines: dec.decode(out.stdout).split("\n").filter((l) => l),
+    stderr: dec.decode(out.stderr),
+  };
+}

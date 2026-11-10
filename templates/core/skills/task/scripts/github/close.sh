@@ -5,7 +5,8 @@
 # Usage: close.sh <number> [completed|not_planned] [--body-file <path>]
 #   --body-file  a closing comment, posted from the file through
 #                clarify-comment.sh before the close; a failed post closes nothing
-# Exit: 0 closed · 2 usage · other gh's
+# Exit: 0 closed · 2 usage · 14 the comment refused by clarify-comment.sh's
+# secret check, nothing posted or closed · other gh's
 set -euo pipefail
 
 # shellcheck source=./_config.sh

@@ -9,6 +9,8 @@
 # `--parent` makes the new task a sub-task of an existing one, in the same
 # shape as the local and github versions. It travels as `parentNumber` on the
 # versioned public contract — by number, never by an internal identifier.
+# Exit: 0 created · 1 the board refused · 2 usage · 14 a text its secret check refused
+# (require_clean_text, _backlog_plan.sh), nothing sent
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
@@ -55,8 +57,11 @@ fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
-if [ -n "$BODY_FILE" ]; then BODY=$(cat -- "$BODY_FILE"); fi
+require_clean_text title "$TITLE"
+if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
 
 PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --arg t "$TITLE" --arg b "$BODY" --arg p "$PARENT" \
   '{ projectKey: $k, title: $t }

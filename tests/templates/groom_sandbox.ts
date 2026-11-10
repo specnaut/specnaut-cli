@@ -76,7 +76,8 @@ export async function project(backend: string, files: string[], config?: string)
   }
   // groom-rules.sh sources common.sh (its CR-safe jq), which sources the
   // template resolver: the three are installed side by side.
-  for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh"]) {
+  // The writers' secret scan, `_report_text.sh`, sits beside them too.
+  for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh", "_report_text.sh"]) {
     await Deno.copyFile(join(dirname(RULES), f), join(bash, f));
   }
   if (config) await Deno.writeTextFile(join(dir, ".specnaut/backlog-config.yml"), config);

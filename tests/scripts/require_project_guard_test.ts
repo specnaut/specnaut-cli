@@ -211,6 +211,15 @@ async function box(ghStub: string | null): Promise<Box> {
     await Deno.copyFile(join(SRC, entry.name), join(backlog, entry.name));
     await Deno.chmod(join(backlog, entry.name), 0o755);
   }
+  // The shared write rules add.sh checks its text by, and the secret scan they run.
+  for (const name of ["_backlog_plan.sh", "_issue_text.sh"]) {
+    await Deno.copyFile(join(SRC, "..", name), join(backlog, name));
+  }
+  await Deno.mkdir(join(dir, ".specnaut/scripts/bash"));
+  await Deno.copyFile(
+    join(SRC, "../../../../specnaut/scripts/bash/_report_text.sh"),
+    join(dir, ".specnaut/scripts/bash/_report_text.sh"),
+  );
   await Deno.writeTextFile(
     join(dir, ".specnaut/backlog-config.yml"),
     'repo: "myorg/myproject"\nproject_number: "42"\n',

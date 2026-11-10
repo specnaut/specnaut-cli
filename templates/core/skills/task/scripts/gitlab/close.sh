@@ -7,7 +7,9 @@
 # Usage: close.sh <number> [completed] [--body-file <path>]
 #   --body-file  a closing note, posted from the file through
 #                clarify-comment.sh before the close; a failed post closes nothing
-# Exit: 0 closed · 2 usage, or a reason GitLab cannot record · other glab's
+# Exit: 0 closed · 2 usage, or a reason GitLab cannot record · 14 the note
+# refused by clarify-comment.sh's secret check, nothing posted or closed ·
+# other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh

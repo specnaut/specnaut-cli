@@ -1,8 +1,14 @@
 # shellcheck shell=bash disable=SC2154
-# Sourced by report-upstream.sh: what it does to text, and nothing that talks to
-# GitHub. What these scans refuse is stated in that script's header, the one home
-# of the list; a pattern added here is added there. It uses that script's `refuse`
-# and its $DIR and $here; every scan refuses by exiting, it never returns a verdict.
+# Sourced by report-upstream.sh, and by `text_refusal` in the backlog scripts'
+# `_backlog_plan.sh`, which runs `scan_hard` over every text a backlog write
+# sends: what is done to text, and nothing that talks to a tracker. What these
+# scans refuse is stated in report-upstream.sh's header, the one home of the
+# list; a pattern added here is added there. It uses the caller's `refuse`, and
+# report-upstream.sh's $DIR and $here; every scan refuses by exiting, it never
+# returns a verdict.
+# The patterns are bytes: in a UTF-8 locale grep rejects HIDDEN_RE as an
+# illegal byte sequence, and that error would refuse every text.
+export LC_ALL=C
 NL=$'\n'
 CR=$'\r'
 SECRET_RE='gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.|-----BEGIN|[A-Za-z][A-Za-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@'

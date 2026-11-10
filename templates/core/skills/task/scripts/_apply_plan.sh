@@ -18,10 +18,10 @@
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against the secret scan of
-# `_report_text.sh`, run over the bytes this script then sends. Any refusal
-# writes nothing. Free text reaches a backend script only as a file this
-# script wrote in its own 0700 directory; every other value as one argument.
+# the schema and the verb's scope, every text against `text_refusal`, run over
+# the bytes this script then sends. Any refusal writes nothing. Free text
+# reaches a backend script only as a file this script wrote in its own 0700
+# directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
@@ -29,11 +29,12 @@
 #   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
 #   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
 #   RECEIPT: <path>... | none     the repository files changed, to stage
-# Exit: 0 applied · 2 usage · 3 refused, nothing written · 4 an operation failed
+# Exit: 0 applied · 2 usage, or no secret scan to run · 3 refused, nothing
+# written · 4 an operation failed
 # shellcheck disable=SC2154  # `here` is the caller's.
 
 # Every failure below is handled where it happens: `set -e` from `_config.sh`
-# would end a run between two writes, and kill the scans' own grep calls.
+# would end a run between two writes.
 set +e
 usage() { echo "usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>" >&2; exit 2; }
 VERB=${1:-}
@@ -48,14 +49,10 @@ fi
 PLAN=$1 ITEMS_FILE=$2
 [[ $VERB =~ ^[a-z][a-z-]{0,31}$ ]] || usage
 
-# A scan that is not there would pass every text: its absence stops the run.
 # shellcheck source=./_backlog_plan.sh
 . "$here/_backlog_plan.sh" || exit 2
 # shellcheck source=./_backlog_scope.sh
 . "$here/_backlog_scope.sh" || exit 2
-# shellcheck source=../../specnaut/scripts/bash/_report_text.sh
-. "$here/../bash/_report_text.sh" || exit 2
-declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
 
 REFUSED=0
 refused() { printf 'REFUSED %s %s\n' "$1" "$2"; REFUSED=1; }
@@ -112,16 +109,20 @@ trap 'rm -rf "$WORK"' EXIT
 chmod 700 "$WORK"
 printf '%s' "$RESULT" | jq_lf -c '.ops[]' >"$WORK/ops.jsonl"
 
-# Every text, written once to the file it is sent from, scanned from those bytes.
-# shellcheck disable=SC2329  # called by _report_text.sh's scans.
-refuse() { printf '%s' "$1"; exit 1; }
+# Every text, written once to the file it is sent from, judged from those bytes.
+# A scan that could not run would pass every text: it stops the run.
 while IFS= read -r op <&3; do
   at=$(jq_lf -r .line <<<"$op")
   for k in title body append; do
     jq_lf -e --arg k "$k" 'has($k)' <<<"$op" >/dev/null || continue
     jq_lf -j --arg k "$k" '.[$k]' <<<"$op" >"$WORK/$at.$k"
-    bytes=$(read_bytes <"$WORK/$at.$k")
-    class=$(scan_hard "${bytes%x}"; exit 0) || refused "${class:-secret}" "$at.$k"
+    rc=0
+    class=$(text_refusal <"$WORK/$at.$k") || rc=$?
+    case $rc in
+      0) ;;
+      1) refused "${class:-secret}" "$at.$k" ;;
+      *) exit 2 ;;
+    esac
   done
   if [ "$VERB" = groom ] && [ "$(jq_lf -r .op <<<"$op")" = close ]; then
     epic_cleared "$(jq_lf -r .target <<<"$op")" || refused scope "$at.target"

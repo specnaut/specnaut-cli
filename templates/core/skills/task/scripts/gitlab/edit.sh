@@ -6,11 +6,14 @@
 # Usage: edit.sh <number> [--title <title>] [--append-file <path>]
 #
 # Each value reaches glab as one argument, with no shell between the two.
-# Exit: 0 edited · 2 usage · 3 the description could not be read · other glab's
+# Exit: 0 edited · 2 usage · 3 the description could not be read · 14 a text
+# its secret check refused (require_clean_text), nothing sent · other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
 
 USAGE='usage: edit.sh <number> [--title <title>] [--append-file <path>]'
 [ "$#" -ge 1 ] || { echo "$USAGE" >&2; exit 2; }
@@ -25,6 +28,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ "$HAS_TITLE" = true ] || [ -n "$APPEND" ] || { echo "$USAGE" >&2; exit 2; }
+# The caller's text is judged, never the description it is appended to.
+[ "$HAS_TITLE" = false ] || require_clean_text title "$TITLE"
+if [ -n "$APPEND" ]; then require_clean_file append "$APPEND"; APPEND=$CLEAN_FILE; fi
 
 ARGS=(issue update "$NUM" --repo "$PROJECT_ID")
 [ "$HAS_TITLE" = false ] || ARGS+=(--title "$TITLE")

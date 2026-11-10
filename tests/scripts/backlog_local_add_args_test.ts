@@ -29,6 +29,14 @@ async function sandbox(): Promise<{ root: string; add: string }> {
       join(scripts, name),
     );
   }
+  // ...and the secret scan it checks every text with, where every install puts it.
+  await Deno.mkdir(join(root, ".specnaut", "scripts", "bash"));
+  await Deno.copyFile(
+    fromFileUrl(
+      new URL(`${LOCAL}/../../../../specnaut/scripts/bash/_report_text.sh`, import.meta.url),
+    ),
+    join(root, ".specnaut", "scripts", "bash", "_report_text.sh"),
+  );
   return { root, add: bashPath(join(scripts, "add.sh")) };
 }
 

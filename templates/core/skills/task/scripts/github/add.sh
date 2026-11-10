@@ -18,6 +18,8 @@
 #   13  the project could not be verified (rate limit, bad token, any gh
 #       error) — NOT a fallback signal and not a config error: retry, or
 #       report it. Nothing was created
+#   14  a text its secret check refused (require_clean_text, _backlog_plan.sh);
+#       nothing was sent
 #   other  `gh issue create` failed — nothing was created
 set -euo pipefail
 
@@ -72,7 +74,12 @@ fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
+require_clean_text title "$TITLE"
+if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY_FILE=$CLEAN_FILE; else require_clean_text body "$BODY"; fi
+require_clean_text label "$LABELS"
 require_project   # a project that does not resolve fails here, not mid-write
 
 # When --parent is set, fail fast if the parent issue doesn't exist —

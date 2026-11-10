@@ -27,11 +27,18 @@ const CONFIG: Record<Backend, string | null> = {
 /**
  * Each stand-in logs one line per call: its name, then every argument on its
  * own `\t` field, a newline inside an argument folded to a space (a JSON
- * payload stays parseable).
+ * payload stays parseable). `calls.raw` keeps the bytes: every argument, and
+ * the content of every `--body-file`, each ended by a NUL.
  */
 const LOG = `printf '%s' "\${0##*/}" >> "$FAKE_ROOT/calls.log"
 for a in "$@"; do printf '\\t%s' "\${a//$'\\n'/ }" >> "$FAKE_ROOT/calls.log"; done
-echo >> "$FAKE_ROOT/calls.log"`;
+echo >> "$FAKE_ROOT/calls.log"
+prev=""
+for a in "$@"; do
+  printf '%s\\0' "$a" >> "$FAKE_ROOT/calls.raw"
+  [ "$prev" != --body-file ] || { cat -- "$a"; printf '\\0'; } >> "$FAKE_ROOT/calls.raw"
+  prev=$a
+done`;
 
 const FAKES: Record<string, string> = {
   gh: `${LOG}
@@ -59,6 +66,8 @@ export interface Result {
   stderr: string;
   /** Every tracker call, one per line: `gh\tissue\tview\t7…`. */
   calls: string;
+  /** Every argument and `--body-file` content the stand-ins received, NUL-separated. */
+  raw: string;
 }
 
 export interface Project {
@@ -97,6 +106,7 @@ export async function project(backend: Backend): Promise<Project> {
     await Deno.writeTextFile(join(dir, "bin", name), `#!/usr/bin/env bash\n${body}\n`);
   }
   await Deno.writeTextFile(join(dir, "calls.log"), "");
+  await Deno.writeTextFile(join(dir, "calls.raw"), "");
   const read = (rel: string) => Deno.readTextFile(join(dir, rel));
   return {
     dir,
@@ -105,7 +115,7 @@ export async function project(backend: Backend): Promise<Project> {
         args: [
           "-c",
           'export FAKE_ROOT="$PWD" HOME="$PWD" PATH="$PWD/bin:$PATH"; chmod +x bin/*; ' +
-          ': > calls.log; s=$1; shift; exec bash ".specnaut/scripts/backlog/$s" "$@"',
+          ': > calls.log; : > calls.raw; s=$1; shift; exec bash ".specnaut/scripts/backlog/$s" "$@"',
           "driver",
           script,
           ...args,
@@ -121,6 +131,7 @@ export async function project(backend: Backend): Promise<Project> {
         stdout: dec.decode(out.stdout),
         stderr: dec.decode(out.stderr),
         calls: await read("calls.log"),
+        raw: await read("calls.raw"),
       };
     },
     read,

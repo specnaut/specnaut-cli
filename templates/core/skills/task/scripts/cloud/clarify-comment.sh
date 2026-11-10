@@ -5,10 +5,14 @@
 #
 # `--body-file` keeps the text off the caller's command line: the file is read
 # here and travels in the JSON payload, with no shell between the two.
+# Exit: 0 posted · 1 the board refused · 2 usage · 14 a text its secret check refused
+# (require_clean_text, _backlog_plan.sh), nothing sent
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
 
 if [ "$#" -lt 2 ]; then
   echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
@@ -18,7 +22,10 @@ NUM=$(require_issue_number "$1") || exit 2
 QUESTION="$2"
 if [ "$2" = "--body-file" ]; then
   [ "$#" -eq 3 ] && [ -f "$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  QUESTION=$(cat -- "$3")
+  require_clean_file body "$3"
+  QUESTION=$(cat -- "$CLEAN_FILE")
+else
+  require_clean_text body "$QUESTION"
 fi
 
 PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg b "$QUESTION" \

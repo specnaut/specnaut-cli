@@ -54,6 +54,12 @@ main session runs no writing script itself; the read-only `list.sh` and `view.sh
 8. **Clean up** once the run ends: `rm -rf <each plan directory> <the ITEMS_FILE's directory>`,
    literal paths. A new read at step 1 removes the previous read's directory first.
 
+**A text the secret scan refuses is never written.** Every script that sends a title, body, comment
+or label to the tracker checks it first, `apply-plan.sh` included; a script called directly exits
+`14` with `REFUSED <class> <field>` on stderr, never the text. `secret`: remove the credential-like
+value. `hidden`: remove HTML comments, link-reference definitions, invisible or control characters,
+and convert CRLF line endings to LF. Never encode, split or reformat a value to get it past the check.
+
 <!-- BEGIN: backend=local -->
 ## Backend: local Markdown files
 

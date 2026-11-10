@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { exists } from "@std/fs/exists";
 import { BACKENDS, localItem, project } from "./backlog_tracker_fixture.ts";
@@ -33,10 +33,19 @@ Deno.test("github: --body-file hands gh the path, never the text", async () => {
     await p.write("body.md", TEXT);
     const add = await p.run("add.sh", ["A title", "--body-file", "body.md"]);
     assertEquals(add.code, 0, add.stderr);
-    assertEquals(argAfter(add.calls, "gh\tissue\tcreate", "--body-file"), "body.md");
+    // gh is handed a private copy of the file, the bytes the secret check judged.
+    assertMatch(
+      argAfter(add.calls, "gh\tissue\tcreate", "--body-file") ?? "",
+      /backlog-text\.[^/]+\/body$/,
+    );
+    assertStringIncludes(add.raw, `${TEXT}\0`);
     const note = await p.run("clarify-comment.sh", ["7", "--body-file", "body.md"]);
     assertEquals(note.code, 0, note.stderr);
-    assertEquals(argAfter(note.calls, "gh\tissue\tcomment\t7", "--body-file"), "body.md");
+    assertMatch(
+      argAfter(note.calls, "gh\tissue\tcomment\t7", "--body-file") ?? "",
+      /backlog-text\.[^/]+\/body$/,
+    );
+    assertStringIncludes(note.raw, `${TEXT}\0`);
     for (const r of [add, note]) assert(!r.calls.includes("touch"), r.calls);
   } finally {
     await p.cleanup();
@@ -108,7 +117,10 @@ for (
       assertEquals(r.code, 0, r.stderr);
       const tool = backend === "github" ? "gh" : "glab";
       const sent = argAfter(r.calls, `${tool}\tissue\t${note}\t7`, flag);
-      assertEquals(sent, backend === "github" ? "body.md" : TEXT);
+      if (backend === "github") {
+        assertMatch(sent ?? "", /backlog-text\.[^/]+\/body$/);
+        assertStringIncludes(r.raw, `${TEXT}\0`);
+      } else assertEquals(sent, TEXT);
       const order = r.calls.split("\n").map((l) => l.split("\t").slice(0, 3).join(" "));
       assert(
         order.indexOf(`${tool} issue ${note}`) < order.indexOf(`${tool} issue close`),
