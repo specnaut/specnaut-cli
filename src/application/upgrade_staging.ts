@@ -81,14 +81,21 @@ export function planStaging(
  * A containment refusal is reported in its own words (`leftAlone`), and a folder
  * the copy left behind in the store's: the copy is gone, so nothing there is to
  * delete by hand.
+ *
+ * The listing is best-effort too (cli#753): a tree it cannot read is one line,
+ * nothing is deleted, and the next run retries (`listStaged`). The one
+ * deliberate abort is a staging folder reached through a link: the store's
+ * `PathRefusal` propagates, because what it would list is the link's target.
  */
 export async function pruneStaging(
   stagingStore: StagingStore,
   projectDir: string,
   keep: ReadonlySet<string>,
 ): Promise<string[]> {
+  const listed = await listStaged(stagingStore, projectDir);
+  if (typeof listed === "string") return [listed];
   const refusals: string[] = [];
-  for (const rel of await stagingStore.list(projectDir)) {
+  for (const rel of listed) {
     if (keep.has(rel)) continue;
     try {
       refusals.push(...await stagingStore.delete(projectDir, rel));
@@ -99,6 +106,28 @@ export async function pruneStaging(
   }
   const tidy = await tidyStagingRoot(stagingStore, projectDir);
   return tidy === null ? refusals : [...refusals, tidy];
+}
+
+/**
+ * The staged paths, or the line to report when the tree cannot be listed (cli#753).
+ *
+ * The type is the test, as in `refusalLine`: a `PathRefusal` (a staging folder
+ * reached through a link) is rethrown, and every other error, whichever errno
+ * the system picked, becomes the line. No "safe to delete by hand": a listing
+ * that failed cannot say what is there. The tidy is skipped with the deletes,
+ * since a second line would only repeat that the folder cannot be read.
+ */
+async function listStaged(
+  stagingStore: StagingStore,
+  projectDir: string,
+): Promise<string[] | string> {
+  try {
+    return await stagingStore.list(projectDir);
+  } catch (err) {
+    if (err instanceof PathRefusal) throw err;
+    return `could not list .specnaut/upgrade-staging/ (${why(err)}); ` +
+      `its stale copies stay until the next run`;
+  }
 }
 
 /**

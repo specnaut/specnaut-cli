@@ -1,4 +1,10 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStrictEquals,
+  assertStringIncludes,
+} from "@std/assert";
 import { join } from "@std/path";
 import { pruneStaging } from "../../src/application/upgrade_staging.ts";
 import { PathRefusal } from "../../src/application/path_refusal.ts";
@@ -38,6 +44,27 @@ Deno.test("a staging directory that is refused gets the containment message too"
   assertEquals(refusals.length, 1);
   assertStringIncludes(refusals[0], ".specnaut/upgrade-staging/");
   assertRefusalWording(refusals[0]);
+});
+
+Deno.test("a staging tree that cannot be listed is one line, and nothing is deleted", async () => {
+  // cli#753: the listing sat outside every `try`, so an unreadable staged folder
+  // aborted the whole upgrade before its managed sections and lock write.
+  const store = fakeStagingStore(["stale.md"]);
+  store.list = () => Promise.reject(new Deno.errors.PermissionDenied("readdir '/p/locked'"));
+  store.cleanupIfEmpty = () => Promise.reject(new Error("tidied after a failed listing"));
+  const refusals = await pruneStaging(store, "/p", new Set());
+  assertEquals(refusals.length, 1, refusals.join("\n"));
+  assertStringIncludes(refusals[0], ".specnaut/upgrade-staging/");
+  assertStringIncludes(refusals[0], "locked");
+  assertEquals(store.deleted, []);
+});
+
+Deno.test("a refusal while listing still aborts the prune, the same error", async () => {
+  const refusal = new PathRefusal("refusing to use a staging directory reached through a symlink");
+  const store = fakeStagingStore();
+  store.list = () => Promise.reject(refusal);
+  const thrown = await assertRejects(() => pruneStaging(store, "/p", new Set()));
+  assertStrictEquals(thrown, refusal);
 });
 
 Deno.test({

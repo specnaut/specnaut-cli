@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 import { pruneStaging } from "../../src/application/upgrade_staging.ts";
@@ -29,14 +29,17 @@ for (const linked of [".specnaut/upgrade-staging", ".specnaut"]) {
         await Deno.mkdir(join(dir, ".specnaut"));
         await makeLink("../src", join(dir, ".specnaut/upgrade-staging"), "dir");
       }
-      const refusals = await pruneStaging(new FsStagingStore(), dir, new Set()).catch((err) => [
-        String(err),
-      ]);
+      // An abort, not a line: the linked root is the one listing failure that
+      // stops the upgrade (cli#753), so a catch-all there must turn this red.
+      await assertRejects(
+        () => pruneStaging(new FsStagingStore(), dir, new Set()),
+        Error,
+        "reached through a symlink",
+      );
       assertEquals(await Deno.readTextFile(join(dir, "src/a.ts")), "export {};\n");
       if (linked === ".specnaut") {
         assert(await Deno.stat(join(dir, "elsewhere/upgrade-staging/b.md")), "b.md was deleted");
       }
-      assertStringIncludes(refusals.join("\n"), "reached through a symlink");
     } finally {
       await Deno.remove(dir, { recursive: true });
     }
