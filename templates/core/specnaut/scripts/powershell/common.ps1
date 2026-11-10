@@ -148,6 +148,10 @@ function Test-FeatureBranch {
     return $true
 }
 
+# Text a file or a directory name supplied, safe to print: a control character
+# becomes `?` (cli#752), so an ESC a committer wrote reaches no terminal or agent.
+function ConvertTo-PrintableText([string]$Text) { return $Text -replace '\p{Cc}', '?' }
+
 # Resolve .specnaut/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
 function Find-FeatureDirByPrefix {
     param(
@@ -177,7 +181,7 @@ function Find-FeatureDirByPrefix {
     if ($dirMatches.Count -eq 1) {
         return $dirMatches[0].FullName
     }
-    $names = ($dirMatches | ForEach-Object { $_.Name }) -join ' '
+    $names = ConvertTo-PrintableText (($dirMatches | ForEach-Object { $_.Name }) -join ' ')
     [Console]::Error.WriteLine("ERROR: Multiple spec directories found with prefix '$prefix': $names")
     [Console]::Error.WriteLine('Please ensure only one spec directory exists per prefix.')
     return $null
@@ -206,7 +210,7 @@ function Get-FeatureJsonDirectory {
     try {
         return ($featureJsonRaw | ConvertFrom-Json).feature_directory
     } catch {
-        [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json: $_")
+        [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json ($($_.Exception.GetType().Name))")
         exit 1
     }
 }
@@ -241,8 +245,8 @@ function Get-FeaturePathsEnv {
         if ((Test-FeatureBranchName $effBranch) -and ((Split-Path -Leaf $featureDir) -ne $effBranch)) {
             [Console]::Error.WriteLine("ERROR: .specnaut/feature.json resolves to a different feature than the current branch.")
             [Console]::Error.WriteLine("  current branch:  $effBranch")
-            [Console]::Error.WriteLine("  feature.json:    $(Split-Path -Leaf $featureDir)")
-            [Console]::Error.WriteLine("  resolved path:   $featureDir")
+            [Console]::Error.WriteLine("  feature.json:    $(ConvertTo-PrintableText (Split-Path -Leaf $featureDir))")
+            [Console]::Error.WriteLine("  resolved path:   $(ConvertTo-PrintableText $featureDir)")
             [Console]::Error.WriteLine("Refusing to act on a contradiction: writing here would touch the other feature's files.")
             [Console]::Error.WriteLine("Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately.")
             exit 1

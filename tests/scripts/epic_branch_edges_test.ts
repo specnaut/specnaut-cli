@@ -135,6 +135,8 @@ for (const runner of RUNNERS) {
       const { code, out } = await r.run(runner);
       assertEquals(code, 1, out);
       assertStringIncludes(out, "Failed to switch to the epic's branch '005-epic'");
+      // Named in fixed text, never in git's, which lists the blocking file (cli#752).
+      assert(!out.includes("README.md"), `git's text reached the output: ${out}`);
       assertEquals(await r.head(), "main");
     });
   });

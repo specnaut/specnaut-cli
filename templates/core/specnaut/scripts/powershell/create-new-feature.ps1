@@ -120,7 +120,7 @@ if ($Issue -gt 0) {
             # Anything else is the gate refusing to answer - since #583 that
             # includes exit 3, "could not read the children". See the bash twin
             # for the full account.
-            $cascadeOut = & bash $cascadeSh $Issue 2>&1
+            $null = & bash $cascadeSh $Issue 2>&1
             $cascadeRc = $LASTEXITCODE
             if ($cascadeRc -eq 11) {
                 $epicIssue = "$Issue"
@@ -128,11 +128,11 @@ if ($Issue -gt 0) {
             } elseif ($cascadeRc -eq 0) {
                 [Console]::Error.WriteLine("# issue $Issue has no parent and no open children - standalone, unchanged")
             } else {
-                [Console]::Error.WriteLine("# cascade-check could not answer for issue $Issue (exit $cascadeRc): $cascadeOut")
+                [Console]::Error.WriteLine("# cascade-check could not answer for issue $Issue (exit $cascadeRc)")
                 [Console]::Error.WriteLine("# epic detection did NOT run - treating it as standalone, which may be wrong if it is an epic")
             }
         } else {
-            [Console]::Error.WriteLine("# could not resolve the parent of issue $Issue (exit $parentRc): $parentOut")
+            [Console]::Error.WriteLine("# could not resolve the parent of issue $Issue (exit $parentRc)")
             [Console]::Error.WriteLine("# treating it as standalone - the branch is created either way")
         }
     }
@@ -214,52 +214,47 @@ if ($epicBranch -and $epicBranch.Length -gt $maxBranchLength) {
 $featureDir = Join-Path $specsDir $branchName
 $specFile = Join-Path $featureDir 'plan.md'
 
+# A failed create or switch says so in fixed text with git's exit code, never in
+# git's message: it quotes refs and paths a committer chose (cli#752). The branch
+# names printed are a slug of the description or a ref git stores, and a ref name
+# holds no control character or whitespace.
 if (-not $DryRun) {
     if ($hasGit -and $epicBranch) {
         # The epic's branch exists: switch to it, or stay on it. Reuse is the
         # point of the lookup, so it needs no -AllowExistingBranch.
         if ($current -cne $epicBranch) {
-            $switchBranchError = git checkout -q $epicBranch 2>&1 | Out-String
+            git checkout -q $epicBranch 2>$null | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Error "Error: Failed to switch to the epic's branch '$epicBranch'. Resolve any local changes or conflicts and try again.`n$($switchBranchError.Trim())"
+                Write-Error "Error: Failed to switch to the epic's branch '$epicBranch' (git exit $LASTEXITCODE). Please resolve any local changes or conflicts and try again."
                 exit 1
             }
         }
     } elseif ($hasGit) {
-        $branchCreated = $false
-        $branchCreateError = ''
+        $createExit = 0
         try {
-            $branchCreateError = git checkout -q -b $branchName 2>&1 | Out-String
-            if ($LASTEXITCODE -eq 0) {
-                $branchCreated = $true
-            }
+            git checkout -q -b $branchName 2>$null | Out-Null
+            $createExit = $LASTEXITCODE
         } catch {
-            $branchCreateError = $_.Exception.Message
+            $createExit = -1
+            [Console]::Error.WriteLine("# warning: git could not be run to create the branch ($($_.Exception.GetType().Name))")
         }
 
-        if (-not $branchCreated) {
+        if ($createExit -ne 0) {
             $currentBranch = ''
             try {
                 $currentBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
             } catch {
-                [Console]::Error.WriteLine("# warning: could not read the current branch: $_")
+                [Console]::Error.WriteLine("# warning: could not read the current branch ($($_.Exception.GetType().Name))")
             }
             # Check if branch already exists
             $existingBranch = git branch --list $branchName 2>$null
             if ($existingBranch) {
                 if ($AllowExistingBranch) {
-                    # If we're already on the branch, continue without another checkout.
-                    if ($currentBranch -eq $branchName) {
-                        # Already on the target branch — nothing to do
-                    } else {
-                        # Otherwise switch to the existing branch instead of failing.
-                        $switchBranchError = git checkout -q $branchName 2>&1 | Out-String
+                    # Already on the branch: continue; otherwise switch to it instead of failing.
+                    if ($currentBranch -ne $branchName) {
+                        git checkout -q $branchName 2>$null | Out-Null
                         if ($LASTEXITCODE -ne 0) {
-                            if ($switchBranchError) {
-                                Write-Error "Error: Branch '$branchName' exists but could not be checked out.`n$($switchBranchError.Trim())"
-                            } else {
-                                Write-Error "Error: Branch '$branchName' exists but could not be checked out. Resolve any uncommitted changes or conflicts and try again."
-                            }
+                            Write-Error "Error: Failed to switch to existing branch '$branchName' (git exit $LASTEXITCODE). Please resolve any local changes or conflicts and try again."
                             exit 1
                         }
                     }
@@ -271,11 +266,7 @@ if (-not $DryRun) {
                     exit 1
                 }
             } else {
-                if ($branchCreateError) {
-                    Write-Error "Error: Failed to create git branch '$branchName'.`n$($branchCreateError.Trim())"
-                } else {
-                    Write-Error "Error: Failed to create git branch '$branchName'. Please check your git configuration and try again."
-                }
+                Write-Error "Error: Failed to create git branch '$branchName' (git exit $createExit). Please check your git configuration and try again."
                 exit 1
             }
         }
@@ -329,7 +320,7 @@ if (-not $DryRun) {
                     [Console]::Error.WriteLine("# child issue $Issue was NOT moved - its card moves when the loop reaches it")
                 }
             } else {
-                [Console]::Error.WriteLine("# could not move issue $moveTarget to In progress: $moveOut")
+                [Console]::Error.WriteLine("# could not move issue $moveTarget to In progress (exit $LASTEXITCODE)")
                 [Console]::Error.WriteLine("# the branch was created; the board was NOT updated")
             }
         }

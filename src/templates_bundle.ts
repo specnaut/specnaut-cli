@@ -27390,6 +27390,10 @@ check_feature_branch() {
     return 0
 }
 
+# Text a file or a directory name supplied, safe to print: a control character
+# becomes \`?\` (cli#752), so an ESC a committer wrote reaches no terminal or agent.
+_printable() { printf '%s' "\${1//[[:cntrl:]]/?}"; }
+
 # Find feature directory by numeric prefix instead of exact branch match
 # This allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
 find_feature_dir_by_prefix() {
@@ -27429,7 +27433,7 @@ find_feature_dir_by_prefix() {
         echo "\$specs_dir/\${matches[0]}"
     else
         # Multiple matches - this shouldn't happen with proper naming convention
-        echo "ERROR: Multiple spec directories found with prefix '\$prefix': \${matches[*]}" >&2
+        echo "ERROR: Multiple spec directories found with prefix '\$prefix': \$(_printable "\${matches[*]}")" >&2
         echo "Please ensure only one spec directory exists per prefix." >&2
         return 1
     fi
@@ -27499,8 +27503,8 @@ _feature_json_contradicts_branch() {
     is_feature_branch_name "\$branch" && [[ "\$(basename "\$1")" != "\$branch" ]] || return 1
     echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
     echo "  current branch:  \$branch" >&2
-    echo "  feature.json:    \$(basename "\$1")" >&2
-    echo "  resolved path:   \$1" >&2
+    echo "  feature.json:    \$(_printable "\$(basename "\$1")")" >&2
+    echo "  resolved path:   \$(_printable "\$1")" >&2
     echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2
     echo "Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately." >&2
 }
@@ -27967,7 +27971,7 @@ if [ -n "\$LINKED_ISSUE" ]; then
                 ;;
             10)
                 _c_rc=0
-                _c_out=\$(bash "\$_cascade_sh" "\$LINKED_ISSUE" 2>&1) || _c_rc=\$?
+                bash "\$_cascade_sh" "\$LINKED_ISSUE" >/dev/null 2>&1 || _c_rc=\$?
                 # Only exit 11 says "epic with open children", and only exit 0
                 # says "no open children". Everything else is the gate REFUSING
                 # to answer — since #583 that includes exit 3, "I could not read
@@ -27990,13 +27994,13 @@ if [ -n "\$LINKED_ISSUE" ]; then
                         echo "# issue \$LINKED_ISSUE has no parent and no open children — standalone, unchanged" >&2
                         ;;
                     *)
-                        echo "# cascade-check could not answer for issue \$LINKED_ISSUE (exit \$_c_rc): \$_c_out" >&2
+                        echo "# cascade-check could not answer for issue \$LINKED_ISSUE (exit \$_c_rc)" >&2
                         echo "# epic detection did NOT run — treating it as standalone, which may be wrong if it is an epic" >&2
                         ;;
                 esac
                 ;;
             *)
-                echo "# could not resolve the parent of issue \$LINKED_ISSUE (exit \$_p_rc): \$_p_out" >&2
+                echo "# could not resolve the parent of issue \$LINKED_ISSUE (exit \$_p_rc)" >&2
                 echo "# treating it as standalone — the branch is created either way" >&2
                 ;;
         esac
@@ -28086,32 +28090,30 @@ fi
 FEATURE_DIR="\$SPECS_DIR/\$BRANCH_NAME"
 SPEC_FILE="\$FEATURE_DIR/plan.md"
 
+# A failed create or switch says so in fixed text with git's exit code, never in
+# git's message: it quotes refs and paths a committer chose (cli#752).
 if [ "\$DRY_RUN" != true ]; then
+    _switch_rc=0
     if [ "\$HAS_GIT" = true ] && [ -n "\$EPIC_BRANCH" ]; then
         # The epic's branch exists: switch to it, or stay on it. Reuse is the
         # point of the lookup, so it needs no --allow-existing-branch.
-        if [ "\$_cur" != "\$EPIC_BRANCH" ] &&
-            ! switch_branch_error=\$(git checkout -q "\$EPIC_BRANCH" 2>&1); then
-            >&2 echo "Error: Failed to switch to the epic's branch '\$EPIC_BRANCH'. Please resolve any local changes or conflicts and try again."
-            [ -n "\$switch_branch_error" ] && >&2 printf '%s\\n' "\$switch_branch_error"
+        [ "\$_cur" = "\$EPIC_BRANCH" ] || git checkout -q "\$EPIC_BRANCH" >/dev/null 2>&1 || _switch_rc=\$?
+        if [ "\$_switch_rc" != 0 ]; then
+            >&2 echo "Error: Failed to switch to the epic's branch '\$EPIC_BRANCH' (git exit \$_switch_rc). Please resolve any local changes or conflicts and try again."
             exit 1
         fi
     elif [ "\$HAS_GIT" = true ]; then
-        branch_create_error=""
-        if ! branch_create_error=\$(git checkout -q -b "\$BRANCH_NAME" 2>&1); then
+        _create_rc=0
+        git checkout -q -b "\$BRANCH_NAME" >/dev/null 2>&1 || _create_rc=\$?
+        if [ "\$_create_rc" != 0 ]; then
             current_branch="\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
             # Check if branch already exists
             if git branch --list "\$BRANCH_NAME" | grep -q .; then
                 if [ "\$ALLOW_EXISTING" = true ]; then
-                    # If we're already on the branch, continue without another checkout.
-                    if [ "\$current_branch" = "\$BRANCH_NAME" ]; then
-                        :
-                    # Otherwise switch to the existing branch instead of failing.
-                    elif ! switch_branch_error=\$(git checkout -q "\$BRANCH_NAME" 2>&1); then
-                        >&2 echo "Error: Failed to switch to existing branch '\$BRANCH_NAME'. Please resolve any local changes or conflicts and try again."
-                        if [ -n "\$switch_branch_error" ]; then
-                            >&2 printf '%s\\n' "\$switch_branch_error"
-                        fi
+                    # Already on the branch: continue; otherwise switch to it instead of failing.
+                    [ "\$current_branch" = "\$BRANCH_NAME" ] || git checkout -q "\$BRANCH_NAME" >/dev/null 2>&1 || _switch_rc=\$?
+                    if [ "\$_switch_rc" != 0 ]; then
+                        >&2 echo "Error: Failed to switch to existing branch '\$BRANCH_NAME' (git exit \$_switch_rc). Please resolve any local changes or conflicts and try again."
                         exit 1
                     fi
                 elif [ "\$USE_TIMESTAMP" = true ]; then
@@ -28122,12 +28124,7 @@ if [ "\$DRY_RUN" != true ]; then
                     exit 1
                 fi
             else
-                >&2 echo "Error: Failed to create git branch '\$BRANCH_NAME'."
-                if [ -n "\$branch_create_error" ]; then
-                    >&2 printf '%s\\n' "\$branch_create_error"
-                else
-                    >&2 echo "Please check your git configuration and try again."
-                fi
+                >&2 echo "Error: Failed to create git branch '\$BRANCH_NAME' (git exit \$_create_rc). Please check your git configuration and try again."
                 exit 1
             fi
         fi
@@ -28187,7 +28184,7 @@ if [ "\$DRY_RUN" != true ]; then
                 echo "# child issue \$LINKED_ISSUE was NOT moved — its card moves when the loop reaches it" >&2
             fi
         else
-            echo "# could not move issue \$_move_target to In progress: \$_move_out" >&2
+            echo "# could not move issue \$_move_target to In progress (exit \$?)" >&2
             echo "# the branch was created; the board was NOT updated" >&2
         fi
     fi
@@ -32378,6 +32375,10 @@ function Test-FeatureBranch {
     return \$true
 }
 
+# Text a file or a directory name supplied, safe to print: a control character
+# becomes \`?\` (cli#752), so an ESC a committer wrote reaches no terminal or agent.
+function ConvertTo-PrintableText([string]\$Text) { return \$Text -replace '\\p{Cc}', '?' }
+
 # Resolve .specnaut/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
 function Find-FeatureDirByPrefix {
     param(
@@ -32407,7 +32408,7 @@ function Find-FeatureDirByPrefix {
     if (\$dirMatches.Count -eq 1) {
         return \$dirMatches[0].FullName
     }
-    \$names = (\$dirMatches | ForEach-Object { \$_.Name }) -join ' '
+    \$names = ConvertTo-PrintableText ((\$dirMatches | ForEach-Object { \$_.Name }) -join ' ')
     [Console]::Error.WriteLine("ERROR: Multiple spec directories found with prefix '\$prefix': \$names")
     [Console]::Error.WriteLine('Please ensure only one spec directory exists per prefix.')
     return \$null
@@ -32436,7 +32437,7 @@ function Get-FeatureJsonDirectory {
     try {
         return (\$featureJsonRaw | ConvertFrom-Json).feature_directory
     } catch {
-        [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json: \$_")
+        [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json (\$(\$_.Exception.GetType().Name))")
         exit 1
     }
 }
@@ -32471,8 +32472,8 @@ function Get-FeaturePathsEnv {
         if ((Test-FeatureBranchName \$effBranch) -and ((Split-Path -Leaf \$featureDir) -ne \$effBranch)) {
             [Console]::Error.WriteLine("ERROR: .specnaut/feature.json resolves to a different feature than the current branch.")
             [Console]::Error.WriteLine("  current branch:  \$effBranch")
-            [Console]::Error.WriteLine("  feature.json:    \$(Split-Path -Leaf \$featureDir)")
-            [Console]::Error.WriteLine("  resolved path:   \$featureDir")
+            [Console]::Error.WriteLine("  feature.json:    \$(ConvertTo-PrintableText (Split-Path -Leaf \$featureDir))")
+            [Console]::Error.WriteLine("  resolved path:   \$(ConvertTo-PrintableText \$featureDir)")
             [Console]::Error.WriteLine("Refusing to act on a contradiction: writing here would touch the other feature's files.")
             [Console]::Error.WriteLine("Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately.")
             exit 1
@@ -32786,7 +32787,7 @@ if (\$Issue -gt 0) {
             # Anything else is the gate refusing to answer - since #583 that
             # includes exit 3, "could not read the children". See the bash twin
             # for the full account.
-            \$cascadeOut = & bash \$cascadeSh \$Issue 2>&1
+            \$null = & bash \$cascadeSh \$Issue 2>&1
             \$cascadeRc = \$LASTEXITCODE
             if (\$cascadeRc -eq 11) {
                 \$epicIssue = "\$Issue"
@@ -32794,11 +32795,11 @@ if (\$Issue -gt 0) {
             } elseif (\$cascadeRc -eq 0) {
                 [Console]::Error.WriteLine("# issue \$Issue has no parent and no open children - standalone, unchanged")
             } else {
-                [Console]::Error.WriteLine("# cascade-check could not answer for issue \$Issue (exit \$cascadeRc): \$cascadeOut")
+                [Console]::Error.WriteLine("# cascade-check could not answer for issue \$Issue (exit \$cascadeRc)")
                 [Console]::Error.WriteLine("# epic detection did NOT run - treating it as standalone, which may be wrong if it is an epic")
             }
         } else {
-            [Console]::Error.WriteLine("# could not resolve the parent of issue \$Issue (exit \$parentRc): \$parentOut")
+            [Console]::Error.WriteLine("# could not resolve the parent of issue \$Issue (exit \$parentRc)")
             [Console]::Error.WriteLine("# treating it as standalone - the branch is created either way")
         }
     }
@@ -32880,52 +32881,47 @@ if (\$epicBranch -and \$epicBranch.Length -gt \$maxBranchLength) {
 \$featureDir = Join-Path \$specsDir \$branchName
 \$specFile = Join-Path \$featureDir 'plan.md'
 
+# A failed create or switch says so in fixed text with git's exit code, never in
+# git's message: it quotes refs and paths a committer chose (cli#752). The branch
+# names printed are a slug of the description or a ref git stores, and a ref name
+# holds no control character or whitespace.
 if (-not \$DryRun) {
     if (\$hasGit -and \$epicBranch) {
         # The epic's branch exists: switch to it, or stay on it. Reuse is the
         # point of the lookup, so it needs no -AllowExistingBranch.
         if (\$current -cne \$epicBranch) {
-            \$switchBranchError = git checkout -q \$epicBranch 2>&1 | Out-String
+            git checkout -q \$epicBranch 2>\$null | Out-Null
             if (\$LASTEXITCODE -ne 0) {
-                Write-Error "Error: Failed to switch to the epic's branch '\$epicBranch'. Resolve any local changes or conflicts and try again.\`n\$(\$switchBranchError.Trim())"
+                Write-Error "Error: Failed to switch to the epic's branch '\$epicBranch' (git exit \$LASTEXITCODE). Please resolve any local changes or conflicts and try again."
                 exit 1
             }
         }
     } elseif (\$hasGit) {
-        \$branchCreated = \$false
-        \$branchCreateError = ''
+        \$createExit = 0
         try {
-            \$branchCreateError = git checkout -q -b \$branchName 2>&1 | Out-String
-            if (\$LASTEXITCODE -eq 0) {
-                \$branchCreated = \$true
-            }
+            git checkout -q -b \$branchName 2>\$null | Out-Null
+            \$createExit = \$LASTEXITCODE
         } catch {
-            \$branchCreateError = \$_.Exception.Message
+            \$createExit = -1
+            [Console]::Error.WriteLine("# warning: git could not be run to create the branch (\$(\$_.Exception.GetType().Name))")
         }
 
-        if (-not \$branchCreated) {
+        if (\$createExit -ne 0) {
             \$currentBranch = ''
             try {
                 \$currentBranch = (git rev-parse --abbrev-ref HEAD 2>\$null).Trim()
             } catch {
-                [Console]::Error.WriteLine("# warning: could not read the current branch: \$_")
+                [Console]::Error.WriteLine("# warning: could not read the current branch (\$(\$_.Exception.GetType().Name))")
             }
             # Check if branch already exists
             \$existingBranch = git branch --list \$branchName 2>\$null
             if (\$existingBranch) {
                 if (\$AllowExistingBranch) {
-                    # If we're already on the branch, continue without another checkout.
-                    if (\$currentBranch -eq \$branchName) {
-                        # Already on the target branch — nothing to do
-                    } else {
-                        # Otherwise switch to the existing branch instead of failing.
-                        \$switchBranchError = git checkout -q \$branchName 2>&1 | Out-String
+                    # Already on the branch: continue; otherwise switch to it instead of failing.
+                    if (\$currentBranch -ne \$branchName) {
+                        git checkout -q \$branchName 2>\$null | Out-Null
                         if (\$LASTEXITCODE -ne 0) {
-                            if (\$switchBranchError) {
-                                Write-Error "Error: Branch '\$branchName' exists but could not be checked out.\`n\$(\$switchBranchError.Trim())"
-                            } else {
-                                Write-Error "Error: Branch '\$branchName' exists but could not be checked out. Resolve any uncommitted changes or conflicts and try again."
-                            }
+                            Write-Error "Error: Failed to switch to existing branch '\$branchName' (git exit \$LASTEXITCODE). Please resolve any local changes or conflicts and try again."
                             exit 1
                         }
                     }
@@ -32937,11 +32933,7 @@ if (-not \$DryRun) {
                     exit 1
                 }
             } else {
-                if (\$branchCreateError) {
-                    Write-Error "Error: Failed to create git branch '\$branchName'.\`n\$(\$branchCreateError.Trim())"
-                } else {
-                    Write-Error "Error: Failed to create git branch '\$branchName'. Please check your git configuration and try again."
-                }
+                Write-Error "Error: Failed to create git branch '\$branchName' (git exit \$createExit). Please check your git configuration and try again."
                 exit 1
             }
         }
@@ -32995,7 +32987,7 @@ if (-not \$DryRun) {
                     [Console]::Error.WriteLine("# child issue \$Issue was NOT moved - its card moves when the loop reaches it")
                 }
             } else {
-                [Console]::Error.WriteLine("# could not move issue \$moveTarget to In progress: \$moveOut")
+                [Console]::Error.WriteLine("# could not move issue \$moveTarget to In progress (exit \$LASTEXITCODE)")
                 [Console]::Error.WriteLine("# the branch was created; the board was NOT updated")
             }
         }
@@ -33100,7 +33092,7 @@ function Get-HighestNumberFromBranches {
             return Get-HighestNumberFromNames -Names \$cleanNames
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not list git branches for numbering: \$_")
+        [Console]::Error.WriteLine("# warning: could not list git branches for numbering (\$(\$_.Exception.GetType().Name))")
     }
     return 0
 }
@@ -33124,7 +33116,7 @@ function Get-HighestNumberFromRemoteRefs {
             }
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering: \$_")
+        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering (\$(\$_.Exception.GetType().Name))")
     }
     return \$highest
 }
@@ -33149,7 +33141,7 @@ function Get-HighestNumberFromHistory {
             return Get-HighestNumberFromNames -Names \$dirNames
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not read spec history for numbering: \$_")
+        [Console]::Error.WriteLine("# warning: could not read spec history for numbering (\$(\$_.Exception.GetType().Name))")
     }
     return 0
 }
@@ -33174,7 +33166,7 @@ function Get-NextBranchNumber {
         } catch {
             # Numbering still works from local refs and history; say so rather
             # than letting a stale remote view pass unannounced.
-            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only: \$_")
+            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only (\$(\$_.Exception.GetType().Name))")
         }
         \$highestBranch = Get-HighestNumberFromBranches
     }
@@ -33427,7 +33419,7 @@ function Invoke-SelectedResolver {
         \$null = & (Join-Path \$scriptDir 'gate-impact.ps1') \$Tier \$commandsFile \$recordsFile \$flag \$baseValue
         \$rc = \$LASTEXITCODE
     } catch {
-        [Console]::Error.WriteLine("run-gate: gate-impact stopped: \$_")
+        [Console]::Error.WriteLine("run-gate: gate-impact stopped (\$(\$_.Exception.GetType().Name))")
         \$rc = 70
     }
     \$lines = if (Test-Path -LiteralPath \$recordsFile) { [string[]]@([System.IO.File]::ReadAllLines(\$recordsFile, \$utf8)) } else { @() }

@@ -149,6 +149,10 @@ check_feature_branch() {
     return 0
 }
 
+# Text a file or a directory name supplied, safe to print: a control character
+# becomes `?` (cli#752), so an ESC a committer wrote reaches no terminal or agent.
+_printable() { printf '%s' "${1//[[:cntrl:]]/?}"; }
+
 # Find feature directory by numeric prefix instead of exact branch match
 # This allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
 find_feature_dir_by_prefix() {
@@ -188,7 +192,7 @@ find_feature_dir_by_prefix() {
         echo "$specs_dir/${matches[0]}"
     else
         # Multiple matches - this shouldn't happen with proper naming convention
-        echo "ERROR: Multiple spec directories found with prefix '$prefix': ${matches[*]}" >&2
+        echo "ERROR: Multiple spec directories found with prefix '$prefix': $(_printable "${matches[*]}")" >&2
         echo "Please ensure only one spec directory exists per prefix." >&2
         return 1
     fi
@@ -258,8 +262,8 @@ _feature_json_contradicts_branch() {
     is_feature_branch_name "$branch" && [[ "$(basename "$1")" != "$branch" ]] || return 1
     echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
     echo "  current branch:  $branch" >&2
-    echo "  feature.json:    $(basename "$1")" >&2
-    echo "  resolved path:   $1" >&2
+    echo "  feature.json:    $(_printable "$(basename "$1")")" >&2
+    echo "  resolved path:   $(_printable "$1")" >&2
     echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2
     echo "Fix .specnaut/feature.json to name the current feature, or set SPECIFY_FEATURE_DIRECTORY to override deliberately." >&2
 }

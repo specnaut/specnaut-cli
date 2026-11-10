@@ -58,7 +58,7 @@ function Get-HighestNumberFromBranches {
             return Get-HighestNumberFromNames -Names $cleanNames
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not list git branches for numbering: $_")
+        [Console]::Error.WriteLine("# warning: could not list git branches for numbering ($($_.Exception.GetType().Name))")
     }
     return 0
 }
@@ -82,7 +82,7 @@ function Get-HighestNumberFromRemoteRefs {
             }
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering: $_")
+        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering ($($_.Exception.GetType().Name))")
     }
     return $highest
 }
@@ -107,7 +107,7 @@ function Get-HighestNumberFromHistory {
             return Get-HighestNumberFromNames -Names $dirNames
         }
     } catch {
-        [Console]::Error.WriteLine("# warning: could not read spec history for numbering: $_")
+        [Console]::Error.WriteLine("# warning: could not read spec history for numbering ($($_.Exception.GetType().Name))")
     }
     return 0
 }
@@ -132,7 +132,7 @@ function Get-NextBranchNumber {
         } catch {
             # Numbering still works from local refs and history; say so rather
             # than letting a stale remote view pass unannounced.
-            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only: $_")
+            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only ($($_.Exception.GetType().Name))")
         }
         $highestBranch = Get-HighestNumberFromBranches
     }

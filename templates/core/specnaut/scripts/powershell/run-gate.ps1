@@ -170,7 +170,7 @@ function Invoke-SelectedResolver {
         $null = & (Join-Path $scriptDir 'gate-impact.ps1') $Tier $commandsFile $recordsFile $flag $baseValue
         $rc = $LASTEXITCODE
     } catch {
-        [Console]::Error.WriteLine("run-gate: gate-impact stopped: $_")
+        [Console]::Error.WriteLine("run-gate: gate-impact stopped ($($_.Exception.GetType().Name))")
         $rc = 70
     }
     $lines = if (Test-Path -LiteralPath $recordsFile) { [string[]]@([System.IO.File]::ReadAllLines($recordsFile, $utf8)) } else { @() }

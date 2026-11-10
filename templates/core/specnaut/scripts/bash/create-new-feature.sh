@@ -188,7 +188,7 @@ if [ -n "$LINKED_ISSUE" ]; then
                 ;;
             10)
                 _c_rc=0
-                _c_out=$(bash "$_cascade_sh" "$LINKED_ISSUE" 2>&1) || _c_rc=$?
+                bash "$_cascade_sh" "$LINKED_ISSUE" >/dev/null 2>&1 || _c_rc=$?
                 # Only exit 11 says "epic with open children", and only exit 0
                 # says "no open children". Everything else is the gate REFUSING
                 # to answer — since #583 that includes exit 3, "I could not read
@@ -211,13 +211,13 @@ if [ -n "$LINKED_ISSUE" ]; then
                         echo "# issue $LINKED_ISSUE has no parent and no open children — standalone, unchanged" >&2
                         ;;
                     *)
-                        echo "# cascade-check could not answer for issue $LINKED_ISSUE (exit $_c_rc): $_c_out" >&2
+                        echo "# cascade-check could not answer for issue $LINKED_ISSUE (exit $_c_rc)" >&2
                         echo "# epic detection did NOT run — treating it as standalone, which may be wrong if it is an epic" >&2
                         ;;
                 esac
                 ;;
             *)
-                echo "# could not resolve the parent of issue $LINKED_ISSUE (exit $_p_rc): $_p_out" >&2
+                echo "# could not resolve the parent of issue $LINKED_ISSUE (exit $_p_rc)" >&2
                 echo "# treating it as standalone — the branch is created either way" >&2
                 ;;
         esac
@@ -307,32 +307,30 @@ fi
 FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
 SPEC_FILE="$FEATURE_DIR/plan.md"
 
+# A failed create or switch says so in fixed text with git's exit code, never in
+# git's message: it quotes refs and paths a committer chose (cli#752).
 if [ "$DRY_RUN" != true ]; then
+    _switch_rc=0
     if [ "$HAS_GIT" = true ] && [ -n "$EPIC_BRANCH" ]; then
         # The epic's branch exists: switch to it, or stay on it. Reuse is the
         # point of the lookup, so it needs no --allow-existing-branch.
-        if [ "$_cur" != "$EPIC_BRANCH" ] &&
-            ! switch_branch_error=$(git checkout -q "$EPIC_BRANCH" 2>&1); then
-            >&2 echo "Error: Failed to switch to the epic's branch '$EPIC_BRANCH'. Please resolve any local changes or conflicts and try again."
-            [ -n "$switch_branch_error" ] && >&2 printf '%s\n' "$switch_branch_error"
+        [ "$_cur" = "$EPIC_BRANCH" ] || git checkout -q "$EPIC_BRANCH" >/dev/null 2>&1 || _switch_rc=$?
+        if [ "$_switch_rc" != 0 ]; then
+            >&2 echo "Error: Failed to switch to the epic's branch '$EPIC_BRANCH' (git exit $_switch_rc). Please resolve any local changes or conflicts and try again."
             exit 1
         fi
     elif [ "$HAS_GIT" = true ]; then
-        branch_create_error=""
-        if ! branch_create_error=$(git checkout -q -b "$BRANCH_NAME" 2>&1); then
+        _create_rc=0
+        git checkout -q -b "$BRANCH_NAME" >/dev/null 2>&1 || _create_rc=$?
+        if [ "$_create_rc" != 0 ]; then
             current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
             # Check if branch already exists
             if git branch --list "$BRANCH_NAME" | grep -q .; then
                 if [ "$ALLOW_EXISTING" = true ]; then
-                    # If we're already on the branch, continue without another checkout.
-                    if [ "$current_branch" = "$BRANCH_NAME" ]; then
-                        :
-                    # Otherwise switch to the existing branch instead of failing.
-                    elif ! switch_branch_error=$(git checkout -q "$BRANCH_NAME" 2>&1); then
-                        >&2 echo "Error: Failed to switch to existing branch '$BRANCH_NAME'. Please resolve any local changes or conflicts and try again."
-                        if [ -n "$switch_branch_error" ]; then
-                            >&2 printf '%s\n' "$switch_branch_error"
-                        fi
+                    # Already on the branch: continue; otherwise switch to it instead of failing.
+                    [ "$current_branch" = "$BRANCH_NAME" ] || git checkout -q "$BRANCH_NAME" >/dev/null 2>&1 || _switch_rc=$?
+                    if [ "$_switch_rc" != 0 ]; then
+                        >&2 echo "Error: Failed to switch to existing branch '$BRANCH_NAME' (git exit $_switch_rc). Please resolve any local changes or conflicts and try again."
                         exit 1
                     fi
                 elif [ "$USE_TIMESTAMP" = true ]; then
@@ -343,12 +341,7 @@ if [ "$DRY_RUN" != true ]; then
                     exit 1
                 fi
             else
-                >&2 echo "Error: Failed to create git branch '$BRANCH_NAME'."
-                if [ -n "$branch_create_error" ]; then
-                    >&2 printf '%s\n' "$branch_create_error"
-                else
-                    >&2 echo "Please check your git configuration and try again."
-                fi
+                >&2 echo "Error: Failed to create git branch '$BRANCH_NAME' (git exit $_create_rc). Please check your git configuration and try again."
                 exit 1
             fi
         fi
@@ -408,7 +401,7 @@ if [ "$DRY_RUN" != true ]; then
                 echo "# child issue $LINKED_ISSUE was NOT moved — its card moves when the loop reaches it" >&2
             fi
         else
-            echo "# could not move issue $_move_target to In progress: $_move_out" >&2
+            echo "# could not move issue $_move_target to In progress (exit $?)" >&2
             echo "# the branch was created; the board was NOT updated" >&2
         fi
     fi
