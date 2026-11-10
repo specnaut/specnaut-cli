@@ -720,9 +720,8 @@ boots real services, or takes tens of minutes.
 That is the whole reason the tiers exist, and it is stated here plainly rather
 than left to be inferred from the word "full".
 
-A failing full gate is fixed on the branch and retried — a fixup commit
-attributed to the child at fault, then the gate again. It does not abandon the
-merge and does not hand the epic back.
+A failing full gate, on an epic or on a standalone item, is fixed as
+\`phases/merge.md\`'s **The full tier** says.
 
 ## The size ratchet — with every tier
 
@@ -782,7 +781,8 @@ never a pass. Every review runs it too, in its Phase 0.
 Only the per-child \`fast\` loop is an epic mechanism. A standalone task has one
 commit and one merge, so there is no per-child tier to run; the work-done row —
 the unit suite, the size ratchet and the boundary check — still runs on it,
-through \`phases/review.md\`.
+through \`phases/review.md\`, and so does the merge row: the \`full\` tier, once,
+through \`phases/merge.md\`.
 `,
     executable: false,
     backend: null,
@@ -1482,25 +1482,33 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    last \`CHILD\` and \`EPIC\` lines (after any fold) for the close.
    This list maps every exit \`epic-status.sh\`'s header lists; an exit it does not list is a
    finding: quote it and stop on the branch.
-   - **Exit 14 — standalone**: load \`phases/merge-squash.md\` — **Squash by scope**.
+   - **Exit 14 — standalone**: run the full tier (**The full tier**, below), then load
+     \`phases/merge-squash.md\` — **Squash by scope**.
    - **Exit 12** — the history does not read back to the board: fix it on the branch. **3** — the
      base is unknown: stop and say so. **15** — the history could not be read: stop and say so.
      **2** — usage: fix the call.
    - **Exit 16** — the range is empty but \`.specnaut/feature.json\` links an epic whose commits have
      landed (a re-run after the base moved): **stop** and say so — never squash, never close from
      here; the \`CHILD\` lines cannot be read back. A range holding any commit never reads 16.
-   - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
-     \`.specnaut/scripts/bash/run-gate.sh full --base "\$(git merge-base HEAD <base>)"\` (a failure is
-     fixed on the branch as a \`--fixup\` of the child at fault,
-     then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and fold. Do not
-     merge past a failed fold. Its other exits: **3**, the candidate is refused: stop and say why,
-     on the branch. **4**, nothing was checked. With a \`removed:\` line other than \`none\`, the branch
-     emptied the tier: stop and say which commands left it, because a bare run of an empty tier
-     passes. With \`removed: none\`, everything was omitted: run it bare,
-     \`.specnaut/scripts/bash/run-gate.sh full\`, and read that result instead. A project that
-     declares \`.specnaut/impact.json\` may run less than the whole tier, so a pass whose \`scope:\`
-     line is not \`full\` is reported as that scope, and a pass with a \`removed:\` line names those
-     commands: neither is ever reported as the full gate.
+   - **Exit 0 — an epic**: do **not** squash: run the full tier (**The full tier**, below), then
+     load \`phases/epic-fixups.md\` and fold. Do not merge past a failed fold.
+
+   **The full tier** — exits 0 and 14 only, before the landing. Run the full gate tier once, but
+   first: if \`git diff --quiet "\$(git merge-base HEAD <base>)" HEAD -- .specnaut/gates.yml\` exits
+   non-zero, the branch edited the list that judges it: stop on the branch and name the change; no
+   run of that list is reported as the full gate. Otherwise run
+   \`.specnaut/scripts/bash/run-gate.sh full --base "\$(git merge-base HEAD <base>)"\`. A failure is
+   fixed on the branch (on an epic, as a \`--fixup\` of the child at fault; on a standalone item, as
+   a commit on the branch, which the squash groups by scope),
+   then the tier re-run — never escalated, and nothing lands past a failure. A fix never edits
+   \`.specnaut/gates.yml\`. Its other exits: **3**, the candidate is refused: stop and say why, on
+   the branch. **4**, nothing was checked. With a \`removed:\` line other than \`none\`, the branch
+   emptied the tier: stop and say which commands left it, because a bare run of an empty tier
+   passes. With \`removed: none\`, everything was omitted: run it bare,
+   \`.specnaut/scripts/bash/run-gate.sh full\`, and read that result instead. A project that
+   declares \`.specnaut/impact.json\` may run less than the whole tier, so a pass whose \`scope:\`
+   line is not \`full\` is reported as that scope, and a pass with a \`removed:\` line names those
+   commands: neither is ever reported as the full gate.
 2. **\`--pr\` only** — push the branch, open the pull request against the base, name any issue its
    body references that \`gh pr view <n> --json closingIssuesReferences\` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
@@ -1581,7 +1589,7 @@ branch pushed, the PR URL, step 5's move, and **nothing has merged and the item 
     suffix: "merge-squash.md",
     content: `# Squash by scope — one commit per scope, never "exactly one commit"
 
-Loaded by \`phases/merge.md\` at its step 4. This is the **standalone** path's rule: one backlog item,
+Loaded by \`phases/merge.md\` on **Exit 14 — standalone**. This is the **standalone** path's rule: one backlog item,
 one branch, one merge. An **epic** branch does not squash — its history is already one commit per
 task and \`merge.md\` routes it elsewhere. If you arrived here from an epic, you are in the wrong
 file.
@@ -6378,7 +6386,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 
 | Contract doc | Loaded by |
 | :--- | :--- |
-| \`phases/merge-squash.md\` | \`merge\`, at its step 4 |
+| \`phases/merge-squash.md\` | \`merge\`, on Exit 14 — standalone |
 | \`phases/epic-commits.md\` | \`implement\`, on an epic |
 | \`phases/quality-gates.md\` | \`implement\`, \`review\` and \`merge\` |
 | \`phases/epic-fixups.md\` | \`merge\`, before an epic merge |

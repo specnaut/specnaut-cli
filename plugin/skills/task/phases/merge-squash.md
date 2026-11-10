@@ -1,6 +1,6 @@
 # Squash by scope — one commit per scope, never "exactly one commit"
 
-Loaded by `phases/merge.md` at its step 4. This is the **standalone** path's rule: one backlog item,
+Loaded by `phases/merge.md` on **Exit 14 — standalone**. This is the **standalone** path's rule: one backlog item,
 one branch, one merge. An **epic** branch does not squash — its history is already one commit per
 task and `merge.md` routes it elsewhere. If you arrived here from an epic, you are in the wrong
 file.

@@ -204,9 +204,8 @@ boots real services, or takes tens of minutes.
 That is the whole reason the tiers exist, and it is stated here plainly rather
 than left to be inferred from the word "full".
 
-A failing full gate is fixed on the branch and retried — a fixup commit
-attributed to the child at fault, then the gate again. It does not abandon the
-merge and does not hand the epic back.
+A failing full gate, on an epic or on a standalone item, is fixed as
+`phases/merge.md`'s **The full tier** says.
 
 ## The size ratchet — with every tier
 
@@ -266,4 +265,5 @@ never a pass. Every review runs it too, in its Phase 0.
 Only the per-child `fast` loop is an epic mechanism. A standalone task has one
 commit and one merge, so there is no per-child tier to run; the work-done row —
 the unit suite, the size ratchet and the boundary check — still runs on it,
-through `phases/review.md`.
+through `phases/review.md`, and so does the merge row: the `full` tier, once,
+through `phases/merge.md`.
