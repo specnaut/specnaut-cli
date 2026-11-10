@@ -10,7 +10,8 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { copy } from "@std/fs";
 import { fromFileUrl, join } from "@std/path";
-import { git, type Run, run, slashes } from "./git_sandbox.ts";
+import { git, type Run, run } from "./git_sandbox.ts";
+import { slashes } from "./twin_paths.ts";
 import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
 
 const PWSH_DIR = fromFileUrl(

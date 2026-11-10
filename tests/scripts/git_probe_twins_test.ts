@@ -15,7 +15,8 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { copy } from "@std/fs";
 import { fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
-import { git, type Run, run, slashes } from "./git_sandbox.ts";
+import { git, type Run, run } from "./git_sandbox.ts";
+import { slashes } from "./twin_paths.ts";
 import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
 
 const SCRIPTS = fromFileUrl(new URL("../../templates/core/specnaut/scripts/", import.meta.url));
