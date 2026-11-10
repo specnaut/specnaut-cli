@@ -72,8 +72,11 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
    **The full tier** — exits 0 and 14 only, before the landing. Run the full gate tier once, but
    first: if `git diff --quiet "$(git merge-base HEAD <base>)" HEAD -- .specnaut/gates.yml` exits
-   non-zero, the branch edited the list that judges it: stop on the branch and name the change; no
-   run of that list is reported as the full gate. Otherwise run
+   non-zero, the branch edited the list that judges it, handled as step 0 handles a changed helper
+   script: this run's merge mode is `manual`; show that diff (the same call without `--quiet`) and
+   ask once: *"This branch changes `.specnaut/gates.yml`. Yes runs the branch's list as the full
+   tier."* A no stops on the branch, nothing landed. The yes covers that diff, and a later one asks
+   again; under it the report names that run as the branch's list, never the base's. Then run
    `.specnaut/scripts/bash/run-gate.sh full --base "$(git merge-base HEAD <base>)"`. A failure is
    fixed on the branch (on an epic, as a `--fixup` of the child at fault; on a standalone item, as
    a commit on the branch, which the squash groups by scope),

@@ -70,14 +70,23 @@ Deno.test("the full-tier call and its exits are spelled once, in one paragraph a
   assertStringIncludes(f, "neither is ever reported as the full gate");
 });
 
-Deno.test("a branch that edits its own gate list stops before the tier judges it", () => {
+Deno.test("a branch that edits its own gate list asks once, as step 0 does for scripts", () => {
   const f = flat(paragraph());
   const check = f.indexOf(
     'git diff --quiet "$(git merge-base HEAD <base>)" HEAD -- .specnaut/gates.yml',
   );
   assert(check >= 0, "the gates.yml check is gone");
-  assert(check < f.indexOf("run-gate.sh full --base"), "the check must come before the run");
-  assertStringIncludes(f, "stop on the branch and name the change");
+  const ask = f.indexOf("show that diff");
+  assert(ask > check, "the diff is not shown once the check fires");
+  assert(ask < f.indexOf("run-gate.sh full --base"), "the question must come before the run");
+  assertStringIncludes(f, "this run's merge mode is `manual`");
+  assertStringIncludes(
+    f,
+    '*"This branch changes `.specnaut/gates.yml`. Yes runs the branch\'s list as the full tier."*',
+  );
+  assertStringIncludes(f, "A no stops on the branch, nothing landed.");
+  assertStringIncludes(f, "the report names that run as the branch's list, never the base's");
+  assert(!f.includes("stop on the branch and name the change"), "the dead-end stop is back");
   assertStringIncludes(f, "A fix never edits `.specnaut/gates.yml`.");
 });
 
