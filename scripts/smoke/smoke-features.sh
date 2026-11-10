@@ -117,8 +117,7 @@ check "plan.md makes an epic ONE plan with ONE stop (#554 AC9/AC10)" \
    grep -qF "An epic is one plan" <<<"$flat" && grep -qF "one table, one stop" <<<"$flat"'
 check "review.md stops only on the LAST child (#554 AC12/AC13)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/review.md)";
-   grep -qF "does not stop the run" <<<"$flat" &&
-   grep -qF "last child" <<<"$flat"'
+   grep -qF "On an epic branch only the last child'"'"'s review is a stop" <<<"$flat"'
 check "the loop iterates sub-issues, not tasks.md entries (#554 AC8/D3)" \
   'grep -qF "Board sub-issues, one per commit" .claude/skills/task/phases/epic-loop.md'
 check "it re-reads the child list each iteration (#554 AC11/D5)" \
