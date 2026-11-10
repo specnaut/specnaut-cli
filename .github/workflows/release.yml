@@ -26,194 +26,21 @@ jobs:
     permissions:
       security-events: read # the ONLY one that buys anything: code-scanning alerts
       contents: read
-    # WHAT THIS JOB CAN ACTUALLY SEE, measured on the v3.2.0 run once #522 made
-    # the degraded warning printable for the first time:
-    #
-    #   code scanning        ✓ readable via `security-events: read`
-    #   secret scanning      ✗ needs repo-admin / security-manager rights
-    #   dependabot alerts    ✗ GITHUB_TOKEN cannot read them, at any severity
-    #   private advisories   ✗ `repository-advisories` is a fine-grained PAT
-    #                          scope, not a workflow permissions key — adding it
-    #                          here fails the workflow parse outright
-    #
-    # Three of the four are structural, not a missing line in this block. The
-    # comment here used to attribute secret scanning to `security-events` and
-    # dependabot to `contents`; both were wrong, and nothing contradicted them
-    # because the warning that would have was dead code.
-    #
-    # The step no longer reports an unreadable source as `0`. A count it could
-    # not obtain is excluded from the gate decision and named in the summary —
-    # so a release that passes says which signals it actually checked (#527).
-    #
-    # The three structural gaps are gated LOCALLY instead (#653): the release
-    # preflight (`.specnaut/release/preflight.sh`) reads secret scanning,
-    # Dependabot and private advisories with the operator's own `gh`, before the
-    # tag exists, and blocks on an unreadable source. No PAT: this public
-    # repository holds no Actions secrets. So their cells here say where they
-    # are gated, and the warning names only a source that SHOULD be readable —
-    # a line printed on every release is a line nobody reads.
+    # What this job's token can and cannot read, and why three sources are
+    # gated locally instead (#653), is written at the top of the script.
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - name: Query open security alerts
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
+        run: bash scripts/release/security-preflight.sh
 
-          # `gh api` writes 4xx error JSON to STDOUT (not stderr), so a naive
-          # `2>/dev/null || echo 0` lets non-numeric blobs leak into shell
-          # arithmetic and crashes the job (line "$((dep_critical + ...))"
-          # fails with "syntax error: operand expected"). Wrap every count
-          # through a coercer that rejects anything that isn't pure digits.
-          # Permission gaps surface as 0 here and downstream — a degraded
-          # but non-blocking signal — and a workflow ::warning is emitted
-          # so the local /release session can investigate.
-          #
-          # The degraded labels go to a FILE, not an array (#522). Every call
-          # site below is a command substitution, so `fetch_count` runs in a
-          # subshell and any `missing_perms+=()` died with it: the parent's
-          # array was always empty and the warning at the bottom of this step
-          # had never once printed. Not a latent path either — three of the
-          # sources were unreadable on every run, so the step had been in
-          # degraded mode permanently and silently. A revoked scope on any
-          # query reads as "0 open alerts", and the gate then passes on an
-          # empty signal it believes is a clean one.
-          degraded_file="${RUNNER_TEMP:-/tmp}/security-preflight-degraded.txt"
-          : > "$degraded_file"
-          fetch_count() {
-            local label="$1" url="$2" jq_filter="$3"
-            local out
-            out=$(gh api "$url" --jq "$jq_filter" 2>/dev/null || true)
-            if [[ "$out" =~ ^[0-9]+$ ]]; then
-              printf '%s' "$out"
-            else
-              # Appending from a subshell is fine; the parent reads the file.
-              printf '%s\n' "$label" >> "$degraded_file"
-              printf '0'
-            fi
-          }
-
-          # 1. Secret scanning — pattern-based credential leak detection
-          secret_open=$(fetch_count "secret_scanning" \
-            "repos/$REPO/secret-scanning/alerts?state=open&hide_secret=true&per_page=100" \
-            '[.[] | {number, secret_type_display_name, html_url}] | length')
-
-          # 2. Dependabot — vulnerable dependencies (severity-aware)
-          dep_critical=$(fetch_count "dependabot/critical" \
-            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            '[.[] | select(.security_advisory.severity=="critical")] | length')
-          dep_high=$(fetch_count "dependabot/high" \
-            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            '[.[] | select(.security_advisory.severity=="high")] | length')
-          dep_medium=$(fetch_count "dependabot/medium" \
-            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            '[.[] | select(.security_advisory.severity=="medium")] | length')
-
-          # 3. Private vulnerability reports are NOT queried here. The
-          # `repository-advisories` scope is a fine-grained PAT's, and a caller
-          # without it can be answered `[]` — an empty list that reads as clean
-          # rather than an error. The local preflight gates them (#653).
-
-          # 4. Code scanning (CodeQL — only counts when code scanning is enabled).
-          code_critical=$(fetch_count "code_scanning/critical" \
-            "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
-            '[.[] | select(.rule.security_severity_level=="critical")] | length')
-          code_high=$(fetch_count "code_scanning/high" \
-            "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
-            '[.[] | select(.rule.security_severity_level=="high")] | length')
-
-          # Decision tree:
-          #   ANY critical (dep or code) → fail the release.
-          #   Secret-scanning open       → fail (every match is treated as P0
-          #                                regardless of "severity" — credentials
-          #                                in source are always release-blocking).
-          #   Pending advisory in triage → fail — enforced by the local
-          #                                preflight, which can read them (#653).
-          critical_total=$((dep_critical + code_critical))
-
-          # Report what was READ, not what was assumed. A source `fetch_count`
-          # could not reach yields 0, and 0 is indistinguishable from "clean" —
-          # which is how this gate passed every release on three sources it had
-          # never once obtained (#527). `unreadable` is the honest cell.
-          readable() { ! grep -qxF "$1" "$degraded_file"; }
-          # GITHUB_TOKEN cannot read these by design; the local preflight gates
-          # them. Unreadable HERE is expected, and is not what the warning is for.
-          gated_locally() { case "$1" in secret_scanning | dependabot/*) return 0 ;; esac; return 1; }
-          cell() {
-            if readable "$1"; then printf '%s' "$2"
-            elif gated_locally "$1"; then printf 'not read here — gated by `preflight.sh`'
-            else printf 'unreadable'; fi
-          }
-          unexpected="$(sort -u "$degraded_file" | while IFS= read -r l; do gated_locally "$l" || printf '%s\n' "$l"; done)"
-
-          {
-            echo "## Security alert preflight"
-            echo
-            echo "| Source | Open count |"
-            echo "| --- | --- |"
-            echo "| Secret scanning | $(cell secret_scanning "$secret_open") |"
-            echo "| Dependabot — critical | $(cell dependabot/critical "$dep_critical") |"
-            echo "| Dependabot — high | $(cell dependabot/high "$dep_high") |"
-            echo "| Dependabot — medium | $(cell dependabot/medium "$dep_medium") |"
-            echo "| Code scanning — critical | $(cell code_scanning/critical "$code_critical") |"
-            echo "| Code scanning — high | $(cell code_scanning/high "$code_high") |"
-            echo "| Pending private advisories | not read here — gated by \`preflight.sh\` |"
-            echo
-            echo "Critical total (dep + code, readable sources only): **${critical_total}**"
-            if [ -n "$unexpected" ]; then
-              echo
-              echo "> Sources marked \`unreadable\` were NOT checked. This preflight"
-              echo "> passing means the readable ones are clean — nothing more."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          # Said BEFORE the decision, not after. The read-back used to sit below
-          # the hard-fail `exit 1`, so the single run where it matters most —
-          # the gate blocking on partial information — was the one run that
-          # never printed it (#527).
-          #
-          # Sorted and de-duplicated: the three dependabot queries share a URL,
-          # so one permission gap would otherwise name it three times.
-          if [ -n "$unexpected" ]; then
-            missing_perms="$(printf '%s\n' "$unexpected" | tr '\n' ' ' | sed 's/ $//')"
-            echo "::warning::Security preflight could not read: ${missing_perms}. Those sources are NOT checked and are excluded from the decision below — a pass here means the readable sources are clean, not that the repository is. This job's token is expected to read them: check its permissions block (#527)."
-          fi
-
-          if [ "$critical_total" -gt 0 ] || [ "$secret_open" -gt 0 ]; then
-            echo "::error::Security preflight blocked the release. Critical/secret counts are non-zero. Resolve via the Security tab, then re-run this workflow (the tag stays valid)."
-            exit 1
-          fi
-
-          if [ "$dep_high" -gt 0 ] || [ "$code_high" -gt 0 ]; then
-            echo "::warning::High-severity findings open: $dep_high dependabot + $code_high code-scanning. The release proceeds; triage them in the Security tab."
-          fi
-
-  # The tag is what publishes, and nothing here used to ask whether the commit
-  # it points at is green.
-  #
-  # `ci.yml` runs the suite on three OSes on every push to `main`; this workflow
-  # runs none of it. So a tag pushed over a red `main` compiled, checksummed and
-  # published a Release, entirely green, with a known-failing commit inside it.
-  # The only thing standing in the way was `.specnaut/release/preflight.sh` — a
-  # script an operator runs locally and can skip, and which cannot be consulted
-  # from here. Observed on the v4.2.2 attempt: `main` was red on Windows and the
-  # tag pipeline would not have noticed.
-  #
-  # `ci` on this SHA starts at the same moment as this workflow — the release
-  # commit is pushed to `main` immediately before the tag — so the job WAITS
-  # rather than reading a conclusion that does not exist yet. What it does with
-  # each outcome is the whole design:
-  #
-  #   concluded failure/cancelled/timed_out → block. The tag survives a failed
-  #     workflow, so the fix is to repair `main` and re-run this run; nothing
-  #     needs deleting and re-tagging.
-  #   concluded success                     → proceed.
-  #   no run for this SHA at all            → warn and proceed. A repository or
-  #     ref where `ci` does not run must not be unable to release.
-  #   still running after the window        → warn and proceed. Blocking a
-  #     release on a stuck runner trades one failure mode for a worse one; the
-  #     window is set well past `ci`'s historical duration so this is rare and
-  #     worth reading when it happens.
+  # The tag is what publishes: this waits for `ci` on the tagged commit and
+  # blocks on a red one. The four outcomes and why only one blocks are written
+  # at the top of the script.
   ci-status:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -221,58 +48,15 @@ jobs:
       actions: read
       contents: read
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - name: Require ci green on the tagged commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          # 25 minutes at 20s. `ci` has historically concluded in 8-11 minutes,
-          # the Windows cross-smoke job being the long pole.
-          deadline=$(( SECONDS + 25 * 60 ))
-          status=""
-          conclusion=""
-
-          while :; do
-            # `--jq` on an empty result yields an empty string, not an error.
-            read -r status conclusion <<< "$(
-              gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
-                --jq '.workflow_runs[0] | "\(.status) \(.conclusion // "-")"' 2>/dev/null || true
-            )"
-
-            [ "$status" = "completed" ] && break
-            if [ "$SECONDS" -ge "$deadline" ]; then break; fi
-            sleep 20
-          done
-
-          {
-            echo "### CI status on the tagged commit"
-            echo
-            echo "| Field | Value |"
-            echo "| --- | --- |"
-            echo "| Commit | \`${SHA}\` |"
-            echo "| ci run status | \`${status:-none}\` |"
-            echo "| ci run conclusion | \`${conclusion:--}\` |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ -z "$status" ]; then
-            echo "::warning::No ci.yml run found for ${SHA}. The release proceeds, but nothing has verified this commit."
-            exit 0
-          fi
-
-          if [ "$status" != "completed" ]; then
-            echo "::warning::ci.yml on ${SHA} was still ${status} after the wait window. The release proceeds unverified — check the run before announcing it."
-            exit 0
-          fi
-
-          if [ "$conclusion" != "success" ]; then
-            echo "::error::ci.yml concluded ${conclusion} on ${SHA}. Refusing to publish a release over a failing commit. Fix main, then re-run this workflow — the tag stays valid."
-            exit 1
-          fi
-
-          echo "ci.yml is green on ${SHA}"
+        run: bash scripts/release/require-ci-green.sh
 
   build:
     needs: [security-preflight, ci-status]
@@ -336,63 +120,7 @@ jobs:
       - name: Bundle templates
         run: deno task bundle
       - name: Plugin pre-flight (version lockstep + scaffold integrity)
-        run: |
-          set -euo pipefail
-          # 1. plugin.json must be parseable JSON
-          jq -e . plugin/.claude-plugin/plugin.json > /dev/null
-          # 2. Plugin scaffold must contain at minimum the specnaut router skill
-          # (catches an accidentally truncated plugin/ directory).
-          test -f plugin/skills/specnaut/SKILL.md
-          # 3. Hard fail if plugin.json version drifts from deno.json version.
-          # The two are kept in lockstep by scripts/bump-version.ts.
-          BIN_VERSION=$(jq -r .version deno.json)
-          PLUGIN_VERSION=$(jq -r .version plugin/.claude-plugin/plugin.json)
-          if [ "$BIN_VERSION" != "$PLUGIN_VERSION" ]; then
-            echo "::error::plugin/.claude-plugin/plugin.json version ($PLUGIN_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          # 4. Hard fail if templates/manifest.json version drifts.
-          # `TEMPLATES_VERSION` in src/templates_bundle.ts is generated
-          # from this file; surfacing a stale value would mislabel the
-          # binary's `--version` output.
-          MANIFEST_VERSION=$(jq -r .version templates/manifest.json)
-          if [ "$BIN_VERSION" != "$MANIFEST_VERSION" ]; then
-            echo "::error::templates/manifest.json version ($MANIFEST_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          # 5. Hard fail if .codex-plugin/plugin.json version drifts.
-          # Codex users install directly from this repository, so the
-          # manifest must match the binary it ships beside. The fork this
-          # used to name was deleted 2026-08-22 and publishes nothing —
-          # the gate is still right, its old reason was not, and a gate
-          # defended by a false reason is one somebody deletes.
-          CODEX_VERSION=$(jq -r .version .codex-plugin/plugin.json)
-          if [ "$BIN_VERSION" != "$CODEX_VERSION" ]; then
-            echo "::error::.codex-plugin/plugin.json version ($CODEX_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          # 6. Hard fail if .cursor-plugin/plugin.json version drifts.
-          # Cursor users install directly from the repo; the manifest's
-          # version must match the binary or the install would advertise
-          # a stale version.
-          CURSOR_VERSION=$(jq -r .version .cursor-plugin/plugin.json)
-          if [ "$BIN_VERSION" != "$CURSOR_VERSION" ]; then
-            echo "::error::.cursor-plugin/plugin.json version ($CURSOR_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          # 7. Hard fail if a marketplace catalog entry is not pinned to this tag.
-          # The marketplace repository copies these files verbatim at this tag,
-          # so an entry on another ref (or none) installs another plugin (#633).
-          # The same definition the bump and check-release-commit.ts use.
-          deno run --allow-read scripts/catalog-refs.ts --check "v$BIN_VERSION"
-          # 8. Hard fail if the cockpit mod's manifest drifts. Claude Code pins an
-          # installed plugin to its `version`; a stale one never updates (#636).
-          COCKPIT_VERSION=$(jq -r .version mods/specnaut-cockpit/.claude-plugin/plugin.json)
-          if [ "$BIN_VERSION" != "$COCKPIT_VERSION" ]; then
-            echo "::error::mods/specnaut-cockpit/.claude-plugin/plugin.json version ($COCKPIT_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION match binary, catalogs pinned to v$BIN_VERSION"
+        run: bash scripts/release/plugin-preflight.sh
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Attest build provenance

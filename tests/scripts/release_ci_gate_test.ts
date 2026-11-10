@@ -29,14 +29,19 @@ async function workflow(): Promise<Workflow> {
   return parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as Workflow;
 }
 
+const SCRIPT = "scripts/release/require-ci-green.sh";
+
+/** The gate's shell, read from the file the workflow step runs. */
 async function gateScript(): Promise<string> {
-  const wf = await workflow();
-  const step = Object.values(wf.jobs)
+  return await Deno.readTextFile(`${ROOT}${SCRIPT}`);
+}
+
+Deno.test("release ci gate: the workflow step runs the script these tests exercise", async () => {
+  const step = Object.values((await workflow()).jobs)
     .flatMap((j) => j.steps ?? [])
     .find((s) => s.name === "Require ci green on the tagged commit");
-  assert(step?.run, "no 'Require ci green on the tagged commit' step with a run block");
-  return step.run;
-}
+  assertEquals(step?.run?.trim(), `bash ${SCRIPT}`);
+});
 
 /**
  * Run the gate with a fake `gh` that answers with `ghLine`, and a `sleep` that

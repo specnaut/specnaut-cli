@@ -17,7 +17,8 @@ import { parse } from "@std/yaml";
  * as "0 open alerts", and the gate then passes on an empty signal it believes
  * is a clean one.
  *
- * These tests run the step's actual shell against a stubbed `gh`, because the
+ * These tests run the step's actual shell (the script the step runs) against a
+ * stubbed `gh`, because the
  * defect was invisible to reading — the code looked correct and the array was
  * right there.
  */
@@ -27,16 +28,22 @@ const ROOT = fromFileUrl(new URL("../../", import.meta.url));
 type Step = { name?: string; run?: string };
 type Workflow = { jobs: Record<string, { steps?: Step[] }> };
 
+const SCRIPT = "scripts/release/security-preflight.sh";
+
+/** The gate's shell, read from the file the workflow step runs. */
 async function alertStepScript(): Promise<string> {
+  return await Deno.readTextFile(`${ROOT}${SCRIPT}`);
+}
+
+Deno.test("release.yml's security step runs the script these tests exercise", async () => {
   const wf = parse(
     await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`),
   ) as Workflow;
   const step = Object.values(wf.jobs)
     .flatMap((j) => j.steps ?? [])
     .find((s) => s.name === "Query open security alerts");
-  assert(step?.run, "no 'Query open security alerts' step with a run block");
-  return step.run;
-}
+  assertEquals(step?.run?.trim(), `bash ${SCRIPT}`);
+});
 
 /**
  * Run the step's shell with a fake `gh` on PATH.
