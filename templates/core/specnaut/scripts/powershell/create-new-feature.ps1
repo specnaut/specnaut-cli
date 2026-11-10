@@ -66,10 +66,10 @@ if ([string]::IsNullOrWhiteSpace($featureDesc)) {
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/branch-naming.ps1"
 
-# Use common.ps1 functions which prioritize .specify over git
+# The project root: the directory holding .specnaut (Get-RepoRoot in common.ps1)
 $repoRoot = Get-RepoRoot
 
-# Check if git is available at this repo root (not a parent)
+# Whether the root is in a git work tree, asked of git at the root (Test-HasGit)
 $hasGit = Test-HasGit
 
 Set-Location $repoRoot

@@ -1,27 +1,39 @@
 #!/usr/bin/env pwsh
 # Common PowerShell functions analogous to common.sh
 
-# Find repository root by searching upward for .specify directory
-# This is the primary marker for spec-kit projects
-function Find-SpecifyRoot {
+# The nearest directory at or above StartDir holding a .specnaut this user owns
+# (cli#750). A filesystem or drive root never counts: a marker there would claim
+# every directory on the machine. Mirrors find_specnaut_root in bash/common.sh.
+function Find-SpecnautRoot {
     param([string]$StartDir = (Get-Location).Path)
-
-    # Normalize to absolute path to prevent issues with relative paths
-    # Use -LiteralPath to handle paths with wildcard characters ([, ], *, ?)
+    # -LiteralPath: a path may hold wildcard characters ([, ], *, ?)
     $resolved = Resolve-Path -LiteralPath $StartDir -ErrorAction SilentlyContinue
     $current = if ($resolved) { $resolved.Path } else { $null }
-    if (-not $current) { return $null }
-
-    while ($true) {
-        if (Test-Path -LiteralPath (Join-Path $current ".specify") -PathType Container) {
-            return $current
-        }
-        $parent = Split-Path $current -Parent
-        if ([string]::IsNullOrEmpty($parent) -or $parent -eq $current) {
-            return $null
-        }
-        $current = $parent
+    while ($current -and $current -ne [System.IO.Path]::GetPathRoot($current)) {
+        if (Test-OwnedDirectory (Join-Path $current '.specnaut')) { return $current }
+        $current = Split-Path $current -Parent
     }
+    return $null
+}
+
+# A directory this user owns. On Windows the ACL names its owner: this account,
+# or the Administrators group an elevated account's files belong to, when this
+# account holds that role. Elsewhere the owner's name is this user's; the
+# trailing separator makes Get-Item follow a link, as bash's -O does.
+function Test-OwnedDirectory {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    if ($IsWindows) {
+        $acl = Get-Acl -LiteralPath $Path -ErrorAction SilentlyContinue
+        if (-not $acl) { return $false }
+        $owner = $acl.GetOwner([System.Security.Principal.SecurityIdentifier])
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        if ($owner -eq $me.User) { return $true }
+        $admins = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+        return ($owner -eq $admins) -and [System.Security.Principal.WindowsPrincipal]::new($me).IsInRole($admins)
+    }
+    $item = Get-Item -LiteralPath "$Path/" -Force -ErrorAction SilentlyContinue
+    return ($null -ne $item) -and ($item.User -eq [Environment]::UserName)
 }
 
 # The one git probe (cli#719): git's stdout, or $null when it did not answer. A normal "no" is
@@ -61,22 +73,19 @@ function Invoke-GitProbe {
     return $null
 }
 
-# Get repository root, prioritizing .specify directory over git
-# This prevents using a parent git repo when spec-kit is initialized in a subdirectory
+# The project root: the directory holding .specnaut (cli#750). Installed, it is the
+# project this script is installed in (its own ../.. is that .specnaut), wherever it
+# runs: a .specnaut planted above the working directory cannot claim it. Run in place
+# (the templates tree), the nearest .specnaut above the working directory, then git's
+# top level, then the script's own location. Mirrors get_repo_root in bash/common.sh.
 function Get-RepoRoot {
-    # First, look for .specify directory (spec-kit's own marker)
-    $specifyRoot = Find-SpecifyRoot
-    if ($specifyRoot) {
-        return $specifyRoot
-    }
-
-    # Fallback to git if no .specify found
+    $specnautDir = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    if ((Split-Path $specnautDir -Leaf) -eq '.specnaut') { return (Split-Path $specnautDir -Parent) }
+    $found = Find-SpecnautRoot
+    if ($found) { return $found }
     $result = Invoke-GitProbe -WorkDir '.' -GitArgs @('rev-parse', '--show-toplevel')
     if ($null -ne $result) { return $result }
-
-    # Final fallback to script location for non-git repos
-    # Use -LiteralPath to handle paths with wildcard characters
-    return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../../..")).Path
+    return (Split-Path $specnautDir -Parent)
 }
 
 function Get-CurrentBranch {
@@ -85,7 +94,7 @@ function Get-CurrentBranch {
         return $env:SPECIFY_FEATURE
     }
 
-    # Then check git if available at the spec-kit root (not parent)
+    # Then git, when the root is in a work tree (see Test-HasGit)
     $repoRoot = Get-RepoRoot
     if (Test-HasGit) {
         # An unborn HEAD fails this too and is normal: HEAD is still a symbolic ref.
@@ -130,18 +139,10 @@ function Get-CurrentBranch {
     return "main"
 }
 
-# Check if we have git available at the spec-kit root level
-# Returns true only if git is installed and the repo root is inside a git work tree
-# Handles both regular repos (.git directory) and worktrees/submodules (.git file)
+# Whether the root is inside a git work tree, asked of git at the root (cli#750): a
+# project nested in a parent repository works on its branches.
 function Test-HasGit {
-    $repoRoot = Get-RepoRoot
-    # Check if .git exists (directory or file for worktrees/submodules)
-    # Use -LiteralPath to handle paths with wildcard characters
-    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot ".git"))) {
-        return $false
-    }
-    # Verify it's actually a valid git work tree
-    return ($null -ne (Invoke-GitProbe -WorkDir $repoRoot -GitArgs @('rev-parse', '--is-inside-work-tree')))
+    return (Invoke-GitProbe -WorkDir (Get-RepoRoot) -GitArgs @('rev-parse', '--is-inside-work-tree')) -eq 'true'
 }
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").

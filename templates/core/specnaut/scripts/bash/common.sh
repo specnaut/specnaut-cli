@@ -1,48 +1,45 @@
 #!/usr/bin/env bash
 # Common functions and variables for all scripts
 
-# Find repository root by searching upward for .specify directory
-# This is the primary marker for spec-kit projects
-find_specify_root() {
-    local dir="${1:-$(pwd)}"
-    # Normalize to absolute path to prevent infinite loop with relative paths
-    # Use -- to handle paths starting with - (e.g., -P, -L)
-    dir="$(cd -- "$dir" 2>/dev/null && pwd)" || return 1
-    local prev_dir=""
-    while true; do
-        if [ -d "$dir/.specify" ]; then
-            echo "$dir"
-            return 0
-        fi
-        # Stop if we've reached filesystem root or dirname stops changing
-        if [ "$dir" = "/" ] || [ "$dir" = "$prev_dir" ]; then
-            break
-        fi
-        prev_dir="$dir"
-        dir="$(dirname "$dir")"
+# The nearest directory at or above $1 (default: here) holding a `.specnaut`
+# this user owns (cli#750). A filesystem or drive root never counts: a marker
+# there would claim every directory on the machine.
+find_specnaut_root() {
+    local dir
+    # Absolute, so the walk ends; `--` for a path starting with `-`.
+    dir="$(CDPATH="" cd -- "${1:-.}" 2>/dev/null && pwd)" || return 1
+    while :; do
+        case "$OSTYPE:$dir" in *:/ | msys*:/[A-Za-z]) return 1 ;; esac
+        if _owned_dir "$dir/.specnaut"; then printf '%s\n' "$dir"; return 0; fi
+        dir="${dir%/*}"
+        dir="${dir:-/}"
     done
-    return 1
 }
 
-# Get repository root, prioritizing .specify directory over git
-# This prevents using a parent git repo when spec-kit is initialized in a subdirectory
+# A directory this user owns. Git Bash has no POSIX owner to compare (an
+# elevated account's files belong to the Administrators group), so there the
+# directory alone counts; the PowerShell twin reads the ACL.
+_owned_dir() {
+    [ -d "$1" ] || return 1
+    case "$OSTYPE" in msys* | cygwin*) return 0 ;; esac
+    [ -O "$1" ]
+}
+
+# The project root: the directory holding `.specnaut` (cli#750). Installed, it
+# is the project this script is installed in (its own `../..` is that
+# `.specnaut`), wherever it runs: a `.specnaut` planted above the working
+# directory cannot claim it. Run in place (the templates tree), the nearest
+# `.specnaut` above the working directory, then git's top level, then the
+# script's own location.
 get_repo_root() {
-    # First, look for .specify directory (spec-kit's own marker)
-    local specify_root
-    if specify_root=$(find_specify_root); then
-        echo "$specify_root"
-        return
+    local here found
+    here="$(CDPATH="" cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+    if [ "${here##*/}" = ".specnaut" ]; then
+        found="${here%/*}"
+    elif ! found=$(find_specnaut_root) && ! found=$(git rev-parse --show-toplevel 2>/dev/null); then
+        found="${here%/*}"
     fi
-
-    # Fallback to git if no .specify found
-    if git rev-parse --show-toplevel >/dev/null 2>&1; then
-        git rev-parse --show-toplevel
-        return
-    fi
-
-    # Final fallback to script location for non-git repos
-    local script_dir="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    (cd "$script_dir/../../.." && pwd)
+    printf '%s\n' "${found:-/}"
 }
 
 # Get current branch, with fallback for non-git repositories
@@ -53,8 +50,9 @@ get_current_branch() {
         return
     fi
 
-    # Then check git if available at the spec-kit root (not parent)
-    local repo_root=$(get_repo_root)
+    # Then git, when the root is in a work tree (see has_git)
+    local repo_root
+    repo_root=$(get_repo_root)
     if has_git; then
         git -C "$repo_root" rev-parse --abbrev-ref HEAD
         return
@@ -101,17 +99,11 @@ get_current_branch() {
     echo "main"  # Final fallback
 }
 
-# Check if we have git available at the spec-kit root level
-# Returns true only if git is installed and the repo root is inside a git work tree
-# Handles both regular repos (.git directory) and worktrees/submodules (.git file)
+# Whether the root is inside a git work tree, asked of git at the root
+# (cli#750): a project nested in a parent repository works on its branches.
 has_git() {
-    # First check if git command is available (before calling get_repo_root which may use git)
     command -v git >/dev/null 2>&1 || return 1
-    local repo_root=$(get_repo_root)
-    # Check if .git exists (directory or file for worktrees/submodules)
-    [ -e "$repo_root/.git" ] || return 1
-    # Verify it's actually a valid git work tree
-    git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1
+    [ "$(git -C "$(get_repo_root)" rev-parse --is-inside-work-tree 2>/dev/null)" = true ]
 }
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").

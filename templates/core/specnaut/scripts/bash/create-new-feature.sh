@@ -119,7 +119,7 @@ if [ -z "$FEATURE_DESCRIPTION" ]; then
     exit 1
 fi
 
-# Resolve repository root using common.sh functions which prioritize .specify over git
+# The project root: the directory holding .specnaut (get_repo_root in common.sh)
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/common.sh
 source "$SCRIPT_DIR/common.sh"
@@ -128,7 +128,7 @@ source "$SCRIPT_DIR/branch-naming.sh"
 
 REPO_ROOT=$(get_repo_root)
 
-# Check if git is available at this repo root (not a parent)
+# Whether the root is in a git work tree, asked of git at the root (has_git)
 if has_git; then
     HAS_GIT=true
 else
