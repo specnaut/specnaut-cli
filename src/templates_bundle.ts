@@ -363,7 +363,8 @@ References to a backlog item follow the \`backlog-reference-contract\` skill.
 \`<task>\` is the item \`plan\` handed on, else the whole-number \`linked_issue\` of HEAD's committed
 \`.specnaut/feature.json\` when \`wip-audit.sh\` (below) prints \`ACTIVE\` for it at HEAD's tip — a link
 HEAD's own commits set, never one inherited from the base; otherwise stop and ask for it. For an
-epic's child it is the epic, and \`<epoch>\` is \`<task>\`'s creation time. First, run
+epic's child it is the epic, and \`<epoch>\` is \`<task>\`'s creation time.
+If \`view.sh\` printed \`—\` for it, the header of \`wip-audit.sh\` says what to pass. First, run
 \`specnaut spec pull <task>\` once: it writes the spec to the gitignored \`.specnaut/specs/.cache/<task>/\`,
 and you read it from there. Read its outcome as \`phases/plan.md\`'s Re-entry does: anything but a
 materialised \`1-plan.md\` stops. Then the branch, from
@@ -29349,7 +29350,11 @@ export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
-usage() { echo "usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…" >&2; exit 2; }
+usage() {
+  echo "usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]..." >&2
+  echo "an item with no creation time: see the header of .specnaut/scripts/bash/wip-audit.sh" >&2
+  exit 2
+}
 NUM='^[1-9][0-9]{0,9}\$'
 limit=20 items=()
 while [ \$# -gt 0 ]; do

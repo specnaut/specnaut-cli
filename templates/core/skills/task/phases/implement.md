@@ -13,7 +13,8 @@ $ARGUMENTS
 `<task>` is the item `plan` handed on, else the whole-number `linked_issue` of HEAD's committed
 `.specnaut/feature.json` when `wip-audit.sh` (below) prints `ACTIVE` for it at HEAD's tip — a link
 HEAD's own commits set, never one inherited from the base; otherwise stop and ask for it. For an
-epic's child it is the epic, and `<epoch>` is `<task>`'s creation time. First, run
+epic's child it is the epic, and `<epoch>` is `<task>`'s creation time.
+If `view.sh` printed `—` for it, the header of `wip-audit.sh` says what to pass. First, run
 `specnaut spec pull <task>` once: it writes the spec to the gitignored `.specnaut/specs/.cache/<task>/`,
 and you read it from there. Read its outcome as `phases/plan.md`'s Re-entry does: anything but a
 materialised `1-plan.md` stops. Then the branch, from

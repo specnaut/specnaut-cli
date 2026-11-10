@@ -46,7 +46,11 @@ export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-usage() { echo "usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…" >&2; exit 2; }
+usage() {
+  echo "usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]..." >&2
+  echo "an item with no creation time: see the header of .specnaut/scripts/bash/wip-audit.sh" >&2
+  exit 2
+}
 NUM='^[1-9][0-9]{0,9}$'
 limit=20 items=()
 while [ $# -gt 0 ]; do
