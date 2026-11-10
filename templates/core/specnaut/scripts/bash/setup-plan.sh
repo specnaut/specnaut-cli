@@ -23,6 +23,10 @@ for arg in "$@"; do
     esac
 done
 
+# A status line: stdout in text mode; stderr in JSON mode, where stdout is the
+# JSON object alone (cli#749). The PowerShell twin prints the same lines.
+say() { if $JSON_MODE; then echo "$1" >&2; else echo "$1"; fi; }
+
 # Get script directory and load common functions
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
@@ -52,14 +56,14 @@ mkdir -p "$FEATURE_DIR"
 # feature's directory. Leaving an existing file alone costs nothing and is the
 # only behaviour that cannot destroy work.
 if [[ -f "$IMPL_PLAN" ]]; then
-    echo "Plan already exists at $IMPL_PLAN — left untouched"
+    say "Plan already exists at $IMPL_PLAN - left untouched"
 else
     TEMPLATE=$(resolve_template "plan-template" "$REPO_ROOT") || true
     if [[ -n "$TEMPLATE" ]] && [[ -f "$TEMPLATE" ]]; then
         cp "$TEMPLATE" "$IMPL_PLAN"
-        echo "Copied plan template to $IMPL_PLAN"
+        say "Copied plan template to $IMPL_PLAN"
     else
-        echo "Warning: Plan template not found"
+        say "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
         touch "$IMPL_PLAN"
     fi

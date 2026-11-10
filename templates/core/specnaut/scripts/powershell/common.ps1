@@ -129,9 +129,11 @@ function Test-FeatureBranch {
         [bool]$HasGit = $true
     )
     
-    # For non-git repos, we can't enforce branch naming but still provide output
+    # For non-git repos, we can't enforce branch naming but still provide output.
+    # On stderr, as the bash twin's line (cli#749): Write-Warning lands on stdout
+    # under `pwsh -File`, ahead of the -Json object.
     if (-not $HasGit) {
-        Write-Warning "[specify] Warning: Git repository not detected; skipped branch validation"
+        [Console]::Error.WriteLine("[specify] Warning: Git repository not detected; skipped branch validation")
         return $true
     }
 

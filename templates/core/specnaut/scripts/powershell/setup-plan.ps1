@@ -20,6 +20,12 @@ if ($Help) {
 # Load common functions
 . "$PSScriptRoot/common.ps1"
 
+# A status line: stdout in text mode; stderr under -Json, where stdout is the JSON
+# object alone (cli#749). The bash twin prints the same lines.
+function Write-Status([string]$Line) {
+    if ($Json) { [Console]::Error.WriteLine($Line) } else { Write-Output $Line }
+}
+
 # Get all paths and variables from common functions
 $paths = Get-FeaturePathsEnv
 
@@ -36,14 +42,14 @@ New-Item -ItemType Directory -Path $paths.FEATURE_DIR -Force | Out-Null
 # Test-Path -PathType Leaf; only this one was unguarded — and it forced the
 # overwrite explicitly. See scripts/bash/setup-plan.sh for the full account.
 if (Test-Path -PathType Leaf $paths.IMPL_PLAN) {
-    Write-Output "Plan already exists at $($paths.IMPL_PLAN) — left untouched"
+    Write-Status "Plan already exists at $($paths.IMPL_PLAN) - left untouched"
 } else {
     $template = Resolve-Template -TemplateName 'plan-template' -RepoRoot $paths.REPO_ROOT
     if ($template -and (Test-Path $template)) {
         Copy-Item $template $paths.IMPL_PLAN -Force
-        Write-Output "Copied plan template to $($paths.IMPL_PLAN)"
+        Write-Status "Copied plan template to $($paths.IMPL_PLAN)"
     } else {
-        Write-Warning "Plan template not found"
+        Write-Status "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
         New-Item -ItemType File -Path $paths.IMPL_PLAN -Force | Out-Null
     }

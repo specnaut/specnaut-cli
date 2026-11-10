@@ -32018,6 +32018,10 @@ for arg in "\$@"; do
     esac
 done
 
+# A status line: stdout in text mode; stderr in JSON mode, where stdout is the
+# JSON object alone (cli#749). The PowerShell twin prints the same lines.
+say() { if \$JSON_MODE; then echo "\$1" >&2; else echo "\$1"; fi; }
+
 # Get script directory and load common functions
 SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 source "\$SCRIPT_DIR/common.sh"
@@ -32047,14 +32051,14 @@ mkdir -p "\$FEATURE_DIR"
 # feature's directory. Leaving an existing file alone costs nothing and is the
 # only behaviour that cannot destroy work.
 if [[ -f "\$IMPL_PLAN" ]]; then
-    echo "Plan already exists at \$IMPL_PLAN — left untouched"
+    say "Plan already exists at \$IMPL_PLAN - left untouched"
 else
     TEMPLATE=\$(resolve_template "plan-template" "\$REPO_ROOT") || true
     if [[ -n "\$TEMPLATE" ]] && [[ -f "\$TEMPLATE" ]]; then
         cp "\$TEMPLATE" "\$IMPL_PLAN"
-        echo "Copied plan template to \$IMPL_PLAN"
+        say "Copied plan template to \$IMPL_PLAN"
     else
-        echo "Warning: Plan template not found"
+        say "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
         touch "\$IMPL_PLAN"
     fi
@@ -32355,9 +32359,11 @@ function Test-FeatureBranch {
         [bool]\$HasGit = \$true
     )
     
-    # For non-git repos, we can't enforce branch naming but still provide output
+    # For non-git repos, we can't enforce branch naming but still provide output.
+    # On stderr, as the bash twin's line (cli#749): Write-Warning lands on stdout
+    # under \`pwsh -File\`, ahead of the -Json object.
     if (-not \$HasGit) {
-        Write-Warning "[specify] Warning: Git repository not detected; skipped branch validation"
+        [Console]::Error.WriteLine("[specify] Warning: Git repository not detected; skipped branch validation")
         return \$true
     }
 
@@ -32815,9 +32821,11 @@ if (\$epicIssue -and \$hasGit) {
     }
 }
 
-# Warn if -Number and -Timestamp are both specified
+# Warn if -Number and -Timestamp are both specified. Every notice here is a
+# line on stderr, never Write-Warning: under \`pwsh -File\` that lands on stdout,
+# ahead of the -Json object (cli#749).
 if (\$Timestamp -and \$Number -ne 0) {
-    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
+    [Console]::Error.WriteLine("[specify] Warning: -Number is ignored when -Timestamp is used")
     \$Number = 0
 }
 
@@ -32864,9 +32872,9 @@ if (\$epicBranch -and \$epicBranch.Length -gt \$maxBranchLength) {
     \$truncatedSuffix = \$branchSuffix.Substring(0, [Math]::Min(\$branchSuffix.Length, \$maxSuffixLength)) -replace '-\$', ''
     \$originalBranchName = \$branchName
     \$branchName = "\$featureNum-\$truncatedSuffix"
-    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
-    Write-Warning "[specify] Original: \$originalBranchName (\$(\$originalBranchName.Length) bytes)"
-    Write-Warning "[specify] Truncated to: \$branchName (\$(\$branchName.Length) bytes)"
+    [Console]::Error.WriteLine("[specify] Warning: Branch name exceeded GitHub's 244-byte limit")
+    [Console]::Error.WriteLine("[specify] Original: \$originalBranchName (\$(\$originalBranchName.Length) bytes)")
+    [Console]::Error.WriteLine("[specify] Truncated to: \$branchName (\$(\$branchName.Length) bytes)")
 }
 
 \$featureDir = Join-Path \$specsDir \$branchName
@@ -32938,7 +32946,7 @@ if (-not \$DryRun) {
             }
         }
     } else {
-        Write-Warning "[specify] Warning: Git repository not detected; skipped branch creation for \$branchName"
+        [Console]::Error.WriteLine("[specify] Warning: Git repository not detected; skipped branch creation for \$branchName")
     }
 
     New-Item -ItemType Directory -Path \$featureDir -Force | Out-Null
@@ -34558,6 +34566,12 @@ if (\$Help) {
 # Load common functions
 . "\$PSScriptRoot/common.ps1"
 
+# A status line: stdout in text mode; stderr under -Json, where stdout is the JSON
+# object alone (cli#749). The bash twin prints the same lines.
+function Write-Status([string]\$Line) {
+    if (\$Json) { [Console]::Error.WriteLine(\$Line) } else { Write-Output \$Line }
+}
+
 # Get all paths and variables from common functions
 \$paths = Get-FeaturePathsEnv
 
@@ -34574,14 +34588,14 @@ New-Item -ItemType Directory -Path \$paths.FEATURE_DIR -Force | Out-Null
 # Test-Path -PathType Leaf; only this one was unguarded — and it forced the
 # overwrite explicitly. See scripts/bash/setup-plan.sh for the full account.
 if (Test-Path -PathType Leaf \$paths.IMPL_PLAN) {
-    Write-Output "Plan already exists at \$(\$paths.IMPL_PLAN) — left untouched"
+    Write-Status "Plan already exists at \$(\$paths.IMPL_PLAN) - left untouched"
 } else {
     \$template = Resolve-Template -TemplateName 'plan-template' -RepoRoot \$paths.REPO_ROOT
     if (\$template -and (Test-Path \$template)) {
         Copy-Item \$template \$paths.IMPL_PLAN -Force
-        Write-Output "Copied plan template to \$(\$paths.IMPL_PLAN)"
+        Write-Status "Copied plan template to \$(\$paths.IMPL_PLAN)"
     } else {
-        Write-Warning "Plan template not found"
+        Write-Status "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
         New-Item -ItemType File -Path \$paths.IMPL_PLAN -Force | Out-Null
     }

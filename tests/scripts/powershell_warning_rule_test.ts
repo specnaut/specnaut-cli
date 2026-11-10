@@ -1,8 +1,8 @@
 // cli#719 — a PowerShell probe that failed says so on stderr, and a normal answer
 // says nothing. Each row of the plan's warning rule is one test here, dot-sourcing
-// common.ps1 where a real project has it and calling the functions: whole-script
-// quiet is not asserted, because `Write-Warning` elsewhere in those scripts lands
-// on stdout and is another finding.
+// common.ps1 where a real project has it and calling the functions. The whole
+// scripts, and their bash twins, are held to the rule by git_probe_twins_test.ts,
+// and their -Json stdout to the JSON object alone by json_stdout_twins_test.ts.
 //
 // Every quiet assertion is paired with the values the functions returned, so it
 // cannot be satisfied by a run that never reached them (`RESULT` lines below).
@@ -10,7 +10,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { copy } from "@std/fs";
 import { fromFileUrl, join } from "@std/path";
-import { git, type Run, run } from "./git_sandbox.ts";
+import { git, type Run, run, slashes } from "./git_sandbox.ts";
 import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
 
 const PWSH_DIR = fromFileUrl(
@@ -46,9 +46,6 @@ function pwsh(dir: string, body: string, path?: string, preference = ""): Promis
   const script = `${setPath}${preference}. '.specnaut/scripts/powershell/common.ps1'\n${body}`;
   return run("pwsh", ["-NoProfile", "-Command", script], dir);
 }
-
-/** Paths in `/` form: on Windows git answers `C:/x` where PowerShell's own path is `C:\\x`. */
-const slashes = (p: string) => p.replaceAll("\\", "/");
 
 const results = (r: Run) =>
   r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) => slashes(l.slice(7)));

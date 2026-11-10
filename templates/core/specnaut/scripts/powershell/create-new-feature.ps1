@@ -155,9 +155,11 @@ if ($epicIssue -and $hasGit) {
     }
 }
 
-# Warn if -Number and -Timestamp are both specified
+# Warn if -Number and -Timestamp are both specified. Every notice here is a
+# line on stderr, never Write-Warning: under `pwsh -File` that lands on stdout,
+# ahead of the -Json object (cli#749).
 if ($Timestamp -and $Number -ne 0) {
-    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
+    [Console]::Error.WriteLine("[specify] Warning: -Number is ignored when -Timestamp is used")
     $Number = 0
 }
 
@@ -204,9 +206,9 @@ if ($epicBranch -and $epicBranch.Length -gt $maxBranchLength) {
     $truncatedSuffix = $branchSuffix.Substring(0, [Math]::Min($branchSuffix.Length, $maxSuffixLength)) -replace '-$', ''
     $originalBranchName = $branchName
     $branchName = "$featureNum-$truncatedSuffix"
-    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
-    Write-Warning "[specify] Original: $originalBranchName ($($originalBranchName.Length) bytes)"
-    Write-Warning "[specify] Truncated to: $branchName ($($branchName.Length) bytes)"
+    [Console]::Error.WriteLine("[specify] Warning: Branch name exceeded GitHub's 244-byte limit")
+    [Console]::Error.WriteLine("[specify] Original: $originalBranchName ($($originalBranchName.Length) bytes)")
+    [Console]::Error.WriteLine("[specify] Truncated to: $branchName ($($branchName.Length) bytes)")
 }
 
 $featureDir = Join-Path $specsDir $branchName
@@ -278,7 +280,7 @@ if (-not $DryRun) {
             }
         }
     } else {
-        Write-Warning "[specify] Warning: Git repository not detected; skipped branch creation for $branchName"
+        [Console]::Error.WriteLine("[specify] Warning: Git repository not detected; skipped branch creation for $branchName")
     }
 
     New-Item -ItemType Directory -Path $featureDir -Force | Out-Null
