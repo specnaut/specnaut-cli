@@ -48,8 +48,9 @@ while [ $i -le $# ]; do
             fi
             i=$((i + 1))
             next_arg="${!i}"
-            if [[ "$next_arg" == --* ]]; then
-                echo 'Error: --number requires a value' >&2
+            # A whole number, as the PowerShell twin's [long]: bash would read it as arithmetic.
+            if ! [[ "$next_arg" =~ ^[0-9]+$ ]]; then
+                echo 'Error: --number requires a whole number' >&2
                 exit 1
             fi
             BRANCH_NUMBER="$next_arg"
@@ -130,11 +131,7 @@ prime_repo_state
 REPO_ROOT=$(get_repo_root)
 
 # Whether the root is in a git work tree, asked of git at the root (has_git)
-if has_git; then
-    HAS_GIT=true
-else
-    HAS_GIT=false
-fi
+if has_git; then HAS_GIT=true; else HAS_GIT=false; fi
 
 cd "$REPO_ROOT"
 
@@ -180,7 +177,10 @@ if [ -n "$LINKED_ISSUE" ]; then
         echo "# no backlog parent-of.sh / cascade-check.sh installed — epic detection did NOT run; treating issue $LINKED_ISSUE as standalone" >&2
     else
         _p_rc=0
-        _p_out=$(bash "$_parent_sh" "$LINKED_ISSUE" 2>&1) || _p_rc=$?
+        _p_out=$(bash "$_parent_sh" "$LINKED_ISSUE" 2>/dev/null) || _p_rc=$?
+        # A parent is an issue number, 007 read as 7, or no answer: a tracker's text is never relayed (cli#752).
+        if [[ "$_p_out" =~ ^0*([1-9][0-9]*)$ ]]; then _p_out="${BASH_REMATCH[1]}"
+        elif [ "$_p_rc" = 0 ]; then _p_rc="0, not an issue number"; fi
         case "$_p_rc" in
             0)
                 EPIC_ISSUE="$_p_out"
@@ -325,7 +325,7 @@ if [ "$DRY_RUN" != true ]; then
         if [ "$_create_rc" != 0 ]; then
             current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
             # Check if branch already exists
-            if git branch --list "$BRANCH_NAME" | grep -q .; then
+            if git branch --list "$BRANCH_NAME" 2>/dev/null | grep -q .; then
                 if [ "$ALLOW_EXISTING" = true ]; then
                     # Already on the branch: continue; otherwise switch to it instead of failing.
                     [ "$current_branch" = "$BRANCH_NAME" ] || git checkout -q "$BRANCH_NAME" >/dev/null 2>&1 || _switch_rc=$?
@@ -395,8 +395,8 @@ if [ "$DRY_RUN" != true ]; then
         _move_sh="$REPO_ROOT/.specnaut/scripts/backlog/move.sh"
         if [ ! -x "$_move_sh" ]; then
             echo "# no backlog move.sh installed — issue $_move_target NOT moved; move it by hand" >&2
-        elif _move_out=$(bash "$_move_sh" "$_move_target" "In progress" 2>&1); then
-            echo "# $_move_out" >&2
+        elif bash "$_move_sh" "$_move_target" "In progress" >/dev/null 2>&1; then
+            echo "# issue $_move_target moved to In progress" >&2
             if [ -n "$EPIC_ISSUE" ] && [ "$EPIC_ISSUE" != "$LINKED_ISSUE" ]; then
                 echo "# child issue $LINKED_ISSUE was NOT moved — its card moves when the loop reaches it" >&2
             fi

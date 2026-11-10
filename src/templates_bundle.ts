@@ -27250,7 +27250,7 @@ find_specnaut_root() {
     # Absolute, so the walk ends; \`--\` for a path starting with \`-\`.
     dir="\$(CDPATH="" cd -- "\${1:-.}" 2>/dev/null && pwd)" || return 1
     while :; do
-        case "\$OSTYPE:\$dir" in *:/ | msys*:/[A-Za-z]) return 1 ;; esac
+        case "\$OSTYPE:\$dir" in *:/ | msys*:/[A-Za-z] | cygwin*:/cygdrive/[A-Za-z]) return 1 ;; esac
         if _owned_dir "\$dir/.specnaut"; then printf '%s\\n' "\$dir"; return 0; fi
         dir="\${dir%/*}"
         dir="\${dir:-/}"
@@ -27382,7 +27382,7 @@ check_feature_branch() {
     branch=\$(spec_kit_effective_branch_name "\$raw")
 
     if ! is_feature_branch_name "\$branch"; then
-        echo "ERROR: Not on a feature branch. Current branch: \$raw" >&2
+        echo "ERROR: Not on a feature branch. Current branch: \$(_printable "\$raw")" >&2
         echo "Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name" >&2
         return 1
     fi
@@ -27502,7 +27502,7 @@ _feature_json_contradicts_branch() {
     branch=\$(spec_kit_effective_branch_name "\$2")
     is_feature_branch_name "\$branch" && [[ "\$(basename "\$1")" != "\$branch" ]] || return 1
     echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
-    echo "  current branch:  \$branch" >&2
+    echo "  current branch:  \$(_printable "\$branch")" >&2
     echo "  feature.json:    \$(_printable "\$(basename "\$1")")" >&2
     echo "  resolved path:   \$(_printable "\$1")" >&2
     echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2
@@ -27831,8 +27831,9 @@ while [ \$i -le \$# ]; do
             fi
             i=\$((i + 1))
             next_arg="\${!i}"
-            if [[ "\$next_arg" == --* ]]; then
-                echo 'Error: --number requires a value' >&2
+            # A whole number, as the PowerShell twin's [long]: bash would read it as arithmetic.
+            if ! [[ "\$next_arg" =~ ^[0-9]+\$ ]]; then
+                echo 'Error: --number requires a whole number' >&2
                 exit 1
             fi
             BRANCH_NUMBER="\$next_arg"
@@ -27913,11 +27914,7 @@ prime_repo_state
 REPO_ROOT=\$(get_repo_root)
 
 # Whether the root is in a git work tree, asked of git at the root (has_git)
-if has_git; then
-    HAS_GIT=true
-else
-    HAS_GIT=false
-fi
+if has_git; then HAS_GIT=true; else HAS_GIT=false; fi
 
 cd "\$REPO_ROOT"
 
@@ -27963,7 +27960,10 @@ if [ -n "\$LINKED_ISSUE" ]; then
         echo "# no backlog parent-of.sh / cascade-check.sh installed — epic detection did NOT run; treating issue \$LINKED_ISSUE as standalone" >&2
     else
         _p_rc=0
-        _p_out=\$(bash "\$_parent_sh" "\$LINKED_ISSUE" 2>&1) || _p_rc=\$?
+        _p_out=\$(bash "\$_parent_sh" "\$LINKED_ISSUE" 2>/dev/null) || _p_rc=\$?
+        # A parent is an issue number, 007 read as 7, or no answer: a tracker's text is never relayed (cli#752).
+        if [[ "\$_p_out" =~ ^0*([1-9][0-9]*)\$ ]]; then _p_out="\${BASH_REMATCH[1]}"
+        elif [ "\$_p_rc" = 0 ]; then _p_rc="0, not an issue number"; fi
         case "\$_p_rc" in
             0)
                 EPIC_ISSUE="\$_p_out"
@@ -28108,7 +28108,7 @@ if [ "\$DRY_RUN" != true ]; then
         if [ "\$_create_rc" != 0 ]; then
             current_branch="\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
             # Check if branch already exists
-            if git branch --list "\$BRANCH_NAME" | grep -q .; then
+            if git branch --list "\$BRANCH_NAME" 2>/dev/null | grep -q .; then
                 if [ "\$ALLOW_EXISTING" = true ]; then
                     # Already on the branch: continue; otherwise switch to it instead of failing.
                     [ "\$current_branch" = "\$BRANCH_NAME" ] || git checkout -q "\$BRANCH_NAME" >/dev/null 2>&1 || _switch_rc=\$?
@@ -28178,8 +28178,8 @@ if [ "\$DRY_RUN" != true ]; then
         _move_sh="\$REPO_ROOT/.specnaut/scripts/backlog/move.sh"
         if [ ! -x "\$_move_sh" ]; then
             echo "# no backlog move.sh installed — issue \$_move_target NOT moved; move it by hand" >&2
-        elif _move_out=\$(bash "\$_move_sh" "\$_move_target" "In progress" 2>&1); then
-            echo "# \$_move_out" >&2
+        elif bash "\$_move_sh" "\$_move_target" "In progress" >/dev/null 2>&1; then
+            echo "# issue \$_move_target moved to In progress" >&2
             if [ -n "\$EPIC_ISSUE" ] && [ "\$EPIC_ISSUE" != "\$LINKED_ISSUE" ]; then
                 echo "# child issue \$LINKED_ISSUE was NOT moved — its card moves when the loop reaches it" >&2
             fi
@@ -32048,12 +32048,12 @@ mkdir -p "\$FEATURE_DIR"
 # feature's directory. Leaving an existing file alone costs nothing and is the
 # only behaviour that cannot destroy work.
 if [[ -f "\$IMPL_PLAN" ]]; then
-    say "Plan already exists at \$IMPL_PLAN - left untouched"
+    say "Plan already exists at \$(_printable "\$IMPL_PLAN") - left untouched"
 else
     TEMPLATE=\$(resolve_template "plan-template" "\$REPO_ROOT") || true
     if [[ -n "\$TEMPLATE" ]] && [[ -f "\$TEMPLATE" ]]; then
         cp "\$TEMPLATE" "\$IMPL_PLAN"
-        say "Copied plan template to \$IMPL_PLAN"
+        say "Copied plan template to \$(_printable "\$IMPL_PLAN")"
     else
         say "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
@@ -32076,10 +32076,12 @@ if \$JSON_MODE; then
             "\$(json_escape "\$FEATURE_SPEC")" "\$(json_escape "\$IMPL_PLAN")" "\$(json_escape "\$FEATURE_DIR")" "\$(json_escape "\$CURRENT_BRANCH")" "\$(json_escape "\$HAS_GIT")"
     fi
 else
-    echo "FEATURE_SPEC: \$FEATURE_SPEC"
-    echo "IMPL_PLAN: \$IMPL_PLAN" 
-    echo "SPECS_DIR: \$FEATURE_DIR"
-    echo "BRANCH: \$CURRENT_BRANCH"
+    # A folder name and the branch read from it are a committer's text: printed
+    # with control characters as \`?\` (cli#752); the JSON above carries them exact.
+    echo "FEATURE_SPEC: \$(_printable "\$FEATURE_SPEC")"
+    echo "IMPL_PLAN: \$(_printable "\$IMPL_PLAN")"
+    echo "SPECS_DIR: \$(_printable "\$FEATURE_DIR")"
+    echo "BRANCH: \$(_printable "\$CURRENT_BRANCH")"
     echo "HAS_GIT: \$HAS_GIT"
 fi
 
@@ -32368,7 +32370,7 @@ function Test-FeatureBranch {
     \$Branch = Get-SpecnautEffectiveBranchName \$raw
 
     if (-not (Test-FeatureBranchName \$Branch)) {
-        [Console]::Error.WriteLine("ERROR: Not on a feature branch. Current branch: \$raw")
+        [Console]::Error.WriteLine("ERROR: Not on a feature branch. Current branch: \$(ConvertTo-PrintableText \$raw)")
         [Console]::Error.WriteLine("Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name")
         return \$false
     }
@@ -32471,7 +32473,7 @@ function Get-FeaturePathsEnv {
         \$effBranch = Get-SpecnautEffectiveBranchName \$currentBranch
         if ((Test-FeatureBranchName \$effBranch) -and ((Split-Path -Leaf \$featureDir) -ne \$effBranch)) {
             [Console]::Error.WriteLine("ERROR: .specnaut/feature.json resolves to a different feature than the current branch.")
-            [Console]::Error.WriteLine("  current branch:  \$effBranch")
+            [Console]::Error.WriteLine("  current branch:  \$(ConvertTo-PrintableText \$effBranch)")
             [Console]::Error.WriteLine("  feature.json:    \$(ConvertTo-PrintableText (Split-Path -Leaf \$featureDir))")
             [Console]::Error.WriteLine("  resolved path:   \$(ConvertTo-PrintableText \$featureDir)")
             [Console]::Error.WriteLine("Refusing to act on a contradiction: writing here would touch the other feature's files.")
@@ -32777,10 +32779,12 @@ if (\$Issue -gt 0) {
     } elseif (-not (Test-Path \$parentSh) -or -not (Test-Path \$cascadeSh)) {
         [Console]::Error.WriteLine("# no backlog parent-of.sh / cascade-check.sh installed - epic detection did NOT run; treating issue \$Issue as standalone")
     } else {
-        \$parentOut = & bash \$parentSh \$Issue 2>&1
+        \$parentOut = "\$(& bash \$parentSh \$Issue 2>\$null)".Trim()
         \$parentRc = \$LASTEXITCODE
+        # A parent is an issue number, 007 read as 7, or no answer: a tracker's text is never relayed (cli#752).
+        if (\$parentRc -eq 0 -and \$parentOut -cnotmatch '^0*[1-9][0-9]*\\z') { \$parentRc = '0, not an issue number' }
         if (\$parentRc -eq 0) {
-            \$epicIssue = "\$parentOut".Trim()
+            \$epicIssue = \$parentOut.TrimStart('0')
             [Console]::Error.WriteLine("# issue \$Issue is a child of epic #\$epicIssue - the branch belongs to the epic")
         } elseif (\$parentRc -eq 10) {
             # Only 11 says "epic with open children" and only 0 says "none".
@@ -32980,9 +32984,9 @@ if (-not \$DryRun) {
         } elseif (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
             [Console]::Error.WriteLine("# the backlog helpers are bash-only and no bash was found - issue \$moveTarget NOT moved")
         } else {
-            \$moveOut = & bash \$moveSh \$moveTarget 'In progress' 2>&1
+            \$null = & bash \$moveSh \$moveTarget 'In progress' 2>\$null
             if (\$LASTEXITCODE -eq 0) {
-                [Console]::Error.WriteLine("# \$moveOut")
+                [Console]::Error.WriteLine("# issue \$moveTarget moved to In progress")
                 if (\$epicIssue -and \$epicIssue -ne "\$Issue") {
                     [Console]::Error.WriteLine("# child issue \$Issue was NOT moved - its card moves when the loop reaches it")
                 }
@@ -33016,9 +33020,7 @@ if (\$Json) {
     Write-Output "BRANCH_NAME: \$branchName"
     Write-Output "SPEC_FILE: \$specFile"
     if (\$featureNum) { Write-Output "FEATURE_NUM: \$featureNum" }
-    if (\$Issue -gt 0) {
-        Write-Output "LINKED_ISSUE: \$Issue"
-    }
+    if (\$Issue -gt 0) { Write-Output "LINKED_ISSUE: \$Issue" }
     if (-not \$DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: \$branchName"
     }
@@ -34580,12 +34582,12 @@ New-Item -ItemType Directory -Path \$paths.FEATURE_DIR -Force | Out-Null
 # Test-Path -PathType Leaf; only this one was unguarded — and it forced the
 # overwrite explicitly. See scripts/bash/setup-plan.sh for the full account.
 if (Test-Path -PathType Leaf \$paths.IMPL_PLAN) {
-    Write-Status "Plan already exists at \$(\$paths.IMPL_PLAN) - left untouched"
+    Write-Status "Plan already exists at \$(ConvertTo-PrintableText \$paths.IMPL_PLAN) - left untouched"
 } else {
     \$template = Resolve-Template -TemplateName 'plan-template' -RepoRoot \$paths.REPO_ROOT
     if (\$template -and (Test-Path \$template)) {
         Copy-Item \$template \$paths.IMPL_PLAN -Force
-        Write-Status "Copied plan template to \$(\$paths.IMPL_PLAN)"
+        Write-Status "Copied plan template to \$(ConvertTo-PrintableText \$paths.IMPL_PLAN)"
     } else {
         Write-Status "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
@@ -34604,10 +34606,11 @@ if (\$Json) {
     }
     \$result | ConvertTo-Json -Compress
 } else {
-    Write-Output "FEATURE_SPEC: \$(\$paths.FEATURE_SPEC)"
-    Write-Output "IMPL_PLAN: \$(\$paths.IMPL_PLAN)"
-    Write-Output "SPECS_DIR: \$(\$paths.FEATURE_DIR)"
-    Write-Output "BRANCH: \$(\$paths.CURRENT_BRANCH)"
+    # Control characters print as \`?\` (cli#752); the JSON above carries the values exact.
+    Write-Output "FEATURE_SPEC: \$(ConvertTo-PrintableText \$paths.FEATURE_SPEC)"
+    Write-Output "IMPL_PLAN: \$(ConvertTo-PrintableText \$paths.IMPL_PLAN)"
+    Write-Output "SPECS_DIR: \$(ConvertTo-PrintableText \$paths.FEATURE_DIR)"
+    Write-Output "BRANCH: \$(ConvertTo-PrintableText \$paths.CURRENT_BRANCH)"
     Write-Output "HAS_GIT: \$(\$paths.HAS_GIT)"
 }
 `,

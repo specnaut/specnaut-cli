@@ -56,12 +56,12 @@ mkdir -p "$FEATURE_DIR"
 # feature's directory. Leaving an existing file alone costs nothing and is the
 # only behaviour that cannot destroy work.
 if [[ -f "$IMPL_PLAN" ]]; then
-    say "Plan already exists at $IMPL_PLAN - left untouched"
+    say "Plan already exists at $(_printable "$IMPL_PLAN") - left untouched"
 else
     TEMPLATE=$(resolve_template "plan-template" "$REPO_ROOT") || true
     if [[ -n "$TEMPLATE" ]] && [[ -f "$TEMPLATE" ]]; then
         cp "$TEMPLATE" "$IMPL_PLAN"
-        say "Copied plan template to $IMPL_PLAN"
+        say "Copied plan template to $(_printable "$IMPL_PLAN")"
     else
         say "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
@@ -84,10 +84,12 @@ if $JSON_MODE; then
             "$(json_escape "$FEATURE_SPEC")" "$(json_escape "$IMPL_PLAN")" "$(json_escape "$FEATURE_DIR")" "$(json_escape "$CURRENT_BRANCH")" "$(json_escape "$HAS_GIT")"
     fi
 else
-    echo "FEATURE_SPEC: $FEATURE_SPEC"
-    echo "IMPL_PLAN: $IMPL_PLAN" 
-    echo "SPECS_DIR: $FEATURE_DIR"
-    echo "BRANCH: $CURRENT_BRANCH"
+    # A folder name and the branch read from it are a committer's text: printed
+    # with control characters as `?` (cli#752); the JSON above carries them exact.
+    echo "FEATURE_SPEC: $(_printable "$FEATURE_SPEC")"
+    echo "IMPL_PLAN: $(_printable "$IMPL_PLAN")"
+    echo "SPECS_DIR: $(_printable "$FEATURE_DIR")"
+    echo "BRANCH: $(_printable "$CURRENT_BRANCH")"
     echo "HAS_GIT: $HAS_GIT"
 fi
 

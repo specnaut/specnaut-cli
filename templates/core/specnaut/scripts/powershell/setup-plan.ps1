@@ -42,12 +42,12 @@ New-Item -ItemType Directory -Path $paths.FEATURE_DIR -Force | Out-Null
 # Test-Path -PathType Leaf; only this one was unguarded — and it forced the
 # overwrite explicitly. See scripts/bash/setup-plan.sh for the full account.
 if (Test-Path -PathType Leaf $paths.IMPL_PLAN) {
-    Write-Status "Plan already exists at $($paths.IMPL_PLAN) - left untouched"
+    Write-Status "Plan already exists at $(ConvertTo-PrintableText $paths.IMPL_PLAN) - left untouched"
 } else {
     $template = Resolve-Template -TemplateName 'plan-template' -RepoRoot $paths.REPO_ROOT
     if ($template -and (Test-Path $template)) {
         Copy-Item $template $paths.IMPL_PLAN -Force
-        Write-Status "Copied plan template to $($paths.IMPL_PLAN)"
+        Write-Status "Copied plan template to $(ConvertTo-PrintableText $paths.IMPL_PLAN)"
     } else {
         Write-Status "Warning: Plan template not found"
         # Create a basic plan file if template doesn't exist
@@ -66,9 +66,10 @@ if ($Json) {
     }
     $result | ConvertTo-Json -Compress
 } else {
-    Write-Output "FEATURE_SPEC: $($paths.FEATURE_SPEC)"
-    Write-Output "IMPL_PLAN: $($paths.IMPL_PLAN)"
-    Write-Output "SPECS_DIR: $($paths.FEATURE_DIR)"
-    Write-Output "BRANCH: $($paths.CURRENT_BRANCH)"
+    # Control characters print as `?` (cli#752); the JSON above carries the values exact.
+    Write-Output "FEATURE_SPEC: $(ConvertTo-PrintableText $paths.FEATURE_SPEC)"
+    Write-Output "IMPL_PLAN: $(ConvertTo-PrintableText $paths.IMPL_PLAN)"
+    Write-Output "SPECS_DIR: $(ConvertTo-PrintableText $paths.FEATURE_DIR)"
+    Write-Output "BRANCH: $(ConvertTo-PrintableText $paths.CURRENT_BRANCH)"
     Write-Output "HAS_GIT: $($paths.HAS_GIT)"
 }

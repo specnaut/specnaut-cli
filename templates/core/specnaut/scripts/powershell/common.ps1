@@ -141,7 +141,7 @@ function Test-FeatureBranch {
     $Branch = Get-SpecnautEffectiveBranchName $raw
 
     if (-not (Test-FeatureBranchName $Branch)) {
-        [Console]::Error.WriteLine("ERROR: Not on a feature branch. Current branch: $raw")
+        [Console]::Error.WriteLine("ERROR: Not on a feature branch. Current branch: $(ConvertTo-PrintableText $raw)")
         [Console]::Error.WriteLine("Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name")
         return $false
     }
@@ -244,7 +244,7 @@ function Get-FeaturePathsEnv {
         $effBranch = Get-SpecnautEffectiveBranchName $currentBranch
         if ((Test-FeatureBranchName $effBranch) -and ((Split-Path -Leaf $featureDir) -ne $effBranch)) {
             [Console]::Error.WriteLine("ERROR: .specnaut/feature.json resolves to a different feature than the current branch.")
-            [Console]::Error.WriteLine("  current branch:  $effBranch")
+            [Console]::Error.WriteLine("  current branch:  $(ConvertTo-PrintableText $effBranch)")
             [Console]::Error.WriteLine("  feature.json:    $(ConvertTo-PrintableText (Split-Path -Leaf $featureDir))")
             [Console]::Error.WriteLine("  resolved path:   $(ConvertTo-PrintableText $featureDir)")
             [Console]::Error.WriteLine("Refusing to act on a contradiction: writing here would touch the other feature's files.")

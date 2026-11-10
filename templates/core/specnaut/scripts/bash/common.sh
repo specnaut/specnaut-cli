@@ -9,7 +9,7 @@ find_specnaut_root() {
     # Absolute, so the walk ends; `--` for a path starting with `-`.
     dir="$(CDPATH="" cd -- "${1:-.}" 2>/dev/null && pwd)" || return 1
     while :; do
-        case "$OSTYPE:$dir" in *:/ | msys*:/[A-Za-z]) return 1 ;; esac
+        case "$OSTYPE:$dir" in *:/ | msys*:/[A-Za-z] | cygwin*:/cygdrive/[A-Za-z]) return 1 ;; esac
         if _owned_dir "$dir/.specnaut"; then printf '%s\n' "$dir"; return 0; fi
         dir="${dir%/*}"
         dir="${dir:-/}"
@@ -141,7 +141,7 @@ check_feature_branch() {
     branch=$(spec_kit_effective_branch_name "$raw")
 
     if ! is_feature_branch_name "$branch"; then
-        echo "ERROR: Not on a feature branch. Current branch: $raw" >&2
+        echo "ERROR: Not on a feature branch. Current branch: $(_printable "$raw")" >&2
         echo "Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name" >&2
         return 1
     fi
@@ -261,7 +261,7 @@ _feature_json_contradicts_branch() {
     branch=$(spec_kit_effective_branch_name "$2")
     is_feature_branch_name "$branch" && [[ "$(basename "$1")" != "$branch" ]] || return 1
     echo "ERROR: .specnaut/feature.json resolves to a different feature than the current branch." >&2
-    echo "  current branch:  $branch" >&2
+    echo "  current branch:  $(_printable "$branch")" >&2
     echo "  feature.json:    $(_printable "$(basename "$1")")" >&2
     echo "  resolved path:   $(_printable "$1")" >&2
     echo "Refusing to act on a contradiction: writing here would touch the other feature's files." >&2

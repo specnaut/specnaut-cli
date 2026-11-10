@@ -110,10 +110,12 @@ if ($Issue -gt 0) {
     } elseif (-not (Test-Path $parentSh) -or -not (Test-Path $cascadeSh)) {
         [Console]::Error.WriteLine("# no backlog parent-of.sh / cascade-check.sh installed - epic detection did NOT run; treating issue $Issue as standalone")
     } else {
-        $parentOut = & bash $parentSh $Issue 2>&1
+        $parentOut = "$(& bash $parentSh $Issue 2>$null)".Trim()
         $parentRc = $LASTEXITCODE
+        # A parent is an issue number, 007 read as 7, or no answer: a tracker's text is never relayed (cli#752).
+        if ($parentRc -eq 0 -and $parentOut -cnotmatch '^0*[1-9][0-9]*\z') { $parentRc = '0, not an issue number' }
         if ($parentRc -eq 0) {
-            $epicIssue = "$parentOut".Trim()
+            $epicIssue = $parentOut.TrimStart('0')
             [Console]::Error.WriteLine("# issue $Issue is a child of epic #$epicIssue - the branch belongs to the epic")
         } elseif ($parentRc -eq 10) {
             # Only 11 says "epic with open children" and only 0 says "none".
@@ -313,9 +315,9 @@ if (-not $DryRun) {
         } elseif (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
             [Console]::Error.WriteLine("# the backlog helpers are bash-only and no bash was found - issue $moveTarget NOT moved")
         } else {
-            $moveOut = & bash $moveSh $moveTarget 'In progress' 2>&1
+            $null = & bash $moveSh $moveTarget 'In progress' 2>$null
             if ($LASTEXITCODE -eq 0) {
-                [Console]::Error.WriteLine("# $moveOut")
+                [Console]::Error.WriteLine("# issue $moveTarget moved to In progress")
                 if ($epicIssue -and $epicIssue -ne "$Issue") {
                     [Console]::Error.WriteLine("# child issue $Issue was NOT moved - its card moves when the loop reaches it")
                 }
@@ -349,9 +351,7 @@ if ($Json) {
     Write-Output "BRANCH_NAME: $branchName"
     Write-Output "SPEC_FILE: $specFile"
     if ($featureNum) { Write-Output "FEATURE_NUM: $featureNum" }
-    if ($Issue -gt 0) {
-        Write-Output "LINKED_ISSUE: $Issue"
-    }
+    if ($Issue -gt 0) { Write-Output "LINKED_ISSUE: $Issue" }
     if (-not $DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: $branchName"
     }
