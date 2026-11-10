@@ -9,6 +9,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { git, type Run, run } from "./git_sandbox.ts";
+import { bashArgv } from "../helpers/bash_argv.ts";
 import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
 
 const SCRIPTS = fromFileUrl(new URL("../../templates/core/specnaut/scripts/", import.meta.url));
@@ -38,14 +39,17 @@ const TWINS = [
   {
     name: "bash",
     quietStderr: true,
-    run: ({ description, shortName }: Input, cwd: string) =>
-      run(BASH, [
+    run: ({ description, shortName }: Input, cwd: string) => {
+      // Through bashArgv: on Windows a newline in a direct argument splits it in two.
+      const bash = bashArgv([
         join(SCRIPTS, "bash/create-new-feature.sh"),
         "--json",
         "--dry-run",
         ...(shortName === undefined ? [] : ["--short-name", shortName]),
         description,
-      ], cwd),
+      ]);
+      return run(BASH, bash.args, cwd, bash.env);
+    },
   },
   ...(PWSH_AVAILABLE
     ? [{

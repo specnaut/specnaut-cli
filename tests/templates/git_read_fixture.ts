@@ -1,6 +1,7 @@
 import { fromFileUrl } from "@std/path";
 import { git } from "./collect_audit_scope_fixture.ts";
 import { IDENTITY, run } from "./child_fixture.ts";
+import { bashArgv } from "../helpers/bash_argv.ts";
 
 /**
  * The harness the `git-read.sh` tests share: the script, its library, a runner
@@ -22,11 +23,15 @@ export function plainGit(args: string[], cwd: string, env: Record<string, string
   return run("git", args, cwd, { ...IDENTITY, ...env });
 }
 
-/** `git-read.sh <args>`; `noglob` keeps a wildcard argument as typed on Windows. */
+/**
+ * `git-read.sh <args>`, each argument whole on Windows too: a `\r` or `\n` in one
+ * is what the refusal tests send (bashArgv). `noglob` keeps a wildcard as typed.
+ */
 export function gitRead(args: string[], cwd: string, env: Record<string, string> = {}) {
   const e: Record<string, string> = { ...env };
   if (Deno.build.os === "windows") e.MSYS = "noglob";
-  return run("bash", [SCRIPT, ...args], cwd, e);
+  const bash = bashArgv([SCRIPT, ...args]);
+  return run("bash", bash.args, cwd, { ...e, ...bash.env });
 }
 
 /** The library's runner on a fixed argv, as a script that sources it calls it. */
@@ -34,7 +39,8 @@ export function libraryGit(args: string[], cwd: string, env: Record<string, stri
   const e: Record<string, string> = { ...env };
   if (Deno.build.os === "windows") e.MSYS = "noglob";
   const lib = LIBRARY.replaceAll("\\", "/");
-  return run("bash", ["-c", '. "$1"; shift; _gu_git "$@"', "_", lib, ...args], cwd, e);
+  const bash = bashArgv(["-c", '. "$1"; shift; _gu_git "$@"', "_", lib, ...args]);
+  return run("bash", bash.args, cwd, { ...e, ...bash.env });
 }
 
 /** Forward slashes: git runs these programs through a shell, which reads `\` as an escape. */
