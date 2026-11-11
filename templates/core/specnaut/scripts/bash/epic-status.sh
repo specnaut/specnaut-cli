@@ -30,18 +30,49 @@
 #      holds any commit is read as it stands: the second branch of an epic
 #      delivered across several is not a re-run
 #
-# Usage: epic-status.sh
+# --landed <E>[@<epoch>] (cli#760) reads what an epic already shipped instead:
+# one CHILD line, oldest first, per commit on the published base —
+# `refs/remotes/origin/<base>`, else `refs/heads/<base>` — whose `Epic: #<E>`
+# trailer names it and whose subject is a child's, ignoring commits older than
+# <epoch> (none given: 0). No sequence check: ordinals carry across the
+# deliveries of one epic. Exits 0, 2 (<E> not ^[1-9][0-9]{0,9}$, an epoch not
+# ^[0-9]{1,12}$), 3 and 15 as above. phases/merge-close.md § Re-entry and
+# _intake_gate.sh read it.
+#
+# Usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-if [ $# -ne 0 ]; then echo "usage: epic-status.sh" >&2; exit 2; fi
+landed=""
+if [ $# -eq 2 ] && [ "$1" = --landed ] && [[ $2 =~ ^[1-9][0-9]{0,9}(@[0-9]{1,12})?$ ]]; then
+  landed=$2
+elif [ $# -ne 0 ]; then
+  echo "usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]" >&2
+  exit 2
+fi
 # The base has one home, base-branch.sh — never an argument.
 base=$(bash "$here/base-branch.sh") || exit 3
 if ! git --no-pager rev-parse --verify --quiet "refs/heads/$base^{commit}" >/dev/null &&
   ! git --no-pager rev-parse --verify --quiet "refs/remotes/origin/$base^{commit}" >/dev/null; then
   echo "epic-status: the base '$base' does not resolve to a commit" >&2
   exit 3
+fi
+# A child's subject, `<type>(T<NN>): <subject> (#<child>)`, read the same by both modes.
+CHILD_RE='^[a-z]+\(T([0-9]{1,4})\): .+ \(#([1-9][0-9]{0,9})\)$'
+if [ -n "$landed" ]; then
+  epic=${landed%%@*} since=0
+  [ "$landed" = "$epic" ] || since=$((10#${landed#*@}))
+  ref="refs/remotes/origin/$base"
+  git --no-pager rev-parse --verify --quiet "$ref^{commit}" >/dev/null || ref="refs/heads/$base"
+  # Anchored per line by git itself: #50 never matches a trailer of #501.
+  log=$(git --no-pager log --reverse --format='%H%x1f%ct%x1f%s' -E --grep="^Epic: #$epic\$" "$ref" --) ||
+    { echo "epic-status: could not read $ref - git log failed; nothing concluded" >&2; exit 15; }
+  while IFS=$'\x1f' read -r sha ct subject; do
+    [ -n "$sha" ] && [ "$ct" -ge "$since" ] && [[ $subject =~ $CHILD_RE ]] || continue
+    printf 'CHILD T%02d #%s %s\n' "$((10#${BASH_REMATCH[1]}))" "${BASH_REMATCH[2]}" "$sha"
+  done <<<"$log"
+  exit 0
 fi
 # Fully qualified: a tag named like the base would otherwise shadow it.
 range="refs/heads/$base..HEAD"
@@ -73,7 +104,7 @@ while IFS=$'\x1f' read -r sha subject; do
   elif [ "$trailer" != "$epic" ]; then
     problems+=("${sha:0:12} names epic #$trailer, the branch is #$epic")
   fi
-  if [[ $subject =~ ^[a-z]+\(T([0-9]{1,4})\):\ .+\ \(#([1-9][0-9]{0,9})\)$ ]]; then
+  if [[ $subject =~ $CHILD_RE ]]; then
     ordinal=$((10#${BASH_REMATCH[1]}))
     child=${BASH_REMATCH[2]}
     if [ "$ordinal" -ne "$expected" ]; then

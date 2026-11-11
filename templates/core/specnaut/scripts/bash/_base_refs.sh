@@ -1,4 +1,4 @@
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC2154 # here: set by the sourcing script
 # The base and its refs, resolved once for wip-audit.sh and its intake gate
 # (cli#760) — the one home of `unread`, `present` and the published ref.
 # Sourced, never run, by wip-audit.sh, which sets `here` (this directory) and

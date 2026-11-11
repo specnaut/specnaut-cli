@@ -2195,6 +2195,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_intake_gate.sh",
+      "source": "core/specnaut/scripts/bash/_intake_gate.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/wip-audit.sh",
       "source": "core/specnaut/scripts/bash/wip-audit.sh",
       "executable": true

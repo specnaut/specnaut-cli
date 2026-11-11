@@ -39,6 +39,7 @@
 # classified then, so no IDLE is ever reported for an item that went unchecked.
 #
 # Usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…   (--limit default 20)
+#        wip-audit.sh --gate …                       (the intake gate, below)
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
 # Git Bash on Windows rewrites an argument shaped like a path list, which
@@ -52,6 +53,33 @@ usage() {
   exit 2
 }
 NUM='^[1-9][0-9]{0,9}$'
+# first_naming <n> <epoch> <records> — the sha of the first record whose
+# subject names #<n> and whose time is not older than <epoch>.
+first_naming() {
+  local n=$1 since=$2 sha ct subject
+  local re="(^|[^[:alnum:]_/.-])#${n}([^0-9]|$)" scope="^[a-z]+\\(${n}\\)!?: "
+  while IFS=$'\x1f' read -r sha ct subject; do
+    [ -n "$sha" ] || continue
+    if [ "$ct" = LINK ]; then
+      [ "$subject" = "$n" ] && { printf '%s' "$sha"; return 0; }
+      continue
+    fi
+    [ "$ct" -ge "$since" ] || continue
+    if [[ $subject =~ $re ]] || [[ $subject =~ $scope ]]; then printf '%s' "$sha"; return 0; fi
+  done <<<"$3"
+  return 1
+}
+# unread, present and the base's refs: their one home, beside this script.
+# shellcheck source=./_base_refs.sh
+. "$here/_base_refs.sh"
+# --gate is the intake gate (cli#760): its rule, lines and exits are the
+# header of _intake_gate.sh. This script only hands it the arguments.
+if [ "${1:-}" = --gate ]; then
+  shift
+  # shellcheck source=./_intake_gate.sh
+  . "$here/_intake_gate.sh"
+  intake_gate "$@"
+fi
 limit=20 items=()
 while [ $# -gt 0 ]; do
   case $1 in
@@ -61,9 +89,6 @@ while [ $# -gt 0 ]; do
 done
 [ ${#items[@]} -gt 0 ] || usage
 
-# unread, present and the base's refs: their one home, beside this script.
-# shellcheck source=./_base_refs.sh
-. "$here/_base_refs.sh"
 resolve_base_refs
 
 # Every history is read whole before any item is matched: a failed read is exit 3.
@@ -112,23 +137,6 @@ while IFS= read -r ref; do
     sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([1-9][0-9]*\).*/\1/p' | sed -n 1p)
   [ -z "$link" ] || active+="$tip"$'\x1fLINK\x1f'"$link"$'\n'
 done <<<"$refs"
-# first_naming <n> <epoch> <records> — the sha of the first record whose
-# subject names #<n> and whose time is not older than <epoch>.
-first_naming() {
-  local n=$1 since=$2 sha ct subject
-  local re="(^|[^[:alnum:]_/.-])#${n}([^0-9]|$)" scope="^[a-z]+\\(${n}\\)!?: "
-  while IFS=$'\x1f' read -r sha ct subject; do
-    [ -n "$sha" ] || continue
-    if [ "$ct" = LINK ]; then
-      [ "$subject" = "$n" ] && { printf '%s' "$sha"; return 0; }
-      continue
-    fi
-    [ "$ct" -ge "$since" ] || continue
-    if [[ $subject =~ $re ]] || [[ $subject =~ $scope ]]; then printf '%s' "$sha"; return 0; fi
-  done <<<"$3"
-  return 1
-}
-
 audited=0 c=0 u=0 l=0 i=0 d=0
 for item in "${items[@]}"; do
   n=${item%%@*} since=0
