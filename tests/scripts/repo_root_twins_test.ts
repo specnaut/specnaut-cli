@@ -12,81 +12,38 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { copy } from "@std/fs";
-import { fromFileUrl, join } from "@std/path";
-import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { join } from "@std/path";
 import { git, type Run, run } from "./git_sandbox.ts";
 import { slashes } from "./twin_paths.ts";
-import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
+import { guardPowerShellArm } from "./pwsh_arm.ts";
+import { results, SCRIPTS, twins } from "./twin_runner.ts";
 
-const SCRIPTS = fromFileUrl(new URL("../../templates/core/specnaut/scripts/", import.meta.url));
 const WINDOWS = Deno.build.os === "windows";
-const BASH = Deno.build.os === "darwin" ? "/bin/bash" : "bash";
 
 guardPowerShellArm();
 
-/** The directories a twin's scripts are run from. */
-type Scripts = { bash: string; powershell: string };
-
-const IN_PLACE: Scripts = { bash: join(SCRIPTS, "bash"), powershell: join(SCRIPTS, "powershell") };
+/** A scripts tree holding `bash/` and `powershell/`: the bundled one run in place, or an install. */
+const IN_PLACE = SCRIPTS;
 
 /** Both twins installed where `specnaut init` puts them. */
-async function install(project: string): Promise<Scripts> {
+async function install(project: string): Promise<string> {
   const dest = join(project, ".specnaut/scripts");
   await copy(SCRIPTS, dest);
-  return { bash: join(dest, "bash"), powershell: join(dest, "powershell") };
+  return dest;
 }
 
-const TWINS = [
-  {
-    name: "bash",
-    probe: (s: Scripts, cwd: string) =>
-      run(BASH, [
-        "-c",
-        `source '${bashPath(join(s.bash, "common.sh"))}'
-printf 'RESULT root=%s\\n' "$(get_repo_root)"
+/** The project root and whether it has git, as each twin answers them. */
+const PROBE = {
+  bash: `printf 'RESULT root=%s\\n' "$(get_repo_root)"
 if has_git; then echo RESULT hasgit=true; else echo RESULT hasgit=false; fi`,
-      ], cwd),
-    feature: (s: Scripts, cwd: string) =>
-      run(BASH, [
-        bashPath(join(s.bash, "create-new-feature.sh")),
-        "--json",
-        "--dry-run",
-        "--short-name",
-        "demo",
-        "Demo",
-      ], cwd),
-  },
-  ...(PWSH_AVAILABLE
-    ? [{
-      name: "pwsh",
-      probe: (s: Scripts, cwd: string) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-Command",
-          `. '${join(s.powershell, "common.ps1")}'
-"RESULT root=$(Get-RepoRoot)"
+  pwsh: `"RESULT root=$(Get-RepoRoot)"
 "RESULT hasgit=$("$(Test-HasGit)".ToLower())"`,
-        ], cwd),
-      feature: (s: Scripts, cwd: string) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-File",
-          join(s.powershell, "create-new-feature.ps1"),
-          "-Json",
-          "-DryRun",
-          "-ShortName",
-          "demo",
-          "Demo",
-        ], cwd),
-    }]
-    : []),
-];
+};
 
-const results = (r: Run) =>
-  r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) => l.slice(7));
+const FEATURE = ["--json", "--dry-run", "--short-name", "demo", "Demo"];
 
 /** What a scenario sets up under a fresh directory, and the answer both twins owe. */
-type Fixture = { cwd: string; scripts: Scripts; root: string; hasGit: boolean };
+type Fixture = { cwd: string; scripts: string; root: string; hasGit: boolean };
 
 async function mkdir(base: string, ...parts: string[]): Promise<string> {
   const dir = join(base, ...parts);
@@ -94,7 +51,7 @@ async function mkdir(base: string, ...parts: string[]): Promise<string> {
   return dir;
 }
 
-async function nested(tmp: string): Promise<{ project: string; scripts: Scripts }> {
+async function nested(tmp: string): Promise<{ project: string; scripts: string }> {
   await git(tmp, "init", "-q", "-b", "main");
   const project = await mkdir(tmp, "sub");
   return { project, scripts: await install(project) };
@@ -191,7 +148,7 @@ async function withTmp(fn: (tmp: string) => Promise<void>): Promise<void> {
   }
 }
 
-for (const twin of TWINS) {
+for (const twin of twins()) {
   for (const { label, ignore, setup } of SCENARIOS) {
     Deno.test({
       name: `repo root [${twin.name}]: ${label}`,
@@ -199,7 +156,7 @@ for (const twin of TWINS) {
       fn: () =>
         withTmp(async (tmp) => {
           const f = await setup(tmp);
-          const r = await twin.probe(f.scripts, f.cwd);
+          const r: Run = await twin.functions(f.scripts, PROBE, f.cwd);
           assertEquals(
             results(r).map((l) => l.startsWith("root=") ? `root=${slashes(l.slice(5))}` : l),
             [`root=${slashes(f.root)}`, `hasgit=${f.hasGit}`],
@@ -212,7 +169,7 @@ for (const twin of TWINS) {
   Deno.test(`repo root [${twin.name}]: a nested project's spec is written under it, on its branch`, () =>
     withTmp(async (tmp) => {
       const { project, scripts } = await nested(tmp);
-      const r = await twin.feature(scripts, project);
+      const r = await twin.entry(scripts, "create-new-feature", FEATURE, project);
       assertEquals(r.code, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
       const out = JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "");
       assertEquals(out.BRANCH_NAME, "001-demo");

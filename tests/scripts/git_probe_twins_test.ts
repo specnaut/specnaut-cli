@@ -2,8 +2,8 @@
 // run, on stderr, in fixed text, and a normal "no" says nothing. The rule is
 // `Invoke-GitProbe`'s (cli#719); `_git_probe` is its bash twin.
 //
-// The function rows call the git-backed functions in one shell, as
-// `powershell_warning_rule_test.ts` does, so "once" is observable. The entry
+// The function rows call the git-backed functions in one shell, so "once" is
+// observable; they are the warning rule's rows for PowerShell too. The entry
 // rows run the scripts, where the bash functions are called inside `$( … )`:
 // only there is a flag set in a subshell lost, and only there does "once per
 // run" have to survive it.
@@ -13,15 +13,13 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { copy } from "@std/fs";
-import { fromFileUrl, join } from "@std/path";
-import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { join } from "@std/path";
 import { git, type Run, run } from "./git_sandbox.ts";
 import { slashes } from "./twin_paths.ts";
-import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
+import { guardPowerShellArm } from "./pwsh_arm.ts";
+import { BASH, results as resultLines, SCRIPTS, twins, warnings } from "./twin_runner.ts";
 
-const SCRIPTS = fromFileUrl(new URL("../../templates/core/specnaut/scripts/", import.meta.url));
 const WINDOWS = Deno.build.os === "windows";
-const BASH = Deno.build.os === "darwin" ? "/bin/bash" : "bash";
 
 guardPowerShellArm();
 
@@ -29,12 +27,14 @@ guardPowerShellArm();
 async function withProject(fn: (dir: string) => Promise<void>): Promise<void> {
   const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "git-probe-twins-" }));
   try {
-    await copy(SCRIPTS, join(dir, ".specnaut/scripts"));
+    await copy(SCRIPTS, installed(dir));
     await fn(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
 }
+
+const installed = (dir: string) => join(dir, ".specnaut/scripts");
 
 /**
  * A directory standing in for PATH with no git on it. Bash still needs the
@@ -56,68 +56,20 @@ async function pathWithout(dir: string, gitStub?: string): Promise<string> {
   return bin;
 }
 
-type Twin = {
-  name: string;
-  /** The three git-backed functions in one shell, with `path`, when given, as the whole PATH. */
-  functions: (dir: string, path?: string) => Promise<Run>;
-  /** An installed entry script, by its bash name, with its JSON flag. */
-  entry: (dir: string, script: string, ...args: string[]) => Promise<Run>;
-};
-
-const TWINS: Twin[] = [
-  {
-    name: "bash",
-    functions: (dir, path) =>
-      run(BASH, [
-        "-c",
-        `${
-          path === undefined ? "" : `PATH='${bashPath(path)}'\n`
-        }source .specnaut/scripts/bash/common.sh
-printf 'RESULT root=%s\\n' "$(get_repo_root)"
+/** The three git-backed functions in one shell, each answering on a `RESULT` line. */
+const GIT_FUNCTIONS = {
+  bash: `printf 'RESULT root=%s\\n' "$(get_repo_root)"
 printf 'RESULT branch='; get_current_branch
 if has_git; then echo RESULT hasgit=true; else echo RESULT hasgit=false; fi
 if command -v git >/dev/null; then echo RESULT gitfound=true; else echo RESULT gitfound=false; fi`,
-      ], dir),
-    entry: (dir, script, ...args) =>
-      run(
-        BASH,
-        [bashPath(join(dir, ".specnaut/scripts/bash", `${script}.sh`)), "--json", ...args],
-        dir,
-      ),
-  },
-  ...(PWSH_AVAILABLE
-    ? [{
-      name: "pwsh",
-      functions: (dir: string, path?: string) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-Command",
-          `${
-            path === undefined ? "" : `$env:PATH = '${path}'\n`
-          }. '.specnaut/scripts/powershell/common.ps1'
-"RESULT root=$(Get-RepoRoot)"
+  pwsh: `"RESULT root=$(Get-RepoRoot)"
 "RESULT branch=$(Get-CurrentBranch)"
 "RESULT hasgit=$("$(Test-HasGit)".ToLower())"
 "RESULT gitfound=$("$([bool](Get-Command git -ErrorAction SilentlyContinue))".ToLower())"`,
-        ], dir),
-      entry: (dir: string, script: string, ...args: string[]) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-File",
-          join(dir, ".specnaut/scripts/powershell", `${script}.ps1`),
-          "-Json",
-          ...args.map((a) => a === "--dry-run" ? "-DryRun" : a),
-        ], dir),
-    }]
-    : []),
-];
+};
 
 const results = (r: Run) =>
-  r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) =>
-    l.startsWith("RESULT root=") ? `root=${slashes(l.slice(12))}` : l.slice(7)
-  );
-
-const warnings = (r: Run) => r.stderr.split(/\r?\n/).filter((l) => l.startsWith("WARNING:"));
+  resultLines(r).map((l) => l.startsWith("root=") ? `root=${slashes(l.slice(5))}` : l);
 
 const BROKEN = "WARNING: git exited 128 reading this repository; continuing without git";
 const NO_GIT = "WARNING: .git is present but git is not on PATH; continuing without git";
@@ -197,7 +149,7 @@ const ROWS: Array<{
   },
 ];
 
-for (const twin of TWINS) {
+for (const twin of twins()) {
   for (const row of ROWS) {
     Deno.test({
       name: `git probe [${twin.name}]: ${row.label}`,
@@ -205,7 +157,7 @@ for (const twin of TWINS) {
       fn: () =>
         withProject(async (dir) => {
           const path = await row.setup(dir);
-          const r = await twin.functions(dir, path);
+          const r = await twin.functions(installed(dir), GIT_FUNCTIONS, dir, path);
           const { branch, hasgit, gitfound } = row.values;
           assertEquals(results(r), [
             `root=${slashes(dir)}`,
@@ -228,19 +180,14 @@ for (const twin of TWINS) {
   }
 
   // Once per RUN: the entry scripts, in a project whose .git git cannot read.
-  for (
-    const [script, ...args] of [["setup-plan"], ["check-prerequisites"], [
-      "create-new-feature",
-      "--dry-run",
-      "demo",
-    ]]
-  ) {
+  const feature = ["create-new-feature", "--dry-run", "demo"];
+  for (const [script, ...args] of [["setup-plan"], ["check-prerequisites"], feature]) {
     Deno.test(`git probe [${twin.name}]: ${script} warns once per run`, () =>
       withProject(async (dir) => {
         await Deno.writeTextFile(join(dir, ".git"), "gitdir: /nowhere\n");
         await Deno.mkdir(join(dir, ".specnaut/specs/001-demo"), { recursive: true });
         await Deno.writeTextFile(join(dir, ".specnaut/specs/001-demo/plan.md"), "# Plan\n");
-        const r = await twin.entry(dir, script, ...args);
+        const r = await twin.entry(installed(dir), script, ["--json", ...args], dir);
         assertEquals(warnings(r), [BROKEN], `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
         assert(!r.stderr.includes("nowhere"), `git's text reached stderr: ${r.stderr}`);
       }));

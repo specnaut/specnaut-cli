@@ -12,14 +12,12 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { copy } from "@std/fs";
-import { fromFileUrl, join } from "@std/path";
+import { join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import { git, type Run, run } from "./git_sandbox.ts";
 import { slashes } from "./twin_paths.ts";
-import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
-
-const SCRIPTS = fromFileUrl(new URL("../../templates/core/specnaut/scripts/", import.meta.url));
-const BASH = Deno.build.os === "darwin" ? "/bin/bash" : "bash";
+import { guardPowerShellArm } from "./pwsh_arm.ts";
+import { BASH, results, SCRIPTS, twins, warnings } from "./twin_runner.ts";
 
 guardPowerShellArm();
 
@@ -34,35 +32,13 @@ Deno.test("the bash arm's python3 is present where it must be", () => {
   if (!PYTHON3) console.warn("  note: python3 is absent — the bash arm did not run");
 });
 
-const TWINS = [
-  ...(PYTHON3
-    ? [{
-      name: "bash",
-      resolve: (project: string) =>
-        run(BASH, [
-          "-c",
-          `source '${bashPath(join(SCRIPTS, "bash/common.sh"))}'
-p=$(resolve_template x "$1") || p=none
+/** The template `x` as each twin resolves it for `project`, or `none`. */
+const resolve = (project: string) => ({
+  bash: `p=$(resolve_template x '${bashPath(project)}') || p=none
 printf 'RESULT found=%s\\n' "$p"`,
-          "_",
-          bashPath(project),
-        ], project),
-    }]
-    : []),
-  ...(PWSH_AVAILABLE
-    ? [{
-      name: "pwsh",
-      resolve: (project: string) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-Command",
-          `. '${join(SCRIPTS, "powershell/common.ps1")}'
-$p = Resolve-Template -TemplateName x -RepoRoot '${project}'
+  pwsh: `$p = Resolve-Template -TemplateName x -RepoRoot '${project}'
 "RESULT found=$(if ($p) { $p } else { 'none' })"`,
-        ], project),
-    }]
-    : []),
-];
+});
 
 /** What the twins return: a preset's template, by the preset's id, or none. */
 type Found = "a" | "zeta" | "none";
@@ -126,14 +102,13 @@ async function withPresets(registry: string | undefined, fn: (p: string) => Prom
   }
 }
 
-const found = (r: Run) =>
-  r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT found=")).map((l) => l.slice(13));
+const found = (r: Run) => results(r).filter((l) => l.startsWith("found=")).map((l) => l.slice(6));
 
-for (const twin of TWINS) {
+for (const twin of twins(PYTHON3)) {
   for (const s of SCENARIOS) {
     Deno.test(`template resolution [${twin.name}]: ${s.label}`, () =>
       withPresets(s.registry, async (project) => {
-        const r = await twin.resolve(project);
+        const r = await twin.functions(SCRIPTS, resolve(project), project);
         const want = s.found === "none"
           ? "none"
           : slashes(join(project, ".specnaut/presets", s.found, "templates/x.md"));
@@ -142,15 +117,15 @@ for (const twin of TWINS) {
           [want],
           `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
         );
-        assertEquals(warnings(r), s.warns ? [MALFORMED] : [], r.stderr);
+        // Every other state is quiet on the whole of stderr, not only of warnings.
+        if (s.warns) assertEquals(warnings(r), [MALFORMED], r.stderr);
+        else assertEquals(r.stderr, "");
       }));
   }
 }
 
 const MALFORMED =
   "WARNING: .specnaut/presets/.registry could not be parsed; using alphabetical preset order";
-
-const warnings = (r: Run) => r.stderr.split(/\r?\n/).filter((l) => l.startsWith("WARNING:"));
 
 /**
  * The whole run (A5): `setup-plan` on a feature branch with no plan yet, so
@@ -173,33 +148,11 @@ async function withFeature(registry: string, fn: (dir: string) => Promise<void>)
   }
 }
 
-const SETUP_PLAN = [
-  ...(PYTHON3
-    ? [{
-      name: "bash",
-      run: (dir: string) =>
-        run(BASH, [bashPath(join(dir, ".specnaut/scripts/bash/setup-plan.sh")), "--json"], dir),
-    }]
-    : []),
-  ...(PWSH_AVAILABLE
-    ? [{
-      name: "pwsh",
-      run: (dir: string) =>
-        run("pwsh", [
-          "-NoProfile",
-          "-File",
-          join(dir, ".specnaut/scripts/powershell/setup-plan.ps1"),
-          "-Json",
-        ], dir),
-    }]
-    : []),
-];
-
-for (const twin of SETUP_PLAN) {
+for (const twin of twins(PYTHON3)) {
   Deno.test(`template resolution [${twin.name}]: setup-plan warns once of a malformed registry, in fixed text`, () =>
     // A raw ESC and a marker in a key: what a parser's message would quote.
     withFeature(`{"presets": {"MARKER-\u001b[31m": {`, async (dir) => {
-      const r = await twin.run(dir);
+      const r = await twin.entry(join(dir, ".specnaut/scripts"), "setup-plan", ["--json"], dir);
       assertEquals(r.code, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
       assertEquals(warnings(r), [MALFORMED], r.stderr);
       assert(!r.stderr.includes("MARKER"), `the key reached stderr: ${r.stderr}`);
@@ -211,7 +164,7 @@ for (const twin of SETUP_PLAN) {
 
   Deno.test(`template resolution [${twin.name}]: setup-plan is quiet on a blank registry`, () =>
     withFeature("  \n", async (dir) => {
-      const r = await twin.run(dir);
+      const r = await twin.entry(join(dir, ".specnaut/scripts"), "setup-plan", ["--json"], dir);
       assertEquals(r.code, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
       assertEquals(warnings(r), [], r.stderr);
       const plan = await Deno.readTextFile(join(dir, ".specnaut/specs/001-demo/plan.md"));
