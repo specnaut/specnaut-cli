@@ -1,6 +1,6 @@
 # shellcheck shell=bash disable=SC2154
 # Sourced by report-upstream.sh (its $DIR and $here used here) and by `text_refusal` in
-# _backlog_plan.sh: what is done to text, nothing that talks to a tracker. What the scans
+# _clean_text.sh: what is done to text, nothing that talks to a tracker. What the scans
 # refuse is listed once, in report-upstream.sh's header: a pattern added here is added there.
 # Every scan refuses by exiting through the caller's `refuse`, never by a verdict; a grep that
 # cannot run calls `refuse <class> error` (report-upstream.sh: the class; text_refusal: 2).

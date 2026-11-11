@@ -4,7 +4,7 @@
 #
 # Usage: label.sh <number> <label>...
 # Exit: 0 labelled · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent ·
+# (require_clean_text, _clean_text.sh), nothing sent ·
 # other glab's
 set -euo pipefail
 

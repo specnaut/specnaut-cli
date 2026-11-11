@@ -1,12 +1,13 @@
 # shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (`apply-plan.sh`) checks it here and
-# applies it; every script that sends text to a tracker asks `text_refusal`
-# here before it sends any. Sourced, never run, by apply-plan.sh, read-items.sh
-# and each backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh
-# posts its comment through clarify-comment.sh), installed beside it, once the
-# caller has `jq_lf`. What a run of a verb may write is `scope_for`, in
-# `_backlog_scope.sh` beside this file.
+# applies it. Sourced, never run, by apply-plan.sh, read-items.sh and each
+# backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh posts its
+# comment through clarify-comment.sh), installed beside it, once the caller has
+# `jq_lf`. Two rules beside this file are not this one: the secret check every
+# text meets before it is sent (`text_refusal`, `require_clean_text`), in
+# `_clean_text.sh`, which this file sources for its callers; and what a run of
+# a verb may write (`scope_for`), in `_backlog_scope.sh`.
 #
 # A plan is JSON Lines: one object per line, its `op` one of the eight below,
 # with exactly these keys (? = optional) and nothing else:
@@ -49,6 +50,8 @@ PLAN_MAX_OPS=40
 _PLAN_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_issue_text.sh
 . "$_PLAN_DIR/_issue_text.sh"
+# shellcheck source=./_clean_text.sh
+. "$_PLAN_DIR/_clean_text.sh"
 
 # backlog_fingerprint <root> — the work tree's state at a read, the same text
 # for read-items.sh, which records it, and apply-plan.sh, which checks it:
@@ -163,78 +166,4 @@ require_title() {
   jq_lf -n -e --arg t "${1-}" "$ISSUE_TEXT_JQ$PLAN_DEFS"' $t | plan_title' >/dev/null 2>&1 && return 0
   printf '%s: a title is one line of 1 to 256 printable characters\n' "${0##*/}" >&2
   return 2
-}
-
-# text_refusal < text -- the rule every backlog write meets: no text the secret
-# scan refuses (`scan_hard`, `_report_text.sh`: the patterns' one home) reaches
-# a tracker or a task file. It reads the bytes on stdin through the scan's own
-# `read_bytes`, so a NUL is judged rather than dropped. Its own subshell sources
-# the scan (only a caller that writes pays for it), in the C locale the scan
-# pins, with `set +e`: a writer's `set -e` would end a scan at the first grep
-# that finds nothing. Status: 0 clean, 1 refused with the class (`secret`,
-# `hidden`) on stdout, 2 with one line on stderr when there is no scan to run,
-# the text could not be read, or a grep of the scan failed: a scan that did not
-# run is no verdict, neither clean nor a refusal. Never 0 unscanned.
-text_refusal() (
-  set +e
-  # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
-  if ! . "$_PLAN_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
-    echo "${0##*/}: the secret scan is missing" >&2
-    exit 2
-  fi
-  # The scans' verdict: every one refuses by calling this, and it ends the
-  # subshell; `error` as the second word is a grep that could not run.
-  # shellcheck disable=SC2329
-  refuse() {
-    [ "${2-}" != error ] || { echo "${0##*/}: the secret scan could not run" >&2; exit 2; }
-    printf '%s' "$1"
-    exit 1
-  }
-  bytes=$(read_bytes) || { echo "${0##*/}: the text could not be read" >&2; exit 2; }
-  scan_hard "${bytes%x}"
-  exit 0
-)
-
-# require_clean_text <field> <text> -- a writer's check of one text field, before
-# its first tracker call or file write: clean, or it ends the calling script with
-# status 14 and `REFUSED <class> <field>` on stderr, never the text (stdout stays
-# the script's result). 14 is used by no other backlog script. A scan that could
-# not run ends it with status 2. Call it from the script's own shell.
-require_clean_text() {
-  local class rc=0
-  class=$(printf '%s' "${2-}" | text_refusal) || rc=$?
-  _clean_or_exit "$1" "$rc" "$class"
-}
-
-# clean_work_dir -- the writer's private work directory, made on first call: a
-# fresh directory only the user can open, removed when the script exits.
-# CLEAN_DIR names it; a writer builds what it sends from a judged text there.
-# It sets the script's EXIT trap, so a writer that calls it sets none of its
-# own. Call it from the script's own shell, never in `$(…)`.
-clean_work_dir() {
-  [ -z "${CLEAN_DIR:-}" ] || return 0
-  CLEAN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/backlog-text.XXXXXXXX") || { echo "${0##*/}: no temporary directory" >&2; exit 2; }
-  chmod 700 "$CLEAN_DIR"
-  trap 'rm -rf "$CLEAN_DIR"' EXIT
-}
-
-# require_clean_file <field> <path> -- require_clean_text for a file's bytes. The
-# file is copied first into clean_work_dir, which owns the script's EXIT trap;
-# CLEAN_FILE names the copy, the one the writer then sends, so the bytes sent
-# are the bytes judged.
-require_clean_file() {
-  local class rc=0
-  clean_work_dir
-  CLEAN_FILE="$CLEAN_DIR/$1"
-  cp -- "$2" "$CLEAN_FILE" || { echo "${0##*/}: could not read the $1 file" >&2; exit 2; }
-  class=$(text_refusal <"$CLEAN_FILE") || rc=$?
-  _clean_or_exit "$1" "$rc" "$class"
-}
-
-_clean_or_exit() {
-  case $2 in
-    0) ;;
-    1) printf 'REFUSED %s %s\n' "${3:-secret}" "$1" >&2; exit 14 ;;
-    *) exit 2 ;;
-  esac
 }

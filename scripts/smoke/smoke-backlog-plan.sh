@@ -2,9 +2,10 @@
 # The product owner's write plan, applied by the installed executor on every
 # backend. read-items.sh writes the items file outside the work tree, then
 # apply-plan.sh checks the plan (_apply_plan.sh, with the vocabulary of
-# _backlog_plan.sh and the scope of _backlog_scope.sh) and runs the backend's
-# own scripts. Each tracker CLI is a stand-in that logs every argv, so a check
-# reads what reached the tracker, or what the local files now hold.
+# _backlog_plan.sh, the text check of _clean_text.sh and the scope of
+# _backlog_scope.sh) and runs the backend's own scripts. Each tracker CLI is a
+# stand-in that logs every argv, so a check reads what reached the tracker, or
+# what the local files now hold.
 #
 # Usage: smoke-backlog-plan.sh <name>
 set -euo pipefail
@@ -90,6 +91,10 @@ check "_backlog_plan.sh: a move to Done is refused, and nothing is written" \
 apply "edit --id 1" '{"op":"comment","target":2,"body":"x"}'
 check "_backlog_scope.sh: a target outside the verb's scope is refused" \
   'said 3 "REFUSED scope 1.target" "RECEIPT: none"'
+# A userinfo URL, assembled so this public file never holds one whole.
+apply "edit --id 1" '{"op":"comment","target":1,"body":"see https://someone:'"hunter2"'@example.com/x"}'
+check "_clean_text.sh: a body the secret scan refuses is refused, and nothing is written" \
+  'said 3 "REFUSED secret 1.body" "RECEIPT: none" && ! item 001 | grep -qF "example.com"'
 read=$(TMPDIR="$WORK" bash .specnaut/scripts/backlog/read-items.sh edit --id 1)
 touch moved-since-the-read
 printf '%s\n' '{"op":"comment","target":1,"body":"x"}' >"$FR/plan.jsonl"

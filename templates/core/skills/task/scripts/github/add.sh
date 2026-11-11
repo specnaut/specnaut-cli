@@ -18,7 +18,7 @@
 #   13  the project could not be verified (rate limit, bad token, any gh
 #       error) — NOT a fallback signal and not a config error: retry, or
 #       report it. Nothing was created
-#   14  a text its secret check refused (require_clean_text, _backlog_plan.sh);
+#   14  a text its secret check refused (require_clean_text, _clean_text.sh);
 #       nothing was sent
 #   other  `gh issue create` failed — nothing was created
 set -euo pipefail

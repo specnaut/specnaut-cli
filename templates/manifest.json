@@ -493,6 +493,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_clean_text",
+      "suffix": "_clean_text.sh",
+      "source": "core/skills/task/scripts/_clean_text.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "_backlog_scope",
       "suffix": "_backlog_scope.sh",
       "source": "core/skills/task/scripts/_backlog_scope.sh",
@@ -717,6 +725,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_clean_text",
+      "suffix": "_clean_text.sh",
+      "source": "core/skills/task/scripts/_clean_text.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "_backlog_scope",
       "suffix": "_backlog_scope.sh",
       "source": "core/skills/task/scripts/_backlog_scope.sh",
@@ -925,6 +941,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_clean_text",
+      "suffix": "_clean_text.sh",
+      "source": "core/skills/task/scripts/_clean_text.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "_backlog_scope",
       "suffix": "_backlog_scope.sh",
       "source": "core/skills/task/scripts/_backlog_scope.sh",
@@ -1056,6 +1080,14 @@
       "name": "_backlog_plan",
       "suffix": "_backlog_plan.sh",
       "source": "core/skills/task/scripts/_backlog_plan.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_clean_text",
+      "suffix": "_clean_text.sh",
+      "source": "core/skills/task/scripts/_clean_text.sh",
       "executable": true,
       "backend": "cloud"
     },

@@ -6,7 +6,7 @@
 # `--body-file` keeps the text off the command line: a caller writes it to a
 # file and passes the path, so no quoting stands between the text and gh.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other gh's
+# (require_clean_text, _clean_text.sh), nothing sent · other gh's
 set -euo pipefail
 
 # shellcheck source=./_config.sh

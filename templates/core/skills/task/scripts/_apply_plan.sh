@@ -18,10 +18,10 @@
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against `text_refusal`, run over
-# the bytes this script then sends. Any refusal writes nothing. Free text
-# reaches a backend script only as a file this script wrote in its own 0700
-# directory; every other value as one argument.
+# the schema and the verb's scope, every text against `text_refusal`
+# (_clean_text.sh), run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this script
+# wrote in its own 0700 directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>

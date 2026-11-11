@@ -13,7 +13,7 @@
 # is refused rather than dropped — the other backends take one, and a caller
 # that passed it must not believe it was recorded (cli#697).
 # Exit: 0 created · 2 usage or a refused title · 3 no such parent · 14 a text
-# its secret check refused (require_clean_text, _backlog_plan.sh), nothing written
+# its secret check refused (require_clean_text, _clean_text.sh), nothing written
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'

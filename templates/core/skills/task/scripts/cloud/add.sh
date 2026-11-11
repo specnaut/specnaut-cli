@@ -10,7 +10,7 @@
 # shape as the local and github versions. It travels as `parentNumber` on the
 # versioned public contract — by number, never by an internal identifier.
 # Exit: 0 created · 1 the board refused · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent
+# (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'

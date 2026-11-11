@@ -6,7 +6,7 @@
 # `--body-file` keeps the text off the caller's command line: the file is read
 # here and handed to glab as one argument, with no shell between the two.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other glab's
+# (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh

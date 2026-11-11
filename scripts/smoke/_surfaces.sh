@@ -41,11 +41,12 @@ SURFACES=(
   # cli#711: the body every backend's close-shipped.sh sources. One source,
   # installed by all four backends, so each backend's smoke runs it.
   # The product owner's write plan: the executor's shared body, the plan's
-  # vocabulary and scope, the inert-text rule and the read, installed by all
-  # four backends and run end to end by smoke-backlog-plan.sh.
+  # vocabulary, scope and text check, the inert-text rule and the read,
+  # installed by all four backends and run end to end by smoke-backlog-plan.sh.
   'templates/core/skills/task/scripts/_apply_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_backlog_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_backlog_scope.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_clean_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_issue_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/read-items.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_close_shipped.sh|smoke-backlog-github.sh smoke-backlog-gitlab.sh smoke-backlog-local.sh smoke-backlog-cloud.sh|backlog-shared-body'

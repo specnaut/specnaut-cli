@@ -6910,7 +6910,7 @@ printf '%s' "\$RECORDS"
 # is refused rather than dropped — the other backends take one, and a caller
 # that passed it must not believe it was recorded (cli#697).
 # Exit: 0 created · 2 usage or a refused title · 3 no such parent · 14 a text
-# its secret check refused (require_clean_text, _backlog_plan.sh), nothing written
+# its secret check refused (require_clean_text, _clean_text.sh), nothing written
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
@@ -7154,7 +7154,7 @@ fi
 # \`--body-file\` keeps the text off the caller's command line: the file is read
 # here and appended as it is.
 # Exit: 0 added · 1 no such item · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent
+# (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -8195,12 +8195,13 @@ echo "linked #\$CHILD under #\$PARENT"
       `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
-# applies it; every script that sends text to a tracker asks \`text_refusal\`
-# here before it sends any. Sourced, never run, by apply-plan.sh, read-items.sh
-# and each backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh
-# posts its comment through clarify-comment.sh), installed beside it, once the
-# caller has \`jq_lf\`. What a run of a verb may write is \`scope_for\`, in
-# \`_backlog_scope.sh\` beside this file.
+# applies it. Sourced, never run, by apply-plan.sh, read-items.sh and each
+# backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh posts its
+# comment through clarify-comment.sh), installed beside it, once the caller has
+# \`jq_lf\`. Two rules beside this file are not this one: the secret check every
+# text meets before it is sent (\`text_refusal\`, \`require_clean_text\`), in
+# \`_clean_text.sh\`, which this file sources for its callers; and what a run of
+# a verb may write (\`scope_for\`), in \`_backlog_scope.sh\`.
 #
 # A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
 # with exactly these keys (? = optional) and nothing else:
@@ -8243,6 +8244,8 @@ PLAN_MAX_OPS=40
 _PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_issue_text.sh
 . "\$_PLAN_DIR/_issue_text.sh"
+# shellcheck source=./_clean_text.sh
+. "\$_PLAN_DIR/_clean_text.sh"
 
 # backlog_fingerprint <root> — the work tree's state at a read, the same text
 # for read-items.sh, which records it, and apply-plan.sh, which checks it:
@@ -8358,6 +8361,24 @@ require_title() {
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
 }
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_clean_text",
+    suffix: "_clean_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of the backlog writers' text check: no text the secret scan
+# refuses reaches a tracker or a task file. \`text_refusal\` judges bytes;
+# \`require_clean_text\` and \`require_clean_file\` end a writer on a refusal.
+# Sourced, never run, by \`_backlog_plan.sh\`, so every script that sources the
+# plan's vocabulary has it; installed beside it. The scan itself
+# (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
+
+_TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -8372,7 +8393,7 @@ require_title() {
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
-  if ! . "\$_PLAN_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
+  if ! . "\$_TEXT_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
@@ -8531,10 +8552,10 @@ epic_cleared() {
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against \`text_refusal\`, run over
-# the bytes this script then sends. Any refusal writes nothing. Free text
-# reaches a backend script only as a file this script wrote in its own 0700
-# directory; every other value as one argument.
+# the schema and the verb's scope, every text against \`text_refusal\`
+# (_clean_text.sh), run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this script
+# wrote in its own 0700 directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
@@ -9300,7 +9321,7 @@ printf '%s' "\$RECORDS"
 #   13  the project could not be verified (rate limit, bad token, any gh
 #       error) — NOT a fallback signal and not a config error: retry, or
 #       report it. Nothing was created
-#   14  a text its secret check refused (require_clean_text, _backlog_plan.sh);
+#   14  a text its secret check refused (require_clean_text, _clean_text.sh);
 #       nothing was sent
 #   other  \`gh issue create\` failed — nothing was created
 set -euo pipefail
@@ -10008,7 +10029,7 @@ fi
 # \`--body-file\` keeps the text off the command line: a caller writes it to a
 # file and passes the path, so no quoting stands between the text and gh.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other gh's
+# (require_clean_text, _clean_text.sh), nothing sent · other gh's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -11302,7 +11323,7 @@ echo "closed #\$NUM"
 #
 # Usage: label.sh <number> <label>...
 # Exit: 0 labelled · 2 usage · 14 a label its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other gh's
+# (require_clean_text, _clean_text.sh), nothing sent · other gh's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -11366,12 +11387,13 @@ echo "linked #\$CHILD under #\$PARENT"
       `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
-# applies it; every script that sends text to a tracker asks \`text_refusal\`
-# here before it sends any. Sourced, never run, by apply-plan.sh, read-items.sh
-# and each backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh
-# posts its comment through clarify-comment.sh), installed beside it, once the
-# caller has \`jq_lf\`. What a run of a verb may write is \`scope_for\`, in
-# \`_backlog_scope.sh\` beside this file.
+# applies it. Sourced, never run, by apply-plan.sh, read-items.sh and each
+# backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh posts its
+# comment through clarify-comment.sh), installed beside it, once the caller has
+# \`jq_lf\`. Two rules beside this file are not this one: the secret check every
+# text meets before it is sent (\`text_refusal\`, \`require_clean_text\`), in
+# \`_clean_text.sh\`, which this file sources for its callers; and what a run of
+# a verb may write (\`scope_for\`), in \`_backlog_scope.sh\`.
 #
 # A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
 # with exactly these keys (? = optional) and nothing else:
@@ -11414,6 +11436,8 @@ PLAN_MAX_OPS=40
 _PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_issue_text.sh
 . "\$_PLAN_DIR/_issue_text.sh"
+# shellcheck source=./_clean_text.sh
+. "\$_PLAN_DIR/_clean_text.sh"
 
 # backlog_fingerprint <root> — the work tree's state at a read, the same text
 # for read-items.sh, which records it, and apply-plan.sh, which checks it:
@@ -11529,6 +11553,24 @@ require_title() {
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
 }
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_clean_text",
+    suffix: "_clean_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of the backlog writers' text check: no text the secret scan
+# refuses reaches a tracker or a task file. \`text_refusal\` judges bytes;
+# \`require_clean_text\` and \`require_clean_file\` end a writer on a refusal.
+# Sourced, never run, by \`_backlog_plan.sh\`, so every script that sources the
+# plan's vocabulary has it; installed beside it. The scan itself
+# (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
+
+_TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -11543,7 +11585,7 @@ require_title() {
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
-  if ! . "\$_PLAN_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
+  if ! . "\$_TEXT_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
@@ -11702,10 +11744,10 @@ epic_cleared() {
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against \`text_refusal\`, run over
-# the bytes this script then sends. Any refusal writes nothing. Free text
-# reaches a backend script only as a file this script wrote in its own 0700
-# directory; every other value as one argument.
+# the schema and the verb's scope, every text against \`text_refusal\`
+# (_clean_text.sh), run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this script
+# wrote in its own 0700 directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
@@ -12624,7 +12666,7 @@ printf '%s' "\$RECORDS"
 # \`--body-file\` reads the body from a file, in place of the positional one
 # (pass "" there to give labels); it reaches glab as one argument, no shell.
 # Exit: 0 created · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other glab's
+# (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
@@ -12909,7 +12951,7 @@ fi
 # \`--body-file\` keeps the text off the caller's command line: the file is read
 # here and handed to glab as one argument, with no shell between the two.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other glab's
+# (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -13671,7 +13713,7 @@ echo "closed #\$NUM"
 #
 # Usage: label.sh <number> <label>...
 # Exit: 0 labelled · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent ·
+# (require_clean_text, _clean_text.sh), nothing sent ·
 # other glab's
 set -euo pipefail
 
@@ -13766,12 +13808,13 @@ echo "linked #\$CHILD under #\$PARENT"
       `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
-# applies it; every script that sends text to a tracker asks \`text_refusal\`
-# here before it sends any. Sourced, never run, by apply-plan.sh, read-items.sh
-# and each backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh
-# posts its comment through clarify-comment.sh), installed beside it, once the
-# caller has \`jq_lf\`. What a run of a verb may write is \`scope_for\`, in
-# \`_backlog_scope.sh\` beside this file.
+# applies it. Sourced, never run, by apply-plan.sh, read-items.sh and each
+# backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh posts its
+# comment through clarify-comment.sh), installed beside it, once the caller has
+# \`jq_lf\`. Two rules beside this file are not this one: the secret check every
+# text meets before it is sent (\`text_refusal\`, \`require_clean_text\`), in
+# \`_clean_text.sh\`, which this file sources for its callers; and what a run of
+# a verb may write (\`scope_for\`), in \`_backlog_scope.sh\`.
 #
 # A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
 # with exactly these keys (? = optional) and nothing else:
@@ -13814,6 +13857,8 @@ PLAN_MAX_OPS=40
 _PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_issue_text.sh
 . "\$_PLAN_DIR/_issue_text.sh"
+# shellcheck source=./_clean_text.sh
+. "\$_PLAN_DIR/_clean_text.sh"
 
 # backlog_fingerprint <root> — the work tree's state at a read, the same text
 # for read-items.sh, which records it, and apply-plan.sh, which checks it:
@@ -13929,6 +13974,24 @@ require_title() {
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
 }
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_clean_text",
+    suffix: "_clean_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of the backlog writers' text check: no text the secret scan
+# refuses reaches a tracker or a task file. \`text_refusal\` judges bytes;
+# \`require_clean_text\` and \`require_clean_file\` end a writer on a refusal.
+# Sourced, never run, by \`_backlog_plan.sh\`, so every script that sources the
+# plan's vocabulary has it; installed beside it. The scan itself
+# (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
+
+_TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -13943,7 +14006,7 @@ require_title() {
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
-  if ! . "\$_PLAN_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
+  if ! . "\$_TEXT_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
@@ -14102,10 +14165,10 @@ epic_cleared() {
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against \`text_refusal\`, run over
-# the bytes this script then sends. Any refusal writes nothing. Free text
-# reaches a backend script only as a file this script wrote in its own 0700
-# directory; every other value as one argument.
+# the schema and the verb's scope, every text against \`text_refusal\`
+# (_clean_text.sh), run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this script
+# wrote in its own 0700 directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
@@ -14772,7 +14835,7 @@ printf '%s' "\$RECORDS"
 # shape as the local and github versions. It travels as \`parentNumber\` on the
 # versioned public contract — by number, never by an internal identifier.
 # Exit: 0 created · 1 the board refused · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent
+# (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
 USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
@@ -15433,12 +15496,13 @@ receipt_snapshot() { :; }
       `# shellcheck shell=bash disable=SC2034  # PLAN_* are read by the scripts that source this.
 # The one home of what a backlog write may say, planned or direct: the product
 # owner proposes a plan, a bundled executor (\`apply-plan.sh\`) checks it here and
-# applies it; every script that sends text to a tracker asks \`text_refusal\`
-# here before it sends any. Sourced, never run, by apply-plan.sh, read-items.sh
-# and each backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh
-# posts its comment through clarify-comment.sh), installed beside it, once the
-# caller has \`jq_lf\`. What a run of a verb may write is \`scope_for\`, in
-# \`_backlog_scope.sh\` beside this file.
+# applies it. Sourced, never run, by apply-plan.sh, read-items.sh and each
+# backend's add.sh, edit.sh, clarify-comment.sh and label.sh (close.sh posts its
+# comment through clarify-comment.sh), installed beside it, once the caller has
+# \`jq_lf\`. Two rules beside this file are not this one: the secret check every
+# text meets before it is sent (\`text_refusal\`, \`require_clean_text\`), in
+# \`_clean_text.sh\`, which this file sources for its callers; and what a run of
+# a verb may write (\`scope_for\`), in \`_backlog_scope.sh\`.
 #
 # A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
 # with exactly these keys (? = optional) and nothing else:
@@ -15481,6 +15545,8 @@ PLAN_MAX_OPS=40
 _PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=./_issue_text.sh
 . "\$_PLAN_DIR/_issue_text.sh"
+# shellcheck source=./_clean_text.sh
+. "\$_PLAN_DIR/_clean_text.sh"
 
 # backlog_fingerprint <root> — the work tree's state at a read, the same text
 # for read-items.sh, which records it, and apply-plan.sh, which checks it:
@@ -15596,6 +15662,24 @@ require_title() {
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
 }
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_clean_text",
+    suffix: "_clean_text.sh",
+    content: `# shellcheck shell=bash
+# The one home of the backlog writers' text check: no text the secret scan
+# refuses reaches a tracker or a task file. \`text_refusal\` judges bytes;
+# \`require_clean_text\` and \`require_clean_file\` end a writer on a refusal.
+# Sourced, never run, by \`_backlog_plan.sh\`, so every script that sources the
+# plan's vocabulary has it; installed beside it. The scan itself
+# (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
+
+_TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -15610,7 +15694,7 @@ require_title() {
 text_refusal() (
   set +e
   # shellcheck source=../../../specnaut/scripts/bash/_report_text.sh
-  if ! . "\$_PLAN_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
+  if ! . "\$_TEXT_DIR/../bash/_report_text.sh" 2>/dev/null || ! declare -F scan_hard >/dev/null; then
     echo "\${0##*/}: the secret scan is missing" >&2
     exit 2
   fi
@@ -15769,10 +15853,10 @@ epic_cleared() {
 #
 # The plan is checked whole before anything is written (_backlog_plan.sh): its
 # verb, id and fingerprint against the items file's header, every line against
-# the schema and the verb's scope, every text against \`text_refusal\`, run over
-# the bytes this script then sends. Any refusal writes nothing. Free text
-# reaches a backend script only as a file this script wrote in its own 0700
-# directory; every other value as one argument.
+# the schema and the verb's scope, every text against \`text_refusal\`
+# (_clean_text.sh), run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this script
+# wrote in its own 0700 directory; every other value as one argument.
 #
 # stdout holds these lines and no others, then RECEIPT:
 #   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
@@ -16026,7 +16110,7 @@ exit 0
 # \`--body-file\` keeps the text off the caller's command line: the file is read
 # here and travels in the JSON payload, with no shell between the two.
 # Exit: 0 posted · 1 the board refused · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent
+# (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -31174,7 +31258,7 @@ esac
     suffix: "scripts/bash/_report_text.sh",
     content: `# shellcheck shell=bash disable=SC2154
 # Sourced by report-upstream.sh (its \$DIR and \$here used here) and by \`text_refusal\` in
-# _backlog_plan.sh: what is done to text, nothing that talks to a tracker. What the scans
+# _clean_text.sh: what is done to text, nothing that talks to a tracker. What the scans
 # refuse is listed once, in report-upstream.sh's header: a pattern added here is added there.
 # Every scan refuses by exiting through the caller's \`refuse\`, never by a verdict; a grep that
 # cannot run calls \`refuse <class> error\` (report-upstream.sh: the class; text_refusal: 2).

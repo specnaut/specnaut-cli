@@ -6,7 +6,7 @@
 # `--body-file` keeps the text off the caller's command line: the file is read
 # here and appended as it is.
 # Exit: 0 added · 1 no such item · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent
+# (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
 # shellcheck source=./_config.sh

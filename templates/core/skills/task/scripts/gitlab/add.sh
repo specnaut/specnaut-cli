@@ -11,7 +11,7 @@
 # `--body-file` reads the body from a file, in place of the positional one
 # (pass "" there to give labels); it reaches glab as one argument, no shell.
 # Exit: 0 created · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _backlog_plan.sh), nothing sent · other glab's
+# (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so `--help` and unknown-flag
