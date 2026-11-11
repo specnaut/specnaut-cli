@@ -27962,6 +27962,13 @@ BRANCH_NUMBER=""
 USE_TIMESTAMP=false
 LINKED_ISSUE=""
 ARGS=()
+# A whole number a signed 64-bit integer holds, leading zeros aside: what the
+# PowerShell twin's [long] binds (cli#764). Past it bash arithmetic wraps
+# silently and \`[ -lt ]\` fails open, so the bound is checked on the digits.
+_fits_long() {
+    local n="\${1#"\${1%%[!0]*}"}"
+    [[ "\$1" =~ ^[0-9]+\$ ]] && { [ \${#n} -lt 19 ] || { [ \${#n} -eq 19 ] && [[ ! "\$n" > 9223372036854775807 ]]; }; }
+}
 i=1
 while [ \$i -le \$# ]; do
     arg="\${!i}"
@@ -27979,14 +27986,10 @@ while [ \$i -le \$# ]; do
             ALLOW_EXISTING=true
             ;;
         --short-name)
-            if [ \$((i + 1)) -gt \$# ]; then
-                echo 'Error: --short-name requires a value' >&2
-                exit 1
-            fi
             i=\$((i + 1))
             next_arg="\${!i}"
-            # Check if the next argument is another option (starts with --)
-            if [[ "\$next_arg" == --* ]]; then
+            # Missing, or the next option (starts with --)
+            if [ \$i -gt \$# ] || [[ "\$next_arg" == --* ]]; then
                 echo 'Error: --short-name requires a value' >&2
                 exit 1
             fi
@@ -27999,9 +28002,8 @@ while [ \$i -le \$# ]; do
             fi
             i=\$((i + 1))
             next_arg="\${!i}"
-            # A whole number, as the PowerShell twin's [long]: bash would read it as arithmetic.
-            if ! [[ "\$next_arg" =~ ^[0-9]+\$ ]]; then
-                echo 'Error: --number requires a whole number' >&2
+            if ! _fits_long "\$next_arg"; then
+                echo "Error: --number requires a whole number up to 9223372036854775807" >&2
                 exit 1
             fi
             BRANCH_NUMBER="\$next_arg"
@@ -28010,18 +28012,14 @@ while [ \$i -le \$# ]; do
             USE_TIMESTAMP=true
             ;;
         --issue)
-            if [ \$((i + 1)) -gt \$# ]; then
-                echo 'Error: --issue requires a value' >&2
-                exit 1
-            fi
             i=\$((i + 1))
             next_arg="\${!i}"
-            if [[ "\$next_arg" == --* ]]; then
+            if [ \$i -gt \$# ] || [[ "\$next_arg" == --* ]]; then
                 echo 'Error: --issue requires a value' >&2
                 exit 1
             fi
-            if ! [[ "\$next_arg" =~ ^[0-9]+\$ ]] || [ "\$next_arg" -lt 1 ]; then
-                echo "Error: --issue must be a positive integer (got '\$next_arg')" >&2
+            if ! _fits_long "\$next_arg" || [ "\$next_arg" -lt 1 ]; then
+                echo "Error: --issue must be a positive integer up to 9223372036854775807 (got '\$next_arg')" >&2
                 exit 1
             fi
             LINKED_ISSUE="\$next_arg"
