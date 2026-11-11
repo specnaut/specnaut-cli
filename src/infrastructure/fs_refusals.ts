@@ -118,16 +118,21 @@ export const linkedStagingRefusal = (root: string, abs: string) =>
 /**
  * A staged path that is not a plain staged copy (cli#751): a link itself, or
  * behind one whose entry lands outside the staging folder, inside the project.
- * Which refusal a staging delete throws: a path whose entry leaves the project
- * gets `leavesRefusal`'s words, judged first; this one covers the rest. Being a
- * `PathRefusal`, `pruneStaging` reports it in `leftAlone`'s words, which say to
- * remove the link itself, never what it points at.
+ * Which refusal a staging read or delete throws (cli#765): a path that leaves
+ * the project gets `leavesRefusal`'s words, judged first; this one covers the
+ * rest. Being a `PathRefusal`, `pruneStaging` reports it in `leftAlone`'s words,
+ * which say to remove the link itself, never what it points at.
  */
-export const stagedEntryRefusal = (root: string, abs: string, resolved: string) =>
+export const stagedEntryRefusal = (
+  root: string,
+  abs: string,
+  resolved: string,
+  action: "read" | "delete",
+) =>
   new ContainmentRefusal(
-    `refusing to delete a staged path that is a link or lies behind one:\n` +
+    `refusing to ${action} a staged path that is a link or lies behind one:\n` +
       `  path:     ${abs}\n` +
       `  resolves: ${resolved}\n` +
       `  project:  ${root}\n` +
-      `Specnaut deletes only the plain copies it staged inside the staging folder.`,
+      `Specnaut reads and deletes only the plain copies it staged inside the staging folder.`,
   );
