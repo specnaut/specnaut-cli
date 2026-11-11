@@ -1,7 +1,15 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { versionsIn } from "../../scripts/check-release-commit.ts";
 import { writeVersions } from "../../scripts/bump-version.ts";
-import { git, H, LEAD, repoAt, repoWithHighlights, run } from "./release_commit_fixture.ts";
+import {
+  git,
+  H,
+  LEAD,
+  recordHistory,
+  repoAt,
+  repoWithHighlights,
+  run,
+} from "./release_commit_fixture.ts";
 
 /**
  * The gate between the release commit and `git tag`.
@@ -127,6 +135,7 @@ Deno.test("highlights absent at the previous tag cannot have been republished", 
   await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
   await Deno.writeTextFile(`${dir}/${H}`, LEAD);
   await writeVersions("1.1.0", dir);
+  await recordHistory(dir, "v1.1.0", LEAD);
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", "chore: release v1.1.0");
   assertEquals((await run(dir, "v1.1.0")).code, 0);

@@ -2,7 +2,7 @@
 //
 // Usage: deno run --allow-read --allow-run scripts/check-release-commit.ts v3.0.0
 //
-// Three things must hold at the moment a release tag is created, and none of
+// Five things must hold at the moment a release tag is created, and none of
 // them is checked by anything else in the pipeline:
 //
 //   1. The working tree is clean. A tag records a commit; anything uncommitted
@@ -23,6 +23,10 @@
 //      Harmless that time — the tree was correct — but it is only luck that
 //      separates "the bump rode along with a feature" from "the tag captured
 //      half a feature". This is the check that would have said so.
+//   5. The release records its highlights in `.specnaut/release/history/<tag>.md`,
+//      equal to `HIGHLIGHTS.md` (cli#759). The binary embeds that history and
+//      `specnaut upgrade` prints it for every release it crosses, so a record
+//      missing or out of step would show the wrong words, or none.
 //
 // Exit 0 = safe to tag. 1 = do not tag. 2 = usage/environment error.
 
@@ -30,6 +34,12 @@ import { VERSIONED_FILES } from "./bump-version.ts";
 import { releaseRefProblems } from "./catalog-refs.ts";
 
 const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
+
+/**
+ * Highlights compared whitespace-insensitively: reflowing is exactly the edit
+ * that must NOT count as rewriting, and `deno fmt` performs it unasked.
+ */
+const flat = (t: string) => t.replace(/\s+/g, " ").trim();
 
 async function git(...args: string[]): Promise<string> {
   const out = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
@@ -124,10 +134,6 @@ async function main() {
       // the gate green over that release's own lead, word for word. A guard that
       // reads when a file was touched cannot answer a question about what it
       // says.
-      //
-      // Whitespace-insensitive on purpose: reflowing is exactly the edit that
-      // must NOT count as rewriting, and `deno fmt` performs it unasked.
-      const flat = (t: string) => t.replace(/\s+/g, " ").trim();
       let published = "";
       try {
         published = await git("show", `${prevTag}:${HIGHLIGHTS}`);
@@ -144,6 +150,19 @@ async function main() {
         );
       }
     }
+  }
+
+  const record = `.specnaut/release/history/${tag}.md`;
+  let recorded: string | null = null;
+  try {
+    recorded = await Deno.readTextFile(record);
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+  }
+  if (recorded === null) {
+    problems.push(`${record} is missing — copy ${HIGHLIGHTS} to it, then bundle and commit`);
+  } else if (flat(recorded) !== flat(highlightsBody)) {
+    problems.push(`${record} differs from ${HIGHLIGHTS} — copy it again, then bundle and commit`);
   }
 
   const subject = await git("log", "-1", "--format=%s");

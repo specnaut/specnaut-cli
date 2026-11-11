@@ -23,6 +23,12 @@ Deno.test("SemVer.parse rejects garbage", () => {
   assertThrows(() => SemVer.parse("not-a-version"));
 });
 
+Deno.test("SemVer.tryParse answers null where parse throws, and parse's version otherwise", () => {
+  assertEquals(SemVer.tryParse("not-a-version"), null);
+  assertEquals(SemVer.tryParse(""), null);
+  assertEquals(SemVer.tryParse("v9.1.0-rc.1"), SemVer.parse("9.1.0-rc.1"));
+});
+
 Deno.test("SemVer.compare orders correctly", () => {
   const a = SemVer.parse("1.0.0");
   const b = SemVer.parse("1.0.1");

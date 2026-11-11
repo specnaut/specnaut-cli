@@ -22,6 +22,7 @@ import { renderOutcome, renderSummary } from "./upgrade_summary.ts";
 import { printUpgradeHookTrust } from "./hook_trust_note.ts";
 import { type BacklogBackend, RemovedHarnessError } from "../../domain/installed_lock.ts";
 import { switchBacklogBackend } from "./upgrade_backlog_switch.ts";
+import { printReleaseNotes } from "./upgrade_notes.ts";
 
 export type UpgradeIntent = {
   kind: "upgrade";
@@ -180,6 +181,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     for (const note of result.notes) console.log(yellow(`ℹ ${note}`));
     await printUpgradeHookTrust({ harness, projectDir }, result);
     console.log(green(`✓ already up to date (templates ${result.currentVersion})`));
+    printReleaseNotes(result);
     return 0;
   }
 
@@ -278,6 +280,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     at: new Date().toISOString(),
   });
   await markerStore.write(projectDir, merged);
+  printReleaseNotes(result);
 
   // Handoff: tell the user how to invoke the agent-assisted review.
   console.log();

@@ -122,8 +122,9 @@ export function staleRouterAdvice(dest: string): string {
  * `true` is one warning, of a wrong `false` an inert guardrail nobody hears of.
  */
 export function predatesPhaseMove(baselineVersion: string): boolean {
-  if (!/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(baselineVersion.trim())) return true;
-  return SemVer.parse(baselineVersion).compare(SemVer.parse(PHASES_LEFT_ROUTER.movedIn)) < 0;
+  const baseline = SemVer.tryParse(baselineVersion);
+  if (baseline === null) return true;
+  return baseline.compare(SemVer.parse(PHASES_LEFT_ROUTER.movedIn)) < 0;
 }
 
 /**

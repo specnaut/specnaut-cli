@@ -82,6 +82,8 @@ export async function repoAt(
     `${dir}/README.md`,
     `\`"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v${version}"]\`\n`,
   );
+  // No highlights here, so the release records an empty history file (cli#759).
+  await recordHistory(dir, `v${version}`, "");
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
   return dir;
@@ -91,12 +93,26 @@ export const H = ".specnaut/release/HIGHLIGHTS.md";
 export const LEAD =
   "**A thing shipped.**\n\nIt does the thing, and here is why that matters to you.\n";
 
-/** A repo tagged at `prev` carrying `lead`, then bumped to `next`. */
+/**
+ * What the release step writes beside the bump (cli#759): `HIGHLIGHTS.md` as
+ * `history/<tag>.md`. `null` writes nothing, for the case the gate refuses.
+ */
+export async function recordHistory(dir: string, tag: string, text: string | null) {
+  await Deno.mkdir(`${dir}/.specnaut/release/history`, { recursive: true });
+  if (text !== null) await Deno.writeTextFile(`${dir}/.specnaut/release/history/${tag}.md`, text);
+}
+
+/**
+ * A repo tagged at `prev` carrying `lead`, then bumped to `next`, whose release
+ * commit records `record` as its history file — by default, `HIGHLIGHTS.md` as
+ * it stands then.
+ */
 export async function repoWithHighlights(
   prev: string,
   next: string,
   lead: string,
   after: (dir: string) => Promise<void>,
+  record?: string | null,
 ): Promise<string> {
   const dir = await repoAt(prev.slice(1), `chore: release ${prev}`);
   await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
@@ -108,6 +124,11 @@ export async function repoWithHighlights(
   // The bump to `next`, in its own commit, written by the pipeline's own
   // writer: a second list of version files here would drift from the real one.
   await writeVersions(next.slice(1), dir);
+  await recordHistory(
+    dir,
+    next,
+    record !== undefined ? record : await Deno.readTextFile(`${dir}/${H}`),
+  );
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", `chore: release ${next}`);
   return dir;

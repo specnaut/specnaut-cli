@@ -34,6 +34,8 @@ type WithMerges = {
 
 export type UpToDateResult = WithRefusals & WithMerges & {
   status: "up-to-date";
+  /** The version the lock recorded before this run: a run that moved only the version crossed releases too. */
+  fromVersion: string;
   currentVersion: string;
 };
 

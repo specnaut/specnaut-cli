@@ -1,5 +1,9 @@
 # Upgrading Specnaut
 
+After it runs, `specnaut upgrade` shows the highlights of every release it crossed, oldest first,
+each with a link to its full notes. They come from the binary itself and need no network.
+`/specnaut upgrade` quotes them in its report. The sections below say what you must do by hand.
+
 ## 9.1.0 → 9.2.0
 
 Run `specnaut upgrade`. The default size limits become file 200 / 500 lines, function 20 / 50 and

@@ -22,8 +22,15 @@ export class SemVer {
   ) {}
 
   static parse(raw: string): SemVer {
+    const parsed = SemVer.tryParse(raw);
+    if (parsed === null) throw new Error(`Invalid semver: ${raw}`);
+    return parsed;
+  }
+
+  /** `parse` for a caller that reads a version it does not control and must not throw on it. */
+  static tryParse(raw: string): SemVer | null {
     const m = SEMVER_RE.exec(raw.trim());
-    if (!m) throw new Error(`Invalid semver: ${raw}`);
+    if (!m) return null;
     return new SemVer(Number(m[1]), Number(m[2]), Number(m[3]), m[4] ?? null);
   }
 

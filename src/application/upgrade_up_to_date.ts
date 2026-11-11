@@ -38,6 +38,7 @@ export async function finishUpToDate(io: UpgradeIo, run: UpgradeRun): Promise<Up
   // The version reported is the one now recorded, not the one that was.
   return {
     status: "up-to-date",
+    fromVersion: run.lock.templatesVersion,
     currentVersion: run.templatesVersion,
     refusals: [...run.refusals, ...pruned],
     notes: [...merges.notes, ...grants],

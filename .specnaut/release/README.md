@@ -42,17 +42,30 @@ Homebrew vs. a hosted service).
 content, `gen-changelog.ts --highlights` renders it as a `### Highlights` block above every
 generated section, including breaking changes.
 
-**Its correct state between releases is empty.** Rewrite it before tagging; `git checkout` it back
-to empty as part of the release commit, or leave it empty when a release needs no lead. An empty
-file renders nothing, so there is no ceremony for an ordinary patch.
+**Write it in the release commit**, for that release, or empty it when a release needs no lead. It
+then stays as it is until the next release commit rewrites or empties it. An empty file renders
+nothing, so there is no ceremony for an ordinary patch.
 
 Say what a commit subject cannot: which renames, which defaults changed, what breaks for someone who
 does nothing. It is not a second changelog — the sections below it already list every commit.
 
-`scripts/check-release-commit.ts` refuses to tag when this file has content last written at or
-before the previous tag. Nothing downstream regenerates these words, so nothing downstream would
-notice them being a release out of date — and stale prose reads as authored and current, which is
-worse than a section that is visibly missing.
+`scripts/check-release-commit.ts` refuses to tag when this file still says what the previous tag
+published (whitespace-insensitive). Nothing downstream regenerates these words, so nothing
+downstream would notice them being a release out of date — and stale prose reads as authored and
+current, which is worse than a section that is visibly missing.
+
+## `history/` — what `specnaut upgrade` shows
+
+**The release commit copies `HIGHLIGHTS.md` to `history/v<NEXT>.md`**, before `deno task bundle`,
+and stages it with the version files — an empty file too, for a release with no lead. The binary
+embeds the history, and `specnaut upgrade` prints the entry of every release a project crosses, with
+a link to its full notes. A release with no entry is never shown.
+
+`scripts/check-release-commit.ts` refuses to tag when that file is missing or says something other
+than `HIGHLIGHTS.md` (whitespace-insensitive). The bundler refuses a history file holding a control,
+bidi or zero-width character, CRLF line endings, or a name that is not `v<MAJOR.MINOR.PATCH>.md`.
+The files are records of what each release published: `deno fmt` skips them, and nothing edits one
+after its release.
 
 ## Prerequisites — repo secrets
 
