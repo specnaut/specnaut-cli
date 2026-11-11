@@ -201,14 +201,14 @@ function Get-FeatureDirFromBranchPrefixOrExit {
     return $resolved
 }
 
-# The "feature_directory" of .specnaut/feature.json; $null when it names none.
+# The "feature_directory" of .specnaut/feature.json; $null when it names none. Read
+# inside the try (cli#763): an unreadable file is refused in the same fixed text.
 function Get-FeatureJsonDirectory {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $featureJson = Join-Path $RepoRoot '.specnaut/feature.json'
     if (-not (Test-Path $featureJson)) { return $null }
-    $featureJsonRaw = Get-Content -LiteralPath $featureJson -Raw
     try {
-        return ($featureJsonRaw | ConvertFrom-Json).feature_directory
+        return ((Get-Content -LiteralPath $featureJson -Raw -ErrorAction Stop) | ConvertFrom-Json).feature_directory
     } catch {
         [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json ($($_.Exception.GetType().Name))")
         exit 1

@@ -16,13 +16,17 @@
 # to $null on return, which is how "parsed, nothing enabled" read as "absent".
 #
 # The sentence is fixed text, because a parser's message quotes the file, and this
-# reaches a terminal and an agent's context (cli#719).
+# reaches a terminal and an agent's context (cli#719). The read is inside the try
+# (cli#763): Get-Content's own error names the file too, so an unreadable registry
+# is malformed, as python3's failed open() makes it in the bash twin.
 function Get-RegistryPresetIds {
     param([Parameter(Mandatory=$true)][string]$RegistryFile)
     $object = [System.Management.Automation.PSCustomObject]
-    $raw = if (Test-Path -LiteralPath $RegistryFile -PathType Leaf) { Get-Content -LiteralPath $RegistryFile -Raw }
-    if ([string]::IsNullOrWhiteSpace($raw)) { return [PSCustomObject]@{ State = 'absent'; Ids = @() } }
+    $absent = [PSCustomObject]@{ State = 'absent'; Ids = @() }
+    if (-not (Test-Path -LiteralPath $RegistryFile -PathType Leaf)) { return $absent }
     try {
+        $raw = Get-Content -LiteralPath $RegistryFile -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($raw)) { return $absent }
         $data = ConvertFrom-Json -InputObject $raw
         if ($data -isnot $object) { throw 'not a registry: the top level is not an object' }
         $presets = if ($data.PSObject.Properties['presets']) { $data.presets } else { [PSCustomObject]@{} }

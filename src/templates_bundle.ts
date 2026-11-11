@@ -32884,14 +32884,14 @@ function Get-FeatureDirFromBranchPrefixOrExit {
     return \$resolved
 }
 
-# The "feature_directory" of .specnaut/feature.json; \$null when it names none.
+# The "feature_directory" of .specnaut/feature.json; \$null when it names none. Read
+# inside the try (cli#763): an unreadable file is refused in the same fixed text.
 function Get-FeatureJsonDirectory {
     param([Parameter(Mandatory = \$true)][string]\$RepoRoot)
     \$featureJson = Join-Path \$RepoRoot '.specnaut/feature.json'
     if (-not (Test-Path \$featureJson)) { return \$null }
-    \$featureJsonRaw = Get-Content -LiteralPath \$featureJson -Raw
     try {
-        return (\$featureJsonRaw | ConvertFrom-Json).feature_directory
+        return ((Get-Content -LiteralPath \$featureJson -Raw -ErrorAction Stop) | ConvertFrom-Json).feature_directory
     } catch {
         [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json (\$(\$_.Exception.GetType().Name))")
         exit 1
@@ -32989,13 +32989,17 @@ function Test-FileExists {
 # to \$null on return, which is how "parsed, nothing enabled" read as "absent".
 #
 # The sentence is fixed text, because a parser's message quotes the file, and this
-# reaches a terminal and an agent's context (cli#719).
+# reaches a terminal and an agent's context (cli#719). The read is inside the try
+# (cli#763): Get-Content's own error names the file too, so an unreadable registry
+# is malformed, as python3's failed open() makes it in the bash twin.
 function Get-RegistryPresetIds {
     param([Parameter(Mandatory=\$true)][string]\$RegistryFile)
     \$object = [System.Management.Automation.PSCustomObject]
-    \$raw = if (Test-Path -LiteralPath \$RegistryFile -PathType Leaf) { Get-Content -LiteralPath \$RegistryFile -Raw }
-    if ([string]::IsNullOrWhiteSpace(\$raw)) { return [PSCustomObject]@{ State = 'absent'; Ids = @() } }
+    \$absent = [PSCustomObject]@{ State = 'absent'; Ids = @() }
+    if (-not (Test-Path -LiteralPath \$RegistryFile -PathType Leaf)) { return \$absent }
     try {
+        \$raw = Get-Content -LiteralPath \$RegistryFile -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace(\$raw)) { return \$absent }
         \$data = ConvertFrom-Json -InputObject \$raw
         if (\$data -isnot \$object) { throw 'not a registry: the top level is not an object' }
         \$presets = if (\$data.PSObject.Properties['presets']) { \$data.presets } else { [PSCustomObject]@{} }

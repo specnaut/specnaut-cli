@@ -43,7 +43,16 @@ printf 'RESULT found=%s\\n' "$p"`,
 /** What the twins return: a preset's template, by the preset's id, or none. */
 type Found = "a" | "zeta" | "none";
 
-const SCENARIOS: Array<{ label: string; registry?: string; found: Found; warns?: boolean }> = [
+/**
+ * A file this process cannot open is a mode, and only a non-root POSIX user is
+ * refused by one: Windows keeps no mode bits, and root reads any file.
+ */
+const UNREADABLE_OK = Deno.build.os !== "windows" &&
+  (await run("id", ["-u"], ".").catch(() => undefined))?.stdout.trim() !== "0";
+
+const SCENARIOS: Array<
+  { label: string; registry?: string; found: Found; warns?: boolean; unreadable?: boolean }
+> = [
   { label: "a registry with no presets searches none", registry: `{"presets":{}}`, found: "none" },
   {
     label: "a registry whose only preset is disabled searches none",
@@ -79,13 +88,21 @@ const SCENARIOS: Array<{ label: string; registry?: string; found: Found; warns?:
     found: "a",
     warns: true,
   },
+  {
+    // cli#763: what it would say if read enables nothing, so a read shows.
+    label: "a registry that cannot be read is malformed: directory order (POSIX)",
+    registry: `{"presets":{}}`,
+    unreadable: true,
+    found: "a",
+    warns: true,
+  },
   { label: "no registry takes directory order", found: "a" },
   { label: "an empty registry takes directory order", registry: "", found: "a" },
   { label: "a blank registry takes directory order", registry: "  \n", found: "a" },
 ];
 
 /** Presets `a` and `zeta` each holding `templates/x.md`; `a` comes first in directory order. */
-async function withPresets(registry: string | undefined, fn: (p: string) => Promise<void>) {
+async function withPresets(s: (typeof SCENARIOS)[number], fn: (p: string) => Promise<void>) {
   const project = await Deno.realPath(await Deno.makeTempDir({ prefix: "template-twins-" }));
   try {
     for (const id of ["a", "zeta"]) {
@@ -93,9 +110,9 @@ async function withPresets(registry: string | undefined, fn: (p: string) => Prom
       await Deno.mkdir(templates, { recursive: true });
       await Deno.writeTextFile(join(templates, "x.md"), `# ${id}\n`);
     }
-    if (registry !== undefined) {
-      await Deno.writeTextFile(join(project, ".specnaut/presets/.registry"), registry);
-    }
+    const registry = join(project, ".specnaut/presets/.registry");
+    if (s.registry !== undefined) await Deno.writeTextFile(registry, s.registry);
+    if (s.unreadable) await Deno.chmod(registry, 0o000);
     await fn(project);
   } finally {
     await Deno.remove(project, { recursive: true });
@@ -106,21 +123,24 @@ const found = (r: Run) => results(r).filter((l) => l.startsWith("found=")).map((
 
 for (const twin of twins(PYTHON3)) {
   for (const s of SCENARIOS) {
-    Deno.test(`template resolution [${twin.name}]: ${s.label}`, () =>
-      withPresets(s.registry, async (project) => {
-        const r = await twin.functions(SCRIPTS, resolve(project), project);
-        const want = s.found === "none"
-          ? "none"
-          : slashes(join(project, ".specnaut/presets", s.found, "templates/x.md"));
-        assertEquals(
-          found(r).map((p) => p === "none" ? p : slashes(p)),
-          [want],
-          `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
-        );
-        // Every other state is quiet on the whole of stderr, not only of warnings.
-        if (s.warns) assertEquals(warnings(r), [MALFORMED], r.stderr);
-        else assertEquals(r.stderr, "");
-      }));
+    Deno.test({
+      name: `template resolution [${twin.name}]: ${s.label}`,
+      ignore: s.unreadable && !UNREADABLE_OK,
+      fn: () =>
+        withPresets(s, async (project) => {
+          const r = await twin.functions(SCRIPTS, resolve(project), project);
+          const want = s.found === "none"
+            ? "none"
+            : slashes(join(project, ".specnaut/presets", s.found, "templates/x.md"));
+          assertEquals(
+            found(r).map((p) => p === "none" ? p : slashes(p)),
+            [want],
+            `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
+          );
+          // The whole of stderr: the one fixed line, or nothing; never a reader's own text.
+          assertEquals(r.stderr.split(/\r?\n/).filter(Boolean), s.warns ? [MALFORMED] : []);
+        }),
+    });
   }
 }
 
