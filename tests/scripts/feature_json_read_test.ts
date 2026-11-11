@@ -11,18 +11,11 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import { copy } from "@std/fs";
 import { join } from "@std/path";
-import { git, run } from "./git_sandbox.ts";
+import { git } from "./git_sandbox.ts";
 import { guardPowerShellArm, PWSH_AVAILABLE } from "./pwsh_arm.ts";
-import { SCRIPTS, twins } from "./twin_runner.ts";
+import { SCRIPTS, twins, UNREADABLE_OK } from "./twin_runner.ts";
 
 guardPowerShellArm();
-
-/**
- * A file this process cannot open is a mode, and only a non-root POSIX user is
- * refused by one: Windows keeps no mode bits, and root reads any file.
- */
-const UNREADABLE_OK = Deno.build.os !== "windows" &&
-  (await run("id", ["-u"], ".").catch(() => undefined))?.stdout.trim() !== "0";
 
 const REFUSAL = /^ERROR: Failed to parse \.specnaut\/feature\.json \(\w+\)$/;
 

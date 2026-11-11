@@ -74,6 +74,28 @@ export function twins(bash = true): Twin[] {
   return [...(bash ? [BASH_TWIN] : []), ...(PWSH_AVAILABLE ? [PWSH_TWIN] : [])];
 }
 
+/**
+ * Whether this process runs as root. No `id` to ask (a host without it) reads
+ * as not root; any other failure to ask is a broken probe, and is thrown.
+ */
+async function rootUser(): Promise<boolean> {
+  try {
+    return (await run("id", ["-u"], ".")).stdout.trim() === "0";
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
+}
+
+/** Root: it owns every directory a row could borrow, and reads every file. */
+export const ROOT_USER = await rootUser();
+
+/**
+ * Whether a file this process cannot open can be made, as a mode: only a
+ * non-root POSIX user is refused by one. Windows keeps no mode bits.
+ */
+export const UNREADABLE_OK = Deno.build.os !== "windows" && !ROOT_USER;
+
 /** The `RESULT <value>` lines a snippet printed, without the prefix. */
 export const results = (r: Run) =>
   r.stdout.split(/\r?\n/).filter((l) => l.startsWith("RESULT ")).map((l) => l.slice(7));

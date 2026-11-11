@@ -17,7 +17,7 @@ import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import { git, type Run, run } from "./git_sandbox.ts";
 import { slashes } from "./twin_paths.ts";
 import { guardPowerShellArm } from "./pwsh_arm.ts";
-import { BASH, results, SCRIPTS, twins, warnings } from "./twin_runner.ts";
+import { BASH, results, SCRIPTS, twins, UNREADABLE_OK, warnings } from "./twin_runner.ts";
 
 guardPowerShellArm();
 
@@ -42,13 +42,6 @@ printf 'RESULT found=%s\\n' "$p"`,
 
 /** What the twins return: a preset's template, by the preset's id, or none. */
 type Found = "a" | "zeta" | "none";
-
-/**
- * A file this process cannot open is a mode, and only a non-root POSIX user is
- * refused by one: Windows keeps no mode bits, and root reads any file.
- */
-const UNREADABLE_OK = Deno.build.os !== "windows" &&
-  (await run("id", ["-u"], ".").catch(() => undefined))?.stdout.trim() !== "0";
 
 const SCENARIOS: Array<
   { label: string; registry?: string; found: Found; warns?: boolean; unreadable?: boolean }

@@ -13,10 +13,10 @@
 import { assert, assertEquals } from "@std/assert";
 import { copy } from "@std/fs";
 import { join } from "@std/path";
-import { git, type Run, run } from "./git_sandbox.ts";
+import { git, type Run } from "./git_sandbox.ts";
 import { slashes } from "./twin_paths.ts";
 import { guardPowerShellArm } from "./pwsh_arm.ts";
-import { results, SCRIPTS, twins } from "./twin_runner.ts";
+import { results, ROOT_USER, SCRIPTS, twins } from "./twin_runner.ts";
 
 const WINDOWS = Deno.build.os === "windows";
 
@@ -56,9 +56,6 @@ async function nested(tmp: string): Promise<{ project: string; scripts: string }
   const project = await mkdir(tmp, "sub");
   return { project, scripts: await install(project) };
 }
-
-/** Whether this process runs as root, which owns every directory a row could borrow. */
-const ROOT_USER = (await run("id", ["-u"], ".").catch(() => undefined))?.stdout.trim() === "0";
 
 const SCENARIOS: Array<{
   label: string;
