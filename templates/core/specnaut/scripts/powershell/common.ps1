@@ -206,7 +206,7 @@ function Get-FeatureDirFromBranchPrefixOrExit {
 function Get-FeatureJsonDirectory {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
     $featureJson = Join-Path $RepoRoot '.specnaut/feature.json'
-    if (-not (Test-Path $featureJson)) { return $null }
+    if (-not (Test-Path -LiteralPath $featureJson)) { return $null }
     try {
         return ((Get-Content -LiteralPath $featureJson -Raw -ErrorAction Stop) | ConvertFrom-Json).feature_directory
     } catch {
