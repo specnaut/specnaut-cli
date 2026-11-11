@@ -27962,8 +27962,8 @@ BRANCH_NUMBER=""
 USE_TIMESTAMP=false
 LINKED_ISSUE=""
 ARGS=()
-# A whole number a signed 64-bit integer holds, leading zeros aside: what the
-# PowerShell twin's [long] binds (cli#764). Past it bash arithmetic wraps
+# Digits whose value, leading zeros aside, is at most [long]'s maximum, the
+# PowerShell twin's upper bound (cli#764). Past it bash arithmetic wraps
 # silently and \`[ -lt ]\` fails open, so the bound is checked on the digits.
 _fits_long() {
     local n="\${1#"\${1%%[!0]*}"}"
@@ -28006,7 +28006,7 @@ while [ \$i -le \$# ]; do
                 echo "Error: --number requires a whole number up to 9223372036854775807" >&2
                 exit 1
             fi
-            BRANCH_NUMBER="\$next_arg"
+            BRANCH_NUMBER=\$((10#\$next_arg))
             ;;
         --timestamp)
             USE_TIMESTAMP=true
@@ -28022,7 +28022,8 @@ while [ \$i -le \$# ]; do
                 echo "Error: --issue must be a positive integer up to 9223372036854775807 (got '\$next_arg')" >&2
                 exit 1
             fi
-            LINKED_ISSUE="\$next_arg"
+            # Its value, never its text: 042 is no JSON number, and move.sh takes 42.
+            LINKED_ISSUE=\$((10#\$next_arg))
             ;;
         --help|-h)
             echo "Usage: \$0 [--json] [--dry-run] [--branch-only] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--issue <id>] <feature_description>"

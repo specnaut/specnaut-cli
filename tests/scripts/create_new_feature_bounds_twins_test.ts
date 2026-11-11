@@ -7,7 +7,7 @@
 // Each row runs for real in a repository, so a refusal is shown by the branch
 // and the spec directory that were not created, not by an exit code alone.
 
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { copy } from "@std/fs";
 import { join } from "@std/path";
 import { git } from "./git_sandbox.ts";
@@ -18,15 +18,23 @@ guardPowerShellArm();
 
 const MAX = "9223372036854775807";
 
-/** A flag's value and the branch both twins owe for it; `null` when both refuse it. */
-const ROWS: Array<{ flag: "--number" | "--issue"; value: string; branch: string | null }> = [
+/**
+ * A flag's value and the branch both twins owe for it, `null` when both refuse
+ * it; and, for `--issue`, the LINKED_ISSUE text their JSON carries: the value,
+ * never the digits as typed (`042` is no JSON number).
+ */
+const ROWS: Array<
+  { flag: "--number" | "--issue"; value: string; branch: string | null; linked?: string }
+> = [
   { flag: "--number", value: "99999999999999999999", branch: null },
   { flag: "--number", value: "9223372036854775808", branch: null },
   { flag: "--number", value: MAX, branch: `${MAX}-demo` },
   { flag: "--number", value: `000${MAX}`, branch: `${MAX}-demo` },
   { flag: "--issue", value: "99999999999999999999", branch: null },
   { flag: "--issue", value: "9223372036854775808", branch: null },
-  { flag: "--issue", value: MAX, branch: "001-demo" },
+  { flag: "--issue", value: MAX, branch: "001-demo", linked: MAX },
+  { flag: "--issue", value: "042", branch: "001-demo", linked: "42" },
+  { flag: "--issue", value: `000${MAX}`, branch: "001-demo", linked: MAX },
 ];
 
 async function withRepo(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -56,7 +64,7 @@ async function specDirs(dir: string): Promise<string[]> {
 }
 
 for (const twin of twins()) {
-  for (const { flag, value, branch } of ROWS) {
+  for (const { flag, value, branch, linked } of ROWS) {
     const verdict = branch === null ? "refused, no branch created" : `accepted as ${branch}`;
     Deno.test(`create-new-feature bounds [${twin.name}]: ${flag} ${value} is ${verdict}`, () =>
       withRepo(async (dir) => {
@@ -71,6 +79,12 @@ for (const twin of twins()) {
           assertEquals(r.code, 0, why);
           assertEquals(await branches(dir), [branch, "main"].sort(), why);
           assertEquals(await specDirs(dir), [branch], why);
+          if (linked) {
+            // The text, not JSON.parse: a 19-digit value does not survive a double.
+            assertEquals(r.stdout.match(/"LINKED_ISSUE":\s*([^,}\s]+)/)?.[1], linked, why);
+            // What parent-of.sh and move.sh are handed, which jq's JSON does not show.
+            assertStringIncludes(r.stderr, `treating issue ${linked} as standalone`);
+          }
         }
       }));
   }
