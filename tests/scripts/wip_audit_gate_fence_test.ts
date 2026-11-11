@@ -5,29 +5,6 @@ import { DIR, gate, land, lines, marker, settle } from "./wip_audit_gate_fixture
 
 /** cli#760 — the intake gate under --since, FENCED and its anchor, PARTIAL, and an epic marker. */
 
-Deno.test("INVALID under --since: the directory is older than the item, or no naming commit is", async () => {
-  const sb = await sandbox();
-  try {
-    const sha = await land(sb, marker(43), "feat(43): x");
-    const future = String(Math.floor(Date.now() / 1000) + 86400);
-    assertEquals(
-      lines((await gate(sb, "--since", `43@${future}`)).stdout)[0],
-      "INVALID closeout 43",
-    );
-    // Another item's --since does not reach this one.
-    assertEquals(
-      lines((await gate(sb, "--since", `4@${future}`)).stdout)[0],
-      `PENDING closeout 43 ${DIR} ${sha}`,
-    );
-    assertEquals(
-      lines((await gate(sb, "--since", "43@0")).stdout)[0],
-      `PENDING closeout 43 ${DIR} ${sha}`,
-    );
-  } finally {
-    await sb.cleanup();
-  }
-});
-
 Deno.test("INVALID under --since: a directory older than the item, though a newer commit names it", async () => {
   const sb = await sandbox();
   try {
@@ -101,20 +78,41 @@ Deno.test("not FENCED: the config is unchanged since the last removal, though it
   }
 });
 
-Deno.test("FENCED: a removal that touched a file outside .specnaut/ is no anchor", async () => {
-  const sb = await sandbox();
-  try {
-    await sb.commit(".specnaut/backlog-config.yml", "repo: acme/first\n", "chore: a board");
-    await land(sb, marker(1), "feat(1): first");
-    await sb.commit(".specnaut/backlog-config.yml", "repo: acme/second\n", "chore: another board");
-    await git(sb.work, "rm", "-r", "--quiet", "--", DIR, ".specnaut/feature.json", "README.md");
-    await git(sb.work, "commit", "--quiet", "-m", "chore: not remove-spec's shape");
-    await git(sb.work, "push", "--quiet", "origin", "main");
-    // The fallback anchor, the parent of the oldest add, predates the second board.
-    await land(sb, marker(53), "feat(53): x");
-    assertEquals(lines((await gate(sb)).stdout)[0].split(" ")[0], "FENCED");
-  } finally {
-    await sb.cleanup();
+Deno.test("FENCED: a removal that also touched a file outside .specnaut/, or edited the config, is no anchor", async () => {
+  // [what the removal commit does besides deleting the marker and its directory]
+  for (const [label, also] of [["README.md deleted", "rm"], ["the config edited", "edit"]]) {
+    const sb = await sandbox();
+    try {
+      await sb.commit(".specnaut/backlog-config.yml", "repo: acme/first\n", "chore: a board");
+      await land(sb, marker(1), "feat(1): first");
+      if (also === "rm") {
+        await sb.commit(".specnaut/backlog-config.yml", "repo: acme/second\n", "chore: b");
+      }
+      await git(
+        sb.work,
+        "rm",
+        "-r",
+        "--quiet",
+        "--",
+        DIR,
+        ".specnaut/feature.json",
+        ...(also === "rm" ? ["README.md"] : []),
+      );
+      if (also === "edit") {
+        await Deno.writeTextFile(
+          join(sb.work, ".specnaut/backlog-config.yml"),
+          "repo: acme/second\n",
+        );
+        await git(sb.work, "add", ".specnaut/backlog-config.yml");
+      }
+      await git(sb.work, "commit", "--quiet", "-m", "chore: not remove-spec's shape");
+      await git(sb.work, "push", "--quiet", "origin", "main");
+      // The fallback anchor, the parent of the oldest add, predates the second board.
+      await land(sb, marker(53), "feat(53): x");
+      assertEquals(lines((await gate(sb)).stdout)[0].split(" ")[0], "FENCED", label);
+    } finally {
+      await sb.cleanup();
+    }
   }
 });
 

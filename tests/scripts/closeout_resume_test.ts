@@ -68,6 +68,29 @@ Deno.test("a removal whose push was refused is the (P) row: pulled, pushed, then
   }
 });
 
+Deno.test("an unpushed commit that is not the removal is someone's work: nothing is pushed", async () => {
+  // [label, what sits on the local base]: one unrelated commit; the refused removal plus another.
+  for (const label of ["one unrelated commit", "the removal and one more"]) {
+    const sb = await project({ "23": { status: "In progress" } });
+    try {
+      await land(sb, `{ "feature_directory": "${DIR}", "linked_issue": 23 }\n`, "feat(23): x");
+      if (label === "the removal and one more") {
+        await sb.refusePushes();
+        const own = lines((await gate(sb, "--own", "23")).stdout)[0];
+        assertEquals(await reenter(sb, own), "unpushed");
+        await Deno.writeTextFile(join(sb.root, "allow"), "");
+      }
+      await sb.commit("notes.md", "mine\n", "chore: local work");
+      const tip = await git(sb.remote, "rev-parse", "main");
+      const out = await resume(sb, "23");
+      assert(out.some((l) => l.startsWith("PENDING push ")), `${label}: ${out.join("\n")}`);
+      assertEquals(await git(sb.remote, "rev-parse", "main"), tip, `${label}: origin moved`);
+    } finally {
+      await sb.cleanup();
+    }
+  }
+});
+
 Deno.test("an epic with one open child: the shipped child closes, the epic stays open, its spec is kept", async () => {
   const sb = await project({
     "40": { status: "In progress" },
@@ -148,12 +171,14 @@ Deno.test("FENCED: no backlog script runs without the answer; with it, the close
     await land(sb, `{ "feature_directory": "${DIR}", "linked_issue": 70 }\n`, "feat(70): x");
     await sb.commit(".specnaut/backlog-config.yml", "repo: acme/two\n", "chore: another board");
     await git(sb.work, "push", "--quiet", "origin", "main");
-    const fenced = lines((await gate(sb, "--own", "70")).stdout)[0];
-    assert(fenced.startsWith("FENCED closeout 70 "), fenced);
-    // No yes: the run stops here, and the item is untouched.
+    const tip = await git(sb.remote, "rev-parse", "main");
+    // No yes: resume stops on the FENCED line, and no backlog script has run.
+    const stopped = await resume(sb, "70");
+    assert(stopped[0].startsWith("FENCED closeout 70 "), stopped.join("\n"));
     assertEquals(await status(sb, "70"), "In progress");
-    const acked = lines((await gate(sb, "--own", "70", "--fence-ack", "70")).stdout)[0];
-    assertEquals(await reenter(sb, acked), "removed");
+    assertEquals(await git(sb.remote, "rev-parse", "main"), tip);
+    // A yes: the rerun with --fence-ack goes on to the closeout.
+    assertEquals(await resume(sb, "70", Infinity, true), ["gate clear"]);
     assertEquals(await status(sb, "70"), "Done");
     assertEquals(lines((await gate(sb)).stdout), ["gate clear"]);
   } finally {

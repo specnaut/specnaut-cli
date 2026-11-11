@@ -105,18 +105,23 @@ export async function reenter(
   return "removed";
 }
 
-/** resume.md's rows, until the gate is clear: the (P) row, then the closeout row. */
-export async function resume(sb: Sandbox, n: string, budget = Infinity) {
+/**
+ * resume.md's rows, until the gate is clear: the (P) row, the closeout row and
+ * the FENCED row, whose question is answered by `answer` (no answer: no yes).
+ */
+export async function resume(sb: Sandbox, n: string, budget = Infinity, answer = false) {
+  const ack: string[] = [];
   for (let round = 0; round < 6; round++) {
-    const g = await gate(sb, "--own", n, "--since", `${n}@0`);
+    const g = await gate(sb, "--own", n, "--since", `${n}@0`, ...ack);
     const out = lines(g.stdout);
     if (g.code === 0 && out.at(-1) === "gate clear" && !out.some((l) => l.startsWith("OWN "))) {
       return out;
     }
     const push = out.filter((l) => l.startsWith("PENDING push "));
     if (push.length) {
-      // FR-10: one local commit that only deletes the marker and its directory — step 4's exit-7 row.
-      assertEquals(push.length, 1, out.join("\n"));
+      // FR-10: exactly one, whose diff only deletes the marker's directory and the marker,
+      // takes step 4's exit-7 row. Otherwise nothing is pushed: they are someone's work.
+      if (push.length !== 1 || !(await removalOnly(sb, push[0].split(" ")[2], out))) return out;
       await git(sb.work, "pull", "--quiet", "--rebase", "--no-autostash", "origin", "main");
       await git(
         sb.work,
@@ -128,10 +133,25 @@ export async function resume(sb: Sandbox, n: string, budget = Infinity) {
       );
       continue;
     }
+    if (out.some((l) => l.startsWith(`FENCED closeout ${n} `))) {
+      if (!answer) return out; // anything but a yes runs no backlog script
+      ack.push("--fence-ack", n);
+      continue;
+    }
     const own = out.find((l) => l.startsWith("OWN "));
     if (!own) return out;
     const r = await reenter(sb, own, round === 0 ? budget : Infinity);
     if (r === "stopped" || r === "held") return out;
   }
   throw new Error("resume did not settle");
+}
+
+/** Whether <sha>'s diff only deletes the marker and the `<dir>` the gate's closeout line names. */
+async function removalOnly(sb: Sandbox, sha: string, out: string[]) {
+  const dir = out.find((l) => / closeout /.test(l))?.split(" ")[3];
+  const status = (await git(sb.work, "diff", "--no-renames", "--name-status", `${sha}^`, sha))
+    .split("\n");
+  return status.every((l) =>
+    l === "D\t.specnaut/feature.json" || (!!dir && dir !== "-" && l.startsWith(`D\t${dir}/`))
+  );
 }

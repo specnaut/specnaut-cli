@@ -156,3 +156,26 @@ Deno.test("INVALID: a directory that is a link, or not in the tree", async () =>
     await sb.cleanup();
   }
 });
+
+Deno.test("INVALID under --since: the directory is older than the item, or no naming commit is", async () => {
+  const sb = await sandbox();
+  try {
+    const sha = await land(sb, marker(43), "feat(43): x");
+    const future = "4102444800"; // 2100-01-01: after any commit this test makes
+    assertEquals(
+      lines((await gate(sb, "--since", `43@${future}`)).stdout)[0],
+      "INVALID closeout 43",
+    );
+    // Another item's --since does not reach this one.
+    assertEquals(
+      lines((await gate(sb, "--since", `4@${future}`)).stdout)[0],
+      `PENDING closeout 43 ${DIR} ${sha}`,
+    );
+    assertEquals(
+      lines((await gate(sb, "--since", "43@0")).stdout)[0],
+      `PENDING closeout 43 ${DIR} ${sha}`,
+    );
+  } finally {
+    await sb.cleanup();
+  }
+});
