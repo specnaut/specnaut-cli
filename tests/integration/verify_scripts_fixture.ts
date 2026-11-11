@@ -8,6 +8,7 @@ import { findHarness } from "../../src/cli/harnesses.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { runSpecnaut } from "../helpers/run_specnaut.ts";
+import { DENO_DIR } from "./spawn_env.ts";
 
 export const LOCK =
   "version: 2\nharness: claude\nbacklog_backend: local\nversion_scheme: semver\n" +
@@ -20,6 +21,7 @@ export function bundled(path: string): string {
   return bundleForLock(CORE_BUNDLE, parseLock(LOCK), findHarness)![path].content;
 }
 
+/** No global or system configuration, and a fixed identity: the fixture is all git reads. */
 const GIT_ENV = {
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
@@ -29,11 +31,21 @@ const GIT_ENV = {
   GIT_COMMITTER_EMAIL: "t@example.com",
 };
 
+/**
+ * The parent's environment minus every `GIT_*` variable (a hook's `GIT_DIR` or `GIT_INDEX_FILE`
+ * would aim the fixture at the outer repository), read at each call, then {@link GIT_ENV}.
+ */
+function gitEnv(): Record<string, string> {
+  const inherited = Object.entries(Deno.env.toObject()).filter(([k]) => !/^GIT_/i.test(k));
+  return { ...Object.fromEntries(inherited), ...GIT_ENV };
+}
+
 export async function git(cwd: string, ...args: string[]): Promise<string> {
   const out = await new Deno.Command("git", {
     args: ["-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args],
     cwd,
-    env: GIT_ENV,
+    clearEnv: true,
+    env: gitEnv(),
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -96,9 +108,20 @@ export type Verified = {
   stderr: string;
 };
 
+let home: string | undefined;
+
+/**
+ * An empty HOME for the CLI, made once: the git it runs reads the user's global configuration
+ * (`init.defaultBranch` names the base when origin has no HEAD), which is the developer's here.
+ */
+function cliHome(): Record<string, string> {
+  home ??= Deno.makeTempDirSync({ prefix: "verify-scripts-cli-home-" });
+  return { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, ".config"), DENO_DIR };
+}
+
 /** `specnaut verify-scripts` in `cwd`, its stdout split into fields. */
-export async function verify(cwd: string, env?: Record<string, string>): Promise<Verified> {
-  const r = await runSpecnaut(["verify-scripts"], { cwd, env });
+export async function verify(cwd: string): Promise<Verified> {
+  const r = await runSpecnaut(["verify-scripts"], { cwd, env: cliHome() });
   const lines = r.stdout.trimEnd().split("\n");
   const field = (key: string) => lines.find((l) => l.startsWith(`${key} `))?.slice(key.length + 1);
   const untrusted = lines.filter((l) => l.startsWith("UNTRUSTED ")).map((l) => l.slice(10));

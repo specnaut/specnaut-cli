@@ -124,9 +124,7 @@ Deno.test("no base it can name: exit 3, and the last line is still untrusted", a
   const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "verify-scripts-loose-" }));
   await git(dir, "init", "-q");
   await Deno.mkdir(join(dir, ".specnaut"));
-  const home = await Deno.makeTempDir({ prefix: "verify-scripts-home-" });
-  const env = { HOME: home, XDG_CONFIG_HOME: join(home, ".config") };
-  const v = await verify(dir, env);
+  const v = await verify(dir);
   assertEquals([v.code, v.lines], [3, ["VERDICT scripts untrusted"]], v.stderr);
   assertMatch(v.stderr, /the base is unknown: no origin\/HEAD and no global init\.defaultBranch/);
 });
