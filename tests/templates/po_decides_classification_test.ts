@@ -110,7 +110,21 @@ function sentences(text: string): string[] {
 }
 
 const CALLS = [/\bpriority\b/i, /\bsizes?\b/i, /\btypes?\b/i, /\bsplits?\b/i];
-const DECIDES = /\b(decid(e|es|ed|ing)|sets|assigns?|chooses|picks|calls)\b/i;
+/**
+ * Somebody deciding, in any of the three ways prose says it: an active verb
+ * ("the product owner sets"), a passive one ("are set by", "assigned by"), or a
+ * noun ("the product owner's decision", "the call of the product owner").
+ * Active verbs alone let a passive restatement through (cli#770).
+ */
+const DECIDES = new RegExp(
+  [
+    String.raw`\b(decid(e|es|ed|ing)|sets|assigns?|chooses|picks|calls)\b`,
+    String.raw`\b(set|decided|chosen|picked|assigned|called|made|determined)\s+by\b`,
+    String.raw`['\u2019]s\s+(decision|call|choice)s?\b`,
+    String.raw`\b(decision|call|choice)s?\s+of\s+the\b`,
+  ].join("|"),
+  "i",
+);
 
 /**
  * A sentence restates the list when it names a split beside a priority, or names
@@ -122,6 +136,29 @@ const restates = (text: string) =>
     (/\bpriority\b/i.test(s) && /\bsplits?\b/i.test(s)) ||
     (DECIDES.test(s) && CALLS.filter((c) => c.test(s)).length >= 2)
   );
+
+/** Each phrasing of a second home the guard must flag, and what it must let through. */
+const PHRASINGS: [sentence: string, flagged: boolean][] = [
+  ["The product owner sets the priority and the size of every item.", true],
+  ["Priority and size are set by the product owner.", true],
+  ["An item's type and size is decided by the product owner.", true],
+  ["Its size and type are chosen by the product owner, never asked.", true],
+  ["Priority and type, assigned by the product owner, are reported in one line.", true],
+  ["Priority and size are the product owner's decision.", true],
+  ["Priority and size are the product owner\u2019s decision.", true],
+  ["Priority and size remain the call of the product owner.", true],
+  [
+    'What the product owner decides is listed once, in `product-owner.md`\'s "What you decide" section.',
+    false,
+  ],
+  ["Priority and size are fields on the board.", false],
+];
+
+Deno.test("the single-home guard flags active, passive and nominal restatements", () => {
+  const wrong = PHRASINGS.filter(([s, want]) => restates(s) !== want)
+    .map(([s, want]) => `${want ? "missed" : "flagged"}: ${s}`);
+  assert(wrong.length === 0, wrong.join("\n"));
+});
 
 Deno.test("the list of calls lives in the product owner alone", () => {
   for (const e of CORE_BUNDLE) {
