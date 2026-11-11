@@ -20,7 +20,7 @@ step 4b, without being asked.
 **Re-entry.** `plan <id>` classifies the item once, before step 2: its state, creation time and
 parent from the backend's `view.sh` (never its body as evidence), then
 `bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>`. `phases/auto-chain.md` decides from that
-whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before step 2.
+whether the chain goes on. Every `plan`, with an id or not, passes its intake gate before step 2.
 
 <!-- BEGIN: spec-backend=local -->
 - `IDLE`, and the working tree's `.specnaut/feature.json` links the item: a plan that stopped on a
@@ -33,8 +33,8 @@ whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before s
 <!-- BEGIN: spec-backend=cloud -->
 An epic is one plan: for a child, `<task>` below is its parent epic, and the epic's class picks the
 branch. Only one thing is the child's own: open chains, closed runs alone (`phases/auto-chain.md`).
-Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`; its
-`UNPUSHED` is a stop as above. So an `IDLE` child of an `ACTIVE` epic continues on the epic's
+Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`; the
+gate above stops an `UNPUSHED` one. So an `IDLE` child of an `ACTIVE` epic continues on the epic's
 branch. Run `specnaut spec pull <task>` first. A plan exists when it materialises
 `.specnaut/specs/.cache/<task>/1-plan.md`; `no spec for task`, or no such file, means none does.
 Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused — since an

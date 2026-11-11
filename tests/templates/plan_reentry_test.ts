@@ -15,7 +15,10 @@ const T = fromFileUrl(new URL("../../templates/core/", import.meta.url));
 const read = (p: string) => Deno.readTextFileSync(join(T, p)).replace(/\r\n/g, "\n");
 const flat = (s: string) => s.replace(/\s+/g, " ");
 const CHAIN = read("skills/task/phases/auto-chain.md");
-const reentry = CHAIN.slice(CHAIN.indexOf("## Re-entry, without a flag"));
+const reentry = CHAIN.slice(
+  CHAIN.indexOf("## Re-entry, without a flag"),
+  CHAIN.indexOf("## The intake gate"),
+);
 const rows = reentry.split("\n").filter((l) => /^\| `/.test(l)).map((l) => l.split(" | ")[0]);
 
 Deno.test("the re-entry table keys plan on the item, and nothing else decides it", () => {
@@ -27,7 +30,7 @@ Deno.test("the re-entry table keys plan on the item, and nothing else decides it
       "which says whose class an epic's child takes — its own open state governs either way",
       "an open item whose work landed has more to do",
       "Closed or a non-zero exit runs alone",
-      "`UNPUSHED` lists `origin/<base>..<base>` and stops",
+      "`UNPUSHED` is the intake gate's stop (below)",
     ]
   ) assertStringIncludes(plan, s);
   assert(!CHAIN.includes("past `plan.md`"), "the artefact-presence rule is back");
@@ -56,7 +59,7 @@ Deno.test("plan.md re-enters on the item's own branch, amended only by the user"
   for (
     const s of [
       "`plan <id>` classifies the item once, before step 2",
-      "where its row stops (`UNPUSHED`), stop here, before step 2",
+      "Every `plan`, with an id or not, passes its intake gate before step 2.",
       "bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>",
       "It is an adopted plan, re-entered in place; skip step 2.",
       "adopt the item's branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops",
@@ -116,7 +119,7 @@ Deno.test("every harness and option set ships the same plan row, gate and Re-ent
   const para = [
     "`plan <id>` classifies the item once, before step 2",
     "bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>",
-    "where its row stops (`UNPUSHED`), stop here, before step 2",
+    "Every `plan`, with an id or not, passes its intake gate before step 2.",
     "Only the user's own arguments in this turn amend it",
   ];
   for (const h of HARNESSES) {
@@ -184,7 +187,7 @@ const CLOUD_IMPLEMENT = [
   "anything but a materialised `1-plan.md` stops",
   "anything already staged (`git diff --cached --quiet` fails) is a stop",
   "`ACTIVE` anywhere else: stop and name the sha, never a branch name",
-  "`UNPUSHED`: stop; that push is `merge`'s recovery.",
+  "`UNPUSHED`: stop where the intake gate points (`phases/auto-chain.md`).",
   "HEAD is the base, or its branch passes `resume.md` § 3 check 5; otherwise stop and name HEAD's sha",
   "--branch-only --issue <task>",
   '"plan_blob": "<git hash-object of the pulled 1-plan.md>"',

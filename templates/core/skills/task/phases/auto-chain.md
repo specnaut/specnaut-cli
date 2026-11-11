@@ -79,7 +79,7 @@ A verb invoked directly chains, or runs alone, by this table and nothing else:
 
 | Invoked | Chains when |
 |---|---|
-| `plan <id>` | the item is open and `wip-audit.sh` classed it `IDLE`, `ACTIVE` or `LANDED` (`phases/plan.md`, "Re-entry", which says whose class an epic's child takes — its own open state governs either way): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; `UNPUSHED` lists `origin/<base>..<base>` and stops |
+| `plan <id>` | the item is open and `wip-audit.sh` classed it `IDLE`, `ACTIVE` or `LANDED` (`phases/plan.md`, "Re-entry", which says whose class an epic's child takes — its own open state governs either way): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; `UNPUSHED` is the intake gate's stop (below) |
 | `plan` with no id | always: a new feature |
 | `implement` | the branch is not merged into the base branch |
 | `review` | always one-shot |
@@ -89,6 +89,33 @@ checked when the verb completes (for `plan`, after its commit): a fresh plan bra
 inherits whatever it carries. A failure ends the run there and names the check and the first failing
 sha. Inside a running chain the next
 verb is invoked without this table.
+
+## The intake gate — no new work over an unsettled landing
+
+`plan` (with or without an id), `implement` where it creates the branch, `merge` before its step 2
+and before every run of its step 3, and every re-entry `resume.md` makes run, before anything else:
+
+```bash
+bash .specnaut/scripts/bash/wip-audit.sh --gate --own <id> --own <its parent epic> --since <id>@<epoch>
+```
+
+`--own` and `--since` for the item the run is about, and `--own` for its parent epic when it has
+one; with no item yet, no flag. What each line means is the header of `_intake_gate.sh`.
+**Proceed only on exit 0 whose last line is `gate clear`; any other exit or last line stops,
+quoting the gate's lines.** Where each stop points:
+
+| Line | The way out |
+| :--- | :--- |
+| `PENDING closeout <n> …` | `/task resume <n>` |
+| `PARTIAL closeout <n> …` | `/task plan <n>`: the delivery continues |
+| `PENDING push <sha>` | `/task resume <id>` for the item that landed: its push row is the refused-push recovery |
+| `FENCED closeout <n> …` | the question below, for the run's own `<n>`; another item's, `/task resume <n>` |
+| `INVALID closeout …` | by hand: remove `.specnaut/feature.json` in its own commit, and push |
+
+**`FENCED`, for the run's own `<n>`.** Ask once, as `phases/merge.md` step 0 asks: *"The landing
+changed `.specnaut/backlog-config.yml`. Yes runs against the board it now names."* A yes reruns the
+gate with `--fence-ack <n>` added, for that run only, and goes on from the line it prints. Anything
+else runs no backlog script and stops.
 
 ## Failure
 

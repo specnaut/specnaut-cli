@@ -22,9 +22,14 @@ const rows = RESUME.split("\n")
 Deno.test("the re-entry table has its rows, in order, first match wins", () => {
   const evidence = rows.slice(1).map((r) => r.split(" | ")[0].slice(2));
   assertEquals(evidence, [
-    "the id is malformed, or `wip-audit.sh` exits anything but `0`",
+    "the id is malformed, `wip-audit.sh` exits anything but `0`, or the gate anything but `0` or `4`",
+    "a `PENDING push` line",
+    "`OWN closeout <id> <dir> <sha>` (or `PENDING closeout <id> …`)",
+    "`FENCED closeout <id> …`",
+    "`OWN partial <id> …` (or `PARTIAL closeout <id> …`), the item closed",
+    "`INVALID closeout …`",
+    "any other gate line",
     "the item is closed",
-    "`UNPUSHED`, or `origin/<base>..<base>` is not empty",
     "`LANDED`, the item open",
     "`IDLE`, and the working tree's `.specnaut/feature.json` links the item",
     "`IDLE`",
@@ -39,11 +44,18 @@ Deno.test("the re-entry table has its rows, in order, first match wins", () => {
 
 Deno.test("only one row re-enters past plan, and it is implement — never review or merge", () => {
   const targets = rows.slice(1).map((r) => r.split(" | ")[1]);
-  const entering = targets.filter((t) => !t.startsWith("nothing"));
+  // The closeout rows (cli#760) re-enter merge-close.md § Re-entry, never merge itself.
+  const entering = targets.filter((t) =>
+    !t.startsWith("nothing") && !t.includes("merge-close.md") && !t.startsWith("exactly one") &&
+    !t.startsWith("the question")
+  );
   assertEquals(entering.length, 3);
   assert(entering[0].startsWith('`plan`, at its section "The plan stop"'), entering[0]);
   assertEquals(entering.slice(1), ["`plan <id>`", "check out the branch, then `implement`"]);
-  assertStringIncludes(FLAT, "Resume never lands, closes or pushes anything itself.");
+  assertStringIncludes(
+    FLAT,
+    "Resume never lands, closes or pushes anything itself, except through `phases/merge-close.md` § Re-entry.",
+  );
 });
 
 Deno.test("the provenance gate runs every check before any checkout", () => {

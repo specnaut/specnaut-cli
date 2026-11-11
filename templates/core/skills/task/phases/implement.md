@@ -25,11 +25,12 @@ materialised `1-plan.md` stops. Then the branch, from
   not its committed `feature.json` `plan_blob`, the plan changed since it was approved: stop and say
   so — `/task plan <task>` re-approves it.
 - `ACTIVE` anywhere else: stop and name the sha, never a branch name — `/task resume <task>`
-  adopts it. `UNPUSHED`: stop; that push is `merge`'s recovery.
+  adopts it. `UNPUSHED`: stop where the intake gate points (`phases/auto-chain.md`).
 - `IDLE` or `LANDED`: HEAD is the base, or its branch passes `resume.md` § 3 check 5; otherwise stop
-  and name HEAD's sha. Then `.specnaut/scripts/bash/create-new-feature.sh --branch-only --issue
-  <task> "<feature description>"`, write `{ "linked_issue": <task>, "plan_blob": "<git hash-object
-  of the pulled 1-plan.md>" }` to `.specnaut/feature.json` and commit it alone — anything already
+  and name HEAD's sha. Then that gate, then `.specnaut/scripts/bash/create-new-feature.sh
+  --branch-only --issue <task> "<feature description>"`, write `{ "linked_issue": <task>,
+  "plan_blob": "<git hash-object of the pulled 1-plan.md>" }` to `.specnaut/feature.json` and
+  commit it alone — anything already
   staged (`git diff --cached --quiet` fails) is a stop:
   `git add .specnaut/feature.json && git commit --allow-empty -m "plan(<task>): link the branch to
   its task"`. `wip-audit.sh` and `resume.md` § 3 check 8 read the branch by it.

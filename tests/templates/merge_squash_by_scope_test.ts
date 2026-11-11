@@ -150,8 +150,9 @@ Deno.test("the epic is read in a step before the landing, and the close never re
     `epic-status.sh at steps ${read}, land-feature.sh at ${land}`,
   );
   const close = phase("merge-close").content;
+  // Only § Re-entry reads it, and as `--landed`: the published base, never the empty range (cli#760).
   assert(
-    !close.includes("bash .specnaut/scripts/bash/epic-status.sh"),
+    !/bash \.specnaut\/scripts\/bash\/epic-status\.sh(?! --landed)/.test(close),
     "merge-close.md re-runs it",
   );
   assertStringIncludes(close, "printed at `phases/merge.md` step 1, before the landing");
