@@ -21,13 +21,13 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
     // Through the use case, not `FsStagingStore.list()` directly: the raw tree
     // also holds copies `reconcile <path>` refuses, and listing those left a
     // queue no command could empty (#613).
-    const pending = await new ListPendingReconciliationsUseCase({
+    const { pending, refused } = await new ListPendingReconciliationsUseCase({
       reader: new DenoFsReader(),
       lockStore: new FsLockStore(),
       stagingStore: new FsStagingStore(),
     }).execute(projectDir);
     const stagingDir = pending.length > 0 ? ".specnaut/upgrade-staging" : null;
-    console.log(JSON.stringify({ pending, stagingDir }, null, 2));
+    console.log(JSON.stringify({ pending, stagingDir, refused }, null, 2));
     return 0;
   }
 

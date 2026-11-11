@@ -166,9 +166,10 @@ const refusalLine = (path: string, err: unknown, failed: string) =>
  * A staged path the adapter refused (cli#687) is not a stale copy: it is a link,
  * or sits behind one, leading out of the project or round a cycle. "Safe to
  * delete by hand" would invite deleting what it points at — a file Specnaut
- * never wrote — so the advice names the link.
+ * never wrote — so the advice names the link. `reconcile --status` reports a copy
+ * it cannot read in the same words.
  */
-const leftAlone = (path: string, err: PathRefusal) =>
+export const leftAlone = (path: string, err: PathRefusal) =>
   `left ${path} in place — ${err.message}\n` +
   `It is not a plain staged copy: check where that link points, then remove the link ` +
   `itself, never what it points at.`;

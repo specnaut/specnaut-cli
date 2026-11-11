@@ -1,7 +1,8 @@
 import type { FsReader, FsWriter, LockStore, StagingStore } from "./ports.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import { computeAcceptCurrent, computeAcceptUpstream } from "../domain/reconcile.ts";
-import { tidyStagingRoot } from "./upgrade_staging.ts";
+import { PathRefusal } from "./path_refusal.ts";
+import { leftAlone, tidyStagingRoot } from "./upgrade_staging.ts";
 
 export type ReconcileMode = "accept-upstream" | "accept-current";
 
@@ -123,26 +124,41 @@ async function preflight(
   return { status: "ok", lock, stagingContent, onDiskContent };
 }
 
+/** A staged copy the store refused to read, and the words that say why and what to do. */
+export type RefusedCopy = { readonly path: string; readonly reason: string };
+
+/** What `reconcile --status` prints: the queue, and the copies no command may act on. */
+export type PendingReconciliations = { pending: string[]; refused: RefusedCopy[] };
+
 /**
  * The pending queue behind `reconcile --status`: staged paths that
  * `reconcile <path>` will actually resolve.
  *
  * A staged copy it would refuse is not pending anything — no command can act on
- * it, so listing it only guarantees the review walk never completes. Such
- * copies are hidden here and deleted by the next `upgrade`; this use case is a
- * read and deletes nothing, so the listing stays safe to run at any time.
+ * it, so listing it only guarantees the review walk never completes. A copy
+ * refused by status (untracked, no project file) is hidden here and deleted by
+ * the next `upgrade`. A copy the STORE refuses to read — a link, or behind one
+ * (cli#765) — is reported in `refused` instead, in `leftAlone`'s words: hiding
+ * it would leave a link nobody is told about, and throwing it ended `--status`
+ * in a stack trace where the review walk parses JSON. This use case is a read
+ * and deletes nothing, so the listing stays safe to run at any time.
  */
 export class ListPendingReconciliationsUseCase {
   constructor(
     private readonly deps: Pick<ReconcilePathDeps, "reader" | "lockStore" | "stagingStore">,
   ) {}
 
-  async execute(projectDir: string): Promise<string[]> {
+  async execute(projectDir: string): Promise<PendingReconciliations> {
     const lock = await this.deps.lockStore.read(projectDir);
-    const out: string[] = [];
+    const out: PendingReconciliations = { pending: [], refused: [] };
     for (const path of await this.deps.stagingStore.list(projectDir)) {
-      const ready = await preflight(this.deps, lock, projectDir, path);
-      if (ready.status === "ok") out.push(path);
+      try {
+        const ready = await preflight(this.deps, lock, projectDir, path);
+        if (ready.status === "ok") out.pending.push(path);
+      } catch (err) {
+        if (!(err instanceof PathRefusal)) throw err;
+        out.refused.push({ path, reason: leftAlone(`.specnaut/upgrade-staging/${path}`, err) });
+      }
     }
     return out;
   }

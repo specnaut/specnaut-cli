@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import { PathRefusal } from "../../src/application/path_refusal.ts";
 import {
   ListPendingReconciliationsUseCase,
   ReconcilePathUseCase,
@@ -127,7 +128,10 @@ Deno.test(
         ".claude/commands/retired.md": "UPSTREAM\n",
       }),
     });
-    assertEquals(await uc.execute("/tmp/proj"), [".claude/agents/developer.md"]);
+    assertEquals(await uc.execute("/tmp/proj"), {
+      pending: [".claude/agents/developer.md"],
+      refused: [],
+    });
   },
 );
 
@@ -139,6 +143,34 @@ Deno.test(
       lockStore: new StubLockStore(mockLock()),
       stagingStore: new StubStagingStore({ ".claude/agents/developer.md": "UPSTREAM\n" }),
     });
-    assertEquals(await uc.execute("/tmp/proj"), []);
+    assertEquals(await uc.execute("/tmp/proj"), { pending: [], refused: [] });
   },
 );
+
+/** A staging store that holds `developer.md` and refuses it on read with `err`. */
+function refusingStore(err: Error): StubStagingStore {
+  const store = new StubStagingStore({ ".claude/agents/developer.md": "UPSTREAM\n" });
+  store.read = () => Promise.reject(err);
+  return store;
+}
+
+Deno.test("ListPendingReconciliationsUseCase reports a copy the store refuses to read", async () => {
+  const uc = new ListPendingReconciliationsUseCase({
+    reader: new StubReader({ ".claude/agents/developer.md": "LOCAL\n" }),
+    lockStore: new StubLockStore(mockLock()),
+    stagingStore: refusingStore(new PathRefusal("refusing to read a staged path")),
+  });
+  const { pending, refused } = await uc.execute("/tmp/proj");
+  assertEquals(pending, []);
+  assertEquals(refused.map((r) => r.path), [".claude/agents/developer.md"]);
+  assertStringIncludes(refused[0].reason, "refusing to read a staged path");
+});
+
+Deno.test("ListPendingReconciliationsUseCase still throws an error that is not a refusal", async () => {
+  const uc = new ListPendingReconciliationsUseCase({
+    reader: new StubReader({ ".claude/agents/developer.md": "LOCAL\n" }),
+    lockStore: new StubLockStore(mockLock()),
+    stagingStore: refusingStore(new Deno.errors.PermissionDenied("EACCES")),
+  });
+  await assertRejects(() => uc.execute("/tmp/proj"), Deno.errors.PermissionDenied);
+});
