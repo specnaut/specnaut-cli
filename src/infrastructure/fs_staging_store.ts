@@ -62,6 +62,38 @@ async function assertPlainStagedEntry(
   }
 }
 
+/**
+ * The staged entry `relPath` names, judged as `read` and `delete` act on it, or
+ * null when nothing is staged there. One helper for both, so they cannot drift
+ * apart again (cli#765): a read that followed the links a delete refused let
+ * reconcile write the project file and the lock before the delete refused.
+ *
+ * `relPath` arrives from `ReconcilePathUseCase` as a LOCK KEY, and the lock is
+ * committed and not covered by the scaffolded `.gitignore` — a cloned
+ * repository supplies it (cli#574). `resolve()` also treats an absolute
+ * `relPath` as the whole path, discarding the prefix entirely, so the string
+ * check is doing real work here and not merely echoing a caller.
+ */
+async function stagedEntry(
+  projectDir: string,
+  relPath: string,
+  action: "read" | "delete",
+): Promise<string | null> {
+  assertSafeDestination(relPath);
+  await assertStagingNotLinked(projectDir);
+  const root = await resolveProjectRoot(projectDir);
+  const full = resolve(projectDir, STAGING_REL, relPath);
+  // The entry it acts on, never where that leads: judge one, act on another (cli#751).
+  await assertRemovableInProject(root, full);
+  try {
+    await assertPlainStagedEntry(root, full, action);
+    return full;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+}
+
 export class FsStagingStore implements StagingStore {
   async list(projectDir: string): Promise<string[]> {
     const stagingDir = resolve(projectDir, STAGING_REL);
@@ -81,20 +113,9 @@ export class FsStagingStore implements StagingStore {
   }
 
   async read(projectDir: string, relPath: string): Promise<string | null> {
-    // `relPath` arrives from `ReconcilePathUseCase` as a LOCK KEY, and the lock
-    // is committed and not covered by the scaffolded `.gitignore` — a cloned
-    // repository supplies it (cli#574). `resolve()` also treats an absolute
-    // `relPath` as the whole path, discarding the prefix entirely, so the
-    // string check is doing real work here and not merely echoing a caller.
-    assertSafeDestination(relPath);
-    await assertStagingNotLinked(projectDir);
-    const root = await resolveProjectRoot(projectDir);
-    const full = resolve(projectDir, STAGING_REL, relPath);
-    // The entry, as `delete` judges it, never where a link leads (cli#765): the
-    // copy reconcile takes for upstream must be the one `delete` then accepts.
-    await assertRemovableInProject(root, full);
+    const full = await stagedEntry(projectDir, relPath, "read");
+    if (full === null) return null;
     try {
-      await assertPlainStagedEntry(root, full, "read");
       return await Deno.readTextFile(full);
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) return null;
@@ -103,14 +124,9 @@ export class FsStagingStore implements StagingStore {
   }
 
   async delete(projectDir: string, relPath: string): Promise<string[]> {
-    assertSafeDestination(relPath);
-    await assertStagingNotLinked(projectDir);
-    const root = await resolveProjectRoot(projectDir);
-    const full = resolve(projectDir, STAGING_REL, relPath);
-    // The entry it unlinks, never where that leads: judge one, remove another (cli#751).
-    await assertRemovableInProject(root, full);
+    const full = await stagedEntry(projectDir, relPath, "delete");
+    if (full === null) return [];
     try {
-      await assertPlainStagedEntry(root, full, "delete");
       await Deno.remove(full);
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) return [];
