@@ -37759,6 +37759,10 @@ back to the previous behaviour — see UPGRADING.md.
 `,
   },
   {
+    version: "5.0.1",
+    content: ``,
+  },
+  {
     version: "5.1.0",
     content:
       `**The Specnaut Cockpit, for developers who work in Claude Code.** A Claude Code mod that puts your
@@ -37801,6 +37805,14 @@ checks staged changes against the branch's merge base — run it by hand or from
 runner. An existing constitution does not receive the table from \`specnaut upgrade\`: run
 \`/specnaut constitution\`, which proposes it.
 `,
+  },
+  {
+    version: "5.3.1",
+    content: ``,
+  },
+  {
+    version: "5.3.2",
+    content: ``,
   },
   {
     version: "5.4.0",
@@ -38115,5 +38127,9 @@ nothing changes.
 **\`/specnaut issue <brief>\`** reports a Specnaut problem or proposal upstream, with the exact text
 you approved.
 `,
+  },
+  {
+    version: "9.3.0",
+    content: ``,
   },
 ];
