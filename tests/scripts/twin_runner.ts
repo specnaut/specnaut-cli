@@ -20,13 +20,19 @@ export const BASH = Deno.build.os === "darwin" ? "/bin/bash" : "bash";
 /** A snippet per twin, each in its own language. */
 export type Bodies = { bash: string; pwsh: string };
 
+/**
+ * `path`, when given, is the whole PATH; `before` runs ahead of the sourcing,
+ * where an entry script sets its preferences (`$ErrorActionPreference`).
+ */
+export type Shell = { path?: string; before?: Partial<Bodies> };
+
 export type Twin = {
   name: "bash" | "pwsh";
   /**
    * `body` in one shell with the twin's `common` sourced from `scripts` (a tree
-   * holding `bash/` and `powershell/`), and `path`, when given, as the whole PATH.
+   * holding `bash/` and `powershell/`).
    */
-  functions: (scripts: string, body: Bodies, cwd: string, path?: string) => Promise<Run>;
+  functions: (scripts: string, body: Bodies, cwd: string, shell?: Shell) => Promise<Run>;
   /** An entry script of `scripts` by its bash name, its flags spelled as bash's. */
   entry: (scripts: string, script: string, args: string[], cwd: string) => Promise<Run>;
 };
@@ -39,10 +45,10 @@ export const pwshFlag = (a: string) =>
 
 const BASH_TWIN: Twin = {
   name: "bash",
-  functions: (scripts, body, cwd, path) =>
+  functions: (scripts, body, cwd, { path, before } = {}) =>
     run(BASH, [
       "-c",
-      `${path === undefined ? "" : `PATH='${bashPath(path)}'\n`}source '${
+      `${path === undefined ? "" : `PATH='${bashPath(path)}'\n`}${before?.bash ?? ""}source '${
         bashPath(join(scripts, "bash/common.sh"))
       }'\n${body.bash}`,
     ], cwd),
@@ -52,11 +58,11 @@ const BASH_TWIN: Twin = {
 
 const PWSH_TWIN: Twin = {
   name: "pwsh",
-  functions: (scripts, body, cwd, path) =>
+  functions: (scripts, body, cwd, { path, before } = {}) =>
     run("pwsh", [
       "-NoProfile",
       "-Command",
-      `${path === undefined ? "" : `$env:PATH = '${path}'\n`}. '${
+      `${path === undefined ? "" : `$env:PATH = '${path}'\n`}${before?.pwsh ?? ""}. '${
         join(scripts, "powershell/common.ps1")
       }'\n${body.pwsh}`,
     ], cwd),

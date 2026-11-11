@@ -40,9 +40,11 @@ const GIT_FUNCTIONS = `
 "RESULT gitfound=$([bool](Get-Command git -ErrorAction SilentlyContinue))"
 `;
 
-/** `body` in a pwsh with common.ps1 dot-sourced, after `preference`. */
+/** `body` in a pwsh with common.ps1 dot-sourced after `preference`, as an entry script sets it. */
 const pwsh = (dir: string, body: string, preference = ""): Promise<Run> =>
-  PWSH.functions(join(dir, ".specnaut/scripts"), { bash: "", pwsh: `${preference}${body}` }, dir);
+  PWSH.functions(join(dir, ".specnaut/scripts"), { bash: "", pwsh: body }, dir, {
+    before: { pwsh: preference },
+  });
 
 /** `slashes` on a path value only: it lowercases on Windows, and `False` is PowerShell's. */
 const fold = (l: string) => /^(root|first|second)=/.test(l) ? slashes(l) : l;

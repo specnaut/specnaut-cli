@@ -157,7 +157,7 @@ for (const twin of twins()) {
       fn: () =>
         withProject(async (dir) => {
           const path = await row.setup(dir);
-          const r = await twin.functions(installed(dir), GIT_FUNCTIONS, dir, path);
+          const r = await twin.functions(installed(dir), GIT_FUNCTIONS, dir, { path });
           const { branch, hasgit, gitfound } = row.values;
           assertEquals(results(r), [
             `root=${slashes(dir)}`,
