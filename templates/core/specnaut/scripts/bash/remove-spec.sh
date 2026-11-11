@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Removes a shipped feature's spec directory, in its own commit, pushed
 # (phases/merge-close.md, spec 042). Run on the base branch after the merge
-# landed and the backlog item closed.
+# landed and the backlog item closed. Two forms:
+#
+#   remove-spec.sh <landed-branch>    the directory and .specnaut/feature.json
+#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone, when it
+#                                     names no directory (cli#760): its
+#                                     linked_issue must be <n>, else 22
+#
+# The directory form, below. The marker form checks the same HEAD, index,
+# tracking and staged-path rules over that one path, and never names a
+# directory.
 #
 # Five conditions, all required, else nothing is touched: HEAD is the base;
 # `.specnaut/feature.json` names a `feature_directory`; it exists; it is in
@@ -31,71 +40,95 @@
 #      (`git restore` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
+#        remove-spec.sh --marker-only <n>
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 skip() { echo "remove-spec: skipped — $*" >&2; exit 22; }
 
-if [ $# -ne 1 ] || [[ ! $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "usage: remove-spec.sh <landed-branch>" >&2
+marker="" landed="" dir=""
+if [ $# -eq 2 ] && [ "$1" = --marker-only ] && [[ $2 =~ ^[1-9][0-9]{0,9}$ ]]; then
+  marker=$2
+elif [ $# -ne 1 ] || [[ ! $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "usage: remove-spec.sh <landed-branch> | remove-spec.sh --marker-only <n>" >&2
   exit 2
+else
+  landed=$1
 fi
-landed=$1
 base=$(bash "$here/base-branch.sh") || exit 3
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 [ "$(git symbolic-ref --quiet --short HEAD || true)" = "$base" ] || skip "HEAD is not $base"
 [ -f .specnaut/feature.json ] || skip "no .specnaut/feature.json"
-dir=$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .specnaut/feature.json | sed -n 1p)
-[ -n "$dir" ] || skip "feature.json names no feature_directory"
-dir=${dir%/}
-case $dir in
-  .specnaut/specs/*) ;;
-  *) skip "'$dir' is not under .specnaut/specs/" ;;
-esac
-name=${dir#.specnaut/specs/}
-[[ $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || skip "'$dir' is not one feature directory directly under .specnaut/specs/"
-[ "$name" = "$landed" ] || skip "'$dir' is not the spec of $landed, the branch that landed — feature.json is stale"
-[ ! -L "$dir" ] || skip "'$dir' is a link"
-[ -d "$dir" ] || skip "'$dir' does not exist"
-# Compared with the physical root, not with `cd -P .specnaut/specs`: a linked
-# `.specnaut/specs` resolves both sides to the same place elsewhere.
-[ "$(cd -P "$dir" && pwd)" = "$(pwd -P)/.specnaut/specs/$name" ] || skip "'$dir' resolves outside .specnaut/specs/ — a link on its path"
-[ -n "$(git log --all --oneline -1 -- "$dir")" ] || skip "'$dir' is in no commit — deleting it would destroy the only copy"
-
 id=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' .specnaut/feature.json | sed -n 1p)
+if [ -n "$marker" ]; then
+  [ "$id" = "$marker" ] || skip "feature.json does not link #$marker"
+else
+  dir=$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .specnaut/feature.json | sed -n 1p)
+  [ -n "$dir" ] || skip "feature.json names no feature_directory"
+  dir=${dir%/}
+  case $dir in
+    .specnaut/specs/*) ;;
+    *) skip "'$dir' is not under .specnaut/specs/" ;;
+  esac
+  name=${dir#.specnaut/specs/}
+  [[ $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || skip "'$dir' is not one feature directory directly under .specnaut/specs/"
+  [ "$name" = "$landed" ] || skip "'$dir' is not the spec of $landed, the branch that landed — feature.json is stale"
+  [ ! -L "$dir" ] || skip "'$dir' is a link"
+  [ -d "$dir" ] || skip "'$dir' does not exist"
+  # Compared with the physical root, not with `cd -P .specnaut/specs`: a linked
+  # `.specnaut/specs` resolves both sides to the same place elsewhere.
+  [ "$(cd -P "$dir" && pwd)" = "$(pwd -P)/.specnaut/specs/$name" ] || skip "'$dir' resolves outside .specnaut/specs/ — a link on its path"
+  [ -n "$(git log --all --oneline -1 -- "$dir")" ] || skip "'$dir' is in no commit — deleting it would destroy the only copy"
+fi
+# The paths this run removes: its pathspecs, its staged-path check and its
+# undo. The marker form's is the file alone — never a directory.
+paths=(.specnaut/feature.json)
+[ -z "$dir" ] || paths=("$dir" .specnaut/feature.json)
+
 # The commit takes the whole index, so it must hold the removal alone: work
 # someone else staged is theirs, never swept into this commit or unstaged.
 git diff --cached --quiet || skip "the index already holds staged changes — commit or unstage them first"
-git diff --quiet -- "$dir" .specnaut/feature.json || skip "'$dir' or feature.json has uncommitted changes"
+if ! git diff --quiet -- "${paths[@]}"; then
+  [ -z "$dir" ] || skip "'$dir' or feature.json has uncommitted changes"
+  skip "feature.json has uncommitted changes"
+fi
 git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "feature.json is not tracked"
-# From the removal to its commit, a failure undoes this script's own two paths
+# From the removal to its commit, a failure undoes this script's own paths
 # and exits by the table — never with git's code, the deletion left staged.
 undo() {
   local rc=$? cmd=$BASH_COMMAND undone="the removal is undone"
-  git restore --staged --worktree --source=HEAD -- "$dir" .specnaut/feature.json ||
-    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- $dir .specnaut/feature.json"
+  git restore --staged --worktree --source=HEAD -- "${paths[@]}" ||
+    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- ${paths[*]}"
   echo "remove-spec: '$cmd' failed (exit $rc) — $undone, nothing committed" >&2
   exit 25
 }
 trap undo ERR
-git rm -r --quiet -- "$dir" .specnaut/feature.json
+git rm -r --quiet -- "${paths[@]}"
 # -z: a name git would quote (core.quotePath) is still compared as written.
 while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-  case $status:$path in
-    D:"$dir"/* | D:.specnaut/feature.json) ;;
+  ok=0
+  [ "$status:$path" != D:.specnaut/feature.json ] || ok=1
+  if [ -n "$dir" ]; then case $status:$path in D:"$dir"/*) ok=1 ;; esac; fi
+  case $ok in
+    1) ;;
     *)
       # Something staged after the check: restore this script's own paths only.
-      git restore --staged --worktree --source=HEAD -- "$dir" .specnaut/feature.json
+      git restore --staged --worktree --source=HEAD -- "${paths[@]}"
       echo "remove-spec: the staged change held '$path' — the removal is undone, nothing committed" >&2
       exit 23 ;;
   esac
 done < <(git diff --cached --no-renames --name-status -z)
-git commit --quiet -m "chore(${id:-spec}): remove the spec directory for the shipped feature"
+if [ -n "$dir" ]; then
+  git commit --quiet -m "chore(${id:-spec}): remove the spec directory for the shipped feature"
+else
+  git commit --quiet -m "chore($marker): remove the feature marker for the shipped item"
+fi
 trap - ERR
 # No --exclude-standard: an ignored file is in no commit either. -z, then %q,
 # so a name with a space or a newline still reads as one path.
-left=$(git ls-files -o -z -- "$dir" | while IFS= read -r -d '' p; do printf '  %q\n' "$p"; done)
+left=""
+[ -z "$dir" ] || left=$(git ls-files -o -z -- "$dir" | while IFS= read -r -d '' p; do printf '  %q\n' "$p"; done)
 if ! out=$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/$base:refs/heads/$base" 2>&1); then
   printf '%s\n' "$out" >&2
   echo "remove-spec: the push was rejected — the commit stays on the local $base" >&2
@@ -107,4 +140,8 @@ if [ -n "$left" ]; then
   printf '%s\n' "$left" >&2
   exit 24
 fi
-echo "remove-spec: removed $dir — restore with: git log --all -- $dir"
+if [ -n "$dir" ]; then
+  echo "remove-spec: removed $dir — restore with: git log --all -- $dir"
+else
+  echo "remove-spec: removed .specnaut/feature.json - restore with: git log --all -- .specnaut/feature.json"
+fi
