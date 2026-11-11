@@ -24,6 +24,9 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
 ## Steps
 
+**The intake gate** (`phases/auto-chain.md`) runs before step 2, before every run of step 3, and,
+under `--no-close`, once more after the push: there the item's line must read `OWN partial`.
+
 0. **Check the helper scripts — before any script under `.specnaut/scripts/` runs**, again right
    after every `git rebase` this phase runs (before the gates and before `epic-status.sh`), before
    step 3, and after every commit this phase makes or rewrites (squash, fold):
@@ -57,6 +60,10 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 1. **Shape the history.** Ask the branch, not the board — `bash .specnaut/scripts/bash/epic-status.sh`
    reads its `Epic: #` trailers, and only before the landing: after it, the range is empty. Keep its
    last `CHILD` and `EPIC` lines (after any fold) for the close.
+   **Under `--no-close`, first mark the delivery partial, on the branch:** set `"delivery":
+   "partial"` in `.specnaut/feature.json` and commit it — on exit 14 as a commit the squash groups,
+   on exit 0 as `git commit --fixup <the last CHILD's sha>`, which the fold folds — so it lands
+   with the work, in the same fast-forward or the same push.
    This list maps every exit `epic-status.sh`'s header lists; an exit it does not list is a
    finding: quote it and stop on the branch.
    - **Exit 14 — standalone**: run the full tier (**The full tier**, below), then load
@@ -91,9 +98,9 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    commands: neither is ever reported as the full gate.
 2. **`--pr` only** — push the branch, open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
-   run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
-   `/task merge` after the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
-   merge": it collapses the scopes the squash produced.
+   run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. After the PR
+   lands, `/task resume <n>` settles it. Never use the forge's "Squash and merge": it collapses
+   the scopes the squash produced.
 3. **Land it** — after step 0 ran again on the history as it now stands:
 
    ```
@@ -134,7 +141,7 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    | How the phase ends | The card |
    | :--- | :--- |
    | `--pr`, whatever `--no-close` says, or not pushed (step 4 exit 7, refused by a rule) | `bash .specnaut/scripts/backlog/move.sh "<linked_issue>" "<review column>"`, the backend's own name for it from its `move.sh` usage. A failed move is reported; it never fails the merge |
-   | pushed under `--no-close` | leave it in `In progress`: the delivery continues on another branch |
+   | pushed under `--no-close` | leave it in `In progress`: the delivery continues on another branch. The field must be in what landed (the gate's run after the push, above) |
    | pushed, not under `--no-close` | load `phases/merge-close.md`: it closes what shipped and reconciles |
 6. **Close what this run spawned** — on every exit from this phase, a stop in step 1, 2 or 4
    included, whatever step 5 did: if `AGENTS.md` names a delegated-session lifecycle for your

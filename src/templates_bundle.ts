@@ -130,7 +130,7 @@ step 4b, without being asked.
 **Re-entry.** \`plan <id>\` classifies the item once, before step 2: its state, creation time and
 parent from the backend's \`view.sh\` (never its body as evidence), then
 \`bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>\`. \`phases/auto-chain.md\` decides from that
-whether the chain goes on; where its row stops (\`UNPUSHED\`), stop here, before step 2.
+whether the chain goes on. Every \`plan\`, with an id or not, passes its intake gate before step 2.
 
 <!-- BEGIN: spec-backend=local -->
 - \`IDLE\`, and the working tree's \`.specnaut/feature.json\` links the item: a plan that stopped on a
@@ -143,8 +143,8 @@ whether the chain goes on; where its row stops (\`UNPUSHED\`), stop here, before
 <!-- BEGIN: spec-backend=cloud -->
 An epic is one plan: for a child, \`<task>\` below is its parent epic, and the epic's class picks the
 branch. Only one thing is the child's own: open chains, closed runs alone (\`phases/auto-chain.md\`).
-Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`; its
-\`UNPUSHED\` is a stop as above. So an \`IDLE\` child of an \`ACTIVE\` epic continues on the epic's
+Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`; the
+gate above stops an \`UNPUSHED\` one. So an \`IDLE\` child of an \`ACTIVE\` epic continues on the epic's
 branch. Run \`specnaut spec pull <task>\` first. A plan exists when it materialises
 \`.specnaut/specs/.cache/<task>/1-plan.md\`; \`no spec for task\`, or no such file, means none does.
 Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused — since an
@@ -375,11 +375,12 @@ materialised \`1-plan.md\` stops. Then the branch, from
   not its committed \`feature.json\` \`plan_blob\`, the plan changed since it was approved: stop and say
   so — \`/task plan <task>\` re-approves it.
 - \`ACTIVE\` anywhere else: stop and name the sha, never a branch name — \`/task resume <task>\`
-  adopts it. \`UNPUSHED\`: stop; that push is \`merge\`'s recovery.
+  adopts it. \`UNPUSHED\`: stop where the intake gate points (\`phases/auto-chain.md\`).
 - \`IDLE\` or \`LANDED\`: HEAD is the base, or its branch passes \`resume.md\` § 3 check 5; otherwise stop
-  and name HEAD's sha. Then \`.specnaut/scripts/bash/create-new-feature.sh --branch-only --issue
-  <task> "<feature description>"\`, write \`{ "linked_issue": <task>, "plan_blob": "<git hash-object
-  of the pulled 1-plan.md>" }\` to \`.specnaut/feature.json\` and commit it alone — anything already
+  and name HEAD's sha. Then that gate, then \`.specnaut/scripts/bash/create-new-feature.sh
+  --branch-only --issue <task> "<feature description>"\`, write \`{ "linked_issue": <task>,
+  "plan_blob": "<git hash-object of the pulled 1-plan.md>" }\` to \`.specnaut/feature.json\` and
+  commit it alone — anything already
   staged (\`git diff --cached --quiet\` fails) is a stop:
   \`git add .specnaut/feature.json && git commit --allow-empty -m "plan(<task>): link the branch to
   its task"\`. \`wip-audit.sh\` and \`resume.md\` § 3 check 8 read the branch by it.
@@ -502,7 +503,9 @@ epic merge path, not here.
 \`bash .specnaut/scripts/bash/epic-status.sh\` is the one reader of this format: it prints a
 \`CHILD T<NN> #<child> <sha>\` line per child, checks the ordinals run 1, 2, 3… and that no child
 has two commits, and fails when the history does not read back to the board. Never parse the log a
-second way; its exits are mapped once, in \`phases/merge.md\` step 1. A history that does not read
+second way; its exits are mapped in two places: \`phases/merge.md\` step 1 for the branch, and
+\`phases/merge-close.md\` § Re-entry for \`--landed\`, which reads what the published base shipped
+across every delivery (the intake gate takes any other exit as a failed read). A history that does not read
 back was rewritten by something that did not follow this file: stop and say so rather than picking
 one reading.
 `,
@@ -849,8 +852,8 @@ the board is the thing the epic loop exists to prevent.
     content: `# Closing and reconciling after a merge
 
 Loaded by \`phases/merge.md\` at its step 5, **only when the push happened** and \`--no-close\` was
-not passed. If nothing was pushed, nothing here runs: a repository that has not published the work
-cannot corroborate a board that says it is done.
+not passed, and by \`resume.md\` through **Re-entry**, below. If nothing was pushed, nothing here
+runs: a repository that has not published the work cannot corroborate a board that says it is done.
 
 ## Order matters: close the issue first, then move the card
 
@@ -863,7 +866,7 @@ confirmed closed.
 
 The scripts below are the ones \`phases/merge.md\` step 0 verified, or the user approved, before
 \`land-feature.sh\` ran: run them only while \`HEAD\` is the commit \`LANDED\` ends at, and only past
-the board fence of \`phases/merge.md\` step 5.
+the board fence of \`phases/merge.md\` step 5. Re-entry differs only where it says.
 
 1. **What shipped.** Standalone: \`linked_issue\` from \`.specnaut/feature.json\` (absent → skip this
    file; a tree from before the field existed). Epic: the children are the \`CHILD\` lines, and the
@@ -871,22 +874,25 @@ the board fence of \`phases/merge.md\` step 5.
    — or at its re-run after a clean rebase (step 4, exit 5), whose lines replace the first. Never
    re-run it now: its range is empty after the landing. A child whose commit is not on the
    branch did not ship, and is not closed.
-2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
-   epic itself, and for a standalone item, run \`bash .specnaut/scripts/backlog/cascade-check.sh <n>\`
-   first: **only exit 0 authorises the close**. 11 — a child is still open: name it and stop. 3 —
-   the gate could not answer: say so and stop. 12 — already closed: nothing to close. Then close it
-   yourself — no \`product-owner\` dispatch, this close is mechanical — with a comment filled from
-   \`land-feature.sh\`'s \`LANDED\` line and nothing else, leaving the card alone:
+2. **Close each one — one order, on every backend, on the first run and on re-entry.**
+   **Do not ask.** The push was the authorisation. Children first, the epic last. For each item, run
+   \`bash .specnaut/scripts/backlog/cascade-check.sh <n>\` before its close: **0** authorises it;
+   **12** — already closed: skip its close, it still goes to step 3; **11** — a child is still
+   open: name it and stop before step 3; **3** — the check could not answer: say so and stop
+   before step 3. The close itself — yours, no \`product-owner\` dispatch, it is mechanical — on
+   github and gitlab is \`close.sh\` with a comment and nothing else, leaving the card alone:
 
    \`\`\`bash
-   range=<first>..<last>   # from LANDED; it must match ^[0-9a-f]{7,40}\\.\\.[0-9a-f]{7,40}\$
-   d=\$(mktemp -d) && chmod 700 "\$d" && printf 'Shipped in %s.\\n' "\$range" >"\$d/close.md"
+   d=\$(mktemp -d) && chmod 700 "\$d" && printf 'Shipped in %s.\\n' "<shipped>" >"\$d/close.md"
    bash .specnaut/scripts/backlog/close.sh <n> completed --body-file "\$d/close.md"
    \`\`\`
 
-   Children first, the epic last. On local and cloud there is no separate issue: skip to step 3,
-   which is the close.
-3. **Settle the board:**
+   \`<shipped>\` is \`<first>..<last>\` from \`land-feature.sh\`'s \`LANDED\` line, matching
+   \`^[0-9a-f]{7,40}\\.\\.[0-9a-f]{7,40}\$\`; on re-entry, the \`<sha>\` of the gate's line, matching
+   \`^[0-9a-f]{40}\$\`. No other text reaches it. On local and cloud there is no separate issue: the
+   close is step 3 run for that one item, before the next item's check, so an epic's check sees
+   the children this closeout closed.
+3. **Settle the board** — the items that answered 0 or 12:
 
    \`\`\`
    bash .specnaut/scripts/backlog/close-shipped.sh <n>…
@@ -894,19 +900,25 @@ the board fence of \`phases/merge.md\` step 5.
 
    It confirms each issue closed, moves its card to Done, then reconciles the whole board once and
    prints the sweep's summary line. Its exit table is the header of \`_close_shipped.sh\` beside it;
-   this maps every exit there. **0** — settled. **20** — an issue was not confirmed closed, its card
-   left alone; **21** — a move or the reconcile failed. Neither fails the merge, which has happened:
-   report it. **2** — usage: a bad number was passed; fix the call.
-4. **Remove the spec directory — once, for the whole epic too:**
+   this maps every exit there, and step 4 reads it. **0** — settled. **20** — an issue was not
+   confirmed closed, its card left alone. **21** — a move or the reconcile failed: the close
+   stands, and the card is reported as drift for groom's sweep. Neither fails the merge, which has
+   happened: report it. **2** — usage: a bad number was passed; fix the call.
+4. **Remove the marker — once, for the whole epic too, and only after step 3 exited 0 or 21.**
+   On **20** the tracker did not confirm the close: remove nothing. \`.specnaut/feature.json\` stays
+   on the base, so the item stays unsettled until \`/task resume <n>\` finishes it. With a feature
+   directory, the removal takes it too; without one (cloud), the file goes alone:
+   \`bash .specnaut/scripts/bash/remove-spec.sh --marker-only <n>\`. Otherwise:
 
    \`\`\`
    bash .specnaut/scripts/bash/remove-spec.sh <branch>
    \`\`\`
 
    \`<branch>\` is the feature branch \`land-feature.sh\` just landed — the one you merged, not one read
-   back from \`feature.json\`. What it removes, and when it refuses, is the script's header; this list
-   maps every exit that header lists — an exit it does not list is a failure: report it verbatim.
-   Never run it before the close succeeded: nobody authorised a removal then.
+   back from \`feature.json\`; on re-entry, the last segment of the gate's \`<dir>\`. What it removes,
+   and when it refuses, is the script's header; this list maps every exit that header lists — an
+   exit it does not list is a failure: report it verbatim. Never run it before the close
+   succeeded: nobody authorised a removal then.
    - **0** — removed and pushed: report its line.
    - **22** — skipped, nothing changed: its reason is printed — report it, never silently.
    - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were
@@ -920,6 +932,26 @@ the board fence of \`phases/merge.md\` step 5.
    - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
      Quote the failure it names and report it; never bypass the hook.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
+
+## Re-entry — finishing a closeout an earlier run left
+
+\`resume.md\` comes here with one line of the intake gate, \`OWN closeout <n> <dir> <sha>\`, after a
+\`FENCED\` one was answered yes when there was one. Landed scripts are the project's own: they are the
+ones on the published base, so no \`specnaut verify-scripts\` runs first.
+
+1. **The base.** Switch to it; when it is strictly behind \`refs/remotes/origin/<base>\`, fast-forward
+   it there (\`git merge --ff-only refs/remotes/origin/<base>\`). Run the steps there.
+2. **The item, the directory and the sha** come from the gate's line and nowhere else: never open
+   \`.specnaut/feature.json\`.
+3. **What shipped.** An epic is an item \`bash .specnaut/scripts/bash/epic-status.sh --landed
+   <n>@<epoch>\` (\`<epoch>\`, its creation time) prints a \`CHILD\` line for. Its children are those
+   that both that call and \`cascade-check.sh --numbers <n>\` list; any other child did not ship and
+   is not closed, so the epic's own check answers 11 and its spec is kept. \`epic-status.sh\`'s
+   exits other than 0 stop here, quoted.
+4. **Steps 2 to 4, as written above.** A step that already ran answers the same way again: a
+   closed issue is 12, a removed marker is no gate line at all.
+
+A \`PARTIAL\` line over a closed item (\`resume.md\`) runs 1 and 2, then step 4 alone: nothing closes.
 
 ## The report names every item, one line each
 
@@ -1447,6 +1479,9 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
 
 ## Steps
 
+**The intake gate** (\`phases/auto-chain.md\`) runs before step 2, before every run of step 3, and,
+under \`--no-close\`, once more after the push: there the item's line must read \`OWN partial\`.
+
 0. **Check the helper scripts — before any script under \`.specnaut/scripts/\` runs**, again right
    after every \`git rebase\` this phase runs (before the gates and before \`epic-status.sh\`), before
    step 3, and after every commit this phase makes or rewrites (squash, fold):
@@ -1480,6 +1515,10 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
 1. **Shape the history.** Ask the branch, not the board — \`bash .specnaut/scripts/bash/epic-status.sh\`
    reads its \`Epic: #\` trailers, and only before the landing: after it, the range is empty. Keep its
    last \`CHILD\` and \`EPIC\` lines (after any fold) for the close.
+   **Under \`--no-close\`, first mark the delivery partial, on the branch:** set \`"delivery":
+   "partial"\` in \`.specnaut/feature.json\` and commit it — on exit 14 as a commit the squash groups,
+   on exit 0 as \`git commit --fixup <the last CHILD's sha>\`, which the fold folds — so it lands
+   with the work, in the same fast-forward or the same push.
    This list maps every exit \`epic-status.sh\`'s header lists; an exit it does not list is a
    finding: quote it and stop on the branch.
    - **Exit 14 — standalone**: run the full tier (**The full tier**, below), then load
@@ -1514,9 +1553,9 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    commands: neither is ever reported as the full gate.
 2. **\`--pr\` only** — push the branch, open the pull request against the base, name any issue its
    body references that \`gh pr view <n> --json closingIssuesReferences\` omits, report the PR URL,
-   run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
-   \`/task merge\` after the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
-   merge": it collapses the scopes the squash produced.
+   run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. After the PR
+   lands, \`/task resume <n>\` settles it. Never use the forge's "Squash and merge": it collapses
+   the scopes the squash produced.
 3. **Land it** — after step 0 ran again on the history as it now stands:
 
    \`\`\`
@@ -1557,7 +1596,7 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    | How the phase ends | The card |
    | :--- | :--- |
    | \`--pr\`, whatever \`--no-close\` says, or not pushed (step 4 exit 7, refused by a rule) | \`bash .specnaut/scripts/backlog/move.sh "<linked_issue>" "<review column>"\`, the backend's own name for it from its \`move.sh\` usage. A failed move is reported; it never fails the merge |
-   | pushed under \`--no-close\` | leave it in \`In progress\`: the delivery continues on another branch |
+   | pushed under \`--no-close\` | leave it in \`In progress\`: the delivery continues on another branch. The field must be in what landed (the gate's run after the push, above) |
    | pushed, not under \`--no-close\` | load \`phases/merge-close.md\`: it closes what shipped and reconciles |
 6. **Close what this run spawned** — on every exit from this phase, a stop in step 1, 2 or 4
    included, whatever step 5 did: if \`AGENTS.md\` names a delegated-session lifecycle for your
@@ -2861,6 +2900,8 @@ when the context is compacted, a more urgent ask interrupts it, or the session e
 survives in git. What is lost is where the chain stopped, and rebuilding that from a summary or
 from a plan's prose is how a finished phase runs twice and an unfinished one is skipped. This verb
 rebuilds it from git alone, writes nothing of its own, and re-enters the chain **in the same turn**.
+Its one exception is a closeout an earlier landing left: it re-enters \`phases/merge-close.md\`
+§ Re-entry, which closes, moves and pushes.
 
 Its only memory is git. It reads no addendum. The verb it re-enters goes through the router's
 normal routing, addendum included.
@@ -2879,7 +2920,8 @@ normal routing, addendum included.
 
    This is the same call groom makes, and the header of \`wip-audit.sh\` defines its lines. It
    prints one sha per item, so a second branch with a different tip is not seen. The brief names
-   the branch it took.
+   the branch it took. Then the intake gate, as \`phases/auto-chain.md\` runs it, for this id: its
+   lines are the evidence for the rows that name them.
 4. **For \`ACTIVE\`, the candidate branch:**
    \`git for-each-ref --points-at <sha> --format='%(refname)' refs/heads\`.
 5. **The working tree:** its \`.specnaut/feature.json\`, and \`git status --porcelain\`.
@@ -2888,9 +2930,14 @@ normal routing, addendum included.
 
 | Evidence | Re-enter at |
 | :--- | :--- |
-| the id is malformed, or \`wip-audit.sh\` exits anything but \`0\` | nothing: report it and stop |
+| the id is malformed, \`wip-audit.sh\` exits anything but \`0\`, or the gate anything but \`0\` or \`4\` | nothing: report it and stop |
+| a \`PENDING push\` line | exactly one, whose diff only deletes the \`<dir>\` and \`.specnaut/feature.json\` of the base's marker: \`phases/merge-close.md\` step 4's exit-7 row. Otherwise nothing: name each sha and whether it names the item, and stop; they are someone's work |
+| \`OWN closeout <id> <dir> <sha>\` (or \`PENDING closeout <id> …\`) | \`phases/merge-close.md\` § Re-entry, from that line |
+| \`FENCED closeout <id> …\` | the question \`phases/auto-chain.md\` asks; a yes, the row its rerun's line matches |
+| \`OWN partial <id> …\` (or \`PARTIAL closeout <id> …\`), the item closed | \`phases/merge-close.md\` § Re-entry, its partial line: the marker goes, nothing closes |
+| \`INVALID closeout …\` | nothing: name its fix in \`phases/auto-chain.md\`, and stop |
+| any other gate line | nothing: quote it and point where \`phases/auto-chain.md\` points, then stop |
 | the item is closed | nothing: name the line \`wip-audit.sh\` printed, with its sha (or "closed without a landing commit"), and stop |
-| \`UNPUSHED\`, or \`origin/<base>..<base>\` is not empty | nothing: list \`origin/<base>..<base>\`, giving each sha and whether it names the item. The local base may hold more than this item's landing, so check that list before following the refused-push row of \`phases/merge.md\` step 4. Then stop |
 | \`LANDED\`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is \`/task close <id>\` or the next branch's \`merge\` |
 | \`IDLE\`, and the working tree's \`.specnaut/feature.json\` links the item | \`plan\`, at its section "The plan stop", as an adopted plan (\`phases/plan.md\`, "Re-entry") |
 | \`IDLE\` | \`plan <id>\` |
@@ -2904,7 +2951,8 @@ there, the only uncommitted paths allowed are that item's own feature directory 
 
 \`implement\` builds what its plan still lacks against the commits already on the branch (its own
 "Before the first line"), and it chains to \`review\` and \`merge\`. An epic goes there too, and
-\`phases/epic-loop.md\` picks its child. Resume never lands, closes or pushes anything itself.
+\`phases/epic-loop.md\` picks its child. Resume never lands, closes or pushes anything itself,
+except through \`phases/merge-close.md\` § Re-entry.
 
 ## 3. The provenance gate — every check runs before any checkout
 
@@ -3470,7 +3518,7 @@ A verb invoked directly chains, or runs alone, by this table and nothing else:
 
 | Invoked | Chains when |
 |---|---|
-| \`plan <id>\` | the item is open and \`wip-audit.sh\` classed it \`IDLE\`, \`ACTIVE\` or \`LANDED\` (\`phases/plan.md\`, "Re-entry", which says whose class an epic's child takes — its own open state governs either way): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; \`UNPUSHED\` lists \`origin/<base>..<base>\` and stops |
+| \`plan <id>\` | the item is open and \`wip-audit.sh\` classed it \`IDLE\`, \`ACTIVE\` or \`LANDED\` (\`phases/plan.md\`, "Re-entry", which says whose class an epic's child takes — its own open state governs either way): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; \`UNPUSHED\` is the intake gate's stop (below) |
 | \`plan\` with no id | always: a new feature |
 | \`implement\` | the branch is not merged into the base branch |
 | \`review\` | always one-shot |
@@ -3480,6 +3528,33 @@ checked when the verb completes (for \`plan\`, after its commit): a fresh plan b
 inherits whatever it carries. A failure ends the run there and names the check and the first failing
 sha. Inside a running chain the next
 verb is invoked without this table.
+
+## The intake gate — no new work over an unsettled landing
+
+\`plan\` (with or without an id), \`implement\` where it creates the branch, \`merge\` before its step 2
+and before every run of its step 3, and every re-entry \`resume.md\` makes run, before anything else:
+
+\`\`\`bash
+bash .specnaut/scripts/bash/wip-audit.sh --gate --own <id> --own <its parent epic> --since <id>@<epoch>
+\`\`\`
+
+\`--own\` and \`--since\` for the item the run is about, and \`--own\` for its parent epic when it has
+one; with no item yet, no flag. What each line means is the header of \`_intake_gate.sh\`.
+**Proceed only on exit 0 whose last line is \`gate clear\`; any other exit or last line stops,
+quoting the gate's lines.** Where each stop points:
+
+| Line | The way out |
+| :--- | :--- |
+| \`PENDING closeout <n> …\` | \`/task resume <n>\` |
+| \`PARTIAL closeout <n> …\` | \`/task plan <n>\`: the delivery continues |
+| \`PENDING push <sha>\` | \`/task resume <id>\` for the item that landed: its push row is the refused-push recovery |
+| \`FENCED closeout <n> …\` | the question below, for the run's own \`<n>\`; another item's, \`/task resume <n>\` |
+| \`INVALID closeout …\` | by hand: remove \`.specnaut/feature.json\` in its own commit, and push |
+
+**\`FENCED\`, for the run's own \`<n>\`.** Ask once, as \`phases/merge.md\` step 0 asks: *"The landing
+changed \`.specnaut/backlog-config.yml\`. Yes runs against the board it now names."* A yes reruns the
+gate with \`--fence-ack <n>\` added, for that run only, and goes on from the line it prints. Anything
+else runs no backlog script and stops.
 
 ## Failure
 
@@ -29684,18 +29759,49 @@ exit 0
 #      holds any commit is read as it stands: the second branch of an epic
 #      delivered across several is not a re-run
 #
-# Usage: epic-status.sh
+# --landed <E>[@<epoch>] (cli#760) reads what an epic already shipped instead:
+# one CHILD line, oldest first, per commit on the published base —
+# \`refs/remotes/origin/<base>\`, else \`refs/heads/<base>\` — whose \`Epic: #<E>\`
+# trailer names it and whose subject is a child's, ignoring commits older than
+# <epoch> (none given: 0). No sequence check: ordinals carry across the
+# deliveries of one epic. Exits 0, 2 (<E> not ^[1-9][0-9]{0,9}\$, an epoch not
+# ^[0-9]{1,12}\$), 3 and 15 as above. phases/merge-close.md § Re-entry and
+# _intake_gate.sh read it.
+#
+# Usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
-if [ \$# -ne 0 ]; then echo "usage: epic-status.sh" >&2; exit 2; fi
+landed=""
+if [ \$# -eq 2 ] && [ "\$1" = --landed ] && [[ \$2 =~ ^[1-9][0-9]{0,9}(@[0-9]{1,12})?\$ ]]; then
+  landed=\$2
+elif [ \$# -ne 0 ]; then
+  echo "usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]" >&2
+  exit 2
+fi
 # The base has one home, base-branch.sh — never an argument.
 base=\$(bash "\$here/base-branch.sh") || exit 3
 if ! git --no-pager rev-parse --verify --quiet "refs/heads/\$base^{commit}" >/dev/null &&
   ! git --no-pager rev-parse --verify --quiet "refs/remotes/origin/\$base^{commit}" >/dev/null; then
   echo "epic-status: the base '\$base' does not resolve to a commit" >&2
   exit 3
+fi
+# A child's subject, \`<type>(T<NN>): <subject> (#<child>)\`, read the same by both modes.
+CHILD_RE='^[a-z]+\\(T([0-9]{1,4})\\): .+ \\(#([1-9][0-9]{0,9})\\)\$'
+if [ -n "\$landed" ]; then
+  epic=\${landed%%@*} since=0
+  [ "\$landed" = "\$epic" ] || since=\$((10#\${landed#*@}))
+  ref="refs/remotes/origin/\$base"
+  git --no-pager rev-parse --verify --quiet "\$ref^{commit}" >/dev/null || ref="refs/heads/\$base"
+  # Anchored per line by git itself: #50 never matches a trailer of #501.
+  log=\$(git --no-pager log --reverse --format='%H%x1f%ct%x1f%s' -E --grep="^Epic: #\$epic\\\$" "\$ref" --) ||
+    { echo "epic-status: could not read \$ref - git log failed; nothing concluded" >&2; exit 15; }
+  while IFS=\$'\\x1f' read -r sha ct subject; do
+    [ -n "\$sha" ] && [ "\$ct" -ge "\$since" ] && [[ \$subject =~ \$CHILD_RE ]] || continue
+    printf 'CHILD T%02d #%s %s\\n' "\$((10#\${BASH_REMATCH[1]}))" "\${BASH_REMATCH[2]}" "\$sha"
+  done <<<"\$log"
+  exit 0
 fi
 # Fully qualified: a tag named like the base would otherwise shadow it.
 range="refs/heads/\$base..HEAD"
@@ -29727,7 +29833,7 @@ while IFS=\$'\\x1f' read -r sha subject; do
   elif [ "\$trailer" != "\$epic" ]; then
     problems+=("\${sha:0:12} names epic #\$trailer, the branch is #\$epic")
   fi
-  if [[ \$subject =~ ^[a-z]+\\(T([0-9]{1,4})\\):\\ .+\\ \\(#([1-9][0-9]{0,9})\\)\$ ]]; then
+  if [[ \$subject =~ \$CHILD_RE ]]; then
     ordinal=\$((10#\${BASH_REMATCH[1]}))
     child=\${BASH_REMATCH[2]}
     if [ "\$ordinal" -ne "\$expected" ]; then
@@ -29780,6 +29886,226 @@ exit 0
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/_base_refs.sh",
+    content: `# shellcheck shell=bash disable=SC2154 # here: set by the sourcing script
+# The base and its refs, resolved once for wip-audit.sh and its intake gate
+# (cli#760) — the one home of \`unread\`, \`present\` and the published ref.
+# Sourced, never run, by wip-audit.sh, which sets \`here\` (this directory) and
+# \`set -euo pipefail\`. base-branch.sh beside it names the base.
+#
+# resolve_base_refs sets four names, every ref fully qualified so a tag named
+# like the base cannot shadow it:
+#   base       the base branch's name, from base-branch.sh (unknown: exit 3)
+#   remote     refs/remotes/origin/<base>, or "" when it does not exist
+#   local      refs/heads/<base>, or "" when it does not exist
+#   published  remote, else local; neither resolving is exit 3
+#
+# A read that fails is never taken for one that found nothing: git's own
+# errors are discarded (they can carry ref text) and the script stops, 3.
+
+# unread <what> — a git read failed: exit 3, never a conclusion drawn from no output.
+unread() { echo "wip-audit: could not read \$1 — nothing classified" >&2; exit 3; }
+# present <ref> — 0 it exists, 1 it does not; any other git failure is unread.
+present() {
+  local s=0
+  git --no-pager show-ref --verify --quiet "\$1" || s=\$?
+  [ "\$s" -le 1 ] || unread "\$1"
+  return "\$s"
+}
+resolve_base_refs() {
+  base=\$(bash "\$here/base-branch.sh") || exit 3
+  remote="refs/remotes/origin/\$base" local="refs/heads/\$base"
+  present "\$remote" || remote=""
+  present "\$local" || local=""
+  published=\${remote:-\$local}
+  [ -n "\$published" ] || { echo "wip-audit: the base '\$base' does not resolve to a commit" >&2; exit 3; }
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_intake_gate.sh",
+    content:
+      `# shellcheck shell=bash disable=SC2154 # here, base and the refs: set by the sourcing script
+# The intake gate (cli#760): is an earlier landing still unsettled? The one
+# home of that rule. Sourced, never run, by \`wip-audit.sh --gate\`, which has
+# set \`here\`, NUM, first_naming and \`set -euo pipefail\`, and sourced
+# _base_refs.sh. phases/auto-chain.md says what a caller does with its lines.
+#
+# A landing is unsettled while either holds:
+#   (P) the local base holds commits refs/remotes/origin/<base> lacks;
+#   (C) the published base tracks .specnaut/feature.json with a numeric
+#       linked_issue. The last step of a closeout removes that file, on every
+#       backend (phases/merge-close.md step 4), so while it is there the
+#       closeout has not finished. A linked_issue of null never blocks.
+#
+# Output — fixed tokens, digits, 40-hex shas and one validated path, never
+# text read from a commit or from the file. First every commit of (P), oldest
+# first, then for the marker the first of these that matches:
+#   PENDING push <sha>
+#   INVALID closeout <n or ->       linked_issue neither digits nor null; a
+#                                   feature_directory that is not one tracked
+#                                   directory, not a link, directly under
+#                                   .specnaut/specs/; no landed commit for <n>;
+#                                   or, under --since <n>@<epoch>, the
+#                                   directory's first commit is older than it
+#   FENCED closeout <n> <dir> <sha> .specnaut/backlog-config.yml differs
+#                                   between the anchor (below) and the tip
+#   PARTIAL closeout <n> <dir> <sha> "delivery": "partial", a --no-close slice
+#   PENDING closeout <n> <dir> <sha> the closeout has not finished
+#   gate clear | gate blocked       always the last line
+# <dir> is \`-\` when the file names no feature_directory. <sha> is the newest
+# commit on the published history whose subject names #<n> (first_naming);
+# when none does, the first CHILD line of \`epic-status.sh --landed\`, because an
+# epic's subjects never name the epic (phases/epic-commits.md).
+#
+# --own <n> prints PENDING as \`OWN closeout …\` and PARTIAL as \`OWN partial …\`,
+# so a reader still tells a partial delivery from a pending closeout.
+# --fence-ack <n>, given for one run after the user's yes, reads a FENCED <n>
+# as unfenced. PENDING push and INVALID are never OWN. The anchor is the
+# newest --first-parent commit that deleted .specnaut/feature.json and nothing
+# outside .specnaut/ (what remove-spec.sh commits), else the parent of the
+# oldest one that added it; no anchor, or a parent a shallow clone lacks,
+# reads FENCED — the user's yes is the way out, never exit 3.
+#
+# Exit: 0 every line printed is OWN (\`gate clear\`) · 4 any other line
+# (\`gate blocked\`) · 2 usage · 3 the base or a read could not be resolved,
+# origin/<base> missing while origin exists included — nothing printed then.
+
+gate_usage() {
+  echo "usage: wip-audit.sh --gate [--own <n>]... [--since <n>@<epoch>] [--fence-ack <n>]" >&2
+  exit 2
+}
+GATE_FJ=.specnaut/feature.json GATE_CFG=.specnaut/backlog-config.yml
+GATE_DIR_RE='^\\.specnaut/specs/[A-Za-z0-9][A-Za-z0-9._-]*\$'
+
+# gate_anchor_fenced — 0 when the config moved since the last settled
+# closeout, or there is no anchor to compare against; 1 when it did not.
+gate_anchor_fenced() {
+  local c dels adds names p anchor="" s=0
+  dels=\$(git --no-pager log --first-parent --no-renames --diff-filter=D --format=%H "\$published" -- "\$GATE_FJ" 2>/dev/null) ||
+    unread "the history of \$GATE_FJ"
+  while IFS= read -r c; do
+    [[ \$c =~ ^[0-9a-f]{40}\$ ]] || continue
+    # A parent a shallow clone lacks is no anchor; the next one may be.
+    names=\$(git --no-pager diff --no-renames --name-only "\$c^" "\$c" -- 2>/dev/null) || continue
+    anchor=\$c
+    # A quoted name (core.quotePath) fails the prefix too: never an anchor then.
+    while IFS= read -r p; do [[ \$p == .specnaut/* ]] || anchor=""; done <<<"\$names"
+    [ -z "\$anchor" ] || break
+  done <<<"\$dels"
+  if [ -z "\$anchor" ]; then
+    adds=\$(git --no-pager log --first-parent --no-renames --diff-filter=A --format=%H "\$published" -- "\$GATE_FJ" 2>/dev/null) ||
+      unread "the history of \$GATE_FJ"
+    c=\$(printf '%s\\n' "\$adds" | sed -n '\$p')
+    [[ \$c =~ ^[0-9a-f]{40}\$ ]] || return 0
+    anchor=\$(git --no-pager rev-parse --verify --quiet "\$c^1^{commit}" 2>/dev/null) || return 0
+  fi
+  git --no-pager diff --quiet --no-ext-diff "\$anchor" "\$published" -- "\$GATE_CFG" 2>/dev/null || s=\$?
+  [ "\$s" -le 1 ] || unread "\$GATE_CFG"
+  [ "\$s" -eq 1 ]
+}
+
+# gate_marker — sets MARKER to the line for the published marker, or "".
+gate_marker() {
+  local entry json n dir="-" since=0 sha="" first rec
+  MARKER=""
+  entry=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager ls-tree "\$published" -- "\$GATE_FJ" 2>/dev/null) || unread "\$GATE_FJ"
+  [ -n "\$entry" ] || return 0
+  [[ \$entry =~ ^100(644|755)\\ blob\\ ([0-9a-f]{40}) ]] || { MARKER="INVALID closeout -"; return 0; }
+  json=\$(git --no-pager cat-file blob "\${BASH_REMATCH[2]}" 2>/dev/null) || unread "\$GATE_FJ"
+  n=\$(printf '%s\\n' "\$json" |
+    sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([^,}[:space:]]*\\).*/\\1/p' | sed -n 1p)
+  [ "\$n" != null ] || return 0
+  [[ \$n =~ \$NUM ]] || { MARKER="INVALID closeout -"; return 0; }
+  if [[ \$GATE_SINCE == *" \$n@"* ]]; then
+    since=\${GATE_SINCE##*" \$n@"}
+    since=\${since%% *}
+  fi
+  if [[ \$json == *'"feature_directory"'* ]]; then
+    dir=\$(printf '%s\\n' "\$json" |
+      sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' | sed -n 1p)
+    dir=\${dir%/}
+    [[ \$dir =~ \$GATE_DIR_RE ]] || { MARKER="INVALID closeout \$n"; return 0; }
+    entry=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager ls-tree "\$published" -- "\$dir" 2>/dev/null) || unread "\$dir"
+    [ "\$entry" = "040000 tree \${entry:12:40}"\$'\\t'"\$dir" ] && [[ \${entry:12:40} =~ ^[0-9a-f]{40}\$ ]] ||
+      { MARKER="INVALID closeout \$n"; return 0; }
+    if [ "\$since" != 0 ]; then
+      first=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager log --reverse --format=%ct "\$published" -- "\$dir" 2>/dev/null) ||
+        unread "\$dir"
+      first=\$(printf '%s\\n' "\$first" | sed -n 1p)
+      [[ \$first =~ ^[0-9]+\$ ]] && [ "\$first" -ge "\$since" ] || { MARKER="INVALID closeout \$n"; return 0; }
+    fi
+  fi
+  rec=\$(git --no-pager log --format='%H%x1f%ct%x1f%s' "\$published" -- 2>/dev/null) || unread "\$published"
+  if ! sha=\$(first_naming "\$n" "\$since" "\$rec"); then
+    rec=\$(bash "\$here/epic-status.sh" --landed "\$n@\$since" 2>/dev/null) || unread "the epic's landed children"
+    sha=\$(printf '%s\\n' "\$rec" | sed -n '1s/^CHILD T[0-9][0-9]* #[1-9][0-9]* \\([0-9a-f]\\{40\\}\\)\$/\\1/p')
+  fi
+  [[ \$sha =~ ^[0-9a-f]{40}\$ ]] || { MARKER="INVALID closeout \$n"; return 0; }
+  if [[ \$GATE_ACK != *" \$n "* ]] && gate_anchor_fenced; then
+    MARKER="FENCED closeout \$n \$dir \$sha"
+  elif [[ \$json =~ \\"delivery\\"[[:space:]]*:[[:space:]]*\\"partial\\" ]]; then
+    MARKER="PARTIAL closeout \$n \$dir \$sha"
+    [[ \$GATE_OWN != *" \$n "* ]] || MARKER="OWN partial \$n \$dir \$sha"
+  else
+    MARKER="PENDING closeout \$n \$dir \$sha"
+    [[ \$GATE_OWN != *" \$n "* ]] || MARKER="OWN closeout \$n \$dir \$sha"
+  fi
+}
+
+intake_gate() {
+  GATE_OWN=" " GATE_SINCE=" " GATE_ACK=" "
+  while [ \$# -gt 0 ]; do
+    [ \$# -ge 2 ] || gate_usage
+    case \$1 in
+      --own) [[ \$2 =~ \$NUM ]] || gate_usage; GATE_OWN+="\$2 " ;;
+      --fence-ack) [[ \$2 =~ \$NUM ]] || gate_usage; GATE_ACK+="\$2 " ;;
+      --since) [[ \$2 =~ ^([1-9][0-9]{0,9})@([0-9]{1,12})\$ ]] || gate_usage; GATE_SINCE+="\$2 " ;;
+      *) gate_usage ;;
+    esac
+    shift 2
+  done
+  resolve_base_refs
+  local s=0 pushes="" c out=() blocked=0 top
+  # Every path below is the repository's, whatever directory the caller is in.
+  top=\$(git --no-pager rev-parse --show-toplevel 2>/dev/null) || unread "the repository's top"
+  cd "\$top" || unread "the repository's top"
+  if [ -z "\$remote" ]; then
+    git --no-pager config --get remote.origin.url >/dev/null 2>&1 || s=\$?
+    [ "\$s" -le 1 ] || unread "the origin remote"
+    if [ "\$s" -eq 0 ]; then
+      echo "wip-audit: origin has no \$base branch - publish it first: git push -u origin \$base" >&2
+      exit 3
+    fi
+  elif [ -n "\$local" ]; then
+    pushes=\$(git --no-pager rev-list --reverse "\$local" --not "\$remote" -- 2>/dev/null) || unread "\$local"
+  fi
+  while IFS= read -r c; do
+    [ -z "\$c" ] || { [[ \$c =~ ^[0-9a-f]{40}\$ ]] || unread "\$local"; out+=("PENDING push \$c"); }
+  done <<<"\$pushes"
+  gate_marker
+  [ -z "\$MARKER" ] || out+=("\$MARKER")
+  for c in \${out[@]+"\${out[@]}"}; do
+    printf '%s\\n' "\$c"
+    [[ \$c == "OWN "* ]] || blocked=1
+  done
+  if [ "\$blocked" -eq 0 ]; then echo "gate clear"; exit 0; fi
+  echo "gate blocked"
+  exit 4
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/wip-audit.sh",
     content: `#!/usr/bin/env bash
 # What git says about each backlog item still on the board (spec 050, cli#673)
@@ -29822,6 +30148,7 @@ exit 0
 # classified then, so no IDLE is ever reported for an item that went unchecked.
 #
 # Usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…   (--limit default 20)
+#        wip-audit.sh --gate …                       (the intake gate, below)
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
 # Git Bash on Windows rewrites an argument shaped like a path list, which
@@ -29835,6 +30162,33 @@ usage() {
   exit 2
 }
 NUM='^[1-9][0-9]{0,9}\$'
+# first_naming <n> <epoch> <records> — the sha of the first record whose
+# subject names #<n> and whose time is not older than <epoch>.
+first_naming() {
+  local n=\$1 since=\$2 sha ct subject
+  local re="(^|[^[:alnum:]_/.-])#\${n}([^0-9]|\$)" scope="^[a-z]+\\\\(\${n}\\\\)!?: "
+  while IFS=\$'\\x1f' read -r sha ct subject; do
+    [ -n "\$sha" ] || continue
+    if [ "\$ct" = LINK ]; then
+      [ "\$subject" = "\$n" ] && { printf '%s' "\$sha"; return 0; }
+      continue
+    fi
+    [ "\$ct" -ge "\$since" ] || continue
+    if [[ \$subject =~ \$re ]] || [[ \$subject =~ \$scope ]]; then printf '%s' "\$sha"; return 0; fi
+  done <<<"\$3"
+  return 1
+}
+# unread, present and the base's refs: their one home, beside this script.
+# shellcheck source=./_base_refs.sh
+. "\$here/_base_refs.sh"
+# --gate is the intake gate (cli#760): its rule, lines and exits are the
+# header of _intake_gate.sh. This script only hands it the arguments.
+if [ "\${1:-}" = --gate ]; then
+  shift
+  # shellcheck source=./_intake_gate.sh
+  . "\$here/_intake_gate.sh"
+  intake_gate "\$@"
+fi
 limit=20 items=()
 while [ \$# -gt 0 ]; do
   case \$1 in
@@ -29844,21 +30198,7 @@ while [ \$# -gt 0 ]; do
 done
 [ \${#items[@]} -gt 0 ] || usage
 
-# unread <what> — a git read failed: exit 3, never a conclusion drawn from no output.
-unread() { echo "wip-audit: could not read \$1 — nothing classified" >&2; exit 3; }
-# present <ref> — 0 it exists, 1 it does not; any other git failure is unread.
-present() {
-  local s=0
-  git --no-pager show-ref --verify --quiet "\$1" || s=\$?
-  [ "\$s" -le 1 ] || unread "\$1"
-  return "\$s"
-}
-base=\$(bash "\$here/base-branch.sh") || exit 3
-remote="refs/remotes/origin/\$base" local="refs/heads/\$base"
-present "\$remote" || remote=""
-present "\$local" || local=""
-published=\${remote:-\$local}
-[ -n "\$published" ] || { echo "wip-audit: the base '\$base' does not resolve to a commit" >&2; exit 3; }
+resolve_base_refs
 
 # Every history is read whole before any item is matched: a failed read is exit 3.
 fmt='%H%x1f%ct%x1f%s'
@@ -29906,23 +30246,6 @@ while IFS= read -r ref; do
     sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([1-9][0-9]*\\).*/\\1/p' | sed -n 1p)
   [ -z "\$link" ] || active+="\$tip"\$'\\x1fLINK\\x1f'"\$link"\$'\\n'
 done <<<"\$refs"
-# first_naming <n> <epoch> <records> — the sha of the first record whose
-# subject names #<n> and whose time is not older than <epoch>.
-first_naming() {
-  local n=\$1 since=\$2 sha ct subject
-  local re="(^|[^[:alnum:]_/.-])#\${n}([^0-9]|\$)" scope="^[a-z]+\\\\(\${n}\\\\)!?: "
-  while IFS=\$'\\x1f' read -r sha ct subject; do
-    [ -n "\$sha" ] || continue
-    if [ "\$ct" = LINK ]; then
-      [ "\$subject" = "\$n" ] && { printf '%s' "\$sha"; return 0; }
-      continue
-    fi
-    [ "\$ct" -ge "\$since" ] || continue
-    if [[ \$subject =~ \$re ]] || [[ \$subject =~ \$scope ]]; then printf '%s' "\$sha"; return 0; fi
-  done <<<"\$3"
-  return 1
-}
-
 audited=0 c=0 u=0 l=0 i=0 d=0
 for item in "\${items[@]}"; do
   n=\${item%%@*} since=0
@@ -30224,7 +30547,16 @@ fi
     content: `#!/usr/bin/env bash
 # Removes a shipped feature's spec directory, in its own commit, pushed
 # (phases/merge-close.md, spec 042). Run on the base branch after the merge
-# landed and the backlog item closed.
+# landed and the backlog item closed. Two forms:
+#
+#   remove-spec.sh <landed-branch>    the directory and .specnaut/feature.json
+#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone, when it
+#                                     names no directory (cli#760): its
+#                                     linked_issue must be <n>, else 22
+#
+# The directory form, below. The marker form checks the same HEAD, index,
+# tracking and staged-path rules over that one path, and never names a
+# directory.
 #
 # Five conditions, all required, else nothing is touched: HEAD is the base;
 # \`.specnaut/feature.json\` names a \`feature_directory\`; it exists; it is in
@@ -30254,71 +30586,95 @@ fi
 #      (\`git restore\` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
+#        remove-spec.sh --marker-only <n>
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 skip() { echo "remove-spec: skipped — \$*" >&2; exit 22; }
 
-if [ \$# -ne 1 ] || [[ ! \$1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]]; then
-  echo "usage: remove-spec.sh <landed-branch>" >&2
+marker="" landed="" dir=""
+if [ \$# -eq 2 ] && [ "\$1" = --marker-only ] && [[ \$2 =~ ^[1-9][0-9]{0,9}\$ ]]; then
+  marker=\$2
+elif [ \$# -ne 1 ] || [[ ! \$1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]]; then
+  echo "usage: remove-spec.sh <landed-branch> | remove-spec.sh --marker-only <n>" >&2
   exit 2
+else
+  landed=\$1
 fi
-landed=\$1
 base=\$(bash "\$here/base-branch.sh") || exit 3
 root=\$(git rev-parse --show-toplevel)
 cd "\$root"
 [ "\$(git symbolic-ref --quiet --short HEAD || true)" = "\$base" ] || skip "HEAD is not \$base"
 [ -f .specnaut/feature.json ] || skip "no .specnaut/feature.json"
-dir=\$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .specnaut/feature.json | sed -n 1p)
-[ -n "\$dir" ] || skip "feature.json names no feature_directory"
-dir=\${dir%/}
-case \$dir in
-  .specnaut/specs/*) ;;
-  *) skip "'\$dir' is not under .specnaut/specs/" ;;
-esac
-name=\${dir#.specnaut/specs/}
-[[ \$name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || skip "'\$dir' is not one feature directory directly under .specnaut/specs/"
-[ "\$name" = "\$landed" ] || skip "'\$dir' is not the spec of \$landed, the branch that landed — feature.json is stale"
-[ ! -L "\$dir" ] || skip "'\$dir' is a link"
-[ -d "\$dir" ] || skip "'\$dir' does not exist"
-# Compared with the physical root, not with \`cd -P .specnaut/specs\`: a linked
-# \`.specnaut/specs\` resolves both sides to the same place elsewhere.
-[ "\$(cd -P "\$dir" && pwd)" = "\$(pwd -P)/.specnaut/specs/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/ — a link on its path"
-[ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
-
 id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | sed -n 1p)
+if [ -n "\$marker" ]; then
+  [ "\$id" = "\$marker" ] || skip "feature.json does not link #\$marker"
+else
+  dir=\$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .specnaut/feature.json | sed -n 1p)
+  [ -n "\$dir" ] || skip "feature.json names no feature_directory"
+  dir=\${dir%/}
+  case \$dir in
+    .specnaut/specs/*) ;;
+    *) skip "'\$dir' is not under .specnaut/specs/" ;;
+  esac
+  name=\${dir#.specnaut/specs/}
+  [[ \$name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || skip "'\$dir' is not one feature directory directly under .specnaut/specs/"
+  [ "\$name" = "\$landed" ] || skip "'\$dir' is not the spec of \$landed, the branch that landed — feature.json is stale"
+  [ ! -L "\$dir" ] || skip "'\$dir' is a link"
+  [ -d "\$dir" ] || skip "'\$dir' does not exist"
+  # Compared with the physical root, not with \`cd -P .specnaut/specs\`: a linked
+  # \`.specnaut/specs\` resolves both sides to the same place elsewhere.
+  [ "\$(cd -P "\$dir" && pwd)" = "\$(pwd -P)/.specnaut/specs/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/ — a link on its path"
+  [ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
+fi
+# The paths this run removes: its pathspecs, its staged-path check and its
+# undo. The marker form's is the file alone — never a directory.
+paths=(.specnaut/feature.json)
+[ -z "\$dir" ] || paths=("\$dir" .specnaut/feature.json)
+
 # The commit takes the whole index, so it must hold the removal alone: work
 # someone else staged is theirs, never swept into this commit or unstaged.
 git diff --cached --quiet || skip "the index already holds staged changes — commit or unstage them first"
-git diff --quiet -- "\$dir" .specnaut/feature.json || skip "'\$dir' or feature.json has uncommitted changes"
+if ! git diff --quiet -- "\${paths[@]}"; then
+  [ -z "\$dir" ] || skip "'\$dir' or feature.json has uncommitted changes"
+  skip "feature.json has uncommitted changes"
+fi
 git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "feature.json is not tracked"
-# From the removal to its commit, a failure undoes this script's own two paths
+# From the removal to its commit, a failure undoes this script's own paths
 # and exits by the table — never with git's code, the deletion left staged.
 undo() {
   local rc=\$? cmd=\$BASH_COMMAND undone="the removal is undone"
-  git restore --staged --worktree --source=HEAD -- "\$dir" .specnaut/feature.json ||
-    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- \$dir .specnaut/feature.json"
+  git restore --staged --worktree --source=HEAD -- "\${paths[@]}" ||
+    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- \${paths[*]}"
   echo "remove-spec: '\$cmd' failed (exit \$rc) — \$undone, nothing committed" >&2
   exit 25
 }
 trap undo ERR
-git rm -r --quiet -- "\$dir" .specnaut/feature.json
+git rm -r --quiet -- "\${paths[@]}"
 # -z: a name git would quote (core.quotePath) is still compared as written.
 while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-  case \$status:\$path in
-    D:"\$dir"/* | D:.specnaut/feature.json) ;;
+  ok=0
+  [ "\$status:\$path" != D:.specnaut/feature.json ] || ok=1
+  if [ -n "\$dir" ]; then case \$status:\$path in D:"\$dir"/*) ok=1 ;; esac; fi
+  case \$ok in
+    1) ;;
     *)
       # Something staged after the check: restore this script's own paths only.
-      git restore --staged --worktree --source=HEAD -- "\$dir" .specnaut/feature.json
+      git restore --staged --worktree --source=HEAD -- "\${paths[@]}"
       echo "remove-spec: the staged change held '\$path' — the removal is undone, nothing committed" >&2
       exit 23 ;;
   esac
 done < <(git diff --cached --no-renames --name-status -z)
-git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
+if [ -n "\$dir" ]; then
+  git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
+else
+  git commit --quiet -m "chore(\$marker): remove the feature marker for the shipped item"
+fi
 trap - ERR
 # No --exclude-standard: an ignored file is in no commit either. -z, then %q,
 # so a name with a space or a newline still reads as one path.
-left=\$(git ls-files -o -z -- "\$dir" | while IFS= read -r -d '' p; do printf '  %q\\n' "\$p"; done)
+left=""
+[ -z "\$dir" ] || left=\$(git ls-files -o -z -- "\$dir" | while IFS= read -r -d '' p; do printf '  %q\\n' "\$p"; done)
 if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
   printf '%s\\n' "\$out" >&2
   echo "remove-spec: the push was rejected — the commit stays on the local \$base" >&2
@@ -30330,7 +30686,11 @@ if [ -n "\$left" ]; then
   printf '%s\\n' "\$left" >&2
   exit 24
 fi
-echo "remove-spec: removed \$dir — restore with: git log --all -- \$dir"
+if [ -n "\$dir" ]; then
+  echo "remove-spec: removed \$dir — restore with: git log --all -- \$dir"
+else
+  echo "remove-spec: removed .specnaut/feature.json - restore with: git log --all -- .specnaut/feature.json"
+fi
 `,
     executable: true,
     backend: null,

@@ -7,6 +7,8 @@ when the context is compacted, a more urgent ask interrupts it, or the session e
 survives in git. What is lost is where the chain stopped, and rebuilding that from a summary or
 from a plan's prose is how a finished phase runs twice and an unfinished one is skipped. This verb
 rebuilds it from git alone, writes nothing of its own, and re-enters the chain **in the same turn**.
+Its one exception is a closeout an earlier landing left: it re-enters `phases/merge-close.md`
+§ Re-entry, which closes, moves and pushes.
 
 Its only memory is git. It reads no addendum. The verb it re-enters goes through the router's
 normal routing, addendum included.
@@ -25,7 +27,8 @@ normal routing, addendum included.
 
    This is the same call groom makes, and the header of `wip-audit.sh` defines its lines. It
    prints one sha per item, so a second branch with a different tip is not seen. The brief names
-   the branch it took.
+   the branch it took. Then the intake gate, as `phases/auto-chain.md` runs it, for this id: its
+   lines are the evidence for the rows that name them.
 4. **For `ACTIVE`, the candidate branch:**
    `git for-each-ref --points-at <sha> --format='%(refname)' refs/heads`.
 5. **The working tree:** its `.specnaut/feature.json`, and `git status --porcelain`.
@@ -34,9 +37,14 @@ normal routing, addendum included.
 
 | Evidence | Re-enter at |
 | :--- | :--- |
-| the id is malformed, or `wip-audit.sh` exits anything but `0` | nothing: report it and stop |
+| the id is malformed, `wip-audit.sh` exits anything but `0`, or the gate anything but `0` or `4` | nothing: report it and stop |
+| a `PENDING push` line | exactly one, whose diff only deletes the `<dir>` and `.specnaut/feature.json` of the base's marker: `phases/merge-close.md` step 4's exit-7 row. Otherwise nothing: name each sha and whether it names the item, and stop; they are someone's work |
+| `OWN closeout <id> <dir> <sha>` (or `PENDING closeout <id> …`) | `phases/merge-close.md` § Re-entry, from that line |
+| `FENCED closeout <id> …` | the question `phases/auto-chain.md` asks; a yes, the row its rerun's line matches |
+| `OWN partial <id> …` (or `PARTIAL closeout <id> …`), the item closed | `phases/merge-close.md` § Re-entry, its partial line: the marker goes, nothing closes |
+| `INVALID closeout …` | nothing: name its fix in `phases/auto-chain.md`, and stop |
+| any other gate line | nothing: quote it and point where `phases/auto-chain.md` points, then stop |
 | the item is closed | nothing: name the line `wip-audit.sh` printed, with its sha (or "closed without a landing commit"), and stop |
-| `UNPUSHED`, or `origin/<base>..<base>` is not empty | nothing: list `origin/<base>..<base>`, giving each sha and whether it names the item. The local base may hold more than this item's landing, so check that list before following the refused-push row of `phases/merge.md` step 4. Then stop |
 | `LANDED`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is `/task close <id>` or the next branch's `merge` |
 | `IDLE`, and the working tree's `.specnaut/feature.json` links the item | `plan`, at its section "The plan stop", as an adopted plan (`phases/plan.md`, "Re-entry") |
 | `IDLE` | `plan <id>` |
@@ -50,7 +58,8 @@ there, the only uncommitted paths allowed are that item's own feature directory 
 
 `implement` builds what its plan still lacks against the commits already on the branch (its own
 "Before the first line"), and it chains to `review` and `merge`. An epic goes there too, and
-`phases/epic-loop.md` picks its child. Resume never lands, closes or pushes anything itself.
+`phases/epic-loop.md` picks its child. Resume never lands, closes or pushes anything itself,
+except through `phases/merge-close.md` § Re-entry.
 
 ## 3. The provenance gate — every check runs before any checkout
 

@@ -59,6 +59,8 @@ epic merge path, not here.
 `bash .specnaut/scripts/bash/epic-status.sh` is the one reader of this format: it prints a
 `CHILD T<NN> #<child> <sha>` line per child, checks the ordinals run 1, 2, 3… and that no child
 has two commits, and fails when the history does not read back to the board. Never parse the log a
-second way; its exits are mapped once, in `phases/merge.md` step 1. A history that does not read
+second way; its exits are mapped in two places: `phases/merge.md` step 1 for the branch, and
+`phases/merge-close.md` § Re-entry for `--landed`, which reads what the published base shipped
+across every delivery (the intake gate takes any other exit as a failed read). A history that does not read
 back was rewritten by something that did not follow this file: stop and say so rather than picking
 one reading.

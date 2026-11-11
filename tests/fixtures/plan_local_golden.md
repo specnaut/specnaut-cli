@@ -20,7 +20,7 @@ step 4b, without being asked.
 **Re-entry.** `plan <id>` classifies the item once, before step 2: its state, creation time and
 parent from the backend's `view.sh` (never its body as evidence), then
 `bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>`. `phases/auto-chain.md` decides from that
-whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before step 2.
+whether the chain goes on. Every `plan`, with an id or not, passes its intake gate before step 2.
 
 - `IDLE`, and the working tree's `.specnaut/feature.json` links the item: a plan that stopped on a
   question. It is an adopted plan, re-entered in place; skip step 2.
