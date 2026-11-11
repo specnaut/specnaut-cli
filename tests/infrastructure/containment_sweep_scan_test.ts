@@ -4,9 +4,9 @@ import {
   mutatingModules,
   MUTATOR_CALLS,
   parseSinks,
-  readExclusions,
   unguardedSinks,
 } from "./containment_sweep_scan.ts";
+import { readExclusions } from "./containment_exclusions.ts";
 
 /**
  * The containment sweep's scanner, tested on its own (cli#766): which function
@@ -76,6 +76,35 @@ Deno.test("unguardedSinks: an owner is a named declaration; a callback belongs t
   );
 });
 
+Deno.test("unguardedSinks: only a guard CALL in the owner's own code stands in front", () => {
+  const owners = (src: string) => unguardedSinks(src).sort();
+  // A nested function's guard runs when it is called, if ever — not before this sink.
+  assertEquals(owners("function f() { const g = () => assertInsideProject(); Deno.mkdir(p); }"), [
+    "f",
+  ]);
+  assertEquals(owners("function f() {\n  // assertInsideProject(root, p)\n  Deno.mkdir(p);\n}"), [
+    "f",
+  ]);
+  // The import names the guard and calls nothing; a module-level object's method owns its sink.
+  const deps = 'import { assertInsideProject } from "./fs_containment.ts";\n' +
+    "export const deps = { async write(p: string) { await Deno.writeTextFile(p, 'x'); } };";
+  assertEquals(owners(deps), ["write"]);
+  // With no named owner the sink is the module's, and the import before it is still no call.
+  assertEquals(owners(deps.replace("async write(p: string) {", "write: async (p: string) => {")), [
+    "<module>",
+  ]);
+  // A guard called before the owner starts, or after the sink, is not in front of it.
+  assertEquals(owners("function f(p: string) { Deno.mkdir(p); assertInsideProject(r, p); }"), [
+    "f",
+  ]);
+  assertEquals(owners("assertInsideProject(r, p);\nfunction f() { Deno.mkdir(p); }"), ["f"]);
+  // A guard in front of a callback still covers the sink inside it.
+  assertEquals(
+    owners("function f(p: string) { assertInsideProject(r, p); [p].map((q) => Deno.mkdir(q)); }"),
+    [],
+  );
+});
+
 Deno.test("parseSinks: deletePaths' Deno.remove is attributed to deletePaths", async () => {
   const path = fromFileUrl(new URL("../../src/infrastructure/deno_fs_writer.ts", import.meta.url));
   const src = await Deno.readTextFile(path);
@@ -91,7 +120,7 @@ Deno.test("parseSinks: the parse finds every mutating call the text shows, acros
   for (const rel of await mutatingModules()) {
     const src = await Deno.readTextFile(fromFileUrl(new URL(`../../${rel}`, import.meta.url)));
     const { sinks, comments } = parseSinks(src);
-    const inComment = (at: number) => comments.some(([s, e]) => s <= at && at < e);
+    const inComment = (at: number) => comments.some((c) => c.start <= at && at < c.end);
     const textual = [...src.matchAll(MUTATOR_CALLS)].map((m) => m.index).filter((at) =>
       !inComment(at)
     );

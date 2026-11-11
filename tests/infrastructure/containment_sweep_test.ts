@@ -1,11 +1,7 @@
 import { assertEquals, assertGreaterOrEqual } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import {
-  fileOf,
-  mutatingModules,
-  readExclusions,
-  unguardedSinks,
-} from "./containment_sweep_scan.ts";
+import { mutatingModules, unguardedSinks } from "./containment_sweep_scan.ts";
+import { fileOf, readExclusions } from "./containment_exclusions.ts";
 
 /**
  * Every module that mutates the filesystem either asks the containment rule or
