@@ -1,0 +1,3 @@
+# The macOS entitlements are pinned by sha256 (release.yml, sign-macos) and
+# signed as bytes: a CRLF checkout on Windows would change them. Never convert.
+packaging/macos/entitlements.plist -text

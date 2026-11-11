@@ -67,6 +67,18 @@ Deno.test("sign-macos checks the entitlements against a pinned sha256 before sig
   const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
     .map((b) => b.toString(16).padStart(2, "0")).join("");
   assertEquals(job.env?.MACOS_ENTITLEMENTS_SHA256, digest, "the pin is not the file's sha256");
+  // The pin hashes bytes, so a checkout may never convert them: Windows' CRLF
+  // checkout once turned this very assertion red there and nowhere else.
+  const attr = new Deno.Command("git", {
+    args: ["check-attr", "text", "--", ENTITLEMENTS],
+    cwd: ROOT,
+  })
+    .outputSync();
+  assertEquals(
+    new TextDecoder().decode(attr.stdout).trim(),
+    `${ENTITLEMENTS}: text: unset`,
+    ".gitattributes must mark the entitlements -text",
+  );
   const sign = (job.steps ?? []).find((s) => (s.run ?? "").includes("rcodesign sign"))?.run ?? "";
   const check = sign.indexOf(`"$MACOS_ENTITLEMENTS_SHA256  ${ENTITLEMENTS}" | sha256sum -c -`);
   assert(check >= 0 && check < sign.indexOf("rcodesign sign"), "not checked before signing");
