@@ -38,7 +38,7 @@ Deno.test("a history file that differs from the highlights is refused", async ()
 });
 
 Deno.test("a history file that only reflows the highlights passes", async () => {
-  const reflowed = NEW.replace(" And here", "\nAnd here").replace("\n\n", "\n \n");
+  const reflowed = NEW.replace("\n\n", "\n \n").replace(/ /g, "  ");
   assertEquals((await run(await releaseRecording(reflowed), "v1.1.0")).code, 0);
 });
 

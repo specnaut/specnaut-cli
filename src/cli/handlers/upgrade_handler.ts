@@ -181,7 +181,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     for (const note of result.notes) console.log(yellow(`ℹ ${note}`));
     await printUpgradeHookTrust({ harness, projectDir }, result);
     console.log(green(`✓ already up to date (templates ${result.currentVersion})`));
-    printReleaseNotes(result);
+    if (!intent.dryRun) printReleaseNotes(result);
     return 0;
   }
 

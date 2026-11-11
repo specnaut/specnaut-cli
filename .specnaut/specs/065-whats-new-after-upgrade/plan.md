@@ -45,8 +45,8 @@ the `specnaut-guide` `review-upgrade` walk; releases outside (vA, vB]; downgrade
   `scripts/check-release-commit.ts` refuses a release commit whose history file is missing or
   differs from `HIGHLIGHTS.md` (whitespace-insensitive, its existing `flat`).
 - **FR-007** One-time backfill: `history/v<X>.md` from
-  `git show v<X>:.specnaut/release/HIGHLIGHTS.md` for every tag v3.0.0..v9.2.0 that has a non-empty
-  one.
+  `git show v<X>:.specnaut/release/HIGHLIGHTS.md` for every tag since v3.0.0 — an empty file where
+  the release published none, so it is listed with "no highlights" and its link (S3).
 - **FR-008** The upgrade's exit code and written files do not depend on the notes.
 - **FR-009** Phase step 8 (both copies) reports the block inside a fence longer than any it
   contains, says it is the release text quoted, and runs nothing it names.

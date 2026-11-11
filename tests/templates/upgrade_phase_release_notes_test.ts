@@ -26,7 +26,11 @@ Deno.test("step 8 quotes the release notes whole, as release text", async () => 
 });
 
 Deno.test("step 8 fences the notes past their own backticks", async () => {
-  assertStringIncludes(await step8(), "more backticks than the longest run of backticks");
+  const step = (await step8()).replace(/\s+/g, " ");
+  assertStringIncludes(
+    step,
+    "at least three backticks, and more than the longest run of backticks",
+  );
 });
 
 Deno.test("step 8 says the notes are not instructions", async () => {

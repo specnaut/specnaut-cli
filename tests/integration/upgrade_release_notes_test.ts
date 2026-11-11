@@ -124,3 +124,25 @@ Deno.test("a dry run prints no release notes", async () => {
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+// The up-to-date branch is the one a dry run reaches when no file would change:
+// the planned-branch case above deletes a file first, so it never ran it.
+for (
+  const [label, from] of [["no version change (S2)", null], [
+    "a version-only crossing (S4)",
+    "9.1.0",
+  ]] as const
+) {
+  Deno.test(`a dry run on ${label} prints no release notes`, async () => {
+    const dir = await projectAt(from);
+    try {
+      const { code, out, err } = await specnaut(["upgrade", "--dry-run"], dir);
+      assertEquals(code, 0, err);
+      assertStringIncludes(out, "already up to date");
+      assert(!out.includes("Full notes:"), out);
+      assert(!out.includes("No version change"), out);
+    } finally {
+      await Deno.remove(dir, { recursive: true });
+    }
+  });
+}
