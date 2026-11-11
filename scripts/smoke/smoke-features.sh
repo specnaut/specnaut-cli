@@ -240,9 +240,9 @@ check "groom ships beside the /task router, not as a phase" \
 check "/task resume ships beside the router, which routes it (cli#727)" \
   '[ -f .claude/skills/task/resume.md ] &&
    grep -qF "| \`resume <id>\` _(or \`continue <id>\`)_ | \`resume.md\` |" .claude/skills/task/SKILL.md'
-check "groom's WIP audit ships its script and calls it (cli#673)" \
-  '[ -x .specnaut/scripts/bash/wip-audit.sh ] &&
-   grep -qF "bash .specnaut/scripts/bash/wip-audit.sh" .claude/skills/task/groom.md'
+check "groom's WIP audit ships its script and calls it (cli#673); the gate's _base_refs.sh and _intake_gate.sh beside it (cli#760)" \
+  '[ -x .specnaut/scripts/bash/wip-audit.sh ] && [ -f .specnaut/scripts/bash/_base_refs.sh ] && [ -f .specnaut/scripts/bash/_intake_gate.sh ] &&
+   grep -qF "bash .specnaut/scripts/bash/wip-audit.sh" .claude/skills/task/groom.md && grep -qF "wip-audit.sh --gate" .claude/skills/task/phases/auto-chain.md'
 
 echo
 echo "═══ #78 + #92  dispatch-agent.sh + depth-aware splitter ═══"

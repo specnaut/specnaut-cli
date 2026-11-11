@@ -15,10 +15,7 @@ const T = fromFileUrl(new URL("../../templates/core/", import.meta.url));
 const read = (p: string) => Deno.readTextFileSync(join(T, p)).replace(/\r\n/g, "\n");
 const flat = (s: string) => s.replace(/\s+/g, " ");
 const CHAIN = read("skills/task/phases/auto-chain.md");
-const reentry = CHAIN.slice(
-  CHAIN.indexOf("## Re-entry, without a flag"),
-  CHAIN.indexOf("## The intake gate"),
-);
+const reentry = CHAIN.slice(CHAIN.indexOf("## Re-entry,"), CHAIN.indexOf("## The intake gate"));
 const rows = reentry.split("\n").filter((l) => /^\| `/.test(l)).map((l) => l.split(" | ")[0]);
 
 Deno.test("the re-entry table keys plan on the item, and nothing else decides it", () => {
