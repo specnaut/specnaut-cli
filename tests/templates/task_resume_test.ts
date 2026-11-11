@@ -28,7 +28,7 @@ Deno.test("the re-entry table has its rows, in order, first match wins", () => {
     "`FENCED closeout <id> …`",
     "`OWN partial <id> …` (or `PARTIAL closeout <id> …`), the item closed",
     "`INVALID closeout …`",
-    "any other gate line",
+    "a gate line other than its last, the verdict",
     "the item is closed",
     "`LANDED`, the item open",
     "`IDLE`, and the working tree's `.specnaut/feature.json` links the item",

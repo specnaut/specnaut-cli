@@ -77,13 +77,13 @@ check "children are enumerated from the branch, not from memory (#560)" \
     [ "$(cut -d" " -f1-3 <<<"$out" | tr "\n" ,)" = "CHILD T01 #51,CHILD T02 #52,EPIC #50," ])'
 # #677 — epic-status.sh reads <base>..HEAD, empty once land-feature.sh has
 # fast-forwarded the base (14; 16 when feature.json names an epic — both
-# epic_status_test's). Instruction only: the order the agent calls the two in.
+# epic_status_test's). Instruction only. § Re-entry reads --landed (cli#760): first run only.
 check "the epic is read before the landing, and the close never re-reads it (#677)" \
   'P=.claude/skills/task/phases;
    r=$(grep -nF "bash .specnaut/scripts/bash/epic-status.sh" "$P/merge.md" | head -1 | cut -d: -f1);
    l=$(grep -nF "bash .specnaut/scripts/bash/land-feature.sh" "$P/merge.md" | head -1 | cut -d: -f1);
    [ -n "$r" ] && [ -n "$l" ] && [ "$r" -lt "$l" ] &&
-   ! grep -qF "bash .specnaut/scripts/bash/epic-status.sh" "$P/merge-close.md"'
+   ! sed "/^## Re-entry/,\$d" "$P/merge-close.md" | grep -qF "bash .specnaut/scripts/bash/epic-status.sh"'
 # Instruction only: merge-close.md is loaded only after a push — no script routes it.
 check "nothing closes when the merge did not push (#560 AC6)" \
   'grep -qF "only when the push" .claude/skills/task/phases/merge-close.md'

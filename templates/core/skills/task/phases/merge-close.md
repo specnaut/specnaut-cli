@@ -25,8 +25,8 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
    branch did not ship, and is not closed.
 2. **Close each one — one order, on every backend, on the first run and on re-entry.**
    **Do not ask.** The push was the authorisation. Children first, the epic last. For each item, run
-   `bash .specnaut/scripts/backlog/cascade-check.sh <n>` before its close: **0** authorises it;
-   **12** — already closed: skip its close, it still goes to step 3; **11** — a child is still
+   `bash .specnaut/scripts/backlog/cascade-check.sh <n>` before its close:
+   **only exit 0 authorises the close**; **12** — already closed: skip its close, it still goes to step 3; **11** — a child is still
    open: name it and stop before step 3; **3** — the check could not answer: say so and stop
    before step 3. The close itself — yours, no `product-owner` dispatch, it is mechanical — on
    github and gitlab is `close.sh` with a comment and nothing else, leaving the card alone:
@@ -38,9 +38,11 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
 
    `<shipped>` is `<first>..<last>` from `land-feature.sh`'s `LANDED` line, matching
    `^[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}$`; on re-entry, the `<sha>` of the gate's line, matching
-   `^[0-9a-f]{40}$`. No other text reaches it. On local and cloud there is no separate issue: the
-   close is step 3 run for that one item, before the next item's check, so an epic's check sees
-   the children this closeout closed.
+   `^[0-9a-f]{40}$`. No other text reaches it. **On local and cloud** there is no separate issue,
+   and the close is the move: step 3 runs here, for that one item, before the next item's check —
+   so an epic's check sees the children this closeout closed — and not again after the loop. A
+   **20** from it stops before the next item's check; step 4 runs only when every one of these
+   per-item runs exited 0 or 21.
 3. **Settle the board** — the items that answered 0 or 12:
 
    ```
@@ -53,7 +55,8 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
    confirmed closed, its card left alone. **21** — a move or the reconcile failed: the close
    stands, and the card is reported as drift for groom's sweep. Neither fails the merge, which has
    happened: report it. **2** — usage: a bad number was passed; fix the call.
-4. **Remove the marker — once, for the whole epic too, and only after step 3 exited 0 or 21.**
+4. **Remove the spec directory, or the marker alone — once, for the whole epic too, and only after
+   step 3 exited 0 or 21.**
    On **20** the tracker did not confirm the close: remove nothing. `.specnaut/feature.json` stays
    on the base, so the item stays unsettled until `/task resume <n>` finishes it. With a feature
    directory, the removal takes it too; without one (cloud), the file goes alone:
@@ -66,8 +69,8 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
    `<branch>` is the feature branch `land-feature.sh` just landed — the one you merged, not one read
    back from `feature.json`; on re-entry, the last segment of the gate's `<dir>`. What it removes,
    and when it refuses, is the script's header; this list maps every exit that header lists — an
-   exit it does not list is a failure: report it verbatim. Never run it before the close
-   succeeded: nobody authorised a removal then.
+   exit it does not list is a failure: report it verbatim.
+   Never run it before the close succeeded: nobody authorised a removal then.
    - **0** — removed and pushed: report its line.
    - **22** — skipped, nothing changed: its reason is printed — report it, never silently.
    - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were

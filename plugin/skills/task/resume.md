@@ -43,7 +43,7 @@ normal routing, addendum included.
 | `FENCED closeout <id> …` | the question `phases/auto-chain.md` asks; a yes, the row its rerun's line matches |
 | `OWN partial <id> …` (or `PARTIAL closeout <id> …`), the item closed | `phases/merge-close.md` § Re-entry, its partial line: the marker goes, nothing closes |
 | `INVALID closeout …` | nothing: name its fix in `phases/auto-chain.md`, and stop |
-| any other gate line | nothing: quote it and point where `phases/auto-chain.md` points, then stop |
+| a gate line other than its last, the verdict | nothing: quote it and point where `phases/auto-chain.md` points, then stop |
 | the item is closed | nothing: name the line `wip-audit.sh` printed, with its sha (or "closed without a landing commit"), and stop |
 | `LANDED`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is `/task close <id>` or the next branch's `merge` |
 | `IDLE`, and the working tree's `.specnaut/feature.json` links the item | `plan`, at its section "The plan stop", as an adopted plan (`phases/plan.md`, "Re-entry") |

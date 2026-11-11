@@ -29,6 +29,7 @@ Deno.test("auto-chain.md is the one home of the proceed rule, the call and the f
     ]
   ) assertStringIncludes(chain, row);
   assertStringIncludes(chain, "Yes runs against the board it now names.");
+  assertStringIncludes(chain, "Anything else runs no backlog script and stops.");
   assertStringIncludes(chain, "`--fence-ack <n>` added, for that run only");
 });
 
@@ -103,6 +104,15 @@ Deno.test("merge-close: one closeout order, a hold only on 20, and a re-entry fe
   assert(!two.includes("skip to step 3"), "local and cloud skip the check again");
   const four = close.slice(close.indexOf(" 4. **"), close.indexOf("## Re-entry"));
   assertStringIncludes(four, "only after step 3 exited 0 or 21.**");
+  // Local and cloud: step 3 runs per item inside step 2, once, and a 20 stops the loop.
+  for (
+    const s of [
+      "step 3 runs here, for that one item, before the next item's check",
+      "and not again after the loop",
+      "**20** from it stops before the next item's check",
+      "step 4 runs only when every one of these per-item runs exited 0 or 21",
+    ]
+  ) assertStringIncludes(two, s);
   assertStringIncludes(four, "On **20** the tracker did not confirm the close: remove nothing.");
   assertStringIncludes(four, "remove-spec.sh --marker-only <n>");
   const reentry = close.slice(close.indexOf("## Re-entry"), close.indexOf("## The report"));
@@ -133,12 +143,25 @@ Deno.test("resume reads the gate's lines in the plan's row order, and names its 
     "`FENCED closeout <id>",
     "`OWN partial <id>",
     "`INVALID closeout",
-    "any other gate line",
+    "a gate line other than its last, the verdict",
     "the item is closed",
   ].map(at);
   assert(!order.includes(-1), `a row is missing: ${JSON.stringify(order)}`);
   assertEquals([...order].sort((a, b) => a - b), order, "the rows are out of order");
   const resume = flat(read("resume.md"));
+  // FR-10: only a lone removal commit is pushed; anything else on the local base is someone's.
+  const push = rows.find((r) => r.startsWith("a `PENDING push` line"));
+  assertStringIncludes(
+    resume,
+    "| a `PENDING push` line | exactly one, whose diff only deletes the " +
+      "`<dir>` and `.specnaut/feature.json` of the base's marker: `phases/merge-close.md` step 4's exit-7 row.",
+  );
+  assertStringIncludes(
+    resume,
+    "Otherwise nothing: name each sha and whether it names the item, and " +
+      "stop; they are someone's work |",
+  );
+  assert(push, "no push row");
   assertStringIncludes(resume, "Its one exception is a closeout an earlier landing left");
   assertStringIncludes(resume, "except through `phases/merge-close.md` § Re-entry.");
 });
