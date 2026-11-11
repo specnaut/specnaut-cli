@@ -35,10 +35,10 @@
 # so a reader still tells a partial delivery from a pending closeout.
 # --fence-ack <n>, given for one run after the user's yes, reads a FENCED <n>
 # as unfenced. PENDING push and INVALID are never OWN. The anchor is the
-# newest --first-parent commit that deleted .specnaut/feature.json and nothing
-# outside .specnaut/ (what remove-spec.sh commits), else the parent of the
-# oldest one that added it; no anchor, or a parent a shallow clone lacks,
-# reads FENCED — the user's yes is the way out, never exit 3.
+# newest --first-parent commit that deleted .specnaut/feature.json and did
+# nothing but delete paths under .specnaut/ (what remove-spec.sh commits),
+# else the parent of the oldest one that added it; no anchor, or a parent a
+# shallow clone lacks, reads FENCED — the user's yes is the way out, never 3.
 #
 # Exit: 0 every line printed is OWN (`gate clear`) · 4 any other line
 # (`gate blocked`) · 2 usage · 3 the base or a read could not be resolved,
@@ -60,10 +60,11 @@ gate_anchor_fenced() {
   while IFS= read -r c; do
     [[ $c =~ ^[0-9a-f]{40}$ ]] || continue
     # A parent a shallow clone lacks is no anchor; the next one may be.
-    names=$(git --no-pager diff --no-renames --name-only "$c^" "$c" -- 2>/dev/null) || continue
+    names=$(git --no-pager diff --no-renames --name-status "$c^" "$c" -- 2>/dev/null) || continue
     anchor=$c
-    # A quoted name (core.quotePath) fails the prefix too: never an anchor then.
-    while IFS= read -r p; do [[ $p == .specnaut/* ]] || anchor=""; done <<<"$names"
+    # Deletions only, all under .specnaut/: a commit that also edits the config
+    # would hide that edit. A quoted name (core.quotePath) fails the prefix too.
+    while IFS= read -r p; do [[ $p == D$'\t'.specnaut/* ]] || anchor=""; done <<<"$names"
     [ -z "$anchor" ] || break
   done <<<"$dels"
   if [ -z "$anchor" ]; then
