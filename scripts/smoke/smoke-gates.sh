@@ -111,6 +111,17 @@ check "merge.md passes the merge-base, and says what 3 and 4 mean there" \
    grep -qF "say which commands left it" .claude/skills/task/phases/merge.md &&
    grep -qF "With \`removed: none\`, everything was omitted: run it bare" .claude/skills/task/phases/merge.md &&
    grep -qF "neither is ever reported as the full gate" .claude/skills/task/phases/merge.md'
+# Instruction only (cli#769): the epic exit runs the same full tier as the standalone
+# one, and that tier's first step is the gates.yml check with its one-time ask.
+M=$(tr '\n' ' ' <.claude/skills/task/phases/merge.md | tr -s ' ')
+has() { case $M in *"$1"*) ;; *) return 1 ;; esac; }
+# shellcheck disable=SC2034 # read by the check below, through eval
+TIER='run the full tier (**The full tier**, below)' EPIC='**Exit 0 — an epic**: do **not** squash: ' \
+  FULL='**The full tier** — exits 0 and 14 only, before the landing. Run the full gate tier once, but first: if '
+check "merge.md takes the epic path, like the standalone one, through the gates.yml ask" \
+  'has "$EPIC$TIER" && has "**Exit 14 — standalone**: $TIER" &&
+   has "$FULL\`git diff --quiet \"\$(git merge-base HEAD <base>)\" HEAD -- .specnaut/gates.yml\`" &&
+   has "ask once: *\"This branch changes \`.specnaut/gates.yml\`."'
 out=$(bash "$GATE" fast --base "$BASE" 2>&1; echo "ec=$?")
 bare=$(bash "$GATE" fast 2>&1; echo "ec=$?")
 [ "$out" = "$bare" ] && pass "with no declaration the flag is the bare run, to the byte" \
