@@ -2189,6 +2189,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_base_refs.sh",
+      "source": "core/specnaut/scripts/bash/_base_refs.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/wip-audit.sh",
       "source": "core/specnaut/scripts/bash/wip-audit.sh",
       "executable": true

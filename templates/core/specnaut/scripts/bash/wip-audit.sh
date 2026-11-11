@@ -61,21 +61,10 @@ while [ $# -gt 0 ]; do
 done
 [ ${#items[@]} -gt 0 ] || usage
 
-# unread <what> — a git read failed: exit 3, never a conclusion drawn from no output.
-unread() { echo "wip-audit: could not read $1 — nothing classified" >&2; exit 3; }
-# present <ref> — 0 it exists, 1 it does not; any other git failure is unread.
-present() {
-  local s=0
-  git --no-pager show-ref --verify --quiet "$1" || s=$?
-  [ "$s" -le 1 ] || unread "$1"
-  return "$s"
-}
-base=$(bash "$here/base-branch.sh") || exit 3
-remote="refs/remotes/origin/$base" local="refs/heads/$base"
-present "$remote" || remote=""
-present "$local" || local=""
-published=${remote:-$local}
-[ -n "$published" ] || { echo "wip-audit: the base '$base' does not resolve to a commit" >&2; exit 3; }
+# unread, present and the base's refs: their one home, beside this script.
+# shellcheck source=./_base_refs.sh
+. "$here/_base_refs.sh"
+resolve_base_refs
 
 # Every history is read whole before any item is matched: a failed read is exit 3.
 fmt='%H%x1f%ct%x1f%s'

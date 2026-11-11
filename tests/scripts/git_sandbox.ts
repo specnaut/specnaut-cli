@@ -11,7 +11,8 @@ import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 const BASH_DIR = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/", import.meta.url),
 );
-export const SCRIPTS = `base-branch.sh epic-status.sh fold-fixups.sh land-feature.sh merge-mode.sh
+export const SCRIPTS =
+  `_base_refs.sh base-branch.sh epic-status.sh fold-fixups.sh land-feature.sh merge-mode.sh
   remove-spec.sh wip-audit.sh`.split(/\s+/);
 
 /**
