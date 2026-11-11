@@ -70,11 +70,8 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-No Edit, Write, NotebookEdit or any mutating tool, and no shell: Glob and Grep find files, Read
-reads them. What only a command can tell you reaches you in the brief
-(`phases/review-seats.md` § A brief carries data, never content); what the brief does not hold,
-downgrade to `Suspicion —` and name what would settle it. Dependencies come from the manifests and
-lockfiles you read.
+`review-findings-contract` § Read-only contract binds this seat. Dependencies come from the
+manifests and lockfiles you read.
 
 ## Mode 3 — Plan expertise (before any code exists)
 

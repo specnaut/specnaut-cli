@@ -1,6 +1,6 @@
 ---
 name: review-findings-contract
-description: Defines the machine-readable REVIEW SUMMARY block every expert/reviewer emits once after its prose, with severity counts and a verdict. Preloaded, not user-invocable.
+description: Defines the machine-readable REVIEW SUMMARY block every expert/reviewer emits once after its prose, with severity counts and a verdict, and the read-only rule the review seats share. Preloaded, not user-invocable.
 user-invocable: false
 constitution-exempt: an output-format contract preloaded by reviewers that already read the constitution first
 ---
@@ -15,7 +15,8 @@ agent also carries `workflow-contract`). It normalizes the review's severity
 counts and verdict so `/task review` can synthesize multiple seats' findings
 without re-reading each prose report; it emits the same block with the
 **aggregated** counts summed across every seat (`phases/review-seats.md`). The block is additive — it appends to the prose, never
-replaces it.
+replaces it. It is also the one home of the read-only rule the seats that point
+at it share (§ Read-only contract).
 
 ## Format
 
@@ -76,3 +77,13 @@ the diff or they are not — instead of a number nobody can check. A seat that
 copies real paths out of the diff and reviews none of them still passes. This
 mechanism answers *did it look at all*, never *did it look well*, and no
 amount of contract text will make it answer the second.
+
+## Read-only contract (NON-NEGOTIABLE)
+
+Written once for every seat whose file says this section binds it; each seat
+adds, under its own heading, the one sentence that is its own.
+
+No Edit, Write, NotebookEdit or any mutating tool, and no shell: Glob and Grep find
+files, Read reads them. What only a command can tell you reaches you in the brief
+(`phases/review-seats.md` § A brief carries data, never content); what the brief
+does not hold, downgrade to `Suspicion —` and name what would settle it.

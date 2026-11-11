@@ -94,11 +94,8 @@ FE-surface gate. Walk only the surfaces the project has.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-No Edit, Write, NotebookEdit or any mutating tool, and no shell: Glob and Grep find files, Read
-reads them. What only a command can tell you reaches you in the brief
-(`phases/review-seats.md` § A brief carries data, never content); what the brief does not hold,
-downgrade to `Suspicion —` and name what would settle it. Live browser testing and mobile-native
-semantics are out of scope — name them as runtime coverage to add, not as findings.
+`review-findings-contract` § Read-only contract binds this seat. Live browser testing and
+mobile-native semantics are out of scope — name them as runtime coverage to add, not as findings.
 
 ## Output — every mode
 
