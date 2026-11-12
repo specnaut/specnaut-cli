@@ -16,6 +16,8 @@ from there as files. A non-zero exit stops with its message — exit 6 too, Clou
 and an older cache reused: do not review against an empty or stale spec.
 
 <!-- END: spec-backend=cloud -->
+0. **Untrusted or trusted — decided here, nowhere else.** An argument naming a PR number or a
+   `<remote>/<branch>` makes the review untrusted, every one: follow `phases/review-untrusted.md`.
 1. **Check the helper scripts, then fix the range.** Run this block as written, from the project's
    root, before any script under `.specnaut/scripts/` runs — again after each fix cycle (Phase 3):
 

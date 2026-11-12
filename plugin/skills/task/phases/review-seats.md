@@ -188,6 +188,8 @@ RECOMMENDATION: <one sentence — what the next actor should do>
 
 `REVIEW_VERDICT: pass` only when every required seat reported **and** aggregated
 `CRITICAL_COUNT == 0` **and** `HIGH_COUNT == 0`; `fail` when either count is > 0 **or**
-`SEATS_REPORTED < SEATS_EXPECTED`; `needs_followup` when only Medium/Low remain. The third trigger
+`SEATS_REPORTED < SEATS_EXPECTED`; `needs_followup` when only Medium/Low remain, **or when the
+tests are `NOT RUN`** — no sandbox, a static-only review, a gate that did not start: a verdict that
+would be `pass` is `needs_followup` then, never `pass`. The third trigger
 is named here on purpose: without it this restatement leaves an all-zero run with a missing seat
 carrying no verdict at all, and a reader following only this paragraph has to invent one.

@@ -10,6 +10,7 @@ export const TASK_PHASES: readonly string[] = [
   "review",
   "review-seats",
   "review-gates",
+  "review-untrusted",
   "merge",
   "audit",
   "constitution",

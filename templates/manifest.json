@@ -75,6 +75,12 @@
     {
       "category": "phase",
       "name": "task",
+      "suffix": "review-untrusted.md",
+      "source": "core/skills/task/phases/review-untrusted.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
       "suffix": "merge.md",
       "source": "core/skills/task/phases/merge.md"
     },

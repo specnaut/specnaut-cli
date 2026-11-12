@@ -5,6 +5,9 @@ detects and runs, and of when the test command runs.
 
 ## Phase 2 — Quality gates (auto-detected)
 
+In an untrusted review every command below runs in a sandbox, or is `NOT RUN`, as
+`phases/review-untrusted.md` § Phase 2 says.
+
 Detect the project's toolchain by looking for marker files and run the
 corresponding commands. Stop at the first failure.
 
