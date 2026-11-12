@@ -74,10 +74,17 @@ fi
 # (tests/scripts/cloud_config_sh_test.ts keeps the two equal). LC_ALL=C keeps the
 # classes ASCII whatever the locale.
 if ! printf '%s\n' "$API_URL" |
-  LC_ALL=C grep -Eq '^https?://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then
+  LC_ALL=C grep -Eq '^https?://([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*|\[::1\])(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then
   echo "error: backlog-config.yml api_url is not a plain http(s) URL." >&2
   exit 2
 fi
+# The token would cross the network in clear over plain http; loopback stays.
+case $API_URL in http://*)
+  LC_ALL=C grep -Eiq '^http://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|$)' <<<"$API_URL" || {
+    echo "error: backlog-config.yml api_url is plain http; use https (http only to localhost)." >&2
+    exit 2
+  } ;;
+esac
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).

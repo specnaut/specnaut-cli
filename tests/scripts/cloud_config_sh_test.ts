@@ -152,3 +152,19 @@ Deno.test("cloud _config.sh refuses a project_key that is more than a plain key"
     assertEquals(r.code, 0, `${key}\n${r.out}`);
   }
 });
+
+// The asset is the bearer token: over plain http it crosses the network in clear,
+// while loopback traffic never leaves the host.
+Deno.test("cloud _config.sh refuses a plain-http api_url before a token is asked for, loopback aside", async () => {
+  for (const url of ["http://cloud.example.com", "http://10.0.0.5:8080/base", "http://127.0.0.2"]) {
+    const r = await source(`backend: cloud\napi_url: "${url}"\nproject_key: CLOUD\n`);
+    assertEquals(r.code, 2, `${url}\n${r.out}`);
+    assertStringIncludes(r.out, "api_url is plain http", url);
+    assertEquals(r.calls, "", `the CLI was never asked for a token for ${url}`);
+  }
+  for (const url of ["http://localhost:3000", "http://127.0.0.1:3000/base", "http://[::1]:3000"]) {
+    const r = await source(`backend: cloud\napi_url: "${url}"\nproject_key: CLOUD\n`);
+    assertEquals(r.code, 0, `${url}\n${r.out}`);
+    assertEquals(normalizeApiUrl(url), url);
+  }
+});

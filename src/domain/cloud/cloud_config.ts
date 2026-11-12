@@ -22,13 +22,13 @@ export type CloudConfig = {
 };
 
 /**
- * A plain http(s) API base: dot-separated ASCII host labels, an optional port and
- * path. An allow-list, because the shell scripts hand this string to curl, which is
+ * A plain http(s) API base: dot-separated ASCII host labels (or the IPv6
+ * loopback `[::1]`), an optional port and path. An allow-list, because the shell scripts hand this string to curl, which is
  * not the parser `URL` is: anything else may read as two different hosts. The same
  * grammar guards `scripts/cloud/_config.sh` (tests/scripts/cloud_config_sh_test.ts).
  */
 const PLAIN_API_URL =
-  /^https?:\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)(?::[0-9]+)?(?:\/[A-Za-z0-9._~\/-]*)?$/;
+  /^https?:\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[::1\])(?::[0-9]+)?(?:\/[A-Za-z0-9._~\/-]*)?$/;
 
 /** A plain API base, trailing slashes dropped, or null. */
 export function normalizeApiUrl(raw: string): string | null {
