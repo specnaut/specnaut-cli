@@ -10,26 +10,21 @@
 // without the key, so it falls back to the branch on both; its row pins that.
 
 import { assert, assertEquals } from "@std/assert";
-import { copy } from "@std/fs";
 import { join } from "@std/path";
-import { git, type Run, run } from "./git_sandbox.ts";
+import {
+  assertOutcome,
+  BRANCH,
+  type Case,
+  REFUSAL,
+  toolBin,
+  which,
+  WINDOWS,
+  withProject,
+} from "./feature_json_fixture.ts";
 import { guardPowerShellArm } from "./pwsh_arm.ts";
-import { BASH, results, SCRIPTS, twins, UNREADABLE_OK } from "./twin_runner.ts";
+import { results, twins, UNREADABLE_OK } from "./twin_runner.ts";
 
 guardPowerShellArm();
-
-const WINDOWS = Deno.build.os === "windows";
-const REFUSAL = (type: string) => `ERROR: Failed to parse .specnaut/feature.json (${type})`;
-/** What a fallback resolves to: the branch's own feature directory. */
-const BRANCH = "branch";
-
-type Case = {
-  label: string;
-  content: string | null;
-  unreadable?: boolean;
-  unparseable?: boolean;
-  expect: string;
-};
 
 const NO_KEY: Case = {
   label: "a feature.json with no feature_directory",
@@ -58,41 +53,6 @@ const CASES: Case[] = [
   { label: "no feature.json", content: null, expect: BRANCH },
 ];
 
-/** A repository on `001-demo` holding that feature, the scripts, and the case's feature.json. */
-async function withProject(c: Case, fn: (dir: string) => Promise<void>): Promise<void> {
-  const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "feature-json-read-" }));
-  try {
-    await copy(SCRIPTS, join(dir, ".specnaut/scripts"));
-    await Deno.mkdir(join(dir, ".specnaut/specs/001-demo"), { recursive: true });
-    await Deno.writeTextFile(join(dir, ".specnaut/specs/001-demo/plan.md"), "# Plan\n");
-    await git(dir, "init", "-q", "-b", "001-demo");
-    const featureJson = join(dir, ".specnaut/feature.json");
-    if (c.content !== null) await Deno.writeTextFile(featureJson, c.content);
-    if (c.unreadable) await Deno.chmod(featureJson, 0o000);
-    await fn(dir);
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
-}
-
-/** The whole of stderr is the one refusal, or nothing and the branch's directory. */
-function assertOutcome(c: Case, r: Run, dir: string, featureDir: () => string | undefined) {
-  const detail = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
-  if (c.expect === BRANCH) {
-    assertEquals(r.code, 0, detail);
-    assertEquals(r.stderr, "", detail);
-    assertEquals(
-      featureDir()?.replaceAll("\\", "/"),
-      `${dir}/.specnaut/specs/001-demo`.replaceAll("\\", "/"),
-    );
-  } else {
-    assertEquals(r.code, 1, detail);
-    assertEquals(r.stderr.split(/\r?\n/).filter(Boolean), [c.expect], detail);
-    assertEquals(r.stdout, "", detail);
-    assert(!r.stderr.includes(dir), `a path reached stderr: ${r.stderr}`);
-  }
-}
-
 for (const twin of twins()) {
   for (const c of CASES) {
     Deno.test({
@@ -111,40 +71,18 @@ for (const twin of twins()) {
   }
 }
 
-/** The tool's absolute path, as bash finds it, or null. */
-async function which(tool: string): Promise<string | null> {
-  const r = await run(BASH, ["-c", `command -v ${tool}`], ".");
-  return r.code === 0 ? r.stdout.trim() : null;
-}
-
-/**
- * Each bash reader, chosen by what PATH holds. PATH is one directory of
- * wrappers over the real tools by absolute path: what `get_feature_paths`
- * calls, and the reader's own. Off Windows only: a wrapper needs a mode bit.
- */
+/** Each bash reader, chosen by what PATH holds (`toolBin`). */
 const READERS = [
   { reader: "jq", tools: ["jq"], unparseable: REFUSAL("ArgumentException") },
   { reader: "python3", tools: ["python3"], unparseable: REFUSAL("ArgumentException") },
   { reader: "grep", tools: [], unparseable: BRANCH },
 ];
-const BASE_TOOLS = ["git", "dirname", "basename", "grep", "sed"];
 
 Deno.test("the bash readers' jq and python3 are present where they must be", async () => {
   if (Deno.env.get("CI") === "true" && !WINDOWS) {
     for (const tool of ["jq", "python3"]) assert(await which(tool), `${tool} is absent on CI`);
   }
 });
-
-/** One directory standing in for PATH: a wrapper per tool, over the real one. */
-async function toolBin(dir: string, tools: string[]): Promise<string> {
-  const bin = join(dir, "reader-bin");
-  await Deno.mkdir(bin);
-  for (const tool of [...BASE_TOOLS, ...tools]) {
-    await Deno.writeTextFile(join(bin, tool), `#!/bin/sh\nexec '${await which(tool)}' "$@"\n`);
-    await Deno.chmod(join(bin, tool), 0o755);
-  }
-  return bin;
-}
 
 const [bash] = twins();
 const RESOLVE =

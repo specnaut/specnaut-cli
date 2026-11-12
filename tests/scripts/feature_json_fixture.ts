@@ -1,0 +1,80 @@
+// The project, the PATH and the assertion that feature_json_read_test.ts's
+// rows share (cli#763, cli#778): a repository on `001-demo` holding that
+// feature, and one directory of tool wrappers standing in for PATH.
+
+import { assert, assertEquals } from "@std/assert";
+import { copy } from "@std/fs";
+import { join } from "@std/path";
+import { git, type Run, run } from "./git_sandbox.ts";
+import { BASH, SCRIPTS } from "./twin_runner.ts";
+
+export const WINDOWS = Deno.build.os === "windows";
+export const REFUSAL = (type: string) => `ERROR: Failed to parse .specnaut/feature.json (${type})`;
+/** What a fallback resolves to: the branch's own feature directory. */
+export const BRANCH = "branch";
+
+export type Case = {
+  label: string;
+  content: string | null;
+  unreadable?: boolean;
+  unparseable?: boolean;
+  expect: string;
+};
+
+/** A repository on `001-demo` holding that feature, the scripts, and the case's feature.json. */
+export async function withProject(c: Case, fn: (dir: string) => Promise<void>): Promise<void> {
+  const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "feature-json-read-" }));
+  try {
+    await copy(SCRIPTS, join(dir, ".specnaut/scripts"));
+    await Deno.mkdir(join(dir, ".specnaut/specs/001-demo"), { recursive: true });
+    await Deno.writeTextFile(join(dir, ".specnaut/specs/001-demo/plan.md"), "# Plan\n");
+    await git(dir, "init", "-q", "-b", "001-demo");
+    const featureJson = join(dir, ".specnaut/feature.json");
+    if (c.content !== null) await Deno.writeTextFile(featureJson, c.content);
+    if (c.unreadable) await Deno.chmod(featureJson, 0o000);
+    await fn(dir);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+/** The whole of stderr is the one refusal, or nothing and the branch's directory. */
+export function assertOutcome(c: Case, r: Run, dir: string, featureDir: () => string | undefined) {
+  const detail = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
+  if (c.expect === BRANCH) {
+    assertEquals(r.code, 0, detail);
+    assertEquals(r.stderr, "", detail);
+    assertEquals(
+      featureDir()?.replaceAll("\\", "/"),
+      `${dir}/.specnaut/specs/001-demo`.replaceAll("\\", "/"),
+    );
+  } else {
+    assertEquals(r.code, 1, detail);
+    assertEquals(r.stderr.split(/\r?\n/).filter(Boolean), [c.expect], detail);
+    assertEquals(r.stdout, "", detail);
+    assert(!r.stderr.includes(dir), `a path reached stderr: ${r.stderr}`);
+  }
+}
+
+/** The tool's absolute path, as bash finds it, or null. */
+export async function which(tool: string): Promise<string | null> {
+  const r = await run(BASH, ["-c", `command -v ${tool}`], ".");
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+const BASE_TOOLS = ["git", "dirname", "basename", "grep", "sed"];
+
+/**
+ * One directory standing in for PATH: a wrapper per tool, over the real one
+ * by absolute path — what `get_feature_paths` calls, and the reader's own.
+ * Off Windows only: a wrapper needs a mode bit.
+ */
+export async function toolBin(dir: string, tools: string[]): Promise<string> {
+  const bin = join(dir, "reader-bin");
+  await Deno.mkdir(bin);
+  for (const tool of [...BASE_TOOLS, ...tools]) {
+    await Deno.writeTextFile(join(bin, tool), `#!/bin/sh\nexec '${await which(tool)}' "$@"\n`);
+    await Deno.chmod(join(bin, tool), 0o755);
+  }
+  return bin;
+}
