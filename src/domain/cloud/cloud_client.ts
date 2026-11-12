@@ -12,6 +12,7 @@ import {
   REDIRECT_REFUSED,
   strField,
 } from "./cloud_wire.ts";
+import { tokenPair } from "./token_pair.ts";
 
 export type DeviceStart = {
   deviceCode: string;
@@ -58,9 +59,6 @@ export type CloudTask = {
 };
 
 export type FetchFn = typeof fetch;
-
-/** A year: far beyond any real access token, and far from an overflowing expiry. */
-const MAX_TOKEN_TTL_S = 31_536_000;
 
 export class CloudApiError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -279,17 +277,4 @@ export class CloudClient {
       size: strField(t, "size"),
     };
   }
-}
-
-/** A token pair from an approving answer, or null when it does not carry a real one. */
-function tokenPair(json: Record<string, unknown>) {
-  const { access_token: accessToken, refresh_token: refreshToken } = json;
-  if (typeof accessToken !== "string" || !accessToken) return null;
-  if (typeof refreshToken !== "string" || !refreshToken) return null;
-  // Clamped like startDevice's timing: a server cannot grant a token "forever".
-  return {
-    accessToken,
-    refreshToken,
-    expiresInS: clamp(Number(json.expires_in ?? 0), 0, MAX_TOKEN_TTL_S),
-  };
 }

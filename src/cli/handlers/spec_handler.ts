@@ -15,11 +15,8 @@
 
 import { dim, green, red, yellow } from "@std/fmt/colors";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
-import {
-  CloudConfigUnreadable,
-  FsBacklogConfigStore,
-} from "../../infrastructure/fs_backlog_config_store.ts";
-import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
+import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
+import { isLocalFailure } from "./cloud_local_failure.ts";
 import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
@@ -90,7 +87,7 @@ export async function runSpec(
   try {
     return await runSpecUnguarded(intent, deps);
   } catch (e) {
-    if (!(e instanceof CloudConfigUnreadable || e instanceof InvalidApiUrl)) throw e;
+    if (!isLocalFailure(e)) throw e;
     deps.err(red(`error: ${e.message}`));
     return 1;
   }
