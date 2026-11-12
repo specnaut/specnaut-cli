@@ -168,7 +168,10 @@ _explicit_head_own_alternates() {
 
 # _explicit_head_msys - true under Git for Windows' bash, whose git reads a drive letter as
 # the start of an absolute path.
-_explicit_head_msys() { case "${OSTYPE:-}" in msys*) return 0 ;; *) return 1 ;; esac; }
+_explicit_head_msys() {
+  case "${OSTYPE:-}" in msys* | cygwin*) return 0 ;; esac
+  case "$(uname -s 2>/dev/null)" in MINGW* | MSYS* | CYGWIN*) return 0 ;; *) return 1 ;; esac
+}
 
 explicit_head_names_head() {
   local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?$'

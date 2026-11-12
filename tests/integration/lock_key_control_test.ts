@@ -24,6 +24,8 @@ entries:
 
 // deno-lint-ignore no-control-regex
 const RAW_CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/;
+/** Deno prints the source excerpt of an uncaught error with the file's own CRLF on Windows: a line end, not a control. */
+const lineEnds = (s: string) => s.replaceAll("\r\n", "\n");
 
 Deno.test("a lock key with control characters is refused, escaped, on stderr", async () => {
   const proj = await Deno.makeTempDir({ prefix: "lock-key-control-" });
@@ -51,7 +53,7 @@ Deno.test("a lock key with control characters is refused, escaped, on stderr", a
     // The marker only this refusal prints, so a crash elsewhere cannot pass.
     assertStringIncludes(stderr, "is not a legal destination");
     assertStringIncludes(stderr, "a\\u001b]0;pwned\\u0007\\u009b2J\\u007fb.md");
-    assert(!RAW_CONTROL.test(stderr), `raw control on stderr: ${JSON.stringify(stderr)}`);
+    assert(!RAW_CONTROL.test(lineEnds(stderr)), `raw control on stderr: ${JSON.stringify(stderr)}`);
   } finally {
     await Deno.remove(proj, { recursive: true });
   }
@@ -96,7 +98,10 @@ for (const c of VALUE_CASES) {
           `Unsupported ${c.name === "harness" ? "harness '" : "lock version"}`,
         );
         assertStringIncludes(stderr, c.shown);
-        assert(!RAW_CONTROL.test(stderr), `raw control on stderr: ${JSON.stringify(stderr)}`);
+        assert(
+          !RAW_CONTROL.test(lineEnds(stderr)),
+          `raw control on stderr: ${JSON.stringify(stderr)}`,
+        );
       } finally {
         await Deno.remove(proj, { recursive: true });
       }

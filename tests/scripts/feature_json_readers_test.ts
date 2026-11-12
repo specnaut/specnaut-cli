@@ -42,14 +42,18 @@ const RESOLVE =
   `out=$(get_feature_paths) || exit $?\neval "$out"\nprintf 'RESULT %s\\n' "$FEATURE_DIR"`;
 
 /** `get_feature_paths` in bash, under the shell `shell` builds in the project. */
-function resolveIn(c: Case, shell: (dir: string) => Promise<Shell>) {
+function resolveIn(c: Case, shell: (dir: string) => Promise<Shell>, read = (s?: string) => s) {
   return () =>
     withProject(c, async (dir) => {
       const scripts = join(dir, ".specnaut/scripts");
       const r = await bash.functions(scripts, { bash: RESOLVE, pwsh: "" }, dir, await shell(dir));
-      assertOutcome(c, r, dir, () => results(r)[0]);
+      assertOutcome(c, r, dir, () => read(results(r)[0]));
     });
 }
+
+/** Git Bash with no git on PATH names the folder `/c/x`; the outcome is the same folder `C:/x`. */
+const driveForm = (s?: string) =>
+  s?.replace(/^\/([A-Za-z])\//, (_, d: string) => `${d.toUpperCase()}:/`);
 
 /** `get_feature_paths` in bash, with PATH holding `tools` and `stubs` (`toolBin`). */
 const resolveRow = (c: Case, tools: string[], stubs: Record<string, string> = {}) =>
@@ -149,7 +153,7 @@ Deno.test({
     outcome(ELSEWHERE)
   }`,
   ignore: !WINDOWS || STORE?.skip !== undefined,
-  fn: resolveIn(ONE_LINE, () => Promise.resolve({ before: { bash: WINDOWS_PATH } })),
+  fn: resolveIn(ONE_LINE, () => Promise.resolve({ before: { bash: WINDOWS_PATH } }), driveForm),
 });
 
 // The grep reader's "no key" is grep matching nothing: under pipefail its status
