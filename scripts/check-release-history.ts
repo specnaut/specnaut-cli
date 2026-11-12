@@ -33,24 +33,33 @@ async function publishedAt(tag: string): Promise<string> {
   return shown.out;
 }
 
+/** Every `v*` tag the checkout can see. */
+async function releaseTags(): Promise<Set<string>> {
+  const listed = (await git("tag", "--list", "v*")).out.split("\n").map((t) => t.trim());
+  return new Set(listed.filter((t) => t !== ""));
+}
+
+/** The history records' file names, in name order. */
+async function recordNames(): Promise<string[]> {
+  const names: string[] = [];
+  for await (const e of Deno.readDir(HISTORY)) {
+    if (e.isFile && e.name.endsWith(".md")) names.push(e.name);
+  }
+  return names.sort();
+}
+
 /** Each tagged history record that differs from what its tag published, or why none can be compared. */
 export async function historyRecordProblems(): Promise<string[]> {
-  const tags = new Set((await git("tag", "--list", "v*")).out.split("\n").map((t) => t.trim()));
-  tags.delete("");
-  const records: string[] = [];
-  for await (const e of Deno.readDir(HISTORY)) {
-    if (e.isFile && e.name.endsWith(".md")) records.push(e.name);
-  }
+  const tags = await releaseTags();
+  const records = await recordNames();
   if (records.length > 0 && tags.size === 0) {
     // A shallow checkout fetches no tag; passing then would compare nothing.
     return [`no v* tag is visible: fetch the tags first, or no record is compared`];
   }
   const problems: string[] = [];
-  for (const name of records.sort()) {
+  for (const name of records) {
     const tag = name.slice(0, -".md".length);
-    if (!tags.has(tag)) continue;
-    const recorded = await Deno.readTextFile(`${HISTORY}/${name}`);
-    if (flat(recorded) !== flat(await publishedAt(tag))) {
+    if (tags.has(tag) && !(await matchesItsTag(name, tag))) {
       problems.push(
         `${HISTORY}/${name} differs from ${HIGHLIGHTS} as ${tag} published it — ` +
           `a history record is never edited after its release`,
@@ -58,6 +67,12 @@ export async function historyRecordProblems(): Promise<string[]> {
     }
   }
   return problems;
+}
+
+/** Whether record `name` says what `tag` published, whitespace-insensitively. */
+async function matchesItsTag(name: string, tag: string): Promise<boolean> {
+  const recorded = await Deno.readTextFile(`${HISTORY}/${name}`);
+  return flat(recorded) === flat(await publishedAt(tag));
 }
 
 if (import.meta.main) {

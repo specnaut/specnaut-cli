@@ -54,20 +54,13 @@ export function releaseUrl(version: SemVer): string {
  * file, so one reaching here is a broken bundle, never a shorter list.
  */
 export function crossedReleases(from: string, to: string, history: ReleaseHistory): ReleaseNotes {
-  const parsed = history.map((e) => {
-    const version = SemVer.tryParse(e.version);
-    if (version === null) throw new Error(`Release history entry "${e.version}" is not SemVer`);
-    return { version, text: e.content };
-  });
   const a = SemVer.tryParse(from);
   const b = SemVer.tryParse(to);
   if (a === null || b === null) return { kind: "none" };
   const order = a.compare(b);
   if (order === 0) return { kind: "no-change" };
   if (order > 0) return { kind: "none" };
-  const recorded = parsed
-    .filter((e) => b.prerelease !== null || e.version.prerelease === null)
-    .sort((x, y) => x.version.compare(y.version));
+  const recorded = recordedFor(history, b);
   const oldest = recorded[0]?.version;
   return {
     kind: "crossed",
@@ -80,4 +73,19 @@ export function crossedReleases(from: string, to: string, history: ReleaseHistor
       })),
     recordedSince: oldest !== undefined && a.compare(oldest) < 0 ? oldest.toString() : null,
   };
+}
+
+/**
+ * The entries an upgrade to `target` may cross, in SemVer order: prereleases
+ * only toward a prerelease. Throws on an entry whose version does not parse.
+ */
+function recordedFor(history: ReleaseHistory, target: SemVer) {
+  return history
+    .map((e) => {
+      const version = SemVer.tryParse(e.version);
+      if (version === null) throw new Error(`Release history entry "${e.version}" is not SemVer`);
+      return { version, text: e.content };
+    })
+    .filter((e) => target.prerelease !== null || e.version.prerelease === null)
+    .sort((x, y) => x.version.compare(y.version));
 }
