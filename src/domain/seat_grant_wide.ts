@@ -1,5 +1,5 @@
 import type { KnownHarness } from "./installed_lock.ts";
-import { toolNames } from "./tool_grant.ts";
+import { type Capability, grantedCapabilities } from "./tool_grant.ts";
 
 /**
  * Which of the shell and write tools an agent file still grants, read from the
@@ -14,11 +14,14 @@ import { toolNames } from "./tool_grant.ts";
  *   is set to `deny`, or the block opens with `"*": deny` and never names it.
  * - **Codex**: only the shell can be switched off (`shell_tool = false`), so
  *   that is all a file can be read for.
+ *
+ * Which tools grant each capability is `tool_grant.ts`'s map, read here and
+ * never re-spelled: a tool it gains is wide here too.
  */
-const WIDE: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
-  ["Bash", ["Bash"]],
-  ["Write", ["Write"]],
-  ["Edit", ["Edit", "MultiEdit", "NotebookEdit"]],
+const WIDE: ReadonlyArray<readonly [string, Capability]> = [
+  ["Bash", "bash"],
+  ["Write", "write"],
+  ["Edit", "edit"],
 ];
 
 /** The frontmatter body of a Markdown agent file, or `null` without one. */
@@ -38,10 +41,10 @@ export function wideGrant(harness: KnownHarness, content: string): string[] {
     const denied = (key: string) =>
       new RegExp(`^\\s+${key}:\\s*deny\\s*$`, "m").test(fm) ||
       (all && !new RegExp(`^\\s+${key}:`, "m").test(fm));
-    return WIDE.filter(([name]) => !denied(name.toLowerCase())).map(([name]) => name);
+    return WIDE.filter(([, capability]) => !denied(capability)).map(([name]) => name);
   }
   const line = /^tools:[ \t]*(.*)$/m.exec(fm)?.[1].trim() ?? "";
-  if (line.length === 0) return WIDE.map(([name]) => name);
-  const names = new Set(toolNames(line));
-  return WIDE.filter(([, tools]) => tools.some((t) => names.has(t))).map(([name]) => name);
+  const granted = grantedCapabilities(line);
+  if (granted === null) return WIDE.map(([name]) => name);
+  return WIDE.filter(([, capability]) => granted.has(capability)).map(([name]) => name);
 }

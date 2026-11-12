@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { wideGrant } from "../../src/domain/seat_grant_wide.ts";
+import { grantedCapabilities } from "../../src/domain/tool_grant.ts";
 
 /** Which shell and write tools an agent file grants, in each harness's own shape. */
 
@@ -16,6 +17,24 @@ Deno.test("seat grant: a tools line names what it grants; Read, Grep, Glob is na
     "Bash",
     "Edit",
   ]);
+});
+
+// The tool map is `tool_grant.ts`'s: a line reads as wide exactly where that map says it grants.
+Deno.test("seat grant: a tools line is wide wherever the tool map says it grants the capability", () => {
+  const WIDE = [["Bash", "bash"], ["Write", "write"], ["Edit", "edit"]] as const;
+  for (
+    const line of [
+      "NotebookEdit",
+      "MultiEdit, Read",
+      "Bash(npm *)",
+      "Write, WebFetch",
+      "Grep, Agent",
+    ]
+  ) {
+    const granted = grantedCapabilities(line)!;
+    const expected = WIDE.filter(([, c]) => granted.has(c)).map(([name]) => name);
+    assertEquals(wideGrant("claude", md(`tools: ${line}\n`)), expected, line);
+  }
 });
 
 Deno.test("seat grant: no tools line is the harness default, every tool", () => {
