@@ -1,4 +1,4 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
@@ -44,4 +44,20 @@ Deno.test("the groom report carries the columns and every failed promotion", asy
   const report = await Deno.readTextFile(`${ROOT}templates/core/skills/task/groom-report.md`);
   assertStringIncludes(report, "Columns:    intake=<name>  ready=<name | none");
   assertStringIncludes(report, "⚠ promotion failed — groomed but still in <intake>:");
+});
+
+// The executor sends a script's output to /dev/null and prints its own line: a report that asks
+// for move.sh's error asks for text no run of the groom ever sees.
+Deno.test("the groom report quotes the executor's FAILED line for a failed move, as the executor defines it", async () => {
+  const report = await Deno.readTextFile(`${ROOT}templates/core/skills/task/groom-report.md`);
+  const executor = await Deno.readTextFile(
+    `${ROOT}templates/core/skills/task/scripts/_apply_plan.sh`,
+  );
+  assertStringIncludes(
+    executor,
+    "#   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>",
+  );
+  const quoted = report.match(/<the executor's `FAILED move <n> <exit>` line>/g) ?? [];
+  assertEquals(quoted.length, 2, "the promotion and the WIP move each quote the executor's line");
+  assert(!/move\.sh's error/.test(report), "groom-report.md asks for move.sh's own error");
 });
