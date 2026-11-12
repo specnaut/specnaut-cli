@@ -110,6 +110,7 @@ selected_outcome() {
     OUTCOME="the $TIER gate ran nothing: every command was omitted or removed, and a skip is not a pass"
   elif [ "$count" -eq 0 ]; then
     RESULT=undeclared OUTCOME="no $TIER gate declared, so nothing ran"
+    [ "$SANDBOX" = 0 ] || CODE=125 OUTCOME="$OUTCOME: NOT RUN, never a pass"
   else
     OUTCOME="the $TIER gate passed (scope: $SCOPE) - $count command(s) ran, ${#OMITTED[@]} omitted"
     [ "$SCOPE" != owners ] || OUTCOME="the $TIER gate passed (scope: owners $SCOPE_OWNERS) - $count command(s) ran, ${#OMITTED[@]} omitted"

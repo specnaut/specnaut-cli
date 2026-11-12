@@ -42,6 +42,11 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   assertStringIncludes(doc, "--sandbox");
   assertStringIncludes(doc, "The result is the exit code alone");
   assertStringIncludes(doc, "a command's 127 (not found on the sandbox's PATH) is NOT RUN too");
+  assertStringIncludes(doc, "a tier `gates.yml` does not declare exits 125 as well");
+  assertStringIncludes(
+    doc,
+    "A PASS is the branch's own claim, since its code chooses its exit code",
+  );
   assertStringIncludes(doc, "A log is briefed by its path, never pasted.");
   assertStringIncludes(
     doc,

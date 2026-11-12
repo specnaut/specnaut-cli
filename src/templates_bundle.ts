@@ -1569,7 +1569,9 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "\$BASE_TIP" --head "
 on the scratch copy, prints one \`log: <file>\` line per command, and writes its evidence under
 \`\$LOGS\`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
 \`--sandbox\`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: \`run-gate.sh\` stops
-there, exits 125 and names the command. A log is briefed by its path, never pasted. Where
+there, exits 125 and names the command; a tier \`gates.yml\` does not declare exits 125 as well. A
+PASS is the branch's own claim, since its code chooses its exit code: it is evidence for the
+verdict, never a reason to merge. A log is briefed by its path, never pasted. Where
 \`specnaut sandbox probe\` exits 1 (no sandbox, as on Windows), the review is static only: every
 gate, the tests included, is \`NOT RUN\`.
 
@@ -29709,8 +29711,8 @@ generate_branch_name() {
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
-#   125 behind --sandbox: the sandbox ran nothing, or a command was not on its PATH
-#       (127), so the tier is NOT RUN, never a pass
+#   125 behind --sandbox: the sandbox ran nothing, a command was not on its PATH (127),
+#       or the tier is not declared, so the tier is NOT RUN, never a pass
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # \`specnaut sandbox exec\` (_gate_sandbox.sh), its output to a new file under the
@@ -29773,7 +29775,9 @@ parse_tier() {
   ' < "\$1"
 }
 
-FLAG="" BASE_VALUE="" EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+FLAG="" BASE_VALUE=""
+# shellcheck source=SCRIPTDIR/_gate_sandbox.sh
+. "\$SCRIPT_DIR/_gate_sandbox.sh" || { echo "run-gate: _gate_sandbox.sh is missing" >&2; exit 3; }
 flag_usage() {
   [ -z "\${1:-}" ] || echo "run-gate: \$1" >&2
   echo "usage: run-gate.sh <fast|full> [--base <rev> | --refs-stdin] [--head <sha> [--objects <dir>] --evidence <dir> --sandbox]" >&2
@@ -29793,28 +29797,17 @@ parse_flags() {
         FLAG=--refs-stdin
         shift
         ;;
-      --head | --objects)
-        [ "\$#" -ge 2 ] || flag_usage "\$1 takes a value"
-        HEAD_ARGS+=("\$1" "\$2")
-        shift 2
-        ;;
-      --evidence)
-        [ "\$#" -ge 2 ] && [ -n "\$2" ] || flag_usage "--evidence takes a value"
-        EVIDENCE="\$2"
-        shift 2
-        ;;
-      --sandbox) SANDBOX=1 && shift ;;
       --parse-gates)
         [ "\$#" -eq 2 ] || flag_usage
         parse_tier "\$2"
         exit 0
         ;;
-      *) flag_usage ;;
+      *) gate_sandbox_option "\$@" && shift "\$GATE_WORDS" ;;
     esac
   done
 }
 parse_flags "\${@:2}"
-[ "\${#HEAD_ARGS[@]}" -eq 0 ] || [ "\$SANDBOX" = 1 ] || flag_usage "--head and --objects need --sandbox"
+gate_sandbox_options_hold
 
 # gate_run_one <owners or -> <command> - the one place a command of the tier is run:
 # from the repository root, stdin from /dev/null, and the owners in the one variable
@@ -29836,22 +29829,20 @@ gate_run_one() {
 if [ -n "\$FLAG" ] || [ "\$SANDBOX" = 1 ]; then
   # shellcheck source=SCRIPTDIR/_gate_selected.sh
   . "\$SCRIPT_DIR/_gate_selected.sh" || { echo "run-gate: _gate_selected.sh is missing" >&2; exit 3; }
-  # shellcheck source=SCRIPTDIR/_gate_sandbox.sh
-  . "\$SCRIPT_DIR/_gate_sandbox.sh" || { echo "run-gate: _gate_sandbox.sh is missing" >&2; exit 3; }
 fi
 [ "\$SANDBOX" = 0 ] || gate_sandbox_start
 [ -z "\$FLAG" ] || run_selected
 
 if [ ! -r "\$GATES" ]; then
   echo "no \$TIER gate declared — \$GATES is absent, so nothing ran"
-  exit 0
+  gate_none_declared
 fi
 
 COMMANDS="\$(parse_tier "\$GATES")"
 
 if [ -z "\$COMMANDS" ]; then
   echo "no \$TIER gate declared — \${TIER}_gate in \$(basename "\$GATES") is empty, so nothing ran"
-  exit 0
+  gate_none_declared
 fi
 
 count="\$(printf '%s\\n' "\$COMMANDS" | wc -l | tr -d ' ')"
@@ -30800,6 +30791,7 @@ selected_outcome() {
     OUTCOME="the \$TIER gate ran nothing: every command was omitted or removed, and a skip is not a pass"
   elif [ "\$count" -eq 0 ]; then
     RESULT=undeclared OUTCOME="no \$TIER gate declared, so nothing ran"
+    [ "\$SANDBOX" = 0 ] || CODE=125 OUTCOME="\$OUTCOME: NOT RUN, never a pass"
   else
     OUTCOME="the \$TIER gate passed (scope: \$SCOPE) - \$count command(s) ran, \${#OMITTED[@]} omitted"
     [ "\$SCOPE" != owners ] || OUTCOME="the \$TIER gate passed (scope: owners \$SCOPE_OWNERS) - \$count command(s) ran, \${#OMITTED[@]} omitted"
@@ -30856,7 +30848,8 @@ run_selected() {
     content: `# shellcheck shell=bash
 # Sourced by run-gate.sh behind --sandbox: the tier's commands, read from this checkout's
 # own gates.yml, run on the exported copy of a head commit through \`specnaut sandbox exec\`,
-# never in this shell. Requires TIER, EVIDENCE, HEAD_ARGS and _gate_selected.sh.
+# never in this shell. Sourced before the options are read; gate_sandbox_start requires
+# TIER and _gate_selected.sh.
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
 # its result is its exit code alone, never read from that output. 125 is the sandbox
@@ -30865,7 +30858,37 @@ run_selected() {
 # and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
-GATE_LOGS="" GATE_RUNS=0
+# shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
+GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+
+# gate_sandbox_option <option> [<value>...] - takes --head, --objects, --evidence or
+# --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
+# it used. A value is never empty and never starts with \`-\`, as --base's. The head is
+# parsed once, later, by _explicit_head.sh.
+gate_sandbox_option() {
+  case "\$1" in --head | --objects | --evidence | --sandbox) ;; *) flag_usage ;; esac
+  GATE_WORDS=1
+  [ "\$1" != --sandbox ] || { SANDBOX=1 && return 0; }
+  [ "\$#" -ge 2 ] && [ -n "\$2" ] || flag_usage "\$1 takes a value"
+  case "\$2" in -*) flag_usage "\$1 takes a value, not \$2" ;; esac
+  GATE_WORDS=2
+  if [ "\$1" = --evidence ]; then EVIDENCE="\$2"; else HEAD_ARGS+=("\$1" "\$2"); fi
+}
+
+# gate_sandbox_options_hold - the head and the evidence folder are only for a sandboxed
+# run: a pass on the work tree must never speak for a commit it did not run.
+gate_sandbox_options_hold() {
+  [ "\$SANDBOX" = 1 ] || { [ "\${#HEAD_ARGS[@]}" -eq 0 ] && [ -z "\$EVIDENCE" ]; } ||
+    flag_usage "--head, --objects and --evidence need --sandbox"
+}
+
+# gate_none_declared - after "no gate declared": bare, that is exit 0; in a sandbox nothing
+# of the branch ran, which is NOT RUN, never a pass.
+gate_none_declared() {
+  [ "\$SANDBOX" = 1 ] || exit 0
+  echo "the \$TIER gate did not run: none is declared, and a gate that did not run is NOT RUN, never a pass" >&2
+  exit 125
+}
 
 # gate_sandbox_start - takes the head and makes the log folder, or stops: exit 2 for an
 # evidence folder or option missing or misplaced, 3 for a head refused.

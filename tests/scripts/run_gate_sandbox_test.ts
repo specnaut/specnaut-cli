@@ -2,61 +2,12 @@
 // this checkout's gates.yml runs on the head's exported copy through `specnaut sandbox exec`,
 // never here, and is judged by its exit code alone. A `specnaut` first on the PATH records each
 // call and exits as told, so no sandbox is needed; the project's own commands write a mark when
-// they run here, so a run that bypassed the sandbox leaves one. The PowerShell twin is static
-// only: it refuses every one of these options.
+// they run here, so a run that bypassed the sandbox leaves one. Refusals: the sibling file.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { DELIMITER, dirname, join } from "@std/path";
-import { exportHead } from "./explicit_head_fixture.ts";
-import { ALWAYS, impactRepo, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
-import { PWSH_AVAILABLE } from "./epic_repo.ts";
-import { runGate, tempDir } from "./run_gate_fixture.ts";
-import { bashPath } from "../templates/hooks/hook_sandbox.ts";
-
-const STUB = `#!/usr/bin/env bash
-printf '%s\\n' "$@" '<end>' >>"$SANDBOX_CALLS"
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = --log ]; then printf 'what the run printed\\n' >"$2"; fi
-  shift
-done
-exit "$SANDBOX_RC"
-`;
-
-/** A project on `feature` with a dirty work tree, a head exported beside it, and a `specnaut`. */
-async function sandboxed(opts: Parameters<typeof impactRepo>[0] = {}) {
-  const repo = await impactRepo(opts);
-  const { head, objects } = await exportHead(repo.root, { "apps/web/a.ts": "the head's web\n" });
-  await Deno.writeTextFile(join(repo.root, "apps/api/a.ts"), "an uncommitted edit\n");
-  const bin = await tempDir("run-gate-bin-");
-  await Deno.writeTextFile(join(bin, "specnaut"), STUB);
-  if (Deno.build.os !== "windows") await Deno.chmod(join(bin, "specnaut"), 0o755);
-  const evidence = bashPath(await tempDir("run-gate-review-"));
-  const key = Object.keys(Deno.env.toObject()).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
-  const calls = join(bin, "calls");
-  const run = async (args: string[], rc = 0) => {
-    await Deno.remove(calls).catch(() => undefined);
-    const env = {
-      [key]: `${bin}${DELIMITER}${Deno.env.get("PATH") ?? ""}`,
-      SANDBOX_CALLS: bashPath(calls),
-      SANDBOX_RC: String(rc),
-    };
-    const r = await repo.gate("bash", args, { env });
-    const text = await Deno.readTextFile(calls).catch(() => "");
-    const said = text.replaceAll("\r", "").split("<end>\n").filter(Boolean);
-    return { ...r, calls: said.map((c) => c.split("\n").slice(0, -1)) };
-  };
-  const full = ["--head", head, "--objects", objects, "--evidence", evidence, "--sandbox"];
-  return { repo, head, objects, evidence, run, full };
-}
-
-/** The one evidence file a run wrote under `folder`. */
-const evidenceOf = async (folder: string) => {
-  const dir = join(folder, "specnaut/gate-evidence");
-  const names = [...Deno.readDirSync(dir)].map((e) => e.name);
-  assertEquals(names.length, 1, names.join(" "));
-  assert(names[0].startsWith("fast-"), names[0]);
-  return JSON.parse(await Deno.readTextFile(join(dir, names[0])));
-};
+import { dirname } from "@std/path";
+import { ALWAYS, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
+import { evidenceOf, sandboxed } from "./run_gate_sandbox_fixture.ts";
 
 Deno.test("run-gate --sandbox: each configured command runs on the head in the sandbox, never here", async () => {
   const { repo, head, evidence, run, full } = await sandboxed();
@@ -118,49 +69,6 @@ Deno.test("run-gate --sandbox: with no declaration, the bare run goes through th
   }
 });
 
-Deno.test("run-gate --sandbox: the options it needs, and a head only with it", async () => {
-  const { repo, head, objects, evidence, run } = await sandboxed();
-  const cases: [string[], string][] = [
-    [["--evidence", evidence, "--sandbox"], "--sandbox needs --head <sha>"],
-    [["--head", head, "--objects", objects, "--sandbox"], "--sandbox needs --evidence <dir>"],
-    [["--head", head, "--objects", objects, "--evidence", evidence], "need --sandbox"],
-    [["--head", head, "--evidence", "review", "--sandbox"], "--evidence takes an absolute folder"],
-    [["--head"], "--head takes a value"],
-    [["--evidence", "", "--sandbox"], "--evidence takes a value"],
-  ];
-  for (const [extra, why] of cases) {
-    const r = await run(["fast", "--base", repo.main, ...extra]);
-    assertEquals(r.code, 2, extra.join(" "));
-    assertStringIncludes(r.stderr, why);
-    assertEquals(r.calls, [], extra.join(" "));
-  }
-});
-
-Deno.test("run-gate --sandbox: a head out of reach, or evidence beside it, runs nothing", async () => {
-  const { head, objects, evidence, run } = await sandboxed();
-  const unreached = await run(["fast", "--head", head, "--evidence", evidence, "--sandbox"]);
-  assertEquals(unreached.code, 3, unreached.stderr);
-  assertStringIncludes(
-    unreached.stdout,
-    `candidate: refused (head-refused: no commit ${head} in reach)`,
-  );
-  const beside = bashPath(join(dirname(dirname(objects)), "review"));
-  await Deno.mkdir(beside);
-  const inside = await run([
-    "fast",
-    "--head",
-    head,
-    "--objects",
-    objects,
-    "--evidence",
-    beside,
-    "--sandbox",
-  ]);
-  assertEquals(inside.code, 2, inside.stderr);
-  assertStringIncludes(inside.stderr, "--evidence lies inside the head's repository");
-  assertEquals([unreached.calls, inside.calls], [[], []]);
-});
-
 Deno.test("review-untrusted.md's run-gate line runs as written", async () => {
   const doc = await Deno.readTextFile(
     new URL("../../templates/core/skills/task/phases/review-untrusted.md", import.meta.url),
@@ -180,21 +88,14 @@ Deno.test("review-untrusted.md's run-gate line runs as written", async () => {
   assertEquals([r.code, r.calls.length], [0, 3], r.stderr);
 });
 
-Deno.test({
-  name: "run-gate.ps1: static only, it refuses every sandboxed run's option with exit 5",
-  ignore: !PWSH_AVAILABLE,
-  fn: async () => {
-    const { repo, head, objects, evidence } = await sandboxed();
-    for (
-      const extra of [["--sandbox"], ["--head", head], ["--objects", objects], [
-        "--evidence",
-        evidence,
-      ]]
-    ) {
-      const r = await runGate("pwsh", repo.root, ["fast", "--base", repo.main, ...extra]);
-      assertEquals(r.code, 5, extra.join(" "));
-      assertStringIncludes(r.stderr, "static only");
-      assertEquals(r.stdout, "", extra.join(" "));
-    }
-  },
+Deno.test("run-gate --sandbox: a tier not declared is NOT RUN, with a declaration or without", async () => {
+  for (const declaration of [undefined, null]) {
+    const { repo, run, full } = await sandboxed({ declaration, gates: "full_gate:\n  - echo x\n" });
+    const r = await run(["fast", "--base", repo.main, ...full]);
+    assertEquals([r.code, r.calls], [125, []], r.stdout + r.stderr);
+    assertStringIncludes(r.stdout + r.stderr, "NOT RUN, never a pass");
+    await Deno.remove(`${repo.root}/.specnaut/gates.yml`);
+    const absent = await run(["fast", ...full]);
+    assertEquals([absent.code, absent.calls], [125, []], absent.stdout + absent.stderr);
+  }
 });

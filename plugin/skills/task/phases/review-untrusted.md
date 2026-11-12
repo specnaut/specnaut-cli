@@ -65,7 +65,9 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "$BASE_TIP" --head "$
 on the scratch copy, prints one `log: <file>` line per command, and writes its evidence under
 `$LOGS`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
 `--sandbox`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: `run-gate.sh` stops
-there, exits 125 and names the command. A log is briefed by its path, never pasted. Where
+there, exits 125 and names the command; a tier `gates.yml` does not declare exits 125 as well. A
+PASS is the branch's own claim, since its code chooses its exit code: it is evidence for the
+verdict, never a reason to merge. A log is briefed by its path, never pasted. Where
 `specnaut sandbox probe` exits 1 (no sandbox, as on Windows), the review is static only: every
 gate, the tests included, is `NOT RUN`.
 

@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # Sourced by run-gate.sh behind --sandbox: the tier's commands, read from this checkout's
 # own gates.yml, run on the exported copy of a head commit through `specnaut sandbox exec`,
-# never in this shell. Requires TIER, EVIDENCE, HEAD_ARGS and _gate_selected.sh.
+# never in this shell. Sourced before the options are read; gate_sandbox_start requires
+# TIER and _gate_selected.sh.
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
 # its result is its exit code alone, never read from that output. 125 is the sandbox
@@ -10,7 +11,37 @@
 # and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
-GATE_LOGS="" GATE_RUNS=0
+# shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
+GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+
+# gate_sandbox_option <option> [<value>...] - takes --head, --objects, --evidence or
+# --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
+# it used. A value is never empty and never starts with `-`, as --base's. The head is
+# parsed once, later, by _explicit_head.sh.
+gate_sandbox_option() {
+  case "$1" in --head | --objects | --evidence | --sandbox) ;; *) flag_usage ;; esac
+  GATE_WORDS=1
+  [ "$1" != --sandbox ] || { SANDBOX=1 && return 0; }
+  [ "$#" -ge 2 ] && [ -n "$2" ] || flag_usage "$1 takes a value"
+  case "$2" in -*) flag_usage "$1 takes a value, not $2" ;; esac
+  GATE_WORDS=2
+  if [ "$1" = --evidence ]; then EVIDENCE="$2"; else HEAD_ARGS+=("$1" "$2"); fi
+}
+
+# gate_sandbox_options_hold - the head and the evidence folder are only for a sandboxed
+# run: a pass on the work tree must never speak for a commit it did not run.
+gate_sandbox_options_hold() {
+  [ "$SANDBOX" = 1 ] || { [ "${#HEAD_ARGS[@]}" -eq 0 ] && [ -z "$EVIDENCE" ]; } ||
+    flag_usage "--head, --objects and --evidence need --sandbox"
+}
+
+# gate_none_declared - after "no gate declared": bare, that is exit 0; in a sandbox nothing
+# of the branch ran, which is NOT RUN, never a pass.
+gate_none_declared() {
+  [ "$SANDBOX" = 1 ] || exit 0
+  echo "the $TIER gate did not run: none is declared, and a gate that did not run is NOT RUN, never a pass" >&2
+  exit 125
+}
 
 # gate_sandbox_start - takes the head and makes the log folder, or stops: exit 2 for an
 # evidence folder or option missing or misplaced, 3 for a head refused.

@@ -22,8 +22,8 @@
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
-#   125 behind --sandbox: the sandbox ran nothing, or a command was not on its PATH
-#       (127), so the tier is NOT RUN, never a pass
+#   125 behind --sandbox: the sandbox ran nothing, a command was not on its PATH (127),
+#       or the tier is not declared, so the tier is NOT RUN, never a pass
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # `specnaut sandbox exec` (_gate_sandbox.sh), its output to a new file under the
@@ -86,7 +86,9 @@ parse_tier() {
   ' < "$1"
 }
 
-FLAG="" BASE_VALUE="" EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+FLAG="" BASE_VALUE=""
+# shellcheck source=SCRIPTDIR/_gate_sandbox.sh
+. "$SCRIPT_DIR/_gate_sandbox.sh" || { echo "run-gate: _gate_sandbox.sh is missing" >&2; exit 3; }
 flag_usage() {
   [ -z "${1:-}" ] || echo "run-gate: $1" >&2
   echo "usage: run-gate.sh <fast|full> [--base <rev> | --refs-stdin] [--head <sha> [--objects <dir>] --evidence <dir> --sandbox]" >&2
@@ -106,28 +108,17 @@ parse_flags() {
         FLAG=--refs-stdin
         shift
         ;;
-      --head | --objects)
-        [ "$#" -ge 2 ] || flag_usage "$1 takes a value"
-        HEAD_ARGS+=("$1" "$2")
-        shift 2
-        ;;
-      --evidence)
-        [ "$#" -ge 2 ] && [ -n "$2" ] || flag_usage "--evidence takes a value"
-        EVIDENCE="$2"
-        shift 2
-        ;;
-      --sandbox) SANDBOX=1 && shift ;;
       --parse-gates)
         [ "$#" -eq 2 ] || flag_usage
         parse_tier "$2"
         exit 0
         ;;
-      *) flag_usage ;;
+      *) gate_sandbox_option "$@" && shift "$GATE_WORDS" ;;
     esac
   done
 }
 parse_flags "${@:2}"
-[ "${#HEAD_ARGS[@]}" -eq 0 ] || [ "$SANDBOX" = 1 ] || flag_usage "--head and --objects need --sandbox"
+gate_sandbox_options_hold
 
 # gate_run_one <owners or -> <command> - the one place a command of the tier is run:
 # from the repository root, stdin from /dev/null, and the owners in the one variable
@@ -149,22 +140,20 @@ gate_run_one() {
 if [ -n "$FLAG" ] || [ "$SANDBOX" = 1 ]; then
   # shellcheck source=SCRIPTDIR/_gate_selected.sh
   . "$SCRIPT_DIR/_gate_selected.sh" || { echo "run-gate: _gate_selected.sh is missing" >&2; exit 3; }
-  # shellcheck source=SCRIPTDIR/_gate_sandbox.sh
-  . "$SCRIPT_DIR/_gate_sandbox.sh" || { echo "run-gate: _gate_sandbox.sh is missing" >&2; exit 3; }
 fi
 [ "$SANDBOX" = 0 ] || gate_sandbox_start
 [ -z "$FLAG" ] || run_selected
 
 if [ ! -r "$GATES" ]; then
   echo "no $TIER gate declared — $GATES is absent, so nothing ran"
-  exit 0
+  gate_none_declared
 fi
 
 COMMANDS="$(parse_tier "$GATES")"
 
 if [ -z "$COMMANDS" ]; then
   echo "no $TIER gate declared — ${TIER}_gate in $(basename "$GATES") is empty, so nothing ran"
-  exit 0
+  gate_none_declared
 fi
 
 count="$(printf '%s\n' "$COMMANDS" | wc -l | tr -d ' ')"
