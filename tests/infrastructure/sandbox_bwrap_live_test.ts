@@ -46,3 +46,18 @@ Deno.test({
       assertEquals(out.trim(), "-1 1");
     }),
 });
+
+Deno.test({
+  name: live("bwrap live: a vsock socket is refused inside, a unix socket is not", NO_PYTHON),
+  ignore: NO_PYTHON !== null,
+  fn: () =>
+    withLayout("bwrap", async ({ policy }) => {
+      const py = "import socket\n" +
+        "for family in (socket.AF_UNIX, socket.AF_VSOCK):\n" +
+        "    try:\n        socket.socket(family, socket.SOCK_STREAM).close(); print('opened')\n" +
+        "    except OSError as e:\n        print(e.errno)\n";
+      const { outcome, out } = await runIn(linux, policy, [PYTHON, "-c", py]);
+      assertEquals(outcome, { kind: "exited", code: 0 });
+      assertEquals(out.trim().split("\n"), ["opened", "1"]);
+    }),
+});

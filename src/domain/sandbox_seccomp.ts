@@ -5,6 +5,8 @@
  * namespace, touches a kernel keyring, loads a module or a BPF program, or acts on the whole host
  * fails with EPERM, so a tool that probes for it carries on. A call made under another architecture
  * (32-bit, or x32 on x86_64) would reach the same kernel under other numbers, so it is refused too.
+ * One socket family is refused as well: vsock, which a network namespace does not isolate, and
+ * which reaches the hypervisor or the host from a virtual machine.
  *
  * Pure: the launcher hands the bytes to bubblewrap on {@link SECCOMP_FD}.
  */
@@ -75,6 +77,12 @@ export const SYSCALL_NUMBERS: Readonly<Record<FilterArch, Partial<Record<Denied,
   },
 };
 
+/** `socket`'s number: its first argument, the address family, is what the vsock rule reads. */
+export const SOCKET_NUMBERS: Readonly<Record<FilterArch, number>> = { x86_64: 41, aarch64: 198 };
+
+/** The vsock address family: no network namespace holds it. */
+export const AF_VSOCK = 40;
+
 /** `AUDIT_ARCH_*`: the value the kernel puts in `seccomp_data.arch` for a native call. */
 const AUDIT_ARCH: Readonly<Record<FilterArch, number>> = {
   x86_64: 0xc000003e,
@@ -92,9 +100,13 @@ const RET_KILL_PROCESS = 0x80000000;
 const RET_ERRNO = 0x00050000;
 const RET_ALLOW = 0x7fff0000;
 const EPERM = 1;
-/** `seccomp_data`: the call's number, then its architecture. */
+/**
+ * `seccomp_data`: the call's number, its architecture, then (past the instruction pointer) its
+ * arguments, 64 bits each, the low half first on both little-endian architectures.
+ */
 const NR_OFFSET = 0;
 const ARCH_OFFSET = 4;
+const ARG0_OFFSET = 16;
 
 export function isFilterArch(arch: string): arch is FilterArch {
   return Object.hasOwn(AUDIT_ARCH, arch);
@@ -104,8 +116,8 @@ type Insn = { code: number; jt: number; jf: number; k: number };
 
 /**
  * The program for `arch`: kill a call made under any other architecture; then refuse each denied
- * number (and, on x86_64, every x32 number) with EPERM; allow the rest. Every refusal jumps to the
- * one EPERM return at the end.
+ * number (and, on x86_64, every x32 number) with EPERM, and `socket` when its family is vsock;
+ * allow the rest. Every refusal jumps to the one EPERM return at the end.
  */
 export function seccompFilter(arch: FilterArch): Uint8Array {
   if (!isFilterArch(arch)) throw new Error(`no syscall filter for ${arch}`);
@@ -120,9 +132,20 @@ export function seccompFilter(arch: FilterArch): Uint8Array {
     ...(arch === "x86_64" ? [{ code: JGE_K, k: X32_SYSCALL_BIT }] : []),
     ...denied.map((k) => ({ code: JEQ_K, k })),
   ];
-  // From test i, the EPERM return sits past the remaining tests and the ALLOW return.
-  const body = tests.map((t, i) => ({ ...t, jt: jump(tests.length - i), jf: 0 }));
-  return encode([...head, ...body, insn(RET_K, RET_ALLOW), insn(RET_K, RET_ERRNO | EPERM)]);
+  const vsock = vsockRule(arch);
+  // From test i, the EPERM return sits past the remaining tests, the vsock rule and ALLOW.
+  const body = tests.map((t, i) => ({ ...t, jt: jump(tests.length - i + vsock.length), jf: 0 }));
+  const end = [insn(RET_K, RET_ALLOW), insn(RET_K, RET_ERRNO | EPERM)];
+  return encode([...head, ...body, ...vsock, ...end]);
+}
+
+/** Not `socket`: on to ALLOW. `socket`: load its family; vsock jumps over ALLOW to EPERM. */
+function vsockRule(arch: FilterArch): Insn[] {
+  return [
+    { code: JEQ_K, jt: 0, jf: 2, k: SOCKET_NUMBERS[arch] },
+    insn(LD_W_ABS, ARG0_OFFSET),
+    { code: JEQ_K, jt: 1, jf: 0, k: AF_VSOCK },
+  ];
 }
 
 function insn(code: number, k: number): Insn {

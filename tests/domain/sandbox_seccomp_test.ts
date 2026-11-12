@@ -1,9 +1,11 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
+  AF_VSOCK,
   DENIED_SYSCALLS,
   isFilterArch,
   SECCOMP_FD,
   seccompFilter,
+  SOCKET_NUMBERS,
   SYSCALL_NUMBERS,
 } from "../../src/domain/sandbox_seccomp.ts";
 
@@ -18,11 +20,12 @@ const RET_ERRNO_EPERM = 0x00050001;
 const RET_ALLOW = 0x7fff0000;
 const AUDIT = { x86_64: 0xc000003e, aarch64: 0xc00000b7, i386: 0x40000003, arm: 0x40000028 };
 
-/** What the kernel answers for a call `nr` made under architecture `arch`. */
-function verdict(program: Uint8Array, arch: number, nr: number): number {
+/** The kernel's answer to call `nr` under architecture `arch`, with `arg0` its first argument. */
+function verdict(program: Uint8Array, arch: number, nr: number, arg0 = 0): number {
   const data = new DataView(new ArrayBuffer(64));
   data.setInt32(0, nr, true);
   data.setUint32(4, arch, true);
+  data.setUint32(16, arg0, true);
   const code = new DataView(program.buffer, program.byteOffset, program.byteLength);
   let acc = 0;
   for (let pc = 0; pc * 8 < program.length; pc++) {
@@ -59,6 +62,19 @@ for (const arch of ["x86_64", "aarch64"] as const) {
   Deno.test(`seccompFilter(${arch}): a call under another architecture kills the process`, () => {
     for (const other of Object.values(AUDIT).filter((a) => a !== AUDIT[arch])) {
       assertEquals(verdict(program, other, EVERYDAY[arch][0]), RET_KILL_PROCESS);
+    }
+  });
+
+  Deno.test(`seccompFilter(${arch}): socket(AF_VSOCK) fails with EPERM; other families pass`, () => {
+    const socket = SOCKET_NUMBERS[arch];
+    assertEquals(verdict(program, AUDIT[arch], socket, AF_VSOCK), RET_ERRNO_EPERM);
+    for (const family of [1, 2, 10, 16, 41]) {
+      assertEquals(verdict(program, AUDIT[arch], socket, family), RET_ALLOW, String(family));
+    }
+    // Another call is not the rule's business, whatever its first argument or its number.
+    assertEquals(verdict(program, AUDIT[arch], EVERYDAY[arch][0], AF_VSOCK), RET_ALLOW);
+    if (!Object.values(SYSCALL_NUMBERS[arch]).includes(AF_VSOCK)) {
+      assertEquals(verdict(program, AUDIT[arch], AF_VSOCK), RET_ALLOW, "call number 40");
     }
   });
 
