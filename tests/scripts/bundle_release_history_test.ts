@@ -17,16 +17,29 @@ async function historyDir(files: Record<string, string>): Promise<URL> {
   return toFileUrl(`${dir}/`);
 }
 
+/**
+ * Refused by Unicode property, not by a list of ranges (cli#775): control
+ * (Cc), format (Cf), line and paragraph separators (Zl, Zp) and every
+ * default-ignorable code point. A list misses the invisible ones an agent still
+ * reads — Tag characters, invisible operators, variation selectors, Hangul
+ * fillers — so each case names the code point the refusal must report.
+ */
 const CLASSES: Array<[string, string, string]> = [
-  ["a C0 control", "**Lead.**\u001b[31m red\n", "C0 control"],
-  ["a tab", "**Lead.**\tindented\n", "C0 control"],
-  ["a bare carriage return", "**Lead.**\rover\n", "C0 control"],
-  ["DEL", "**Lead.**\u007f\n", "C0 control"],
-  ["a C1 control", "**Lead.**\u009b31m\n", "C1 control"],
-  ["a bidi override", "**Lead.** \u202eevil\n", "bidi"],
-  ["a bidi isolate", "**Lead.** \u2066evil\u2069\n", "bidi"],
-  ["a zero-width space", "**Lead.**\u200b\n", "zero-width"],
-  ["a byte-order mark", "\ufeff**Lead.**\n", "zero-width"],
+  ["a C0 control", "**Lead.**\u001b[31m red\n", "U+001B"],
+  ["a tab", "**Lead.**\tindented\n", "U+0009"],
+  ["a bare carriage return", "**Lead.**\rover\n", "U+000D"],
+  ["DEL", "**Lead.**\u007f\n", "U+007F"],
+  ["a C1 control", "**Lead.**\u009b31m\n", "U+009B"],
+  ["a bidi override", "**Lead.** \u202eevil\n", "U+202E"],
+  ["a bidi isolate", "**Lead.** \u2066evil\u2069\n", "U+2066"],
+  ["a zero-width space", "**Lead.**\u200b\n", "U+200B"],
+  ["a byte-order mark", "\ufeff**Lead.**\n", "U+FEFF"],
+  ["a Unicode Tag character", "**Lead.**\u{E0041}\n", "U+E0041"],
+  ["an invisible operator", "**Lead.** a\u2062b\n", "U+2062"],
+  ["a variation selector", "**Lead.** a\ufe0f\n", "U+FE0F"],
+  ["a Hangul filler", "**Lead.** \u3164\n", "U+3164"],
+  ["a line separator", "**Lead.**\u2028Next.\n", "U+2028"],
+  ["a paragraph separator", "**Lead.**\u2029Next.\n", "U+2029"],
   ["CRLF line endings", "**Lead.**\r\nNext.\r\n", "CRLF"],
 ];
 
@@ -47,9 +60,14 @@ for (const name of ["9.1.0.md", "v9.1.md", "v09.1.0.md", "vv9.1.0.md", "v9.1.0.t
   Deno.test(`a history file named ${name} fails the bundle`, async () => {
     const dir = await historyDir({ [name]: "**Lead.**\n" });
     const err = await assertRejects(() => readReleaseHistory(dir), Error);
-    assertStringIncludes(err.message, name);
+    assertStringIncludes(err.message, `${name}: not named v<MAJOR.MINOR.PATCH[-PRERELEASE]>.md`);
   });
 }
+
+Deno.test("a prerelease's history file is accepted under its own name", async () => {
+  const dir = await historyDir({ "v1.0.0-rc.1.md": "**Candidate.**\n" });
+  assertEquals((await readReleaseHistory(dir)).map((e) => e.version), ["1.0.0-rc.1"]);
+});
 
 Deno.test("plain Markdown, an empty file and non-ASCII prose are accepted", async () => {
   const dir = await historyDir({

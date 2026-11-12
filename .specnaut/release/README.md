@@ -62,10 +62,12 @@ embeds the history, and `specnaut upgrade` prints the entry of every release a p
 a link to its full notes. A release with no entry is never shown.
 
 `scripts/check-release-commit.ts` refuses to tag when that file is missing or says something other
-than `HIGHLIGHTS.md` (whitespace-insensitive). The bundler refuses a history file holding a control,
-bidi or zero-width character, CRLF line endings, or a name that is not `v<MAJOR.MINOR.PATCH>.md`.
-The files are records of what each release published: `deno fmt` skips them, and nothing edits one
-after its release.
+than `HIGHLIGHTS.md` (whitespace-insensitive). The bundler refuses a history file holding CRLF line
+endings, any character a terminal acts on or a reader cannot see — refused by Unicode property:
+control, format, line or paragraph separator, default-ignorable — or a name that is not
+`v<MAJOR.MINOR.PATCH[-PRERELEASE]>.md`. A prerelease is recorded under its own name, and
+`specnaut upgrade` shows it only to a project upgrading to a prerelease. The files are records of
+what each release published: `deno fmt` skips them, and nothing edits one after its release.
 
 ## Prerequisites — repo secrets
 

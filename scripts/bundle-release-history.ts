@@ -15,19 +15,21 @@ import type { ReleaseHistory } from "../src/domain/release_notes.ts";
 import { contentField } from "./bundle-content-field.ts";
 
 /**
- * Each class a terminal or a reader can be misled by, one pattern per class.
- * C0 keeps `\n` (and CR inside a CRLF pair, which is its own class); DEL rides
- * with C0 because it is a control in the same range. Bidi covers embeddings,
- * overrides, isolates and marks; zero-width includes the byte-order mark.
+ * Every character a terminal acts on or a reader cannot see, refused by Unicode
+ * property rather than by a list of ranges (cli#775): a list missed invisible
+ * characters an agent still reads — Tag characters, invisible operators,
+ * variation selectors, Hangul fillers. Matched one line at a time, so `\n`, the
+ * one control a record holds, is never seen, and CR inside a CRLF pair is
+ * reported as CRLF instead.
  */
-const FORBIDDEN: ReadonlyArray<[string, RegExp]> = [
-  // deno-lint-ignore no-control-regex -- matching control characters is this pattern's job
-  ["C0 control", /[\u0000-\u0009\u000b-\u001f\u007f]/],
-  ["C1 control", /[\u0080-\u009f]/],
-  // Raw strings, not regex literals: `deno fmt` rewrites a literal's `\u` escapes into the
-  // characters themselves, which would plant the invisible text this check refuses in its source.
-  ["bidi control", new RegExp(String.raw`[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]`)],
-  ["zero-width character", new RegExp(String.raw`[\u200b-\u200d\u2060\ufeff]`)],
+const FORBIDDEN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
+
+/** The name a refused character goes by in the refusal, from the first property it has. */
+const KINDS: ReadonlyArray<[string, RegExp]> = [
+  ["control", /\p{Cc}/u],
+  ["format character", /\p{Cf}/u],
+  ["line or paragraph separator", /[\p{Zl}\p{Zp}]/u],
+  ["invisible character", /\p{Default_Ignorable_Code_Point}/u],
 ];
 
 /** What is wrong with one history file, by name and content, or nothing. */
@@ -36,18 +38,26 @@ export function historyFileProblems(name: string, content: string): string[] {
   const raw = /^v(.+)\.md$/.exec(name)?.[1];
   // Round-tripped, so `v09.1.0.md` cannot embed as a release that is not its name.
   if (raw === undefined || SemVer.tryParse(raw)?.toString() !== raw) {
-    problems.push(`${name}: not named v<MAJOR.MINOR.PATCH>.md`);
+    problems.push(`${name}: not named v<MAJOR.MINOR.PATCH[-PRERELEASE]>.md`);
   }
   if (content.includes("\r\n")) problems.push(`${name}: CRLF line endings`);
   const lines = content.replaceAll("\r\n", "\n").split("\n");
-  for (const [label, pattern] of FORBIDDEN) {
-    const at = lines.findIndex((l) => pattern.test(l));
-    if (at === -1) continue;
-    const ch = pattern.exec(lines[at])![0].codePointAt(0)!;
-    const code = ch.toString(16).toUpperCase().padStart(4, "0");
-    problems.push(`${name}: ${label} U+${code} on line ${at + 1}`);
-  }
-  return problems;
+  return [...problems, ...forbiddenCharacters(lines).map((p) => `${name}: ${p}`)];
+}
+
+/** Each forbidden code point the lines hold, once, at its first line. */
+function forbiddenCharacters(lines: string[]): string[] {
+  const found = new Map<number, string>();
+  lines.forEach((line, at) => {
+    for (const [ch] of line.matchAll(FORBIDDEN)) {
+      const cp = ch.codePointAt(0)!;
+      if (found.has(cp)) continue;
+      const kind = KINDS.find(([, p]) => p.test(ch))![0];
+      const code = cp.toString(16).toUpperCase().padStart(4, "0");
+      found.set(cp, `${kind} U+${code} on line ${at + 1}`);
+    }
+  });
+  return [...found.values()];
 }
 
 /** Every history file in `dir`, in version order; throws naming each problem found. */
