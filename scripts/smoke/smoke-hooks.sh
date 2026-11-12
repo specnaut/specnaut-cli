@@ -49,6 +49,14 @@ done
 check ".specnaut/hooks/.gitattributes keeps git from converting the hooks" \
   'grep -qxF "* -text" .specnaut/hooks/.gitattributes'
 check "check-backlog-prereqs.sh executable" '[ -x .claude/hooks/check-backlog-prereqs.sh ]'
+# The checkout gate before each shell command: registered on Bash, and a command
+# that never mentions a review is let through without starting the binary.
+check "review-gate.sh executable" '[ -x .claude/hooks/review-gate.sh ]'
+check "review-gate.sh registered on PreToolUse for Bash" \
+  'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | select(test(\"review-gate\\\\.sh\"))] | length == 1" .claude/settings.json >/dev/null'
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | bash .claude/hooks/review-gate.sh 2>&1; echo "ec=$?")
+[ "$out" = "ec=0" ] && pass "review-gate.sh lets a command with no review through, silent" \
+  || fail "review-gate.sh stopped or spoke on an unrelated command" "$out"
 check "retired protect-generated copy not scaffolded" '[ ! -e .claude/hooks/protect-generated.sh ]'
 check "retired log-subagent copy not scaffolded" '[ ! -e .claude/hooks/log-subagent.sh ]'
 # Every script a registration runs exists: a moved hook left registered at its
