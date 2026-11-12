@@ -5,6 +5,12 @@ import type { BaseEntry, TreeWalk } from "../domain/script_trust.ts";
  * project-file ports, and these read a repository's commits and one folder of its work tree.
  */
 
+/**
+ * The most bytes one script, or the lock, is read as, from a commit or from the disk: far above any
+ * helper script, so only a file that is not one meets it, and no check holds an unbounded file.
+ */
+export const MAX_SCRIPT_BYTES = 1024 * 1024;
+
 /** One path of a commit, as the base lock is read. */
 export type BaseFile =
   | { readonly kind: "absent" }
@@ -28,8 +34,9 @@ export interface GitObjectReader {
   mergeBase(a: string, b: string): Promise<string | null>;
   /** How many commits `to` has that `from` lacks. */
   aheadCount(from: string, to: string): Promise<number>;
-  /** Every entry under `dir` at `commit`, recursively. */
+  /** Every entry under `dir` at `commit`, recursively; a blob over the cap is a throw. */
   listTree(commit: string, dir: string): Promise<BaseEntry[]>;
+  /** One path at `commit`; a blob over the cap is a throw. */
   readFile(commit: string, path: string): Promise<BaseFile>;
   /** The paths changed between two commits, from the repository's top. */
   changedNames(from: string, to: string): Promise<string[]>;

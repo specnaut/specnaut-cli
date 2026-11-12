@@ -1,6 +1,10 @@
-import type { BaseFile, GitObjectReader } from "../application/script_trust_ports.ts";
+import {
+  type BaseFile,
+  type GitObjectReader,
+  MAX_SCRIPT_BYTES,
+} from "../application/script_trust_ports.ts";
 import type { BaseEntry } from "../domain/script_trust.ts";
-import { PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
+import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 
 /**
  * Reads a repository's commits for `specnaut verify-scripts`, through the hardened git. Every
@@ -59,8 +63,7 @@ export class GitObjects implements GitObjectReader {
 
   async listTree(commit: string, dir: string): Promise<BaseEntry[]> {
     const records = await this.#lsTree(commit, ["-r", "--", `${this.projectPrefix}${dir}`]);
-    const blobs = records.filter((r) => r.kind === "blob");
-    const bytes = await this.#catFiles(blobs.map((r) => r.sha));
+    const bytes = await this.#catFiles(commit, records.filter((r) => r.kind === "blob"));
     return records.map((r): BaseEntry =>
       r.kind === "blob" ? { kind: "blob", path: r.path, bytes: bytes.get(r.sha)! } : r
     );
@@ -70,7 +73,7 @@ export class GitObjects implements GitObjectReader {
     const [record] = await this.#lsTree(commit, ["--", `${this.projectPrefix}${path}`]);
     if (record === undefined || record.path !== path) return { kind: "absent" };
     if (record.kind !== "blob") return { kind: "not_regular" };
-    return { kind: "blob", bytes: (await this.#catFiles([record.sha])).get(record.sha)! };
+    return { kind: "blob", bytes: (await this.#catFiles(commit, [record])).get(record.sha)! };
   }
 
   async changedNames(from: string, to: string): Promise<string[]> {
@@ -78,26 +81,33 @@ export class GitObjects implements GitObjectReader {
     return decode(await this.#git.run("diff-tree", args)).split("\0").filter(Boolean);
   }
 
-  /** `ls-tree -z --full-tree`, paths made project-relative; a tree entry is not listed. */
+  /** `ls-tree -z -l --full-tree`, paths made project-relative; a tree entry is not listed. */
   async #lsTree(commit: string, args: string[]): Promise<TreeRecord[]> {
-    const out = decode(await this.#git.run("ls-tree", ["-z", "--full-tree", commit, ...args]));
+    const argv = ["-z", "-l", "--full-tree", commit, ...args];
     const records: TreeRecord[] = [];
-    for (const line of out.split("\0")) {
-      const m = /^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s.exec(line);
-      if (m === null || !m[4].startsWith(this.projectPrefix)) continue;
-      const path = m[4].slice(this.projectPrefix.length);
+    for (const line of decode(await this.#git.run("ls-tree", argv)).split("\0")) {
+      const m = /^(\d+) (\w+) ([0-9a-f]+) +(-|\d+)\t(.*)$/s.exec(line);
+      if (m === null || !m[5].startsWith(this.projectPrefix)) continue;
+      const path = m[5].slice(this.projectPrefix.length);
       if (m[1] === "160000") records.push({ kind: "submodule", path });
       else if (m[1] === "120000") records.push({ kind: "link", path });
-      else if (m[2] === "blob") records.push({ kind: "blob", path, sha: m[3] });
+      else if (m[2] === "blob") records.push({ kind: "blob", path, sha: m[3], size: Number(m[4]) });
     }
     return records;
   }
 
-  /** Each object's raw bytes, through one `cat-file --batch`. */
-  async #catFiles(shas: string[]): Promise<Map<string, Uint8Array>> {
+  /**
+   * Each blob's raw bytes, through one `cat-file --batch`. The sizes `ls-tree` listed are checked
+   * first: a blob over the cap is refused by its path, before any of it is read.
+   */
+  async #catFiles(commit: string, blobs: BlobRecord[]): Promise<Map<string, Uint8Array>> {
     const found = new Map<string, Uint8Array>();
-    if (shas.length === 0) return found;
-    const input = new TextEncoder().encode(shas.map((s) => `${s}\n`).join(""));
+    const over = blobs.find((b) => b.size > MAX_SCRIPT_BYTES);
+    if (over) {
+      throw new GitRefused(`${over.path} at ${commit} is over ${MAX_SCRIPT_BYTES} bytes`);
+    }
+    if (blobs.length === 0) return found;
+    const input = new TextEncoder().encode(blobs.map((b) => `${b.sha}\n`).join(""));
     const out = await this.#git.run("cat-file", ["--batch"], input);
     let at = 0;
     while (at < out.length) {
@@ -112,7 +122,8 @@ export class GitObjects implements GitObjectReader {
   }
 }
 
+type BlobRecord = { kind: "blob"; path: string; sha: string; size: number };
 type TreeRecord =
-  | { kind: "blob"; path: string; sha: string }
+  | BlobRecord
   | { kind: "link"; path: string }
   | { kind: "submodule"; path: string };

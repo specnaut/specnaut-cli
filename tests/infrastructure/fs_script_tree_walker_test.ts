@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
+import { MAX_SCRIPT_BYTES } from "../../src/application/script_trust_ports.ts";
 import { FsScriptTreeWalker } from "../../src/infrastructure/fs_script_tree_walker.ts";
 
 /**
@@ -79,4 +80,12 @@ Deno.test("a scripts path that is a file, not a folder, stops the walk", async (
 Deno.test("no scripts folder is an empty walk", async () => {
   const root = await Deno.realPath(await Deno.makeTempDir({ prefix: "script-walker-" }));
   assertEquals(await walk(root), []);
+});
+
+Deno.test("a file over the size cap is unreadable, never held whole; one at the cap is read", async () => {
+  const root = await project();
+  await Deno.writeTextFile(join(root, SCRIPT), "x".repeat(MAX_SCRIPT_BYTES));
+  assertEquals(await walk(root), [`file ${SCRIPT} 1`]);
+  await Deno.writeTextFile(join(root, SCRIPT), "x".repeat(MAX_SCRIPT_BYTES + 1));
+  assertEquals(await walk(root), [`unreadable ${SCRIPT}`]);
 });

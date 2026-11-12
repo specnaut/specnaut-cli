@@ -1,5 +1,5 @@
 import { join } from "@std/path";
-import type { ScriptTreeWalker } from "../application/script_trust_ports.ts";
+import { MAX_SCRIPT_BYTES, type ScriptTreeWalker } from "../application/script_trust_ports.ts";
 import { REASON, SCRIPTS_DIR, type TreeEntry, type TreeWalk } from "../domain/script_trust.ts";
 
 /**
@@ -49,16 +49,23 @@ async function readChecked(abs: string, path: string, seen: Deno.FileInfo): Prom
     if (!info.isFile || info.ino !== seen.ino || info.dev !== seen.dev) {
       return { kind: "unreadable", path, why: "changed while it was read" };
     }
-    const chunks: Uint8Array<ArrayBuffer>[] = [];
-    const buf = new Uint8Array(64 * 1024);
-    for (let n = await file.read(buf); n !== null; n = await file.read(buf)) {
-      chunks.push(buf.slice(0, n));
+    // The size `fstat` reports bounds the read; a file growing under it is a race, not a mistake.
+    if (info.size > MAX_SCRIPT_BYTES) {
+      return { kind: "unreadable", path, why: `over ${MAX_SCRIPT_BYTES} bytes` };
     }
-    const bytes = new Uint8Array(await new Blob(chunks).arrayBuffer());
-    return { kind: "file", path, bytes, links: info.nlink ?? 1 };
+    return { kind: "file", path, bytes: await readAll(file), links: info.nlink ?? 1 };
   } finally {
     file.close();
   }
+}
+
+async function readAll(file: Deno.FsFile): Promise<Uint8Array> {
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  const buf = new Uint8Array(64 * 1024);
+  for (let n = await file.read(buf); n !== null; n = await file.read(buf)) {
+    chunks.push(buf.slice(0, n));
+  }
+  return new Uint8Array(await new Blob(chunks).arrayBuffer());
 }
 
 async function lstatOrNull(abs: string): Promise<Deno.FileInfo | null> {
