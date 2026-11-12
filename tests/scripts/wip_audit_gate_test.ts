@@ -83,43 +83,44 @@ Deno.test("a cloud marker, with no feature_directory, prints - for the directory
   }
 });
 
+/** [label, feature.json, subject, the line] — each published as `merge` lands it. */
+const INVALID_CASES: [string, string, string, string][] = [
+  [
+    "a quoted number",
+    `{ "feature_directory": "${DIR}", "linked_issue": "41" }\n`,
+    "feat(41): x",
+    "INVALID closeout -",
+  ],
+  ["no link at all", `{ "feature_directory": "${DIR}" }\n`, "feat(41): x", "INVALID closeout -"],
+  [
+    "a parent path",
+    marker(41).replace(DIR, ".specnaut/specs/../x"),
+    "feat(41): x",
+    "INVALID closeout 41",
+  ],
+  [
+    "a nested path",
+    marker(41).replace(DIR, `${DIR}/deeper`),
+    "feat(41): x",
+    "INVALID closeout 41",
+  ],
+  [
+    "outside specs",
+    marker(41).replace(DIR, ".specnaut/001-x"),
+    "feat(41): x",
+    "INVALID closeout 41",
+  ],
+  [
+    "a null directory",
+    '{ "feature_directory": null, "linked_issue": 41 }\n',
+    "feat(41): x",
+    "INVALID closeout 41",
+  ],
+  ["no commit names it", marker(41), "feat: unnamed", "INVALID closeout 41"],
+];
+
 Deno.test("INVALID: a malformed link, a directory outside the rule, a link, a missing one, no landed commit", async () => {
-  const cases: [string, string, string, string][] = [
-    // [label, feature.json, subject, the line]
-    [
-      "a quoted number",
-      `{ "feature_directory": "${DIR}", "linked_issue": "41" }\n`,
-      "feat(41): x",
-      "INVALID closeout -",
-    ],
-    ["no link at all", `{ "feature_directory": "${DIR}" }\n`, "feat(41): x", "INVALID closeout -"],
-    [
-      "a parent path",
-      marker(41).replace(DIR, ".specnaut/specs/../x"),
-      "feat(41): x",
-      "INVALID closeout 41",
-    ],
-    [
-      "a nested path",
-      marker(41).replace(DIR, `${DIR}/deeper`),
-      "feat(41): x",
-      "INVALID closeout 41",
-    ],
-    [
-      "outside specs",
-      marker(41).replace(DIR, ".specnaut/001-x"),
-      "feat(41): x",
-      "INVALID closeout 41",
-    ],
-    [
-      "a null directory",
-      '{ "feature_directory": null, "linked_issue": 41 }\n',
-      "feat(41): x",
-      "INVALID closeout 41",
-    ],
-    ["no commit names it", marker(41), "feat: unnamed", "INVALID closeout 41"],
-  ];
-  for (const [label, json, subject, line] of cases) {
+  for (const [label, json, subject, line] of INVALID_CASES) {
     const sb = await sandbox();
     try {
       await land(sb, json, subject);

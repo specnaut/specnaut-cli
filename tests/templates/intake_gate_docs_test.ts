@@ -98,30 +98,17 @@ Deno.test("merge-close: one closeout order, a hold only on 20, and a re-entry fe
     close.slice(close.indexOf(` ${n}. **`), close.indexOf(` ${n + 1}. **`));
   const two = step(2);
   assertStringIncludes(two, "one order, on every backend, on the first run and on re-entry");
-  assertStringIncludes(two, "**12** — already closed: skip its close");
-  assertStringIncludes(two, "**11** — a child is still open: name it and stop before step 3");
-  assertStringIncludes(two, "**3** — the check could not answer: say so and stop before step 3");
   assert(!two.includes("skip to step 3"), "local and cloud skip the check again");
   const four = close.slice(close.indexOf(" 4. **"), close.indexOf("## Re-entry"));
   assertStringIncludes(four, "only after step 3 exited 0 or 21.**");
-  // Local and cloud: step 3 runs per item inside step 2, once, and a 20 stops the loop.
-  for (
-    const s of [
-      "step 3 runs here, for that one item, before the next item's check",
-      "and not again after the loop",
-      "**20** from it stops before the next item's check",
-      "step 4 runs only when every one of these per-item runs exited 0 or 21",
-    ]
-  ) assertStringIncludes(two, s);
-  assertStringIncludes(four, "On **20** the tracker did not confirm the close: remove nothing.");
-  assertStringIncludes(four, "remove-spec.sh --marker-only <n>");
-  const reentry = close.slice(close.indexOf("## Re-entry"), close.indexOf("## The report"));
+  // Local and cloud: step 3 runs per item inside step 2, once (its per-item run is pinned below).
+  assertStringIncludes(two, "and not again after the loop");
   assertStringIncludes(
-    reentry,
-    "come from the gate's line and nowhere else: never open `.specnaut/feature.json`",
+    two,
+    "step 4 runs only when every one of these per-item runs exited 0 or 21",
   );
-  assertStringIncludes(reentry, "epic-status.sh --landed <n>@<epoch>");
-  assertStringIncludes(reentry, "`cascade-check.sh --numbers <n>`");
+  assertStringIncludes(four, "On **20** the tracker did not confirm the close: remove nothing.");
+  const reentry = close.slice(close.indexOf("## Re-entry"), close.indexOf("## The report"));
   assertStringIncludes(reentry, "Landed scripts are the project's own");
   assertStringIncludes(reentry, "**Steps 2 to 4, as written above.**");
   assertStringIncludes(
@@ -170,4 +157,43 @@ Deno.test("epic-commits.md names both places that map epic-status.sh's exits", (
   const doc = flat(read("phases/epic-commits.md"));
   assertStringIncludes(doc, "`phases/merge.md` step 1 for the branch");
   assertStringIncludes(doc, "`phases/merge-close.md` § Re-entry for `--landed`");
+});
+
+/**
+ * tests/scripts/closeout_fixture.ts plays the agent through these docs in TypeScript, so it cannot
+ * notice a doc that changed under it: each branch it takes is pinned to the sentence defining it.
+ */
+const [MC, AC, RS] = ["phases/merge-close.md", "phases/auto-chain.md", "resume.md"];
+const FIXTURE_BRANCHES: [string, string, string][] = [
+  ["shipped: --landed", MC, "epic-status.sh --landed <n>@<epoch>`"],
+  ["shipped: both lists", MC, "both that call and `cascade-check.sh --numbers <n>` list"],
+  ["closeEach: children, then the epic", MC, "Children first, the epic last."],
+  ["closeEach: the check first", MC, "cascade-check.sh <n>` before its close"],
+  ["closeEach: 12", MC, "**12** — already closed: skip its close"],
+  ["closeEach: 11", MC, "**11** — a child is still open: name it and stop before step 3"],
+  ["closeEach: 3", MC, "**3** — the check could not answer: say so and stop before step 3"],
+  ["closeEach: per item", MC, "step 3 runs here, for that one item, before the next item's check"],
+  ["closeEach: 20", MC, "**20** from it stops before the next item's check"],
+  ["reenter: partial", MC, "runs 1 and 2, then step 4 alone: nothing closes."],
+  [
+    "removeSpec: none",
+    MC,
+    "goes alone: `bash .specnaut/scripts/bash/remove-spec.sh --marker-only <n>`",
+  ],
+  ["removeSpec: a directory", MC, "the last segment of the gate's `<dir>`"],
+  ["removeSpec: 7", MC, "**7** — the push was rejected"],
+  ["reenter: the line alone", MC, "nowhere else: never open `.specnaut/feature.json`"],
+  ["pushRow: the recovery", MC, "`git pull --rebase --no-autostash origin <base>`, then `git push"],
+  ["row: clear", AC, "Proceed only on exit 0 whose last line is `gate clear`"],
+  ["row: FENCED, a yes", AC, "A yes reruns the gate with `--fence-ack <n>`"],
+  ["row: FENCED, a no", AC, "Anything else runs no backlog script and stops."],
+  ["row: push", RS, "| a `PENDING push` line | exactly one, whose diff only deletes"],
+  ["row: FENCED", RS, "| `FENCED closeout <id> …` | the question `phases/auto-chain.md` asks"],
+  ["row: OWN closeout", RS, "| `OWN closeout <id> <dir> <sha>` (or `PENDING closeout <id> …`)"],
+  ["row: OWN partial", RS, "| `OWN partial <id> …` (or `PARTIAL closeout <id> …`)"],
+];
+
+Deno.test("every branch the closeout fixture takes is pinned to the sentence that defines it", () => {
+  const missing = FIXTURE_BRANCHES.filter(([, doc, s]) => !flat(read(doc)).includes(s));
+  assertEquals(missing.map(([branch]) => branch), []);
 });

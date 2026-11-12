@@ -47,39 +47,39 @@ Deno.test("origin without the base is exit 3 and names the push that publishes i
   }
 });
 
+/**
+ * Each read the gate makes, failing alone: [label, the git call the shim fails,
+ * the gate's flags, the landing's subject]. `--since` reaches the directory's
+ * first commit; an unnamed subject reaches `epic-status.sh --landed`.
+ */
+const READ_FAILURES: [string, string, string[], string][] = [
+  ["the marker's entry", '[ "$2" = ls-tree ]', [], "feat(81): x"],
+  ["the marker's blob", '[ "$2" = cat-file ]', [], "feat(81): x"],
+  ["the directory's entry", `[ "$2" = ls-tree ] && [ "$5" = ${DIR} ]`, [], "feat(81): x"],
+  ["the directory's first commit", '[ "$2" = log ] && [ "$4" = --format=%ct ]', [
+    "--since",
+    "81@1",
+  ], "feat(81): x"],
+  ["the pushes", '[ "$2" = rev-list ]', [], "feat(81): x"],
+  ["the published log", '[ "$2" = log ] && [ "$3" = --format=%H%x1f%ct%x1f%s ]', [], "feat(81): x"],
+  ["the epic's landed children", '[ "$2" = log ] && [ "$5" = -E ]', [], "feat: unnamed"],
+  ["the anchor's history", '[ "$2" = log ] && [ "$3" = --first-parent ]', [], "feat(81): x"],
+  ["the config diff", '[ "$2" = diff ] && [ "$3" = --quiet ]', [], "feat(81): x"],
+  ["the origin remote", '[ "$2" = config ] && [ "$4" = remote.origin.url ]', [], "feat(81): x"],
+];
+
 Deno.test("a git read that fails is exit 3 with nothing printed, never gate clear", async () => {
   if (Deno.build.os === "windows") return; // the shim is a bash script
-  for (
-    const [label, shim] of [
-      ["the marker's entry", '[ "$2" = ls-tree ] && exit 128; exec "$REAL_GIT" "$@"'],
-      ["the marker's blob", '[ "$2" = cat-file ] && exit 128; exec "$REAL_GIT" "$@"'],
-      ["the pushes", '[ "$2" = rev-list ] && exit 128; exec "$REAL_GIT" "$@"'],
-      [
-        "the published log",
-        '[ "$2" = log ] && [ "$3" = --format=%H%x1f%ct%x1f%s ] && exit 128; exec "$REAL_GIT" "$@"',
-      ],
-      [
-        "the anchor's history",
-        '[ "$2" = log ] && [ "$3" = --first-parent ] && exit 128; exec "$REAL_GIT" "$@"',
-      ],
-      [
-        "the config diff",
-        '[ "$2" = diff ] && [ "$3" = --quiet ] && exit 128; exec "$REAL_GIT" "$@"',
-      ],
-      [
-        "the origin remote",
-        '[ "$2" = config ] && [ "$4" = remote.origin.url ] && exit 128; exec "$REAL_GIT" "$@"',
-      ],
-    ]
-  ) {
+  for (const [label, fails, args, subject] of READ_FAILURES) {
     const sb = await sandbox();
     try {
-      await land(sb, marker(81), "feat(81): x");
+      await land(sb, marker(81), subject);
       if (label === "the origin remote") {
         await git(sb.work, "update-ref", "-d", "refs/remotes/origin/main");
       }
       await sb.commit("u", "u\n", "chore: unpushed");
-      const r = await sb.scriptWithGit(shim, "wip-audit.sh", "--gate");
+      const shim = `${fails} && exit 128; exec "$REAL_GIT" "$@"`;
+      const r = await sb.scriptWithGit(shim, "wip-audit.sh", "--gate", ...args);
       assertEquals([r.code, r.stdout], [3, ""], `${label}: ${r.stderr}`);
     } finally {
       await sb.cleanup();

@@ -1,12 +1,18 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
-import { git, run, type Sandbox, sandbox } from "./git_sandbox.ts";
+import { git, type Run, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 
 /**
  * cli#760 — the agent's half of a closeout re-entered from the intake gate's
  * line, on the local backend with the real scripts (closeout_resume_test.ts):
  * it reads only the gate's line and the exits, never feature.json, and stops
  * wherever merge-close.md and resume.md say it stops.
+ *
+ * The limit this leaves: the rows of merge-close.md § Re-entry and resume.md
+ * are re-encoded here in TypeScript, so a doc edit alone reddens nothing in the
+ * tests that use this fixture. Every branch it takes is pinned to the sentence
+ * that defines it, in tests/templates/intake_gate_docs_test.ts ("every branch
+ * the closeout fixture takes"); a branch added here gets a row there.
  */
 
 const LOCAL = fromFileUrl(new URL("../../templates/core/skills/task/scripts/", import.meta.url));
@@ -16,6 +22,21 @@ export const lines = (out: string) => out.trim().split("\n");
 /** A sandbox with the local backend installed and a backlog the tree ignores. */
 export async function project(items: Record<string, { status: string; parent?: string }>) {
   const sb = await sandbox();
+  await installLocalBacklog(sb);
+  await Deno.mkdir(join(sb.work, ".specnaut/backlog"), { recursive: true });
+  for (const [n, { status, parent }] of Object.entries(items)) {
+    await Deno.writeTextFile(
+      join(sb.work, `.specnaut/backlog/${n.padStart(3, "0")}-item.md`),
+      `---\nnumber: ${n}\ntitle: Item ${n}\nstatus: ${status}\n${
+        parent ? `parent: "#${parent}"\n` : ""
+      }---\n\nBody.\n`,
+    );
+  }
+  return sb;
+}
+
+/** The local backend's scripts, committed; the backlog they write, excluded from the tree. */
+async function installLocalBacklog(sb: Sandbox) {
   const dest = join(sb.work, ".specnaut/scripts/backlog");
   await Deno.mkdir(dest, { recursive: true });
   for await (const e of Deno.readDir(join(LOCAL, "local"))) {
@@ -28,17 +49,6 @@ export async function project(items: Record<string, { status: string; parent?: s
     join(sb.work, ".git/info/exclude"),
     ".specnaut/backlog/\n.specnaut/backlog.md\n",
   );
-  await Deno.mkdir(join(sb.work, ".specnaut/backlog"), { recursive: true });
-  for (const [n, { status, parent }] of Object.entries(items)) {
-    const pad = n.padStart(3, "0");
-    await Deno.writeTextFile(
-      join(sb.work, `.specnaut/backlog/${pad}-item.md`),
-      `---\nnumber: ${n}\ntitle: Item ${n}\nstatus: ${status}\n${
-        parent ? `parent: "#${parent}"\n` : ""
-      }---\n\nBody.\n`,
-    );
-  }
-  return sb;
 }
 
 export const status = async (sb: Sandbox, n: string) =>
@@ -62,6 +72,7 @@ export const gate = (sb: Sandbox, ...args: string[]) =>
   sb.script("wip-audit.sh", "--gate", ...args);
 
 export type Stop = "stopped" | "held" | "removed" | "unpushed";
+type Spend = () => boolean;
 
 /**
  * merge-close.md § Re-entry from one `OWN closeout|partial <n> <dir> <sha>` line,
@@ -77,26 +88,37 @@ export async function reenter(
   const [, kind, n, dir] = m;
   let calls = 0;
   const spend = () => ++calls > budget;
-  const shipped: string[] = [];
   if (kind === "closeout") {
-    const landed = (await sb.script("epic-status.sh", "--landed", `${n}@0`)).stdout;
-    const kids = new Set(lines((await backlog(sb, "cascade-check.sh", "--numbers", n)).stdout));
-    const children = [...landed.matchAll(/^CHILD T\d+ #(\d+) /gm)].map((c) => c[1]).filter((c) =>
-      kids.has(c)
-    );
-    for (const item of [...children, n]) {
-      if (spend()) return "interrupted";
-      const cc = (await backlog(sb, "cascade-check.sh", item)).code;
-      if (cc === 11 || cc === 3) return "stopped";
-      if (cc !== 0 && cc !== 12) throw new Error(`cascade-check ${item}: ${cc}`);
-      if (spend()) return "interrupted";
-      // Local: the close is close-shipped.sh for that item, before the next item's check.
-      const cs = (await backlog(sb, "close-shipped.sh", item)).code;
-      if (cs === 20) return "held";
-      shipped.push(item);
-    }
+    const stop = await closeEach(sb, await shipped(sb, n), spend);
+    if (stop) return stop;
   }
   if (spend()) return "interrupted";
+  return await removeSpec(sb, n, dir);
+}
+
+/** Re-entry step 3: the children both `--landed` and `cascade-check.sh --numbers` list, then the item. */
+async function shipped(sb: Sandbox, n: string): Promise<string[]> {
+  const landed = (await sb.script("epic-status.sh", "--landed", `${n}@0`)).stdout;
+  const kids = new Set(lines((await backlog(sb, "cascade-check.sh", "--numbers", n)).stdout));
+  const children = [...landed.matchAll(/^CHILD T\d+ #(\d+) /gm)].map((c) => c[1]);
+  return [...children.filter((c) => kids.has(c)), n];
+}
+
+/** Step 2, with step 3 per item as on local: its check, then its close, before the next item's check. */
+async function closeEach(sb: Sandbox, items: string[], spend: Spend) {
+  for (const item of items) {
+    if (spend()) return "interrupted";
+    const cc = (await backlog(sb, "cascade-check.sh", item)).code;
+    if (cc === 11 || cc === 3) return "stopped";
+    if (cc !== 0 && cc !== 12) throw new Error(`cascade-check ${item}: ${cc}`);
+    if (spend()) return "interrupted";
+    if ((await backlog(sb, "close-shipped.sh", item)).code === 20) return "held";
+  }
+  return null;
+}
+
+/** Step 4: the marker alone when the line's `<dir>` is `-`, else the directory by its last segment. */
+async function removeSpec(sb: Sandbox, n: string, dir: string): Promise<Stop> {
   const rm = dir === "-"
     ? await sb.script("remove-spec.sh", "--marker-only", n)
     : await sb.script("remove-spec.sh", dir.split("/").at(-1)!);
@@ -113,37 +135,42 @@ export async function resume(sb: Sandbox, n: string, budget = Infinity, answer =
   const ack: string[] = [];
   for (let round = 0; round < 6; round++) {
     const g = await gate(sb, "--own", n, "--since", `${n}@0`, ...ack);
-    const out = lines(g.stdout);
-    if (g.code === 0 && out.at(-1) === "gate clear" && !out.some((l) => l.startsWith("OWN "))) {
-      return out;
-    }
-    const push = out.filter((l) => l.startsWith("PENDING push "));
-    if (push.length) {
-      // FR-10: exactly one, whose diff only deletes the marker's directory and the marker,
-      // takes step 4's exit-7 row. Otherwise nothing is pushed: they are someone's work.
-      if (push.length !== 1 || !(await removalOnly(sb, push[0].split(" ")[2], out))) return out;
-      await git(sb.work, "pull", "--quiet", "--rebase", "--no-autostash", "origin", "main");
-      await git(
-        sb.work,
-        "push",
-        "--quiet",
-        "--no-follow-tags",
-        "origin",
-        "refs/heads/main:refs/heads/main",
-      );
-      continue;
-    }
-    if (out.some((l) => l.startsWith(`FENCED closeout ${n} `))) {
-      if (!answer) return out; // anything but a yes runs no backlog script
-      ack.push("--fence-ack", n);
-      continue;
-    }
-    const own = out.find((l) => l.startsWith("OWN "));
-    if (!own) return out;
-    const r = await reenter(sb, own, round === 0 ? budget : Infinity);
-    if (r === "stopped" || r === "held") return out;
+    const ctx = { ack: answer ? ack : null, budget: round === 0 ? budget : Infinity };
+    if (await row(sb, n, g, ctx) === "stop") return lines(g.stdout);
   }
   throw new Error("resume did not settle");
+}
+
+type Turn = { ack: string[] | null; budget: number };
+
+/** The first row that matches the gate's lines: "again" reruns the gate, "stop" ends resume. */
+async function row(sb: Sandbox, n: string, g: Run, turn: Turn): Promise<"again" | "stop"> {
+  const out = lines(g.stdout);
+  const own = out.find((l) => l.startsWith("OWN "));
+  if (g.code === 0 && out.at(-1) === "gate clear" && !own) return "stop";
+  const push = out.filter((l) => l.startsWith("PENDING push "));
+  if (push.length) return await pushRow(sb, push, out) ? "again" : "stop";
+  if (out.some((l) => l.startsWith(`FENCED closeout ${n} `))) {
+    if (!turn.ack) return "stop"; // anything but a yes runs no backlog script
+    turn.ack.push("--fence-ack", n);
+    return "again";
+  }
+  if (!own) return "stop";
+  const r = await reenter(sb, own, turn.budget);
+  return r === "stopped" || r === "held" ? "stop" : "again";
+}
+
+/**
+ * FR-10: exactly one `PENDING push`, whose diff only deletes the marker's
+ * directory and the marker, takes step 4's exit-7 row; false, and nothing is
+ * pushed, for anything else — it is someone's work.
+ */
+async function pushRow(sb: Sandbox, push: string[], out: string[]) {
+  if (push.length !== 1 || !(await removalOnly(sb, push[0].split(" ")[2], out))) return false;
+  await git(sb.work, "pull", "--quiet", "--rebase", "--no-autostash", "origin", "main");
+  const refspec = "refs/heads/main:refs/heads/main";
+  await git(sb.work, "push", "--quiet", "--no-follow-tags", "origin", refspec);
+  return true;
 }
 
 /** Whether <sha>'s diff only deletes the marker and the `<dir>` the gate's closeout line names. */

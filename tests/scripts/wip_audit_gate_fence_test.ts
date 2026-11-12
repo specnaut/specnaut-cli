@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { join, toFileUrl } from "@std/path";
-import { git, run, sandbox } from "./git_sandbox.ts";
+import { git, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 import { DIR, gate, land, lines, marker, settle } from "./wip_audit_gate_fixture.ts";
 
 /** cli#760 — the intake gate under --since, FENCED and its anchor, PARTIAL, and an epic marker. */
@@ -30,35 +30,40 @@ Deno.test("INVALID under --since: a directory older than the item, though a newe
   }
 });
 
-Deno.test("FENCED: the config moved since the last removal; --own alone does not cross it, --fence-ack does", async () => {
+/** A settled landing, then the config pointed at another board, then #51 landed: its sha. */
+async function fencedLanding(sb: Sandbox) {
+  await land(sb, marker(1), "feat(1): first");
+  await settle(sb);
+  await sb.commit(".specnaut/backlog-config.yml", "repo: acme/other\n", "chore: another board");
+  return await land(sb, marker(51), "feat(51): the landing");
+}
+
+Deno.test("FENCED: the config moved since the last removal, and --own alone does not cross it", async () => {
   const sb = await sandbox();
   try {
-    await land(sb, marker(1), "feat(1): first");
-    await settle(sb);
-    await sb.commit(
-      ".specnaut/backlog-config.yml",
-      "repo: acme/other\n",
-      "chore: point at another board",
-    );
-    const sha = await land(sb, marker(51), "feat(51): the landing");
+    const sha = await fencedLanding(sb);
     const r = await gate(sb, "--own", "51");
     assertEquals([r.code, lines(r.stdout)], [4, [
       `FENCED closeout 51 ${DIR} ${sha}`,
       "gate blocked",
     ]]);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("FENCED: --fence-ack crosses it, for its own number only", async () => {
+  const sb = await sandbox();
+  try {
+    const sha = await fencedLanding(sb);
     const ack = await gate(sb, "--own", "51", "--fence-ack", "51");
     assertEquals([ack.code, lines(ack.stdout)], [0, [
       `OWN closeout 51 ${DIR} ${sha}`,
       "gate clear",
     ]]);
-    assertEquals(
-      lines((await gate(sb, "--fence-ack", "51")).stdout)[0],
-      `PENDING closeout 51 ${DIR} ${sha}`,
-    );
-    assertEquals(
-      lines((await gate(sb, "--fence-ack", "5")).stdout)[0],
-      `FENCED closeout 51 ${DIR} ${sha}`,
-    );
+    const first = async (...args: string[]) => lines((await gate(sb, ...args)).stdout)[0];
+    assertEquals(await first("--fence-ack", "51"), `PENDING closeout 51 ${DIR} ${sha}`);
+    assertEquals(await first("--fence-ack", "5"), `FENCED closeout 51 ${DIR} ${sha}`);
   } finally {
     await sb.cleanup();
   }
@@ -78,9 +83,22 @@ Deno.test("not FENCED: the config is unchanged since the last removal, though it
   }
 });
 
+/** A removal that is not remove-spec.sh's: it also deletes README.md, or also edits the config. */
+async function removeOffShape(sb: Sandbox, also: "rm" | "edit") {
+  const extra = also === "rm" ? ["README.md"] : [];
+  await git(sb.work, "rm", "-r", "--quiet", "--", DIR, ".specnaut/feature.json", ...extra);
+  if (also === "edit") {
+    await Deno.writeTextFile(join(sb.work, ".specnaut/backlog-config.yml"), "repo: acme/second\n");
+    await git(sb.work, "add", ".specnaut/backlog-config.yml");
+  }
+  await git(sb.work, "commit", "--quiet", "-m", "chore: not remove-spec's shape");
+  await git(sb.work, "push", "--quiet", "origin", "main");
+}
+
 Deno.test("FENCED: a removal that also touched a file outside .specnaut/, or edited the config, is no anchor", async () => {
-  // [what the removal commit does besides deleting the marker and its directory]
-  for (const [label, also] of [["README.md deleted", "rm"], ["the config edited", "edit"]]) {
+  for (
+    const [label, also] of [["README.md deleted", "rm"], ["the config edited", "edit"]] as const
+  ) {
     const sb = await sandbox();
     try {
       await sb.commit(".specnaut/backlog-config.yml", "repo: acme/first\n", "chore: a board");
@@ -88,25 +106,7 @@ Deno.test("FENCED: a removal that also touched a file outside .specnaut/, or edi
       if (also === "rm") {
         await sb.commit(".specnaut/backlog-config.yml", "repo: acme/second\n", "chore: b");
       }
-      await git(
-        sb.work,
-        "rm",
-        "-r",
-        "--quiet",
-        "--",
-        DIR,
-        ".specnaut/feature.json",
-        ...(also === "rm" ? ["README.md"] : []),
-      );
-      if (also === "edit") {
-        await Deno.writeTextFile(
-          join(sb.work, ".specnaut/backlog-config.yml"),
-          "repo: acme/second\n",
-        );
-        await git(sb.work, "add", ".specnaut/backlog-config.yml");
-      }
-      await git(sb.work, "commit", "--quiet", "-m", "chore: not remove-spec's shape");
-      await git(sb.work, "push", "--quiet", "origin", "main");
+      await removeOffShape(sb, also);
       // The fallback anchor, the parent of the oldest add, predates the second board.
       await land(sb, marker(53), "feat(53): x");
       assertEquals(lines((await gate(sb)).stdout)[0].split(" ")[0], "FENCED", label);

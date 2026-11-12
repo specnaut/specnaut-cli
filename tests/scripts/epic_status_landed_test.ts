@@ -49,9 +49,20 @@ Deno.test("two deliveries of one epic read back as every landed child, oldest fi
       `CHILD T04 #54 ${c}`,
     ]);
     assertEquals((await landed(sb, "50@0")).lines, r.lines);
-    // #5 is not #50, nor #500.
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("an epic's number is matched whole: #5 is not #50, and #50 is not #500", async () => {
+  const sb = await sandbox();
+  try {
+    const a = await child(sb, "a", 1_700_000_000, "feat(T01): one (#51)");
+    const z = await child(sb, "z", 1_700_000_100, "feat(T01): far (#501)", "500");
+    await git(sb.work, "push", "--quiet", "origin", "main");
     assertEquals((await landed(sb, "5")).lines, []);
-    assertEquals((await landed(sb, "500")).code, 0);
+    assertEquals((await landed(sb, "50")).lines, [`CHILD T01 #51 ${a}`]);
+    assertEquals((await landed(sb, "500")).lines, [`CHILD T01 #501 ${z}`]);
   } finally {
     await sb.cleanup();
   }
