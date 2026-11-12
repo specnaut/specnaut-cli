@@ -8547,11 +8547,13 @@ scope_for() {
 
 # epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
 # the only item a groom may close. The check's exit 0 alone also means "no
-# children at all"; only its "safe to close" line says it has some.
+# children at all", so the children are its --numbers list. Never its words:
+# on Cloud they name the board's own column, whatever that is called.
 epic_cleared() {
-  local out
-  out=\$(bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
-  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+  local kids
+  bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" >/dev/null 2>&1 || return 1
+  kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$1" 2>/dev/null) || return 1
+  printf '%s\\n' "\$kids" | tr -d '\\r' | grep -Eq '^[1-9][0-9]{0,9}\$'
 }
 `,
     executable: true,
@@ -11744,11 +11746,13 @@ scope_for() {
 
 # epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
 # the only item a groom may close. The check's exit 0 alone also means "no
-# children at all"; only its "safe to close" line says it has some.
+# children at all", so the children are its --numbers list. Never its words:
+# on Cloud they name the board's own column, whatever that is called.
 epic_cleared() {
-  local out
-  out=\$(bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
-  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+  local kids
+  bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" >/dev/null 2>&1 || return 1
+  kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$1" 2>/dev/null) || return 1
+  printf '%s\\n' "\$kids" | tr -d '\\r' | grep -Eq '^[1-9][0-9]{0,9}\$'
 }
 `,
     executable: true,
@@ -14170,11 +14174,13 @@ scope_for() {
 
 # epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
 # the only item a groom may close. The check's exit 0 alone also means "no
-# children at all"; only its "safe to close" line says it has some.
+# children at all", so the children are its --numbers list. Never its words:
+# on Cloud they name the board's own column, whatever that is called.
 epic_cleared() {
-  local out
-  out=\$(bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
-  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+  local kids
+  bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" >/dev/null 2>&1 || return 1
+  kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$1" 2>/dev/null) || return 1
+  printf '%s\\n' "\$kids" | tr -d '\\r' | grep -Eq '^[1-9][0-9]{0,9}\$'
 }
 `,
     executable: true,
@@ -15863,11 +15869,13 @@ scope_for() {
 
 # epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
 # the only item a groom may close. The check's exit 0 alone also means "no
-# children at all"; only its "safe to close" line says it has some.
+# children at all", so the children are its --numbers list. Never its words:
+# on Cloud they name the board's own column, whatever that is called.
 epic_cleared() {
-  local out
-  out=\$(bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
-  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+  local kids
+  bash "\$_SCOPE_DIR/cascade-check.sh" "\$1" >/dev/null 2>&1 || return 1
+  kids=\$(bash "\$_SCOPE_DIR/cascade-check.sh" --numbers "\$1" 2>/dev/null) || return 1
+  printf '%s\\n' "\$kids" | tr -d '\\r' | grep -Eq '^[1-9][0-9]{0,9}\$'
 }
 `,
     executable: true,

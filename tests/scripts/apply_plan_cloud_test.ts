@@ -10,7 +10,7 @@ import { gitProject } from "./read_items_fixture.ts";
  * only behind the cascade check — on the column the board itself names.
  */
 
-/** Columns out of order, the terminal one called Shipped; kids.json lists #1's children. */
+/** columns.json is the board (out of order, the terminal one Shipped); kids.json lists #1's children. */
 const CURL = `#!/usr/bin/env bash
 printf curl >> "$FAKE_ROOT/calls.log"
 for a in "$@"; do printf '\\t%s' "\${a//$'\\n'/ }" >> "$FAKE_ROOT/calls.log"; done
@@ -18,7 +18,7 @@ echo >> "$FAKE_ROOT/calls.log"
 cat >/dev/null
 case "$*" in
   *PATCH*) b='{"ok":true}' ;;
-  *columns*) b='{"columns":[{"id":"c2","order":2,"name":"Shipped"},{"id":"c0","order":0,"name":"Backlog"},{"id":"c1","order":1,"name":"Ready"}]}' ;;
+  *columns*) b=$(cat "$FAKE_ROOT/fake/columns.json") ;;
   *parentNumber=*) b=$(cat "$FAKE_ROOT/fake/kids.json") ;;
   *number=*) u="$*"; n=\${u##*number=}; b='{"task":{"number":'"\${n%% *}"',"columnId":"c1","title":"Task","body":"Body."}}' ;;
 esac
@@ -28,11 +28,21 @@ printf '%s\\n200' "$b"
 const NO_KIDS = '{"tasks":[]}';
 const OPEN_KID = '{"tasks":[{"number":2,"columnId":"c1","title":"Child"}]}';
 
-async function cloudBoard(kids: string) {
+const columns = (terminal: string) =>
+  JSON.stringify({
+    columns: [
+      { id: "c2", order: 2, name: terminal },
+      { id: "c0", order: 0, name: "Backlog" },
+      { id: "c1", order: 1, name: "Ready" },
+    ],
+  });
+
+async function cloudBoard(kids: string, terminal = "Shipped") {
   const p = await gitProject("cloud");
   await p.write("bin/curl", CURL);
   await Deno.mkdir(join(p.dir, "fake"));
   await p.write("fake/kids.json", kids);
+  await p.write("fake/columns.json", columns(terminal));
   return p;
 }
 
@@ -82,6 +92,29 @@ Deno.test("cloud: columns.sh --terminal names the column a close moves into", as
   try {
     const out = await p.run("columns.sh", ["--terminal"]);
     assertEquals([out.code, out.stdout], [0, "Shipped\n"], out.stderr);
+  } finally {
+    await p.cleanup();
+  }
+});
+
+// The check's words are not its verdict: Cloud's names the board's own column, whatever it says.
+Deno.test("cloud: a groom closes no childless task, whatever the terminal column is called", async () => {
+  const p = await cloudBoard(NO_KIDS, "safe to close");
+  try {
+    const plan = jsonl({ op: "close", target: 1, reason: "completed" });
+    const out = await readThenApply(p, ["groom", "1"], plan);
+    assertEquals(
+      [out.code, out.lines],
+      [3, ["REFUSED scope 1.target", "RECEIPT: none"]],
+      out.stderr,
+    );
+    assert(!PATCHES.test(out.calls), out.calls);
+    await p.write("fake/kids.json", OPEN_KID);
+    const open = await readThenApply(p, ["groom", "1"], plan);
+    assertEquals([open.code, open.lines[0]], [3, "REFUSED scope 1.target"], open.stderr);
+    await p.write("fake/kids.json", '{"tasks":[{"number":2,"columnId":"c2","title":"Child"}]}');
+    const epic = await readThenApply(p, ["groom", "1"], plan);
+    assertEquals(epic.lines, ["APPLIED close 1", "RECEIPT: none"], epic.stderr);
   } finally {
     await p.cleanup();
   }
