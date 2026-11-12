@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
-import { CAP_ENFORCEMENT, LIMITS } from "../../src/domain/sandbox_limits.ts";
+import { CAP_ENFORCEMENT, LIMITS, unenforcedCaps } from "../../src/domain/sandbox_limits.ts";
 import { after, policyOf } from "./sandbox_fixture.ts";
 
 /** Where each resource cap is applied: a cap the data puts in a backend's arguments is in them. */
@@ -38,8 +38,16 @@ Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and
   };
   for (const [backend, caps] of Object.entries(carried)) {
     const expected = Object.fromEntries(
-      Object.entries(caps).map(([cap, inArgs]) => [cap, inArgs ? "arguments" : "launcher"]),
+      Object.entries(caps).map((
+        [cap, inArgs],
+      ) => [cap, inArgs ? "arguments" : cap === "wallClockSeconds" ? "launcher" : "unenforced"]),
     );
     assertEquals(CAP_ENFORCEMENT[backend as keyof typeof CAP_ENFORCEMENT], expected, backend);
   }
+});
+
+Deno.test("unenforcedCaps: the container runs with every cap; the others name what they lack", () => {
+  assertEquals(unenforcedCaps("container"), []);
+  assertEquals(unenforcedCaps("bwrap"), ["processes", "memoryBytes", "cpus"]);
+  assertEquals(unenforcedCaps("seatbelt"), ["processes", "memoryBytes", "cpus", "scratchBytes"]);
 });

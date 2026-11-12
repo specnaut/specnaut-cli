@@ -9,9 +9,9 @@ import { type ProcessLauncher, untilWallClock } from "./sandbox_process.ts";
 
 /**
  * One runner per backend. Each launches exactly what the domain generated for the policy, adds
- * nothing to it, and applies the wall clock, which no backend's own options can. The process,
- * memory and CPU caps are applied only where `CAP_ENFORCEMENT` puts them in the arguments: a
- * container's.
+ * nothing to it, and applies the wall clock, which no backend's own options can. The other caps
+ * are applied where `CAP_ENFORCEMENT` puts them in the arguments, and nowhere else: what a
+ * backend runs without is `unenforcedCaps`.
  */
 
 /** The run's container, named so it can be removed when the wall clock runs out or we are stopped. */

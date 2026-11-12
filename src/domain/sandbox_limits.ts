@@ -25,21 +25,25 @@ export const LIMITS: SandboxLimits = {
   scratchBytes: GIB,
 };
 
-/** Who applies a cap: the backend's own arguments, or the launcher around it. */
-export type CapEnforcer = "arguments" | "launcher";
+/**
+ * Who applies a cap: the backend's own arguments, the launcher around it, or nobody. A cap a
+ * backend cannot enforce is named as such here, never claimed: the run goes ahead without it.
+ */
+export type CapEnforcer = "arguments" | "launcher" | "unenforced";
 
-const BY_LAUNCHER: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
-  processes: "launcher",
-  memoryBytes: "launcher",
-  cpus: "launcher",
+/** What a backend with no resource options gets: the launcher's wall clock, and nothing else. */
+const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
+  processes: "unenforced",
+  memoryBytes: "unenforced",
+  cpus: "unenforced",
   wallClockSeconds: "launcher",
-  scratchBytes: "launcher",
+  scratchBytes: "unenforced",
 };
 
 /**
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
  * option ends a run on time. Neither bubblewrap nor `sandbox-exec` can cap processes, memory or
- * CPU, so the launcher sets those as resource limits on the process it starts.
+ * CPU, and nothing around them does either; bubblewrap caps its scratch tmpfs by size.
  */
 export const CAP_ENFORCEMENT: Readonly<
   Record<SandboxedBackend, Readonly<Record<keyof SandboxLimits, CapEnforcer>>>
@@ -51,6 +55,12 @@ export const CAP_ENFORCEMENT: Readonly<
     wallClockSeconds: "launcher",
     scratchBytes: "arguments",
   },
-  bwrap: { ...BY_LAUNCHER, scratchBytes: "arguments" },
-  seatbelt: BY_LAUNCHER,
+  bwrap: { ...WALL_CLOCK_ONLY, scratchBytes: "arguments" },
+  seatbelt: WALL_CLOCK_ONLY,
 };
+
+/** The caps `backend` runs without. */
+export function unenforcedCaps(backend: SandboxedBackend): (keyof SandboxLimits)[] {
+  return (Object.entries(CAP_ENFORCEMENT[backend]) as [keyof SandboxLimits, CapEnforcer][])
+    .filter(([, by]) => by === "unenforced").map(([cap]) => cap);
+}
