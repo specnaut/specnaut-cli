@@ -8,6 +8,22 @@
 
 _TEXT_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# CLEAN_TEXT_JQ -- jq definitions of what a plan's text may hold, which the
+# executor's validator (PLAN_JQ, _backlog_plan.sh) is appended to:
+#   unquoted   the text with closed code taken out, a fenced block or a
+#              single-line span each becoming a space, so what follows still
+#              starts a word; an unclosed backtick or fence hides nothing
+#   mentions   the logins its @s name outside closed code, in GitHub's and
+#              GitLab's forms: an @ after anything but a letter, digit or `_`,
+#              the login running on through . _ / -, a closing dot dropped,
+#              lower-cased (a login is case-blind on both)
+# shellcheck disable=SC2016  # jq program.
+CLEAN_TEXT_JQ='
+  def unquoted: gsub("(?:^|(?<=\n))[ \t]*```[^\n]*\n(?:[^\n]*\n)*?[ \t]*```[^\n]*"; "\n") | gsub("`[^`\n]+`"; " ");
+  def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
+    | .captures[0].string | sub("[./]+$"; "") | ascii_downcase];
+'
+
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (`scan_hard`, `_report_text.sh`: the patterns' one home) reaches
 # a tracker or a task file. It reads the bytes on stdin through the scan's own

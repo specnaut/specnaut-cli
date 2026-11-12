@@ -100,7 +100,7 @@ RESULT=$(jq_lf -n -R -c --argjson ops "$(ops_json "$SCOPE_OPS")" --argjson targe
   --argjson parents "$(ops_json "$SCOPE_PARENTS")" --argjson refs "$SCOPE_REFS" --argjson statuses "$STATUSES" \
   --argjson labels "$LABELS" \
   --argjson authors "$AUTHORS" --argjson cannot "$PLAN_CANNOT" --argjson max "$PLAN_MAX_OPS" \
-  "$ISSUE_TEXT_JQ$PLAN_DEFS$PLAN_JQ" <"$PLAN") || { refused parse plan; stop_if_refused; }
+  "$ISSUE_TEXT_JQ$CLEAN_TEXT_JQ$PLAN_DEFS$PLAN_JQ" <"$PLAN") || { refused parse plan; stop_if_refused; }
 printf '%s' "$RESULT" | jq_lf -r '.refused[] | "REFUSED \(.[0]) \(.[1])"'
 printf '%s' "$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \(.)"'
 [ "$(printf '%s' "$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1

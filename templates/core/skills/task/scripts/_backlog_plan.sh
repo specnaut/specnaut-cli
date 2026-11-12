@@ -40,8 +40,8 @@
 #   title           one line, 1 to 256 characters, every one `inert` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
-#                   item's author (case-blind, as the items file records it); none new
+#   @-mentions      in any text, only of the target item's author, case-blind; none
+#                   new. What counts as one: `mentions`, CLEAN_TEXT_JQ, _clean_text.sh
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -97,7 +97,6 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}$");
-  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+$"; "") | ascii_downcase];
   def resolve($v; $st; $in): if ($v | number) then ($v | tostring) as $n
       | (if any($in[]; . == $n) then $n else null end)
     elif $refs and ($v | refname) and any($st.refs[]; . == $v) then $v

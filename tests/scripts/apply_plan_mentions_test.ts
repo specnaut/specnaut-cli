@@ -67,3 +67,25 @@ Deno.test("apply-plan: a mention in any form GitHub or GitLab reads is someone's
     await p.cleanup();
   }
 });
+
+// A closed code span or fenced block renders as code, where no tracker mentions anyone.
+Deno.test("apply-plan: an @ inside closed code is no mention; an unclosed backtick does not hide one", async () => {
+  const p = await ghProject(issues);
+  try {
+    for (
+      const body of [
+        "Import it from `@std/assert`.",
+        'Like so:\n```ts\nimport { a } from "@std/assert";\n```\nDone.',
+      ]
+    ) {
+      const out = await readThenApply(p, ["edit", "--id", "7"], comment(body));
+      assertEquals([out.code, out.lines], [0, ["APPLIED comment 7", "RECEIPT: none"]], body);
+    }
+    for (const body of ["`@victim", "x`code`@victim", "```\n@victim, the fence never closes"]) {
+      const out = await readThenApply(p, ["edit", "--id", "7"], comment(body));
+      assertEquals([out.code, out.lines], [3, ["REFUSED mention 1.body", "RECEIPT: none"]], body);
+    }
+  } finally {
+    await p.cleanup();
+  }
+});

@@ -8262,8 +8262,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
-#                   item's author (case-blind, as the items file records it); none new
+#   @-mentions      in any text, only of the target item's author, case-blind; none
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -8319,7 +8319,6 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st; \$in): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$in[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -8407,6 +8406,22 @@ require_title() {
 # (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
 
 _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# CLEAN_TEXT_JQ -- jq definitions of what a plan's text may hold, which the
+# executor's validator (PLAN_JQ, _backlog_plan.sh) is appended to:
+#   unquoted   the text with closed code taken out, a fenced block or a
+#              single-line span each becoming a space, so what follows still
+#              starts a word; an unclosed backtick or fence hides nothing
+#   mentions   the logins its @s name outside closed code, in GitHub's and
+#              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
+#              the login running on through . _ / -, a closing dot dropped,
+#              lower-cased (a login is case-blind on both)
+# shellcheck disable=SC2016  # jq program.
+CLEAN_TEXT_JQ='
+  def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
+  def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
+    | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+'
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -8666,7 +8681,7 @@ RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson ta
   --argjson parents "\$(ops_json "\$SCOPE_PARENTS")" --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" \\
   --argjson labels "\$LABELS" \\
   --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
-  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+  "\$ISSUE_TEXT_JQ\$CLEAN_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
 printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
 printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 [ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
@@ -11461,8 +11476,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
-#                   item's author (case-blind, as the items file records it); none new
+#   @-mentions      in any text, only of the target item's author, case-blind; none
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -11518,7 +11533,6 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st; \$in): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$in[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -11606,6 +11620,22 @@ require_title() {
 # (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
 
 _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# CLEAN_TEXT_JQ -- jq definitions of what a plan's text may hold, which the
+# executor's validator (PLAN_JQ, _backlog_plan.sh) is appended to:
+#   unquoted   the text with closed code taken out, a fenced block or a
+#              single-line span each becoming a space, so what follows still
+#              starts a word; an unclosed backtick or fence hides nothing
+#   mentions   the logins its @s name outside closed code, in GitHub's and
+#              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
+#              the login running on through . _ / -, a closing dot dropped,
+#              lower-cased (a login is case-blind on both)
+# shellcheck disable=SC2016  # jq program.
+CLEAN_TEXT_JQ='
+  def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
+  def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
+    | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+'
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -11865,7 +11895,7 @@ RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson ta
   --argjson parents "\$(ops_json "\$SCOPE_PARENTS")" --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" \\
   --argjson labels "\$LABELS" \\
   --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
-  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+  "\$ISSUE_TEXT_JQ\$CLEAN_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
 printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
 printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 [ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
@@ -13889,8 +13919,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
-#                   item's author (case-blind, as the items file records it); none new
+#   @-mentions      in any text, only of the target item's author, case-blind; none
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -13946,7 +13976,6 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st; \$in): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$in[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -14034,6 +14063,22 @@ require_title() {
 # (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
 
 _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# CLEAN_TEXT_JQ -- jq definitions of what a plan's text may hold, which the
+# executor's validator (PLAN_JQ, _backlog_plan.sh) is appended to:
+#   unquoted   the text with closed code taken out, a fenced block or a
+#              single-line span each becoming a space, so what follows still
+#              starts a word; an unclosed backtick or fence hides nothing
+#   mentions   the logins its @s name outside closed code, in GitHub's and
+#              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
+#              the login running on through . _ / -, a closing dot dropped,
+#              lower-cased (a login is case-blind on both)
+# shellcheck disable=SC2016  # jq program.
+CLEAN_TEXT_JQ='
+  def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
+  def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
+    | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+'
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -14293,7 +14338,7 @@ RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson ta
   --argjson parents "\$(ops_json "\$SCOPE_PARENTS")" --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" \\
   --argjson labels "\$LABELS" \\
   --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
-  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+  "\$ISSUE_TEXT_JQ\$CLEAN_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
 printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
 printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 [ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
@@ -15592,8 +15637,8 @@ receipt_snapshot() { :; }
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
-#                   item's author (case-blind, as the items file records it); none new
+#   @-mentions      in any text, only of the target item's author, case-blind; none
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -15649,7 +15694,6 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st; \$in): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$in[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -15737,6 +15781,22 @@ require_title() {
 # (\`scan_hard\`, the patterns' one home) is \`_report_text.sh\`, in \`../bash\`.
 
 _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# CLEAN_TEXT_JQ -- jq definitions of what a plan's text may hold, which the
+# executor's validator (PLAN_JQ, _backlog_plan.sh) is appended to:
+#   unquoted   the text with closed code taken out, a fenced block or a
+#              single-line span each becoming a space, so what follows still
+#              starts a word; an unclosed backtick or fence hides nothing
+#   mentions   the logins its @s name outside closed code, in GitHub's and
+#              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
+#              the login running on through . _ / -, a closing dot dropped,
+#              lower-cased (a login is case-blind on both)
+# shellcheck disable=SC2016  # jq program.
+CLEAN_TEXT_JQ='
+  def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
+  def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
+    | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+'
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
 # scan refuses (\`scan_hard\`, \`_report_text.sh\`: the patterns' one home) reaches
@@ -15996,7 +16056,7 @@ RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson ta
   --argjson parents "\$(ops_json "\$SCOPE_PARENTS")" --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" \\
   --argjson labels "\$LABELS" \\
   --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
-  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+  "\$ISSUE_TEXT_JQ\$CLEAN_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
 printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
 printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
 [ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
