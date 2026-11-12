@@ -5,10 +5,8 @@ import { type CheckoutOutcome, verifyCheckout } from "../../src/application/veri
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { CHECKOUT_REASON, RESTART_ADVICE } from "../../src/domain/checkout_trust.ts";
 import { REASON } from "../../src/domain/script_trust.ts";
-import {
-  FsScriptTreeWalker,
-  FsTreeWalker,
-} from "../../src/infrastructure/fs_script_tree_walker.ts";
+import { FsScriptTreeWalker } from "../../src/infrastructure/fs_script_tree_walker.ts";
+import { FsTreeWalker } from "../../src/infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../src/infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import {
