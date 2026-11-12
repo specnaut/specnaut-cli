@@ -20,7 +20,7 @@ import {
  * Exports a branch's tree as inert files: fetched as objects into a repository of its own, judged
  * whole, then written twice outside the project. Nothing is checked out, so no filter, hook or
  * harness setting the branch carries runs or is loaded; and one commit id is bound from the fetch
- * to the folder name to the re-hash of what was written.
+ * to the folder name to the re-hash of the reviewers' copy. The scratch copy is not re-hashed.
  */
 
 export type ExportDeps = {

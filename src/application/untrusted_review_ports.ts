@@ -37,7 +37,7 @@ export type ExportHome = {
   readonly gitDir: string;
   /** Read by the reviewers; files `0644`, checked against the commit after writing. */
   readonly seats: string;
-  /** Run by the sandbox, which mounts it read-only; executable bits kept. */
+  /** Run by the sandbox, which mounts it read-only; executable bits kept; never re-hashed. */
   readonly scratch: string;
 };
 
