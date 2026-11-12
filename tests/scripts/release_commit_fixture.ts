@@ -1,13 +1,27 @@
 import { assert } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 import { writeVersions } from "../../scripts/bump-version.ts";
 
-/** Repositories in the states `check-release-commit.ts` judges, and a way to run it on one. */
+/**
+ * Repositories in the states the release scripts judge, and a way to run one
+ * on them: `check-release-commit.ts` and `check-release-history.ts` share it.
+ */
 
-const SCRIPT = new URL("../../scripts/check-release-commit.ts", import.meta.url).pathname;
+const SCRIPT = fromFileUrl(new URL("../../scripts/check-release-commit.ts", import.meta.url));
 
-export async function run(cwd: string, tag: string): Promise<{ code: number; err: string }> {
+/** `check-release-commit.ts <tag>` run in `cwd`. */
+export function run(cwd: string, tag: string): Promise<{ code: number; err: string }> {
+  return runScript(SCRIPT, cwd, tag);
+}
+
+/** A release script, by absolute path, run in `cwd` with the permissions CI gives it. */
+export async function runScript(
+  script: string,
+  cwd: string,
+  ...args: string[]
+): Promise<{ code: number; err: string }> {
   const out = await new Deno.Command("deno", {
-    args: ["run", "--allow-read", "--allow-run", SCRIPT, tag],
+    args: ["run", "--allow-read", "--allow-run", script, ...args],
     cwd,
     stdout: "piped",
     stderr: "piped",
@@ -16,12 +30,22 @@ export async function run(cwd: string, tag: string): Promise<{ code: number; err
 }
 
 export async function git(cwd: string, ...args: string[]) {
-  const out = await new Deno.Command("git", { args, cwd, stdout: "null", stderr: "null" }).output();
-  assert(out.success, `git ${args.join(" ")} failed`);
+  const out = await new Deno.Command("git", { args, cwd, stdout: "null", stderr: "piped" })
+    .output();
+  assert(out.success, `git ${args.join(" ")}: ${new TextDecoder().decode(out.stderr)}`);
 }
 
 /** A temp repository, removed when the test's `await using` ends. */
 export type Repo = AsyncDisposable & { readonly dir: string };
+
+/** An empty temp repository with a committer configured. */
+export async function emptyRepo(prefix = "specnaut-release-"): Promise<Repo> {
+  const dir = await Deno.makeTempDir({ prefix });
+  await git(dir, "init", "-q");
+  await git(dir, "config", "user.email", "t@t");
+  await git(dir, "config", "user.name", "t");
+  return { dir, [Symbol.asyncDispose]: () => Deno.remove(dir, { recursive: true }) };
+}
 
 /** A repo carrying every version file at `version`, committed with `subject`. */
 export async function repoAt(
@@ -29,10 +53,8 @@ export async function repoAt(
   subject: string,
   opts: { desync?: string; staleRef?: string } = {},
 ): Promise<Repo> {
-  const dir = await Deno.makeTempDir();
-  await git(dir, "init", "-q");
-  await git(dir, "config", "user.email", "t@t");
-  await git(dir, "config", "user.name", "t");
+  const repo = await emptyRepo();
+  const { dir } = repo;
   const json = (v: string) => JSON.stringify({ version: v }, null, 2);
   await Deno.writeTextFile(`${dir}/deno.json`, json(version));
   await Deno.mkdir(`${dir}/src/domain`, { recursive: true });
@@ -89,10 +111,11 @@ export async function repoAt(
   await recordHistory(dir, `v${version}`, "");
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
-  return { dir, [Symbol.asyncDispose]: () => Deno.remove(dir, { recursive: true }) };
+  return repo;
 }
 
 export const H = ".specnaut/release/HIGHLIGHTS.md";
+export const HISTORY = ".specnaut/release/history";
 export const LEAD =
   "**A thing shipped.**\n\nIt does the thing, and here is why that matters to you.\n";
 
@@ -101,8 +124,8 @@ export const LEAD =
  * `history/<tag>.md`. `null` writes nothing, for the case the gate refuses.
  */
 export async function recordHistory(dir: string, tag: string, text: string | null) {
-  await Deno.mkdir(`${dir}/.specnaut/release/history`, { recursive: true });
-  if (text !== null) await Deno.writeTextFile(`${dir}/.specnaut/release/history/${tag}.md`, text);
+  await Deno.mkdir(`${dir}/${HISTORY}`, { recursive: true });
+  if (text !== null) await Deno.writeTextFile(`${dir}/${HISTORY}/${tag}.md`, text);
 }
 
 /**

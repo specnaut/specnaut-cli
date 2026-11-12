@@ -1,4 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 import { parseOptions, probe } from "../../scripts/keychain-probe.ts";
 import type { KeychainBackend } from "../../src/infrastructure/keychain/keychain_backend.ts";
 
@@ -120,7 +121,7 @@ async function matrixRemovals(killAt: string): Promise<string[]> {
     }
     await new Deno.Command("bash", {
       args: [
-        new URL("../../scripts/keychain-probe-matrix.sh", import.meta.url).pathname,
+        fromFileUrl(new URL("../../scripts/keychain-probe-matrix.sh", import.meta.url)),
         `${dir}/go`,
         `${dir}/ts`,
       ],

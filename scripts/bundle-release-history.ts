@@ -32,6 +32,13 @@ const KINDS: ReadonlyArray<[string, RegExp]> = [
   ["invisible character", /\p{Default_Ignorable_Code_Point}/u],
 ];
 
+/**
+ * Code points that come from inside an emoji, not from anything an author typed
+ * as such: the emoji presentation selector and the zero-width joiner. Their
+ * refusal says so, or the author hunts for a character they cannot see.
+ */
+const EMOJI_PARTS = new Set([0xfe0f, 0x200d]);
+
 /** What is wrong with one history file, by name and content, or nothing. */
 export function historyFileProblems(name: string, content: string): string[] {
   const problems: string[] = [];
@@ -54,7 +61,8 @@ function forbiddenCharacters(lines: string[]): string[] {
       if (found.has(cp)) continue;
       const kind = KINDS.find(([, p]) => p.test(ch))![0];
       const code = cp.toString(16).toUpperCase().padStart(4, "0");
-      found.set(cp, `${kind} U+${code} on line ${at + 1}`);
+      const emoji = EMOJI_PARTS.has(cp) ? " (an emoji caused it: remove the emoji)" : "";
+      found.set(cp, `${kind} U+${code} on line ${at + 1}${emoji}`);
     }
   });
   return [...found.values()];

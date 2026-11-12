@@ -65,6 +65,17 @@ for (const [what, content, named] of CLASSES) {
   });
 }
 
+for (const [cp, ch] of [["U+FE0F", "\ufe0f"], ["U+200D", "\u200d"]]) {
+  Deno.test(`a refused ${cp} says an emoji caused it, naming the file and line`, () => {
+    // Both hide inside an emoji (a presentation selector, a joiner): the code
+    // point alone sends the author hunting for a character they never typed.
+    const [problem] = historyFileProblems("v1.0.0.md", `**Lead.**\nShipped \u2764${ch}\n`);
+    assertStringIncludes(problem, `v1.0.0.md: `);
+    assertStringIncludes(problem, `${cp} on line 2`);
+    assertStringIncludes(problem, "emoji");
+  });
+}
+
 Deno.test("CRLF is named once, not again as a carriage return", () => {
   assertEquals(historyFileProblems("v1.0.0.md", "a\r\nb\r\n").length, 1);
 });

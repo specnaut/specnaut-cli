@@ -238,11 +238,11 @@ Deno.test("FR-016: the link decodes to the scanned bytes, and a long one says to
     const digest = await b.prepared(`${title}\n\n${body}`);
     const link = await b.run(["link", digest]);
     const line = /^LINK (\S+)$/.exec(link.stdout.trimEnd())![1];
-    const url = new URL(line);
-    assertEquals(url.origin + url.pathname, `https://github.com/${constant("REPO")}/issues/new`);
-    assertEquals(url.searchParams.get("title"), title);
-    assertEquals(url.searchParams.get("body"), body);
-    assertEquals(url.searchParams.get("labels"), null, "the link asks for a label");
+    const { origin, pathname, searchParams } = new URL(line);
+    assertEquals(origin + pathname, `https://github.com/${constant("REPO")}/issues/new`);
+    assertEquals(searchParams.get("title"), title);
+    assertEquals(searchParams.get("body"), body);
+    assertEquals(searchParams.get("labels"), null, "the link asks for a label");
     assertEquals(createLines(await b.log()), [], "a link created an issue");
 
     const long = await b.prepared(`A title\n\n${"word ".repeat(700)}\n`);

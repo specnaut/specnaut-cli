@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 import { computeNextVersion, VERSIONED_FILES, writeVersions } from "../../scripts/bump-version.ts";
 
 Deno.test("computeNextVersion patch bump", () => {
@@ -137,7 +137,7 @@ Deno.test("--list prints exactly VERSIONED_FILES, for the runbook to stage", asy
     args: [
       "run",
       "--allow-read",
-      new URL("../../scripts/bump-version.ts", import.meta.url).pathname,
+      fromFileUrl(new URL("../../scripts/bump-version.ts", import.meta.url)),
       "--list",
     ],
     stdout: "piped",

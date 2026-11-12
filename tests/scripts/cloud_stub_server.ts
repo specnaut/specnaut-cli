@@ -73,29 +73,30 @@ const server = Deno.serve({
   port: 0,
   onListen: ({ port }) => Deno.writeTextFileSync(`${dir}/port`, String(port)),
 }, async (req) => {
-  const url = new URL(req.url);
+  // The request's path, not a file path: `pathname` is right here on every OS.
+  const { origin, pathname: path } = new URL(req.url);
   const line = {
-    path: url.pathname,
+    path,
     authorization: req.headers.get("authorization"),
     extra: req.headers.get("x-from-user-config"),
     body: await req.text(),
   };
   await Deno.writeTextFile(`${dir}/requests.log`, JSON.stringify(line) + "\n", { append: true });
-  if (url.pathname.startsWith("/moved/")) {
-    const to = url.pathname.replace("/moved/", "/elsewhere/");
-    return new Response("{}", { status: 307, headers: { Location: `${url.origin}${to}` } });
+  if (path.startsWith("/moved/")) {
+    const to = path.replace("/moved/", "/elsewhere/");
+    return new Response("{}", { status: 307, headers: { Location: `${origin}${to}` } });
   }
-  const status = url.pathname.match(/^\/status\/(\d+)\//)?.[1];
+  const status = path.match(/^\/status\/(\d+)\//)?.[1];
   if (status) return new Response(null, { status: Number(status) });
-  if (url.pathname.startsWith("/partial/") && url.pathname.endsWith("/tasks")) {
+  if (path.startsWith("/partial/") && path.endsWith("/tasks")) {
     return Response.json({ ok: false });
   }
-  if (url.pathname.startsWith("/garbage/")) {
+  if (path.startsWith("/garbage/")) {
     return new Response("<html>\x1b[31m", { status: 200 });
   }
-  if (url.pathname.startsWith("/dirty/")) return Response.json(DIRTY);
-  if (url.pathname.startsWith("/refused/")) return Response.json(REFUSED);
-  return createdAnswer(url.pathname) ?? Response.json(ANSWER);
+  if (path.startsWith("/dirty/")) return Response.json(DIRTY);
+  if (path.startsWith("/refused/")) return Response.json(REFUSED);
+  return createdAnswer(path) ?? Response.json(ANSWER);
 });
 
 await server.finished;

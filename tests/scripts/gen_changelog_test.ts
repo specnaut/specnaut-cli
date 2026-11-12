@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 import {
   breakingGuardWarning,
   type Classified,
@@ -169,7 +170,7 @@ Deno.test("formatChangelog omits compare URL when fromTag is null", () => {
   assertEquals(md.includes("Full changelog"), false);
 });
 
-import { extractAdoption } from "../../scripts/gen-changelog.ts";
+import { extractAdoption, extractPrNumber } from "../../scripts/gen-changelog.ts";
 
 Deno.test("extractAdoption: returns null when no section present", () => {
   const body = "## Summary\n\nfoo\n\n## Tests\n\nbar\n";
@@ -203,8 +204,6 @@ Deno.test("extractAdoption: returns null when section has no prompt block", () =
   const body = "## Agent adoption\n\njust prose, no fenced block\n\n## Tests\n";
   assertEquals(extractAdoption(body), null);
 });
-
-import { extractPrNumber } from "../../scripts/gen-changelog.ts";
 
 Deno.test("extractPrNumber: parses trailing (#NNN)", () => {
   assertEquals(extractPrNumber("Add foo (#252)"), 252);
@@ -500,7 +499,7 @@ Deno.test({
   // Spawns subprocesses (deno + git + a shadowed gh); needs run/read/write/env.
   permissions: { run: true, read: true, write: true, env: true },
   fn: async () => {
-    const scriptDir = new URL("../../scripts/gen-changelog.ts", import.meta.url).pathname;
+    const scriptDir = fromFileUrl(new URL("../../scripts/gen-changelog.ts", import.meta.url));
 
     // A throwaway dir holding (a) a `gh` shim that always fails and (b) a
     // self-contained git repo with one known `feat: … (#999)` commit. Building
