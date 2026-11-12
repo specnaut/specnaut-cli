@@ -3,7 +3,7 @@ import { parseArgs } from "../../src/cli/parser.ts";
 
 const SHA = "b".repeat(40);
 
-Deno.test("review gate, guard, start and end parse into their intent", () => {
+Deno.test("review gate, guard, start, trust and end parse into their intent", () => {
   assertEquals(parseArgs(["review", "gate"]), { kind: "review", sub: "gate" });
   assertEquals(parseArgs(["review", "guard"]), { kind: "review", sub: "guard" });
   assertEquals(parseArgs(["review", "start", "12"]), {
@@ -12,6 +12,17 @@ Deno.test("review gate, guard, start and end parse into their intent", () => {
     source: "12",
   });
   assertEquals(parseArgs(["review", "end", SHA]), { kind: "review", sub: "end", sha: SHA });
+  assertEquals(parseArgs(["review", "trust", "12", SHA]), {
+    kind: "review",
+    sub: "trust",
+    pr: "12",
+    head: SHA,
+  });
+  assertEquals(
+    parseArgs(["review", "trust", "x", ""]),
+    { kind: "review", sub: "trust", pr: "x", head: "" },
+    "a malformed pair is the decision's to judge: it prints untrusted",
+  );
 });
 
 Deno.test("review refuses a missing or extra argument, and an end that is not a full id", () => {
@@ -20,6 +31,9 @@ Deno.test("review refuses a missing or extra argument, and an end that is not a 
       ["review"],
       ["review", "gate", "x"],
       ["review", "guard", "x"],
+      ["review", "trust"],
+      ["review", "trust", "12"],
+      ["review", "trust", "12", SHA, "x"],
       ["review", "start"],
       ["review", "start", "a", "b"],
       ["review", "end", "HEAD"],

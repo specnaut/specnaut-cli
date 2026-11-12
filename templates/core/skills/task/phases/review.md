@@ -16,8 +16,15 @@ from there as files. A non-zero exit stops with its message — exit 6 too, Clou
 and an older cache reused: do not review against an empty or stale spec.
 
 <!-- END: spec-backend=cloud -->
-0. **Untrusted or trusted — decided here, nowhere else.** An argument naming a PR number or a
-   `<remote>/<branch>` makes the review untrusted, every one: follow `phases/review-untrusted.md`.
+0. **Untrusted or trusted — decided here, nowhere else.** A `<remote>/<branch>` makes the review
+   untrusted. A PR number `<n>` is trusted only when this prints the one line `trusted`, exit 0:
+
+   ```bash
+   sha=$(git ls-remote origin "refs/pull/<n>/head" | cut -f1); specnaut review trust "<n>" "$sha"
+   ```
+
+   Then `git fetch origin "refs/pull/<n>/head"`, `git switch --detach "$sha"`, and step 1 reviews
+   that commit. Any other line or exit makes the review untrusted: follow `phases/review-untrusted.md`.
 1. **Check the helper scripts, then fix the range.** Run this block as written, from the project's
    root, before any script under `.specnaut/scripts/` runs — again after each fix cycle (Phase 3):
 

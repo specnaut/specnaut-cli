@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import type { BranchExport } from "../../../src/application/untrusted_review.ts";
+import type { TrustDecision } from "../../../src/domain/review_trust.ts";
 import { runReview, startLines } from "../../../src/cli/handlers/review_handler.ts";
 import { removeKeptExport } from "../../../src/infrastructure/fs_tree_export.ts";
 import { exists } from "../../helpers/fs_exists.ts";
@@ -31,6 +32,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
     err: (s: string) => said.push(s),
     gate: () => Promise.resolve(0),
     guard: () => Promise.resolve(0),
+    trust: () => Promise.reject(new Error("unreached")),
     end: () => Promise.resolve(false),
     start: () =>
       Promise.resolve({
@@ -76,10 +78,37 @@ Deno.test("guard and gate each run their own hook's check, and answer with its e
     err: () => {},
     gate: () => Promise.resolve(void ran.push("gate")).then(() => 0),
     guard: () => Promise.resolve(void ran.push("guard")).then(() => 2),
+    trust: () => Promise.reject(new Error("unreached")),
     end: () => Promise.reject(new Error("unreached")),
     start: () => Promise.reject(new Error("unreached")),
   };
   assertEquals(await runReview({ kind: "review", sub: "guard" }, deps), 2);
   assertEquals(await runReview({ kind: "review", sub: "gate" }, deps), 0);
   assertEquals(ran, ["guard", "gate"]);
+});
+
+Deno.test("trust prints its one line, inert, and exits 0 only when trusted", async () => {
+  const cases: [TrustDecision, string, number][] = [
+    [{ trusted: true }, "trusted", 0],
+    [{ trusted: false, why: "the head moved" }, "untrusted the head moved", 1],
+    [{ trusted: false, why: "gh: \u001b[2J" }, "untrusted gh: \\u001b[2J", 1],
+  ];
+  for (const [decision, line, code] of cases) {
+    const said: string[] = [];
+    const asked: string[] = [];
+    const deps = {
+      out: (s: string) => said.push(s),
+      err: (s: string) => said.push(`err ${s}`),
+      gate: () => Promise.reject(new Error("unreached")),
+      guard: () => Promise.reject(new Error("unreached")),
+      trust: (pr: string, head: string) =>
+        Promise.resolve(void asked.push(`${pr} ${head}`)).then(() => decision),
+      end: () => Promise.reject(new Error("unreached")),
+      start: () => Promise.reject(new Error("unreached")),
+    };
+    const intent = { kind: "review", sub: "trust", pr: "12", head: SHA } as const;
+    assertEquals(await runReview(intent, deps), code, line);
+    assertEquals(said, [line]);
+    assertEquals(asked, [`12 ${SHA}`]);
+  }
 });

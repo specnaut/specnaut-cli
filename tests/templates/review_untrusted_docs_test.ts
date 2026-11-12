@@ -14,7 +14,7 @@ const flat = (name: string) => read(name).replace(/\s+/g, " ");
 Deno.test("review.md decides untrusted or trusted at its entry, and only there", () => {
   const entry = flat("review.md");
   assertStringIncludes(entry, "Untrusted or trusted — decided here, nowhere else.");
-  assertStringIncludes(entry, "a PR number or a `<remote>/<branch>` makes the review untrusted");
+  assertStringIncludes(entry, "A `<remote>/<branch>` makes the review untrusted.");
   assertStringIncludes(entry, "follow `phases/review-untrusted.md`");
   for (const name of ["review-untrusted.md", "review-seats.md", "review-gates.md"]) {
     assert(!flat(name).includes("makes the review untrusted"), `${name} decides it too`);
@@ -113,4 +113,18 @@ Deno.test("the lock dispatches exactly the seats review.md's seat table names", 
   const table = read("review.md").split("### Seat selection")[1].split("###")[0];
   const seats = [...table.matchAll(/^\| `([a-z-]+)`/gm)].map((m) => m[1]);
   assertEquals(seats, [...REVIEW_SEATS]);
+});
+
+Deno.test("a PR is trusted only on the forge's decision, for the commit the review then reads", () => {
+  const entry = flat("review.md");
+  assertStringIncludes(
+    entry,
+    "A PR number `<n>` is trusted only when this prints the one line `trusted`, exit 0:",
+  );
+  assertStringIncludes(
+    entry,
+    'sha=$(git ls-remote origin "refs/pull/<n>/head" | cut -f1); specnaut review trust "<n>" "$sha"',
+  );
+  assertStringIncludes(entry, '`git switch --detach "$sha"`, and step 1 reviews that commit');
+  assertStringIncludes(entry, "Any other line or exit makes the review untrusted");
 });

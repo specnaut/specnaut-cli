@@ -35,13 +35,14 @@ export type SandboxIntent =
 
 /**
  * `specnaut review`: `gate` is the hook's checkout check, `guard` the hook's review lock, `start`
- * exports the branch `source` names once the gate passed, `end` removes the export of `sha`
- * (review_handler.ts).
+ * exports the branch `source` names once the gate passed, `trust` decides whether PR `pr` at
+ * commit `head` may be reviewed as trusted, `end` removes the export of `sha` (review_handler.ts).
  */
 export type ReviewIntent =
   | { kind: "review"; sub: "gate" }
   | { kind: "review"; sub: "guard" }
   | { kind: "review"; sub: "start"; source: string }
+  | { kind: "review"; sub: "trust"; pr: string; head: string }
   | { kind: "review"; sub: "end"; sha: string };
 
 export type Intent =

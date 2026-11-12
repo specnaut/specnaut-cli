@@ -60,7 +60,9 @@ const argv: string[][] = [
   ["record-checkout"], ["record-checkout", "x"], ["record-checkout", "--path", "x"],
   ["record-checkout", "--help"], ["record-checkout", "a", "b"], ["--force", "record-checkout"],
   // `specnaut review`: gate and guard take nothing, start one source, end one full commit id.
-  ["review"], ["review", "gate"], ["review", "gate", "x"], ["review", "guard"], ["review", "guard", "x"], ["review", "start"], ["review", "start", "12"],
+  ["review"], ["review", "gate"], ["review", "gate", "x"], ["review", "guard"], ["review", "guard", "x"],
+  ["review", "trust"], ["review", "trust", "12"], ["review", "trust", "12", SHA], ["review", "trust", "12", "", "x"],
+  ["review", "trust", "origin/x", "HEAD"], ["review", "start"], ["review", "start", "12"],
   ["review", "start", "origin/topic"], ["review", "start", ""], ["review", "start", "a", "b"],
   ["review", "end"], ["review", "end", SHA], ["review", "end", "HEAD"], ["review", "merge"],
   ["review", "start", "12", "--force"], ["--help", "review", "gate"], ["review", "--force", "start", "12"],

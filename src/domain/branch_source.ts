@@ -25,11 +25,17 @@ const PR_NUMBER = /^#?([1-9][0-9]{0,9})$/;
  */
 const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
-export function parseBranchSource(text: string, remotes: readonly string[]): ParsedSource {
+/** The PR number `text` names (`12` or `#12`), or `null` when it names none. */
+export function prNumberOf(text: string): number | null {
   const pr = PR_NUMBER.exec(text);
-  if (pr !== null) {
+  return pr === null ? null : Number(pr[1]);
+}
+
+export function parseBranchSource(text: string, remotes: readonly string[]): ParsedSource {
+  const number = prNumberOf(text);
+  if (number !== null) {
     if (!remotes.includes(PR_REMOTE)) return refused(`no remote named ${PR_REMOTE} is configured`);
-    return { kind: "pr", remote: PR_REMOTE, number: Number(pr[1]) };
+    return { kind: "pr", remote: PR_REMOTE, number };
   }
   if (/[:\\]/.test(text) || /^[/.~]/.test(text)) {
     return refused("a URL or a path is not accepted: name a PR number or <remote>/<branch>");

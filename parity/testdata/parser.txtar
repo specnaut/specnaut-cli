@@ -58,6 +58,8 @@ specnaut record-checkout a b
 specnaut review
 specnaut review gate x
 specnaut review guard x
+specnaut review trust 12
+specnaut review trust 12 a b
 specnaut review start
 specnaut review start a b
 specnaut review end HEAD

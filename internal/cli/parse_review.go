@@ -6,7 +6,7 @@ import (
 )
 
 // parseReview is review_parser.ts's parseReview: `gate` and `guard` take no word, `start` one
-// non-empty source and no option, `end` one full commit id. The Go binary answers each as not
+// non-empty source and no option, `trust` two words, `end` one full commit id. The Go binary answers each as not
 // ported.
 func parseReview(a Args, rest []string) Intent {
 	sub, words := "", []string{}
@@ -24,6 +24,10 @@ func parseReview(a Args, rest []string) Intent {
 		}
 		if len(words) != 1 || words[0] == "" {
 			return unknown("review start takes one source")
+		}
+	case "trust":
+		if len(words) != 2 {
+			return unknown("review trust takes one PR number and one commit id")
 		}
 	case "end":
 		if len(words) != 1 || !fullSha.MatchString(words[0]) {

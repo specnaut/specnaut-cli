@@ -38,6 +38,9 @@ const helpTemplate = `{bold:specnaut} — AI project scaffolding CLI with auto-c
                                       Once the gate let it through: lock the session until it ends, export
                                       the branch as inert files outside the project, and print where
                                       (HEAD, SEATS, SCRATCH, OBJECTS)
+  specnaut review trust <pr> <sha>    Print trusted, or untrusted and why, for reviewing PR <pr> at commit
+                                      <sha>, from the forge's facts alone: a team member's PR, its head in
+                                      this repository and at <sha>. Exit 0 trusted, 1 untrusted
   specnaut review end <sha>           Remove the export of <sha>
   specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other
                                       one cannot (read-only). Exit 0 one is available, 1 none: static only

@@ -114,6 +114,11 @@
 {"args":["review","gate","x"],"intent":{"kind":"unknown","received":"review gate takes no argument"}}
 {"args":["review","guard"],"intent":{"kind":"review","sub":"guard"}}
 {"args":["review","guard","x"],"intent":{"kind":"unknown","received":"review guard takes no argument"}}
+{"args":["review","trust"],"intent":{"kind":"unknown","received":"review trust takes one PR number and one commit id"}}
+{"args":["review","trust","12"],"intent":{"kind":"unknown","received":"review trust takes one PR number and one commit id"}}
+{"args":["review","trust","12","0123456789abcdef0123456789abcdef01234567"],"intent":{"kind":"review","sub":"trust","pr":"12","head":"0123456789abcdef0123456789abcdef01234567"}}
+{"args":["review","trust","12","","x"],"intent":{"kind":"unknown","received":"review trust takes one PR number and one commit id"}}
+{"args":["review","trust","origin/x","HEAD"],"intent":{"kind":"review","sub":"trust","pr":"origin/x","head":"HEAD"}}
 {"args":["review","start"],"intent":{"kind":"unknown","received":"review start takes one source"}}
 {"args":["review","start","12"],"intent":{"kind":"review","sub":"start","source":"12"}}
 {"args":["review","start","origin/topic"],"intent":{"kind":"review","sub":"start","source":"origin/topic"}}

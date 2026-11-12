@@ -1,5 +1,9 @@
 import { red } from "@std/fmt/colors";
 import { type StartDeps, startReview } from "../../application/review_start.ts";
+import { decideTrust } from "../../application/review_trust.ts";
+import { type TrustDecision, trustLine } from "../../domain/review_trust.ts";
+import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
+import { GhPullRequests } from "../../infrastructure/gh_pull_request.ts";
 import { baseTipOf } from "../../application/verify_scripts.ts";
 import { type BranchExport, exportBranchTree } from "../../application/untrusted_review.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
@@ -29,6 +33,9 @@ import { runReviewGuard } from "./review_guard_handler.ts";
  *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), then one
  *                 `LISTED <kind> <blob sha> <path>` per entry listed and never written. Exit 0
  *                 started, 1 refused or failed (why on stderr).
+ *   trust <pr> <sha>
+ *                 prints `trusted`, or `untrusted <why>`, for reviewing PR <pr> at commit <sha>
+ *                 (review_trust.ts). Exit 0 trusted, 1 untrusted, whatever made it so.
  *   end <sha>     removes the kept export of <sha>. Exit 0 removed or none there, 1 failed.
  */
 const EXIT = { done: 0, failed: 1 } as const;
@@ -40,11 +47,17 @@ export type ReviewDeps = {
   readonly end: (sha: string) => Promise<boolean>;
   readonly gate: () => Promise<number>;
   readonly guard: () => Promise<number>;
+  readonly trust: (pr: string, head: string) => Promise<TrustDecision>;
 };
 
 export async function runReview(intent: ReviewIntent, deps = defaultDeps()): Promise<number> {
   if (intent.sub === "gate") return await deps.gate();
   if (intent.sub === "guard") return await deps.guard();
+  if (intent.sub === "trust") {
+    const decision = await deps.trust(intent.pr, intent.head);
+    deps.out(terminalText(trustLine(decision)));
+    return decision.trusted ? EXIT.done : EXIT.failed;
+  }
   try {
     if (intent.sub === "end") {
       const removed = await deps.end(intent.sha);
@@ -91,6 +104,10 @@ function defaultDeps(): ReviewDeps {
     err: (s) => console.error(s),
     gate: () => runReviewGate(),
     guard: () => runReviewGuard(),
+    trust: (pr, head) => {
+      const forge = new GhPullRequests(new DenoSubprocessRunner(), cwd);
+      return decideTrust({ pullRequest: (n) => forge.facts(n) }, pr, head);
+    },
     end: (sha) => removeKeptExport(cache(), sha),
     start: async () => {
       const [pass, lock] = await Promise.all([FsReviewPass.open(cwd), FsReviewLock.open(cwd)]);

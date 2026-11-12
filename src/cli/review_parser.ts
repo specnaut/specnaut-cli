@@ -4,7 +4,8 @@ import type { Intent } from "./intent.ts";
 /**
  * `specnaut review gate|guard|start|end`'s arguments, validated into its intent. `gate` and
  * `guard` take none (their input is a hook's, on stdin); `start` one source, a PR number or
- * `<remote>/<branch>`, judged by the export; `end` one full commit id. A refusal is `unknown`,
+ * `<remote>/<branch>`, judged by the export; `trust` two words, a PR number and a commit id, judged
+ * by the decision so that every malformed one prints `untrusted`; `end` one full commit id. A refusal is `unknown`,
  * exit 2 with the help.
  *
  * `start` takes no option and no `--`, read from the raw argument list: the checkout gate lets a
@@ -21,6 +22,10 @@ export function parseReview(rest: readonly string[], argv: readonly string[]): I
     if (argv.some((w) => w.startsWith("-"))) return refused("start takes no option");
     if (words.length !== 1 || words[0] === "") return refused("start takes one source");
     return { kind: "review", sub: "start", source: words[0] };
+  }
+  if (sub === "trust") {
+    if (words.length !== 2) return refused("trust takes one PR number and one commit id");
+    return { kind: "review", sub: "trust", pr: words[0], head: words[1] };
   }
   if (sub === "end") {
     if (words.length !== 1 || !isFullSha(words[0])) return refused("end takes one full commit id");
