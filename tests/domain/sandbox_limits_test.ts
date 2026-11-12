@@ -1,6 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
-import { CAP_ENFORCEMENT, LIMITS, unenforcedCaps } from "../../src/domain/sandbox_limits.ts";
+import {
+  CAP_ENFORCEMENT,
+  LIMITS,
+  STOP_LIMIT,
+  unenforcedCaps,
+} from "../../src/domain/sandbox_limits.ts";
 import { after, policyOf } from "./sandbox_fixture.ts";
 
 /** Where each resource cap is applied: a cap the data puts in a backend's arguments is in them. */
@@ -50,4 +55,10 @@ Deno.test("unenforcedCaps: the container runs with every cap; the others name wh
   assertEquals(unenforcedCaps("container"), []);
   assertEquals(unenforcedCaps("bwrap"), ["processes", "memoryBytes", "cpus"]);
   assertEquals(unenforcedCaps("seatbelt"), ["processes", "memoryBytes", "cpus", "scratchBytes"]);
+});
+
+Deno.test("STOP_LIMIT: only sandbox-exec's stop misses a process that left the run's group", () => {
+  assertEquals(STOP_LIMIT.container, null);
+  assertEquals(STOP_LIMIT.bwrap, null);
+  assertEquals(typeof STOP_LIMIT.seatbelt, "string");
 });

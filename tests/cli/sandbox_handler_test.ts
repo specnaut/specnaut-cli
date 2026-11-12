@@ -2,7 +2,8 @@ import { assertEquals } from "@std/assert";
 import { runSandbox, type SandboxDeps } from "../../src/cli/handlers/sandbox_handler.ts";
 import type { ExecOutcome } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
-import type { BackendProbe } from "../../src/domain/sandbox.ts";
+import type { BackendProbe, SandboxedBackend } from "../../src/domain/sandbox.ts";
+import { STOP_LIMIT } from "../../src/domain/sandbox_limits.ts";
 import type { SandboxIntent } from "../../src/cli/intent.ts";
 
 /**
@@ -53,6 +54,7 @@ Deno.test("sandbox probe: each backend, available or why not, then the one a run
       "UNAVAILABLE container no container image: no devcontainer",
       "UNAVAILABLE bwrap bubblewrap: Linux only",
       "AVAILABLE seatbelt",
+      `LIMIT seatbelt ${STOP_LIMIT.seatbelt}`,
       "BACKEND seatbelt",
     ].join("\n"),
   );
@@ -70,7 +72,7 @@ Deno.test("sandbox probe: with no backend it says static and exits 1", async () 
 Deno.test("sandbox exec: the command's exit code is the exit code", async () => {
   const ran: ExecOutcome = {
     kind: "ran",
-    backend: "seatbelt",
+    backend: "container",
     outcome: { kind: "exited", code: 42 },
   };
   const { d, err } = deps(MAC, () => Promise.resolve(ran));
@@ -102,4 +104,31 @@ Deno.test("sandbox exec: a refusal or a launcher that cannot start is 125, never
     assertEquals(await runSandbox(EXEC, d), 125);
     assertEquals(err.join("\n").includes(failure.message), true);
   }
+});
+
+const ran = (backend: SandboxedBackend): ExecOutcome => ({
+  kind: "ran",
+  backend,
+  outcome: { kind: "exited", code: 0 },
+});
+
+Deno.test("sandbox exec: a run says on stderr what its backend's stop cannot reach, if anything", async () => {
+  for (const backend of ["container", "bwrap", "seatbelt"] as const) {
+    const { d, out, err } = deps(MAC, () => Promise.resolve(ran(backend)));
+    assertEquals(await runSandbox(EXEC, d), 0);
+    const limit = STOP_LIMIT[backend];
+    const expected = limit === null
+      ? []
+      : [`notice: specnaut sandbox exec: LIMIT ${backend} ${limit}`];
+    assertEquals(err, expected, backend);
+    assertEquals(out, [], backend);
+  }
+});
+
+Deno.test("sandbox probe: no LIMIT line for a backend whose stop reaches every process", async () => {
+  const linux: BackendProbe = { ...MAC, os: "linux", sandboxExec: false, bwrap: "usable" };
+  const withBwrap = { ...linux, bwrapVersion: "bubblewrap 0.9.0", arch: "x86_64" };
+  const { d, out } = deps(withBwrap, () => Promise.reject(new Error("unused")));
+  assertEquals(await runSandbox(PROBE, d), 0);
+  assertEquals(out.join("\n").split("\n").filter((l) => l.startsWith("LIMIT")), []);
 });

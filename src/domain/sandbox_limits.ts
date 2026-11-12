@@ -64,3 +64,16 @@ export function unenforcedCaps(backend: SandboxedBackend): (keyof SandboxLimits)
   return (Object.entries(CAP_ENFORCEMENT[backend]) as [keyof SandboxLimits, CapEnforcer][])
     .filter(([, by]) => by === "unenforced").map(([cap]) => cap);
 }
+
+/**
+ * What stopping a run cannot reach, per backend; `null` where it reaches every process. A
+ * container's init and bubblewrap's PID namespace take every process in them when the run ends.
+ * `sandbox-exec` has neither: the stop kills the run's process group, and a process that called
+ * `setsid` has left it. That process stays under the profile (no network, no home, writes only to
+ * the scratch folder), and the run stops waiting on its output soon after the command ends.
+ */
+export const STOP_LIMIT: Readonly<Record<SandboxedBackend, string | null>> = {
+  container: null,
+  bwrap: null,
+  seatbelt: "a process that leaves the run's process group is not stopped with the run",
+};
