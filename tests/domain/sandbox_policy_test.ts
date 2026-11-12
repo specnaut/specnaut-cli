@@ -17,6 +17,8 @@ import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts
  * real home and the user's checkout are never visible.
  */
 
+const QUOTE = "holds a character a backend cannot quote";
+
 function refusal(over: Partial<SandboxPaths>, backend: "bwrap" | "seatbelt" = "bwrap"): string {
   const result = sandboxPolicy(backend, { ...PATHS, ...over });
   assert(!result.ok, `expected a refusal for ${JSON.stringify(over)}`);
@@ -85,22 +87,22 @@ Deno.test("sandboxPolicy: a PATH entry outside every read folder is refused", ()
 });
 
 Deno.test("sandboxPolicy: a path the backends cannot quote or that is not plain is refused", () => {
-  for (
-    const tree of [
-      "relative/tree",
-      "/",
-      "/a/../home/dev",
-      "/a//b",
-      "/a/b/",
-      '/a/"b',
-      "/a/b\\c",
-      "/a/b,c",
-      "/a/b:c",
-      "/a/b\nc",
-      "/a/\u0000",
-    ]
-  ) {
-    assertEquals(sandboxPolicy("seatbelt", { ...PATHS, tree }).ok, false, JSON.stringify(tree));
+  const reasons: [string, string][] = [
+    ["relative/tree", "is not absolute"],
+    ["/", "is the root folder"],
+    ["/a/../home/dev", "is not in plain form"],
+    ["/a//b", "is not in plain form"],
+    ["/a/b/", "is not in plain form"],
+    ['/a/"b', QUOTE],
+    ["/a/b\\c", QUOTE],
+    ["/a/b,c", QUOTE],
+    ["/a/b:c", QUOTE],
+    ["/a/b\nc", QUOTE],
+    ["/a/\u0000", QUOTE],
+  ];
+  for (const [tree, reason] of reasons) {
+    const result = sandboxPolicy("seatbelt", { ...PATHS, tree });
+    assertEquals(result, { ok: false, why: `${JSON.stringify(tree)} ${reason}` }, tree);
   }
 });
 

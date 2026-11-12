@@ -8,6 +8,7 @@ import type { ImageSource } from "../../src/domain/sandbox_image.ts";
  */
 
 const IMAGE: ImageSource = { kind: "pinned", ref: `acme/dev@sha256:${"a".repeat(64)}` };
+const NO_ENGINE_WHY = "container: no rootless podman and no docker";
 const CGROUPS_WHY =
   "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
 const OLD_BWRAP_WHY = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";
@@ -32,7 +33,7 @@ Deno.test("chooseBackend: rootless podman comes first, ahead of docker and bubbl
 });
 
 Deno.test("chooseBackend: podman running as root is passed over for docker", () => {
-  const rooted = probe({ podman: "root", docker: true, bwrap: "usable" });
+  const rooted = probe({ podman: "root", podmanCgroups: true, docker: true, bwrap: "usable" });
   assertEquals(chooseBackend(rooted), { kind: "container", engine: "docker", image: IMAGE.ref });
 });
 
@@ -62,12 +63,10 @@ Deno.test("chooseBackend: no digest-pinned image means no container, whatever en
 });
 
 Deno.test("chooseBackend: bubblewrap blocked by the user-namespace restriction is passed over", () => {
-  const restricted = probe({ bwrap: "userns_restricted" });
-  const chosen = chooseBackend(restricted);
-  assertEquals(chosen.kind, "static");
-  if (chosen.kind === "static") {
-    assertEquals(chosen.why.some((w) => w.includes("user namespaces")), true);
-  }
+  assertEquals(chooseBackend(probe({ bwrap: "userns_restricted" })), {
+    kind: "static",
+    why: [NO_ENGINE_WHY, "bubblewrap: user namespaces restricted"],
+  });
 });
 
 Deno.test("chooseBackend: bubblewrap older than 0.8 cannot forbid nested user namespaces", () => {
@@ -81,7 +80,10 @@ Deno.test("chooseBackend: bubblewrap older than 0.8 cannot forbid nested user na
 });
 
 Deno.test("chooseBackend: bubblewrap is a Linux backend only", () => {
-  assertEquals(chooseBackend(probe({ os: "darwin", bwrap: "usable" })).kind, "static");
+  assertEquals(chooseBackend(probe({ os: "darwin", bwrap: "usable" })), {
+    kind: "static",
+    why: [NO_ENGINE_WHY, "sandbox-exec: not available"],
+  });
 });
 
 Deno.test("chooseBackend: sandbox-exec on macOS when no container runs", () => {
@@ -90,14 +92,15 @@ Deno.test("chooseBackend: sandbox-exec on macOS when no container runs", () => {
 });
 
 Deno.test("chooseBackend: sandbox-exec is a macOS backend only", () => {
-  assertEquals(chooseBackend(probe({ sandboxExec: true })).kind, "static");
+  assertEquals(chooseBackend(probe({ sandboxExec: true })), {
+    kind: "static",
+    why: [NO_ENGINE_WHY, "bubblewrap: not installed"],
+  });
 });
 
 Deno.test("chooseBackend: Windows is static only, even with an engine and a pinned image", () => {
   const win = probe({ os: "windows", podman: "rootless", podmanCgroups: true, docker: true });
-  const chosen = chooseBackend(win);
-  assertEquals(chosen.kind, "static");
-  if (chosen.kind === "static") assertEquals(chosen.why.length, 1);
+  assertEquals(chooseBackend(win), { kind: "static", why: ["no sandbox on Windows"] });
 });
 
 Deno.test("chooseBackend: with no backend it is static only, and says why for each one", () => {

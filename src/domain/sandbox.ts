@@ -24,13 +24,15 @@ import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
 import { ancestors, overlaps, pathProblem, type SandboxPaths, within } from "./sandbox_paths.ts";
 
 export type Engine = "podman" | "docker";
-export type SandboxedBackend = "container" | "bwrap" | "seatbelt";
 
 export type Backend =
   | { readonly kind: "container"; readonly engine: Engine; readonly image: string }
   | { readonly kind: "bwrap" }
   | { readonly kind: "seatbelt" }
   | { readonly kind: "static"; readonly why: readonly string[] };
+
+/** A backend that runs something: every one but static only. */
+export type SandboxedBackend = Exclude<Backend["kind"], "static">;
 
 /** What the host offers, as the caller probed it. */
 export type BackendProbe = {
