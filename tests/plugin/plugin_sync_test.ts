@@ -1,4 +1,5 @@
 import { assertEquals, assertGreaterOrEqual } from "@std/assert";
+import { TASK_PHASES } from "../../src/domain/task_phases.ts";
 import { fromFileUrl, relative } from "@std/path";
 import { walk } from "@std/fs";
 
@@ -30,26 +31,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // `specnaut/phases/` (only addresses changed), so every one is a mirror. The
   // contract docs (`auto-chain`, `plan-reentry`, `epic-*`, `merge-*`, …) are not
   // verbs — synced all the same, because the router loads them on demand.
-  ...[
-    "plan",
-    "plan-reentry",
-    "implement",
-    "review",
-    "review-seats",
-    "merge",
-    "audit",
-    "constitution",
-    "auto-chain",
-    "remote-gates",
-    "script-gate",
-    "orphan-specs",
-    "epic-commits",
-    "epic-fixups",
-    "epic-loop",
-    "merge-close",
-    "merge-squash",
-    "quality-gates",
-  ].map((name) => ({
+  ...TASK_PHASES.map((name) => ({
     plugin: `plugin/skills/task/phases/${name}.md`,
     source: `templates/core/skills/task/phases/${name}.md`,
   })),

@@ -1,3 +1,4 @@
+import { TASK_PHASES } from "./task_phases.ts";
 /**
  * The Claude Code paths the plugin serves, one by one: what `isPluginCoveredPath` checks first and
  * `check --project` reads. Its own module so the list grows without growing the rules that use it.
@@ -41,26 +42,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/task/groom-report.md",
   ".claude/skills/task/resume.md",
   ".claude/skills/task/spec-autogen.md",
-  ...[
-    "plan",
-    "plan-reentry",
-    "implement",
-    "epic-commits",
-    "quality-gates",
-    "epic-fixups",
-    "merge-close",
-    "epic-loop",
-    "review",
-    "review-seats",
-    "merge",
-    "merge-squash",
-    "auto-chain",
-    "remote-gates",
-    "script-gate",
-    "orphan-specs",
-    "audit",
-    "constitution",
-  ].map((name) => `.claude/skills/task/phases/${name}.md`),
+  ...TASK_PHASES.map((name) => `.claude/skills/task/phases/${name}.md`),
 
   // Every remaining core skill, each owning exactly one document. They were
   // uncovered not by decision but by omission: the list was written when
