@@ -31800,16 +31800,19 @@ sanitise_title() {
 # report-upstream.sh's header too.
 # A line is a name, one space, then a POSIX extended regular expression, to the end
 # of the line. A name on several lines is one pattern: its lines joined by \`|\`.
-# The one bracket class used is [:space:]; the binary translates no other.
+# The one bracket class used is [:space:]; the binary translates no other. Every run
+# a pattern repeats before something must follow is bounded ({0,64}, not *): unbounded,
+# a long line makes a backtracking engine rescan it from every position. No bound
+# exceeds 255, POSIX's RE_DUP_MAX: grep refuses a pattern that does.
 #   SECRET_RE          a known token shape
 #   SECRET_ANYCASE_RE  case-insensitive: a credential assigned a value, an auth header
 #   SCHEME_VALUE_RE    case-insensitive: Bearer or Basic, and the value after it
 #   TOKEN_LIKE_RE      what makes that value a credential rather than a word
-SECRET_RE gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}\\.|-----BEGIN|[A-Za-z][A-Za-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@
+SECRET_RE gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,255}\\.[A-Za-z0-9_-]{4}|-----BEGIN|(^|[^A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]{0,31}://[^/[:space:]:@]{1,255}:[^/[:space:]@]{1,255}@
 # Anchored: \`task-x\`, \`global-x\`, \`risk_live\` and \`shelf_x\` are words, not tokens.
 SECRET_RE (^|[^A-Za-z0-9])(gl(pat|ptt|dt|rt|cbt|oas|ft|imt|agent|soat|ffct)-[A-Za-z0-9_-]{16,}|sk-ant-|sk-[A-Za-z0-9_-]{16,}|[sr]k_live|sk_test_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9+/=]{8,}|pypi-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{16,}|SG\\.[A-Za-z0-9_-]{16,}|shpat_[A-Za-z0-9]{8,}|dop_v1_[A-Za-z0-9]{8,}|ya29\\.[A-Za-z0-9_-]{16,}|xapp-[A-Za-z0-9-]{8,}|dckr_pat_[A-Za-z0-9_-]{8,}|xox[a-z0-9]-)
 # A placeholder such as <redacted> is not a value.
-SECRET_ANYCASE_RE (pass(word|wd)?|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret|credential)[A-Za-z0-9_-]*["']?[[:space:]]*[:=][[:space:]]*["']?[^[:space:]"'<]{8,}|authorization["']?[[:space:]]*[:=]|(cookie|x-api-key)[[:space:]]*:
+SECRET_ANYCASE_RE (pass(word|wd)?|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret|credential)[A-Za-z0-9_-]{0,64}["']?[[:space:]]*[:=][[:space:]]*["']?[^[:space:]"'<]{8,}|authorization["']?[[:space:]]*[:=]|(cookie|x-api-key)[[:space:]]*:
 SCHEME_VALUE_RE (bearer|basic)[[:space:]]+[A-Za-z0-9._~+/=-]{8,}
 TOKEN_LIKE_RE [0-9_~+/=]|[a-z][A-Z]|[A-Za-z0-9]\\.[A-Za-z0-9]
 `,
