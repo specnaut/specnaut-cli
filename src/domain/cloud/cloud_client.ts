@@ -13,6 +13,7 @@ import {
   strField,
 } from "./cloud_wire.ts";
 import { tokenPair } from "./token_pair.ts";
+import { refuseCredentials } from "./credential_check.ts";
 
 export type DeviceStart = {
   deviceCode: string;
@@ -243,6 +244,7 @@ export class CloudClient {
     key: string,
     name: string,
   ): Promise<CloudProject> {
+    refuseCredentials([["project key", key], ["project name", name]]);
     const { status, json } = await this.postJson("/projects", { key, name }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create project failed");
@@ -264,6 +266,7 @@ export class CloudClient {
     projectKey: string,
     title: string,
   ): Promise<CloudTask> {
+    refuseCredentials([["task title", title]]);
     const { status, json } = await this.postJson("/tasks", { projectKey, title }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create task failed");

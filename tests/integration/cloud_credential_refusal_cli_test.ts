@@ -1,0 +1,88 @@
+import { assertEquals } from "@std/assert";
+import { runSpec, type SpecIntent } from "../../src/cli/handlers/spec_handler.ts";
+import { type GateIntent, runGate } from "../../src/cli/handlers/gate_handler.ts";
+import { SpecSession } from "../../src/domain/cloud/spec_session.ts";
+import { SpecClient } from "../../src/domain/cloud/spec_client.ts";
+import { CloudClient, type FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { GateClient } from "../../src/domain/cloud/gate_client.ts";
+import { GateSession } from "../../src/domain/cloud/gate_session.ts";
+import type { SpecStep } from "../../src/domain/spec/spec_step.ts";
+import type { SpecBackend } from "../../src/domain/installed_lock.ts";
+
+/**
+ * `spec push` and `gate raise` with a credential in what they would send: the command
+ * says which field and which class, exits 1, makes no request, and prints no value.
+ */
+
+const API = "https://api.example.com";
+const VALUE = `gh${"p"}_${"a".repeat(36)}`;
+
+function recording() {
+  const out: string[] = [];
+  const err: string[] = [];
+  let calls = 0;
+  const fetchFn = (() => {
+    calls++;
+    return Promise.resolve(new Response("{}", { status: 500 }));
+  }) as FetchFn;
+  return { out, err, fetchFn, calls: () => calls };
+}
+
+Deno.test("spec push refuses a step that holds a credential, and sends nothing", async () => {
+  const r = recording();
+  const steps: SpecStep[] = [{ key: "plan", name: "Plan", order: 1, body: `Use ${VALUE}.` }];
+  const session = new SpecSession({
+    projectKey: "ACME",
+    client: new SpecClient(API, r.fetchFn),
+    cloudClient: new CloudClient(API, r.fetchFn),
+    token: () => Promise.resolve("tok"),
+  });
+  const intent: SpecIntent = { kind: "spec", sub: "push", task: 7, apiUrl: null };
+  const code = await runSpec(intent, {
+    out: (s) => r.out.push(s),
+    err: (s) => r.err.push(s),
+    projectDir: "/nonexistent",
+    readSpecBackend: () => Promise.resolve("cloud" as SpecBackend),
+    buildSession: () => Promise.resolve(session),
+    cache: {
+      read: () => Promise.resolve(steps),
+      write: () => Promise.resolve([]),
+      clear: () => Promise.resolve(),
+    },
+  });
+  assertEquals([code, r.calls(), r.out], [1, 0, []]);
+  assertEquals(r.err.length, 1);
+  assertEquals(/step 1 body.*\(token\)/.test(r.err[0]), true, r.err[0]);
+  assertEquals(r.err[0].includes(VALUE), false);
+});
+
+Deno.test("gate raise refuses a title that holds a credential, and sends nothing", async () => {
+  const r = recording();
+  const session = new GateSession({
+    projectKey: "ACME",
+    client: new GateClient(API, r.fetchFn),
+    remote: { enabled: true, awaitTimeoutMs: 60_000, pollIntervalMs: 5_000 },
+    token: () => Promise.resolve("tok"),
+    now: () => 0,
+    sleep: () => Promise.resolve(),
+  });
+  const intent: GateIntent = {
+    kind: "gate",
+    sub: "raise",
+    apiUrl: null,
+    type: "decision",
+    title: `Rotate ${VALUE}?`,
+    payload: '{"question":"q","options":[{"id":"A","label":"Yes"}]}',
+    task: null,
+    id: null,
+  };
+  const code = await runGate(intent, {
+    out: (s) => r.out.push(s),
+    err: (s) => r.err.push(s),
+    buildSession: () => Promise.resolve(session),
+  });
+  assertEquals([code, r.calls(), r.out], [1, 0, []]);
+  assertEquals(r.err.length, 1);
+  assertEquals(/gate title.*\(token\)/.test(r.err[0]), true, r.err[0]);
+  assertEquals(r.err[0].includes(VALUE), false);
+});

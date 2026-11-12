@@ -11,6 +11,7 @@ import type { FetchFn } from "./cloud_client.ts";
 import { cloudFetch, isRedirectStatus, isUnavailableStatus, jsonObject } from "./cloud_wire.ts";
 import { parseSpec, type SpecWire } from "./spec_contract.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
+import { refuseCredentials } from "./credential_check.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type SpecErrorReason =
@@ -87,6 +88,7 @@ export class SpecClient {
     taskNumber: number,
     title?: string,
   ): Promise<SpecWire> {
+    if (title !== undefined) refuseCredentials([["spec title", title]]);
     const { status, json } = await this.send("POST", "/specs", token, {
       projectKey,
       taskNumber,
@@ -122,6 +124,11 @@ export class SpecClient {
     taskNumber: number,
     steps: readonly SpecStep[],
   ): Promise<void> {
+    refuseCredentials(steps.flatMap((s, i): [string, string][] => [
+      [`step ${i + 1} key`, s.key],
+      [`step ${i + 1} name`, s.name],
+      [`step ${i + 1} body`, s.body],
+    ]));
     const { status } = await this.send("PUT", "/specs/steps", token, {
       projectKey,
       taskNumber,

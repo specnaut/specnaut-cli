@@ -235,5 +235,5 @@ function reasonOf(e: unknown): GateErrorReason | "unknown" {
 
 function errorOutcome(e: unknown): ResolutionOutcome {
   if (e instanceof GateApiError) return { kind: "error", reason: e.reason };
-  return { kind: "error", reason: "transient" };
+  throw e; // Not Cloud's answer: a refusal before the request, or a bug, is never "transient".
 }

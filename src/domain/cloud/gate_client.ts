@@ -12,6 +12,7 @@
 import type { FetchFn } from "./cloud_client.ts";
 import { cloudFetch, isRedirectStatus, isUnavailableStatus, readJson } from "./cloud_wire.ts";
 import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
+import { jsonFields, refuseCredentials } from "./credential_check.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type GateErrorReason =
@@ -75,6 +76,7 @@ export class GateClient {
 
   /** POST /api/v1/gates — open a gate. 201 ⇒ the new `open` gate. */
   async open(token: string, req: GateRequest): Promise<Gate> {
+    refuseCredentials([["gate title", req.title], ...jsonFields("gate payload", req.payload)]);
     const { status, json } = await this.send("POST", "/gates", token, {
       projectKey: req.projectKey,
       type: req.type,

@@ -187,6 +187,7 @@ async function runPush(task: number, deps: SpecDeps): Promise<number> {
   try {
     await new CloudSpecStore(session).push(task, steps);
   } catch (e) {
+    if (isLocalFailure(e)) throw e;
     deps.err(actionable(e, `push spec for task ${task}`));
     return 5;
   }
