@@ -13,7 +13,13 @@ export const SCOPE_SOURCE = fromFileUrl(
   new URL("../../templates/core/skills/task/scripts/collect-audit-scope.sh", import.meta.url),
 );
 const SCRIPTS_BASH = "../../templates/core/specnaut/scripts/bash/";
-const LIBRARY = ["_git_untrusted.sh", "_scope_globs.sh", "_explicit_head.sh", "_audit_scopes.sh"];
+const LIBRARY = [
+  "_git_untrusted.sh",
+  "_git_manifests.sh",
+  "_scope_globs.sh",
+  "_explicit_head.sh",
+  "_audit_scopes.sh",
+];
 
 /**
  * The script runs from a folder laid out as `init` installs it: the git library

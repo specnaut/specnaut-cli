@@ -16695,7 +16695,8 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
     content: `# shellcheck shell=bash
 # _git_untrusted.sh - git with hardened defaults, for reading a repository whose
 # configuration nobody vetted. Sourced, never run: git-read.sh is its command
-# line and lists its forms; collect-audit-scope.sh sources it beside itself.
+# line and lists its forms; collect-audit-scope.sh sources it beside itself. The
+# manifests form lives in _git_manifests.sh, sourced here.
 #
 # The one home of how git reads such a repository. Every call drops the GIT_*
 # environment and runs with these defaults, each turning off a program or a
@@ -16728,10 +16729,11 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 # that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$_gu_here/_scope_globs.sh" ] && [ -f "\$_gu_here/_explicit_head.sh" ] ||
-  { echo "git-read: _scope_globs.sh or _explicit_head.sh is missing from \$_gu_here" >&2 && return 70; }
-# shellcheck source=SCRIPTDIR/_scope_globs.sh disable=SC1091
-. "\$_gu_here/_scope_globs.sh" && . "\$_gu_here/_explicit_head.sh"
+for _gu_lib in _scope_globs.sh _explicit_head.sh _git_manifests.sh; do
+  [ -f "\$_gu_here/\$_gu_lib" ] || { echo "git-read: \$_gu_lib is missing from \$_gu_here" >&2 && return 70; }
+  # shellcheck source=/dev/null
+  . "\$_gu_here/\$_gu_lib" || return 70
+done
 
 # A revision: ref-name characters only, the whole string, never an option or a
 # range. \`+\` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
@@ -16872,29 +16874,6 @@ gu_base() {
   [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "\$1" || return 2
   _gu_git merge-base --end-of-options "\${EXPLICIT_HEAD:-HEAD}" "\$1"
-}
-
-# The patch of every changed file _scope_globs.sh counts as a manifest, in a new
-# temp file outside the repository; it prints that path and the count, so no file
-# name reaches a command line. The names come from git (NUL-separated) and go
-# after \`--\` as they are: --literal-pathspecs keeps each one a path.
-gu_manifests() {
-  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
-  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
-  local out names f rc=0 picked=()
-  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
-  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
-  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
-  while IFS= read -r -d '' f; do
-    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
-  done <"\$names"
-  rm -f "\$names"
-  # None changed: the file stays empty, since a patch naming no path is the whole diff.
-  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
-    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
-  fi
-  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
-  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
@@ -17043,6 +17022,42 @@ _explicit_head_own_alternates() {
 explicit_head_names_head() {
   local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?\$'
   [[ \$1 =~ \$re ]]
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/audit/_git_manifests.sh",
+    content: `# shellcheck shell=bash
+# _git_manifests.sh - git-read's \`manifests\` form: the patch of every changed file
+# _scope_globs.sh counts as a manifest. Sourced, never run, by _git_untrusted.sh, whose
+# argument checks and git runner it calls.
+
+# gu_manifests <a> <b> - that patch, in a new temp file outside the repository; it
+# prints that path and the count, so no file name reaches a command line. The names
+# come from git (NUL-separated) and go after \`--\` as they are: --literal-pathspecs
+# keeps each one a path.
+gu_manifests() {
+  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  local out names f rc=0 picked=()
+  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
+  while IFS= read -r -d '' f; do
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
+  done <"\$names"
+  rm -f "\$names"
+  # None changed: the file stays empty, since a patch naming no path is the whole diff.
+  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
+    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
+  fi
+  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
+  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
@@ -32755,7 +32770,8 @@ exit 0
     content: `# shellcheck shell=bash
 # _git_untrusted.sh - git with hardened defaults, for reading a repository whose
 # configuration nobody vetted. Sourced, never run: git-read.sh is its command
-# line and lists its forms; collect-audit-scope.sh sources it beside itself.
+# line and lists its forms; collect-audit-scope.sh sources it beside itself. The
+# manifests form lives in _git_manifests.sh, sourced here.
 #
 # The one home of how git reads such a repository. Every call drops the GIT_*
 # environment and runs with these defaults, each turning off a program or a
@@ -32788,10 +32804,11 @@ exit 0
 # that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$_gu_here/_scope_globs.sh" ] && [ -f "\$_gu_here/_explicit_head.sh" ] ||
-  { echo "git-read: _scope_globs.sh or _explicit_head.sh is missing from \$_gu_here" >&2 && return 70; }
-# shellcheck source=SCRIPTDIR/_scope_globs.sh disable=SC1091
-. "\$_gu_here/_scope_globs.sh" && . "\$_gu_here/_explicit_head.sh"
+for _gu_lib in _scope_globs.sh _explicit_head.sh _git_manifests.sh; do
+  [ -f "\$_gu_here/\$_gu_lib" ] || { echo "git-read: \$_gu_lib is missing from \$_gu_here" >&2 && return 70; }
+  # shellcheck source=/dev/null
+  . "\$_gu_here/\$_gu_lib" || return 70
+done
 
 # A revision: ref-name characters only, the whole string, never an option or a
 # range. \`+\` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
@@ -32932,29 +32949,6 @@ gu_base() {
   [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "\$1" || return 2
   _gu_git merge-base --end-of-options "\${EXPLICIT_HEAD:-HEAD}" "\$1"
-}
-
-# The patch of every changed file _scope_globs.sh counts as a manifest, in a new
-# temp file outside the repository; it prints that path and the count, so no file
-# name reaches a command line. The names come from git (NUL-separated) and go
-# after \`--\` as they are: --literal-pathspecs keeps each one a path.
-gu_manifests() {
-  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
-  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
-  local out names f rc=0 picked=()
-  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
-  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
-  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
-  while IFS= read -r -d '' f; do
-    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
-  done <"\$names"
-  rm -f "\$names"
-  # None changed: the file stays empty, since a patch naming no path is the whole diff.
-  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
-    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
-  fi
-  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
-  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
@@ -33103,6 +33097,42 @@ _explicit_head_own_alternates() {
 explicit_head_names_head() {
   local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?\$'
   [[ \$1 =~ \$re ]]
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_git_manifests.sh",
+    content: `# shellcheck shell=bash
+# _git_manifests.sh - git-read's \`manifests\` form: the patch of every changed file
+# _scope_globs.sh counts as a manifest. Sourced, never run, by _git_untrusted.sh, whose
+# argument checks and git runner it calls.
+
+# gu_manifests <a> <b> - that patch, in a new temp file outside the repository; it
+# prints that path and the count, so no file name reaches a command line. The names
+# come from git (NUL-separated) and go after \`--\` as they are: --literal-pathspecs
+# keeps each one a path.
+gu_manifests() {
+  [ \$# -eq 2 ] || { _gu_refuse "manifests takes <a> <b>"; return 2; }
+  _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
+  local out names f rc=0 picked=()
+  out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
+  while IFS= read -r -d '' f; do
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
+  done <"\$names"
+  rm -f "\$names"
+  # None changed: the file stays empty, since a patch naming no path is the whole diff.
+  if [ "\$rc" -eq 0 ] && [ \${#picked[@]} -gt 0 ]; then
+    _gu_git diff "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- "\${picked[@]}" >"\$out" || rc=\$?
+  fi
+  [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
+  printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
 }
 `,
     executable: true,
