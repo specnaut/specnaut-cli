@@ -83,14 +83,21 @@ Deno.test("the committed history passes its own check", async () => {
 Deno.test("the committed history always checks out LF, so Windows bundles it too", () => {
   // The refusal above reads the checkout's bytes: Windows' CRLF checkout once
   // turned every history file into a refused one there and nowhere else.
-  const file = ".specnaut/release/history/v9.2.0.md";
-  const attr = new Deno.Command("git", {
-    args: ["check-attr", "eol", "--", file],
-    cwd: new URL("../../", import.meta.url),
-  }).outputSync();
-  assertEquals(
-    new TextDecoder().decode(attr.stdout).trim(),
-    `${file}: eol: lf`,
-    ".gitattributes must mark the release history eol=lf",
-  );
+  // So do the fixtures the integration test compares the history with.
+  for (
+    const file of [
+      ".specnaut/release/history/v9.2.0.md",
+      "tests/fixtures/release_highlights/v9.1.0.md",
+    ]
+  ) {
+    const attr = new Deno.Command("git", {
+      args: ["check-attr", "eol", "--", file],
+      cwd: new URL("../../", import.meta.url),
+    }).outputSync();
+    assertEquals(
+      new TextDecoder().decode(attr.stdout).trim(),
+      `${file}: eol: lf`,
+      `.gitattributes must mark ${file} eol=lf`,
+    );
+  }
 });

@@ -3,3 +3,5 @@
 packaging/macos/entitlements.plist -text
 # The bundler refuses a release history file holding a CR (cli#759): always check out LF.
 .specnaut/release/history/*.md text eol=lf
+# The integration test compares these to the history byte for byte: same rule.
+tests/fixtures/release_highlights/*.md text eol=lf
