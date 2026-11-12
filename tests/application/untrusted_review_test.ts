@@ -5,15 +5,9 @@ import { ExportRefused } from "../../src/application/untrusted_review_ports.ts";
 import type { TreeObjects } from "../../src/application/untrusted_review_ports.ts";
 import type { BranchSource } from "../../src/domain/branch_source.ts";
 import { TreeRefused } from "../../src/domain/tree_plan.ts";
+import { exists } from "../helpers/fs_exists.ts";
 import { blob, commit, git, type RawEntry, tree } from "../helpers/git_fixture.ts";
-import {
-  cacheEntries,
-  depsOf,
-  exists,
-  exportOf,
-  fetcherOf,
-  withWorld,
-} from "../helpers/export_world.ts";
+import { cacheEntries, depsOf, exportOf, fetcherOf, withWorld } from "../helpers/export_world.ts";
 
 const mode = async (p: string) => (await Deno.lstat(p)).mode! & 0o777;
 const posix = Deno.build.os !== "windows";

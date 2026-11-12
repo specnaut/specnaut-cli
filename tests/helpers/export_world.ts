@@ -64,5 +64,3 @@ export async function cacheEntries(w: World): Promise<string[]> {
   for await (const e of Deno.readDir(w.cache)) names.push(e.name);
   return names;
 }
-
-export const exists = (p: string) => Deno.lstat(p).then(() => true, () => false);

@@ -8,6 +8,7 @@ import {
   GitBranchFetcher,
   redacted,
 } from "../../src/infrastructure/git_branch_fetch.ts";
+import { exists } from "../helpers/fs_exists.ts";
 import { blob, commit, git, initRepo, tempDir, tree } from "../helpers/git_fixture.ts";
 
 Deno.test("the URL and the refspec come after --, and nothing follows them", () => {
@@ -78,7 +79,7 @@ Deno.test("a PR head is fetched into a bare repository that borrows the project'
     assertEquals(alternates, `${join(await Deno.realPath(w.project), ".git", "objects")}\n`);
     assertEquals(await git(w.out, ["rev-parse", "--is-bare-repository"]), "true");
     assertEquals(await git(w.out, ["for-each-ref", "--format=%(refname)"]), FETCHED_REF);
-    assertEquals(await Deno.lstat(join(w.out, "hooks")).then(() => true, () => false), false);
+    assertEquals(await exists(join(w.out, "hooks")), false);
   } finally {
     await w.cleanup();
   }

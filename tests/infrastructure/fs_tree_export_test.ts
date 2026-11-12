@@ -4,11 +4,11 @@ import { ExportRefused } from "../../src/application/untrusted_review_ports.ts";
 import type { ExportPlan } from "../../src/domain/tree_plan.ts";
 import { exportCacheRoot, FsExportStore } from "../../src/infrastructure/fs_tree_export.ts";
 import { GitTreeObjects } from "../../src/infrastructure/git_tree_objects.ts";
+import { exists } from "../helpers/fs_exists.ts";
 import { blob, commit, git, initRepo, tempDir, tree } from "../helpers/git_fixture.ts";
 
 const env = (vars: Record<string, string>) => (name: string) => vars[name];
 const posix = Deno.build.os !== "windows";
-const exists = (p: string) => Deno.lstat(p).then(() => true, () => false);
 
 Deno.test("the export lives in the user's cache folder, as each platform names it", () => {
   const tail = join("specnaut", "untrusted");
