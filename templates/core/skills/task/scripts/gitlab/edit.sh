@@ -7,7 +7,8 @@
 #
 # Each value reaches glab as one argument, with no shell between the two.
 # Exit: 0 edited · 2 usage · 3 the description could not be read · 14 a text
-# its secret check refused (require_clean_text), nothing sent · other glab's
+# its secret check refused (require_clean_text), or a description that holds a
+# quick action, which a rewrite would run: nothing sent · other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -37,6 +38,9 @@ ARGS=(issue update "$NUM" --repo "$PROJECT_ID")
 if [ -n "$APPEND" ]; then
   BODY=$(glab issue view "$NUM" --repo "$PROJECT_ID" --output json | jq_lf -r '.description // ""') ||
     { echo "edit.sh: could not read #$NUM's description" >&2; exit 3; }
+  # Rewriting the description would run any quick action it already holds.
+  rc=0; quick_action_check "$BODY" >/dev/null || rc=$?
+  case $rc in 0) ;; 1) echo "REFUSED quick-action description" >&2; exit 14 ;; *) exit 2 ;; esac
   ADDED=$(cat -- "$APPEND"; printf x)
   if [ -n "$BODY" ]; then BODY="$BODY"$'\n\n'"${ADDED%x}"; else BODY=${ADDED%x}; fi
   ARGS+=(--description "$BODY")

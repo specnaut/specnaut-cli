@@ -65,6 +65,11 @@ fi
 # error. There is no silent write-only path to guard, so a guard would buy
 # nothing and add a second way to fail.
 
+# GitLab runs a quick action (`/close`, `/label`, ...) found on a line of an
+# issue's text: every text this family sends is refused one
+# (`quick_action_check`, _clean_text.sh).
+BACKLOG_QUICK_ACTIONS=1
+
 # `glab` reads the host from the GITLAB_HOST env var; the --repo flag
 # accepts either a numeric id or a "group/project" path.
 export GITLAB_HOST="$HOST"

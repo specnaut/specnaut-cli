@@ -8437,7 +8437,7 @@ CLEAN_TEXT_JQ='
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# \`hidden\`, \`quick-action\`) on stdout, 2 with one line on stderr when there is no scan to run,
 # the text could not be read, or a grep of the scan failed: a scan that did not
 # run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
@@ -8456,9 +8456,26 @@ text_refusal() (
     exit 1
   }
   bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
+  quick_action_check "\${bytes%x}" || exit \$?
   scan_hard "\${bytes%x}"
   exit 0
 )
+
+# quick_action_check <text> -- on a tracker that runs quick actions
+# (BACKLOG_QUICK_ACTIONS=1, set by gitlab's _config.sh), status 1 and
+# \`quick-action\` on stdout when a line of <text> starts with \`/\` and a letter:
+# GitLab runs it with the writer's token, past every scope and cascade check.
+# A CR ends a line too. 0 otherwise; 2, said on stderr, when grep could not run.
+quick_action_check() {
+  [ "\${BACKLOG_QUICK_ACTIONS:-}" = 1 ] || return 0
+  local rc=0
+  printf '%s\\n' "\${1-}" | tr '\\r' '\\n' | LC_ALL=C grep -Eq '^[[:blank:]]*/[A-Za-z]' || rc=\$?
+  case \$rc in
+    0) printf quick-action; return 1 ;;
+    1) return 0 ;;
+    *) echo "\${0##*/}: the quick-action check could not run" >&2; return 2 ;;
+  esac
+}
 
 # require_clean_text <field> <text> -- a writer's check of one text field, before
 # its first tracker call or file write: clean, or it ends the calling script with
@@ -11658,7 +11675,7 @@ CLEAN_TEXT_JQ='
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# \`hidden\`, \`quick-action\`) on stdout, 2 with one line on stderr when there is no scan to run,
 # the text could not be read, or a grep of the scan failed: a scan that did not
 # run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
@@ -11677,9 +11694,26 @@ text_refusal() (
     exit 1
   }
   bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
+  quick_action_check "\${bytes%x}" || exit \$?
   scan_hard "\${bytes%x}"
   exit 0
 )
+
+# quick_action_check <text> -- on a tracker that runs quick actions
+# (BACKLOG_QUICK_ACTIONS=1, set by gitlab's _config.sh), status 1 and
+# \`quick-action\` on stdout when a line of <text> starts with \`/\` and a letter:
+# GitLab runs it with the writer's token, past every scope and cascade check.
+# A CR ends a line too. 0 otherwise; 2, said on stderr, when grep could not run.
+quick_action_check() {
+  [ "\${BACKLOG_QUICK_ACTIONS:-}" = 1 ] || return 0
+  local rc=0
+  printf '%s\\n' "\${1-}" | tr '\\r' '\\n' | LC_ALL=C grep -Eq '^[[:blank:]]*/[A-Za-z]' || rc=\$?
+  case \$rc in
+    0) printf quick-action; return 1 ;;
+    1) return 0 ;;
+    *) echo "\${0##*/}: the quick-action check could not run" >&2; return 2 ;;
+  esac
+}
 
 # require_clean_text <field> <text> -- a writer's check of one text field, before
 # its first tracker call or file write: clean, or it ends the calling script with
@@ -12442,6 +12476,11 @@ fi
 # so a wrong value fails on the very first read, loudly, with \`glab\`'s own
 # error. There is no silent write-only path to guard, so a guard would buy
 # nothing and add a second way to fail.
+
+# GitLab runs a quick action (\`/close\`, \`/label\`, ...) found on a line of an
+# issue's text: every text this family sends is refused one
+# (\`quick_action_check\`, _clean_text.sh).
+BACKLOG_QUICK_ACTIONS=1
 
 # \`glab\` reads the host from the GITLAB_HOST env var; the --repo flag
 # accepts either a numeric id or a "group/project" path.
@@ -13702,7 +13741,8 @@ receipt_snapshot() { :; }
 #
 # Each value reaches glab as one argument, with no shell between the two.
 # Exit: 0 edited · 2 usage · 3 the description could not be read · 14 a text
-# its secret check refused (require_clean_text), nothing sent · other glab's
+# its secret check refused (require_clean_text), or a description that holds a
+# quick action, which a rewrite would run: nothing sent · other glab's
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -13732,6 +13772,9 @@ ARGS=(issue update "\$NUM" --repo "\$PROJECT_ID")
 if [ -n "\$APPEND" ]; then
   BODY=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json | jq_lf -r '.description // ""') ||
     { echo "edit.sh: could not read #\$NUM's description" >&2; exit 3; }
+  # Rewriting the description would run any quick action it already holds.
+  rc=0; quick_action_check "\$BODY" >/dev/null || rc=\$?
+  case \$rc in 0) ;; 1) echo "REFUSED quick-action description" >&2; exit 14 ;; *) exit 2 ;; esac
   ADDED=\$(cat -- "\$APPEND"; printf x)
   if [ -n "\$BODY" ]; then BODY="\$BODY"\$'\\n\\n'"\${ADDED%x}"; else BODY=\${ADDED%x}; fi
   ARGS+=(--description "\$BODY")
@@ -14108,7 +14151,7 @@ CLEAN_TEXT_JQ='
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# \`hidden\`, \`quick-action\`) on stdout, 2 with one line on stderr when there is no scan to run,
 # the text could not be read, or a grep of the scan failed: a scan that did not
 # run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
@@ -14127,9 +14170,26 @@ text_refusal() (
     exit 1
   }
   bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
+  quick_action_check "\${bytes%x}" || exit \$?
   scan_hard "\${bytes%x}"
   exit 0
 )
+
+# quick_action_check <text> -- on a tracker that runs quick actions
+# (BACKLOG_QUICK_ACTIONS=1, set by gitlab's _config.sh), status 1 and
+# \`quick-action\` on stdout when a line of <text> starts with \`/\` and a letter:
+# GitLab runs it with the writer's token, past every scope and cascade check.
+# A CR ends a line too. 0 otherwise; 2, said on stderr, when grep could not run.
+quick_action_check() {
+  [ "\${BACKLOG_QUICK_ACTIONS:-}" = 1 ] || return 0
+  local rc=0
+  printf '%s\\n' "\${1-}" | tr '\\r' '\\n' | LC_ALL=C grep -Eq '^[[:blank:]]*/[A-Za-z]' || rc=\$?
+  case \$rc in
+    0) printf quick-action; return 1 ;;
+    1) return 0 ;;
+    *) echo "\${0##*/}: the quick-action check could not run" >&2; return 2 ;;
+  esac
+}
 
 # require_clean_text <field> <text> -- a writer's check of one text field, before
 # its first tracker call or file write: clean, or it ends the calling script with
@@ -15833,7 +15893,7 @@ CLEAN_TEXT_JQ='
 # the scan (only a caller that writes pays for it), in the C locale the scan
 # pins, with \`set +e\`: a writer's \`set -e\` would end a scan at the first grep
 # that finds nothing. Status: 0 clean, 1 refused with the class (\`secret\`,
-# \`hidden\`) on stdout, 2 with one line on stderr when there is no scan to run,
+# \`hidden\`, \`quick-action\`) on stdout, 2 with one line on stderr when there is no scan to run,
 # the text could not be read, or a grep of the scan failed: a scan that did not
 # run is no verdict, neither clean nor a refusal. Never 0 unscanned.
 text_refusal() (
@@ -15852,9 +15912,26 @@ text_refusal() (
     exit 1
   }
   bytes=\$(read_bytes) || { echo "\${0##*/}: the text could not be read" >&2; exit 2; }
+  quick_action_check "\${bytes%x}" || exit \$?
   scan_hard "\${bytes%x}"
   exit 0
 )
+
+# quick_action_check <text> -- on a tracker that runs quick actions
+# (BACKLOG_QUICK_ACTIONS=1, set by gitlab's _config.sh), status 1 and
+# \`quick-action\` on stdout when a line of <text> starts with \`/\` and a letter:
+# GitLab runs it with the writer's token, past every scope and cascade check.
+# A CR ends a line too. 0 otherwise; 2, said on stderr, when grep could not run.
+quick_action_check() {
+  [ "\${BACKLOG_QUICK_ACTIONS:-}" = 1 ] || return 0
+  local rc=0
+  printf '%s\\n' "\${1-}" | tr '\\r' '\\n' | LC_ALL=C grep -Eq '^[[:blank:]]*/[A-Za-z]' || rc=\$?
+  case \$rc in
+    0) printf quick-action; return 1 ;;
+    1) return 0 ;;
+    *) echo "\${0##*/}: the quick-action check could not run" >&2; return 2 ;;
+  esac
+}
 
 # require_clean_text <field> <text> -- a writer's check of one text field, before
 # its first tracker call or file write: clean, or it ends the calling script with
