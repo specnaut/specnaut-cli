@@ -1534,8 +1534,8 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    - **Anything else** — exit 3, no \`specnaut\` on the PATH, output without those parts: stop on the
      branch and say so. Nothing lands.
 
-   A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\`, or a \`workflow\` line other than \`VERDICT
-   workflow trusted\`, on any run, makes the merge mode \`manual\`: ask \`phases/auto-chain.md\`'s one
+   A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\`, on any run, makes the merge mode \`manual\`, and
+   so does any run unless it printed \`VERDICT workflow trusted\`: ask \`phases/auto-chain.md\`'s one
    question before step 3 unless the user already answered one. Every other config line acts
    where its input is read, per \`phases/script-gate.md\` § The config verdicts.
    Each run's \`NAMES_FILE\` is removed (\`rm -f\`) once the next run prints its own, and the last
@@ -3517,11 +3517,9 @@ plan → implement → review → merge → push
    untrusted verdict: behind the base only, it rebases and the mode is read below; any other
    untrusted reason is step 0's one question, asked instead of "Ready to merge?", so nothing is
    asked twice; anything else stops. A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\` means \`manual\`
-   and the script below does not run; so does a \`workflow\` line other than \`VERDICT workflow
-   trusted\`, or a \`backlog-config\` line other than \`VERDICT backlog-config trusted\`
-   (\`phases/script-gate.md\`). Under the latter, remote mode is on when the base tip's copy turns
-   it on (\`git show <BASE_TIP>:.specnaut/backlog-config.yml\`), whatever \`specnaut gate status\`
-   says of the tree: a branch never turns remote mode off. A dirty tree (\`git -c core.fsmonitor=false status
+   and the script below does not run; so it is, and the script does not run, unless the gate
+   printed both \`VERDICT workflow trusted\` and \`VERDICT backlog-config trusted\`
+   (\`phases/script-gate.md\`): a missing line is an untrusted one. A dirty tree (\`git -c core.fsmonitor=false status
    --porcelain\` prints a line) is never \`auto\`: say so. Otherwise:
 
    \`\`\`
@@ -3537,6 +3535,10 @@ plan → implement → review → merge → push
 
 When the project is in remote mode (\`specnaut gate status\` exits 0), read \`phases/remote-gates.md\`:
 it raises the plan and merge approvals as gates, and remote mode keeps its gate under either mode.
+Remote mode is on, whatever the verdict, when the tree or the base tip's copy turns it on (\`git
+show <BASE_TIP>:.specnaut/backlog-config.yml\`); a copy that does not parse never turns it off, so a
+branch never turns it off. On, and the gate did not print \`VERDICT backlog-config trusted\`: stop on
+the branch, nothing lands. \`specnaut gate\` reads the tree's address, which the branch chose.
 
 Autopilot still halts, and says why: an unresolved CRITICAL/HIGH, a FAIL verdict, a missing review
 seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops. A quota hold
@@ -3720,13 +3722,13 @@ none, means the tree's value is never read, and the row below applies:
 | \`workflow\` | \`merge-mode.sh\`: \`phases/auto-chain.md\`, \`phases/merge.md\` step 0 | the mode is \`manual\`, the reading that asks |
 | \`size-limits\` | \`size-ratchet.sh\`: \`phases/review-seats.md\`, \`phases/quality-gates.md\`; \`specnaut scan\`: \`phases/audit.md\` | not run: report \`NOT RUN: <the line>\`, never a pass; \`merge\` asks (its **The full tier**) |
 | \`boundaries\` | \`boundary-check.sh\`: \`phases/review-seats.md\`, \`phases/quality-gates.md\`, \`phases/audit.md\` | as \`size-limits\` |
-| \`backlog-config\` | every backlog script, and remote mode: \`backlog.md\`, \`groom.md\`, \`resume.md\`, \`phases/auto-chain.md\`, \`phases/merge.md\` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is \`manual\`, and remote mode keeps the base tip's setting |
+| \`backlog-config\` | every backlog script, and remote mode: \`backlog.md\`, \`groom.md\`, \`resume.md\`, \`phases/auto-chain.md\`, \`phases/merge.md\` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is \`manual\`; remote mode is on if either copy turns it on, and then nothing lands (\`phases/auto-chain.md\`) |
 | \`linked-issue\` | \`.specnaut/feature.json\`'s link: \`resume.md\`, \`phases/plan-reentry.md\`, \`phases/merge.md\` step 5 (whose item \`phases/merge-close.md\` takes) | the link is not read; \`phases/merge.md\` step 5 names its one exception |
 | \`gates\` | \`run-gate.sh\`: \`phases/merge.md\` **The full tier**, \`phases/review-seats.md\`, \`phases/quality-gates.md\` | \`merge\` asks; the review's fast tier is skipped |
 
 \`backlog-config\` judges every line of \`.specnaut/backlog-config.yml\` but the columns grooming
-writes (\`intake_column\`, \`ready_column\`): the tracker's address on any backend, and the \`remote:\`
-block. \`linked-issue\` judges the parsed link, and refuses a file its readers could read two ways.
+writes (\`intake_column\`, \`ready_column\`), each held to the one quoted value grooming writes: the
+tracker's address on any backend, and the \`remote:\` block. \`linked-issue\` judges the parsed link, and refuses a file its readers could read two ways.
 `,
     executable: false,
     backend: null,

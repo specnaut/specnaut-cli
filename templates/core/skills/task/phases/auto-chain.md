@@ -21,11 +21,9 @@ plan → implement → review → merge → push
    untrusted verdict: behind the base only, it rebases and the mode is read below; any other
    untrusted reason is step 0's one question, asked instead of "Ready to merge?", so nothing is
    asked twice; anything else stops. A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`
-   and the script below does not run; so does a `workflow` line other than `VERDICT workflow
-   trusted`, or a `backlog-config` line other than `VERDICT backlog-config trusted`
-   (`phases/script-gate.md`). Under the latter, remote mode is on when the base tip's copy turns
-   it on (`git show <BASE_TIP>:.specnaut/backlog-config.yml`), whatever `specnaut gate status`
-   says of the tree: a branch never turns remote mode off. A dirty tree (`git -c core.fsmonitor=false status
+   and the script below does not run; so it is, and the script does not run, unless the gate
+   printed both `VERDICT workflow trusted` and `VERDICT backlog-config trusted`
+   (`phases/script-gate.md`): a missing line is an untrusted one. A dirty tree (`git -c core.fsmonitor=false status
    --porcelain` prints a line) is never `auto`: say so. Otherwise:
 
    ```
@@ -41,6 +39,10 @@ plan → implement → review → merge → push
 
 When the project is in remote mode (`specnaut gate status` exits 0), read `phases/remote-gates.md`:
 it raises the plan and merge approvals as gates, and remote mode keeps its gate under either mode.
+Remote mode is on, whatever the verdict, when the tree or the base tip's copy turns it on (`git
+show <BASE_TIP>:.specnaut/backlog-config.yml`); a copy that does not parse never turns it off, so a
+branch never turns it off. On, and the gate did not print `VERDICT backlog-config trusted`: stop on
+the branch, nothing lands. `specnaut gate` reads the tree's address, which the branch chose.
 
 Autopilot still halts, and says why: an unresolved CRITICAL/HIGH, a FAIL verdict, a missing review
 seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops. A quota hold

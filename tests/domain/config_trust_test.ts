@@ -46,13 +46,37 @@ Deno.test("backlog-config: the columns grooming writes are the only lines not ju
   const base = file('repo: "acme/my-app"\nproject_number: 1\n');
   const sides = { tip: base, mergeBase: base };
   const columned = file(
-    'repo: "acme/my-app"\nproject_number: 1\nintake_column: Inbox\nready_column: Ready\n',
+    'repo: "acme/my-app"\nproject_number: 1\nintake_column: "Inbox"\nready_column: "Ready"\n',
   );
   assertEquals(judge("backlog-config", { ...sides, tree: columned }), "trusted");
   const moved = file('repo: "acme/other"\nproject_number: 1\n');
   assertEquals(judge("backlog-config", { ...sides, tree: moved }), REASON.differs);
   const twice = file('repo: "acme/my-app"\nrepo: "acme/other"\nproject_number: 1\n');
   assertEquals(judge("backlog-config", { ...sides, tree: twice }), REASON.differs);
+});
+
+Deno.test("backlog-config: a grooming line that is not one quoted value is refused, unjudged", () => {
+  const base = file('repo: "acme/my-app"\nready_column: "Ready"\n');
+  const sides = { tip: base, mergeBase: base };
+  const judged = (text: string) => judge("backlog-config", { ...sides, tree: file(text) });
+  assertEquals(judged('repo: "acme/my-app"\nready_column: "Doing"\n'), "trusted");
+  assertEquals(
+    judged('repo: "acme/my-app"\nready_column: "Ready\n'),
+    "ready_column is not one quoted value",
+  );
+  assertEquals(
+    judged('repo: "acme/my-app"\nready_column: Ready\n'),
+    "ready_column is not one quoted value",
+  );
+  assertEquals(
+    judged('repo: "acme/my-app"\nready_column: "Ready"\nready_column: "Done"\n'),
+    "a column key is given twice",
+  );
+  assertEquals(
+    judged('repo: "acme/my-app"\nready_column: "Ready"\r---\n'),
+    "a carriage return inside a line",
+  );
+  assertEquals(judged('repo: "acme/my-app"\r\nready_column: "Ready"\n'), REASON.differs);
 });
 
 Deno.test("backlog-config: a remote block turned off is judged, like any line grooming does not write", () => {

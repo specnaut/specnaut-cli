@@ -62,8 +62,8 @@ Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one
   const m = flat(phase("merge").content);
   assertStringIncludes(
     m,
-    "A `NAMES_FILE` listing `.specnaut/workflow.yml`, or a `workflow` line other than " +
-      "`VERDICT workflow trusted`, on any run",
+    "A `NAMES_FILE` listing `.specnaut/workflow.yml`, on any run, makes the merge mode `manual`, " +
+      "and so does any run unless it printed `VERDICT workflow trusted`",
   );
 });
 

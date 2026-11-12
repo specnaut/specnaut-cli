@@ -88,7 +88,13 @@ function isBehind(input: ConfigInput, mine: Uint8Array, mergeBase: ConfigFile) {
 type Refusal = { readonly why: string };
 
 /** The keys grooming writes into `backlog-config.yml` on any branch: the only lines not judged. */
-const GROOMING_KEYS = /^(?:intake_column|ready_column):/;
+const GROOMING_KEYS = /^(intake_column|ready_column):/;
+/**
+ * A grooming line exactly as `groom-columns.sh` writes it: one double-quoted value, nothing a
+ * YAML parser could read past. Anything else could break the parse of the whole file (and with it
+ * remote mode) while the line itself goes unjudged, so it is refused.
+ */
+const GROOMING_LINE = /^(?:intake_column|ready_column): "[^"\\\r]*"[ \t]*$/;
 
 /**
  * What a class's readers take from the file, as bytes to compare, or why it cannot be read.
@@ -98,8 +104,19 @@ const GROOMING_KEYS = /^(?:intake_column|ready_column):/;
 function valueOf(input: ConfigInput, bytes: Uint8Array): Uint8Array | Refusal {
   if (input.value === "bytes") return bytes;
   const text = new TextDecoder().decode(bytes);
-  if (input.value === "linked_issue") return linkOf(text);
-  const kept = text.split("\n").filter((line) => !GROOMING_KEYS.test(line));
+  return input.value === "linked_issue" ? linkOf(text) : trackerOf(text);
+}
+
+/** Every line of `backlog-config.yml` but the grooming lines, each checked to hold its shape. */
+function trackerOf(text: string): Uint8Array | Refusal {
+  if (/\r(?!\n)/.test(text)) return { why: "a carriage return inside a line" };
+  const lines = text.split("\n");
+  const groomed = lines.filter((line) => GROOMING_KEYS.test(line));
+  const odd = groomed.find((line) => !GROOMING_LINE.test(line));
+  if (odd !== undefined) return { why: `${odd.split(":")[0]} is not one quoted value` };
+  const keys = groomed.map((line) => line.split(":")[0]);
+  if (new Set(keys).size < keys.length) return { why: "a column key is given twice" };
+  const kept = lines.filter((line) => !GROOMING_KEYS.test(line));
   return new TextEncoder().encode(kept.join("\n"));
 }
 

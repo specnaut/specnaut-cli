@@ -128,8 +128,16 @@ Deno.test("every section of a task doc that reads a class's input names its trus
 
 Deno.test("a backlog-config line not trusted makes the merge manual, and keeps remote mode on", () => {
   const a = flat(read("phases/auto-chain.md"));
-  assertStringIncludes(a, "or a `backlog-config` line other than `VERDICT backlog-config trusted`");
-  assertStringIncludes(a, "a branch never turns remote mode off");
+  assertStringIncludes(
+    a,
+    "unless the gate printed both `VERDICT workflow trusted` and `VERDICT backlog-config trusted`",
+  );
+  assertStringIncludes(a, "when the tree or the base tip's copy turns it on");
+  assertStringIncludes(a, "a copy that does not parse never turns it off");
+  assertStringIncludes(
+    a,
+    "On, and the gate did not print `VERDICT backlog-config trusted`: stop on the branch, nothing lands.",
+  );
 });
 
 Deno.test("merge settles a link the branch wrote only for the id the run was given", () => {
