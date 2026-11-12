@@ -1,10 +1,5 @@
 import { assertEquals } from "@std/assert";
-import {
-  FETCHED_REF,
-  isCommitSha,
-  parseBranchSource,
-  refspecOf,
-} from "../../src/domain/branch_source.ts";
+import { FETCHED_REF, parseBranchSource, refspecOf } from "../../src/domain/branch_source.ts";
 
 const REMOTES = ["origin", "my/fork"];
 const parse = (text: string) => parseBranchSource(text, REMOTES);
@@ -56,51 +51,33 @@ Deno.test("a URL or a path is refused, whatever its form", () => {
   }
 });
 
+/** Branch names git or a shell could read as an option, a revision, a glob or a path step. */
+const BAD_BRANCHES: readonly string[] = [
+  "-x",
+  "--upload-pack=x",
+  "a/../b",
+  "a..b",
+  ".hidden",
+  "a/.b",
+  "a.lock",
+  "a@{1}",
+  "a//b",
+  "a/",
+  "a b",
+  "a\nb",
+  "a~1",
+  "a^",
+  "a:b",
+  "a*",
+  "",
+];
+
 Deno.test("a branch name git or a shell could read as something else is refused", () => {
-  for (
-    const branch of [
-      "-x",
-      "--upload-pack=x",
-      "a/../b",
-      "a..b",
-      ".hidden",
-      "a/.b",
-      "a.lock",
-      "a@{1}",
-      "a//b",
-      "a/",
-      "a b",
-      "a\nb",
-      "a~1",
-      "a^",
-      "a:b",
-      "a*",
-      "",
-    ]
-  ) {
+  for (const branch of BAD_BRANCHES) {
     assertEquals(parse(`origin/${branch}`).kind, "refused", JSON.stringify(branch));
   }
 });
 
 Deno.test("the fetched head lands on one private ref", () => {
   assertEquals(FETCHED_REF, "refs/specnaut/head");
-});
-
-Deno.test("a commit id is 40 or 64 lowercase hex digits and nothing else", () => {
-  assertEquals(isCommitSha("a".repeat(40)), true);
-  assertEquals(isCommitSha("0123456789abcdef".repeat(4)), true);
-  for (
-    const bad of [
-      "a".repeat(39),
-      "a".repeat(41),
-      "a".repeat(63),
-      "A".repeat(40),
-      `${"a".repeat(40)}\n`,
-      `../${"a".repeat(37)}`,
-      "g".repeat(40),
-      "",
-    ]
-  ) {
-    assertEquals(isCommitSha(bad), false, JSON.stringify(bad));
-  }
 });

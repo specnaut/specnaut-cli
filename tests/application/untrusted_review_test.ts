@@ -9,58 +9,6 @@ import { exists } from "../helpers/fs_exists.ts";
 import { blob, commit, git, type RawEntry, tree } from "../helpers/git_fixture.ts";
 import { cacheEntries, depsOf, exportOf, fetcherOf, withWorld } from "../helpers/export_world.ts";
 
-const mode = async (p: string) => (await Deno.lstat(p)).mode! & 0o777;
-const posix = Deno.build.os !== "windows";
-
-/** Any commit-shaped id: a submodule entry names a commit the tree does not hold. */
-const head0 = () => "0123456789abcdef0123456789abcdef01234567";
-
-Deno.test("a tree is written twice, inert, and what is not a plain file is only listed", () =>
-  withWorld(async (w) => {
-    const [text, script, note] = await Promise.all(
-      ["text\n", "#!/bin/sh\necho hi\n", "agent rules\n"].map((c) => blob(w.repo, c)),
-    );
-    const claudeDir = await tree(w.repo, [["100644", "settings.json", note]]);
-    const src = await tree(w.repo, [["100644", "a.ts", text], ["100644", "AGENTS.md", note]]);
-    const { head, run } = await exportOf(w, [
-      ["100644", "README.md", text],
-      ["100755", "run.sh", script],
-      ["40000", "src", src],
-      ["100644", "CLAUDE.md", note],
-      ["40000", ".claude", claudeDir],
-      ["120000", "link", text],
-      ["160000", "vendor", head0()],
-    ]);
-    const out = await run();
-    assertEquals(out.sha, head);
-    assertEquals(out.root, join(await Deno.realPath(w.cache), head));
-    for (const copy of [out.seats, out.scratch]) {
-      assertEquals(await Deno.readTextFile(join(copy, "src", "a.ts")), "text\n");
-      assertEquals(await Deno.readTextFile(join(copy, "run.sh")), "#!/bin/sh\necho hi\n");
-      for (const absent of ["CLAUDE.md", ".claude", "link", "vendor", "src/AGENTS.md"]) {
-        assertEquals(await exists(join(copy, absent)), false, `${absent} was materialised`);
-      }
-    }
-    if (posix) {
-      assertEquals(
-        await mode(join(out.seats, "run.sh")),
-        0o644,
-        "the reviewers' copy runs nothing",
-      );
-      assertEquals(await mode(join(out.scratch, "run.sh")), 0o755, "the scratch copy keeps +x");
-      assertEquals(await mode(join(out.seats, "README.md")), 0o644);
-    }
-    assertEquals(out.listed.map((l) => [l.path, l.kind, l.sha]), [
-      ["CLAUDE.md", "instruction", note],
-      ["link", "link", text],
-      ["vendor", "submodule", head0()],
-      ["src/AGENTS.md", "instruction", note],
-      [".claude/settings.json", "instruction", note],
-    ]);
-    await out.remove();
-    assertEquals(await exists(out.root), false);
-  }));
-
 Deno.test("case-fold twins write nothing", () =>
   withWorld(async (w) => {
     const id = await blob(w.repo, "x\n");
@@ -137,6 +85,17 @@ Deno.test("a repeated subtree's bytes are charged each time it appears, not once
     assertEquals(err.faults, [`the tree holds more than ${once} bytes`]);
   }));
 
+/** The objects of `real`, every blob read back as one wrong byte. */
+function corrupting(real: TreeObjects): TreeObjects {
+  return {
+    treeOf: (c) => real.treeOf(c),
+    sizes: (ids, type) => real.sizes(ids, type),
+    readTrees: (ids) => real.readTrees(ids),
+    readBlobs: async (ids) =>
+      new Map([...(await real.readBlobs(ids)).keys()].map((id) => [id, new Uint8Array([1])])),
+  };
+}
+
 Deno.test("bytes that differ from the commit are caught by the re-hash, and nothing is left", () =>
   withWorld(async (w) => {
     const head = await commit(
@@ -144,16 +103,7 @@ Deno.test("bytes that differ from the commit are caught by the re-hash, and noth
       await tree(w.repo, [["100644", "a", await blob(w.repo, "x")]]),
     );
     const base = depsOf(w, fetcherOf(w, head));
-    const objects = (gitDir: string): TreeObjects => {
-      const real = base.objects(gitDir);
-      return {
-        treeOf: (c) => real.treeOf(c),
-        sizes: (ids, type) => real.sizes(ids, type),
-        readTrees: (ids) => real.readTrees(ids),
-        readBlobs: async (ids) =>
-          new Map([...(await real.readBlobs(ids)).keys()].map((id) => [id, new Uint8Array([1])])),
-      };
-    };
+    const objects = (gitDir: string) => corrupting(base.objects(gitDir));
     const run = () => exportBranchTree({ ...base, objects }, { source: "origin/topic" });
     await assertRejects(run, ExportRefused, "differs from the commit");
     assertEquals(await cacheEntries(w), []);

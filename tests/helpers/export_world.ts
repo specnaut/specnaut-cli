@@ -2,6 +2,7 @@ import { join } from "@std/path";
 import { exportBranchTree, type ExportDeps } from "../../src/application/untrusted_review.ts";
 import type { BranchFetcher } from "../../src/application/untrusted_review_ports.ts";
 import { type BranchSource, FETCHED_REF } from "../../src/domain/branch_source.ts";
+import { isFullSha } from "../../src/domain/commit_sha.ts";
 import { DEFAULT_TREE_CAPS, type TreeCaps } from "../../src/domain/tree_plan.ts";
 import { FsExportStore } from "../../src/infrastructure/fs_tree_export.ts";
 import { GitTreeObjects } from "../../src/infrastructure/git_tree_objects.ts";
@@ -36,7 +37,7 @@ export function fetcherOf(w: World, head: string, calls: BranchSource[] = []): B
       await git(w.repo, ["init", "-q", "--bare", "--template=", gitDir]);
       const alternates = join(gitDir, "objects", "info", "alternates");
       await Deno.writeTextFile(alternates, `${join(w.repo, ".git", "objects")}\n`);
-      if (/^[0-9a-f]{40}$/.test(head)) await git(gitDir, ["update-ref", FETCHED_REF, head]);
+      if (isFullSha(head)) await git(gitDir, ["update-ref", FETCHED_REF, head]);
       return head;
     },
   };

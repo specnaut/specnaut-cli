@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { formatOf, gitBlobId } from "../../src/domain/git_object_id.ts";
+import { formatOf, gitBlobId, hex, idBytes } from "../../src/domain/git_object_id.ts";
 
 const hashObject = async (bytes: Uint8Array, format: string): Promise<string> => {
   const dir = await Deno.makeTempDir({ prefix: "blob-id-" });
@@ -33,4 +33,9 @@ Deno.test("a blob id is the one git computes, in both object formats", async () 
 Deno.test("the object format follows the id's length", () => {
   assertEquals(formatOf("a".repeat(40)), "sha1");
   assertEquals(formatOf("a".repeat(64)), "sha256");
+});
+
+Deno.test("an id is spelled as git prints it, and takes half its length in raw bytes", () => {
+  assertEquals(hex(new Uint8Array([0, 15, 171, 255])), "000fabff");
+  assertEquals([idBytes("a".repeat(40)), idBytes("a".repeat(64))], [20, 32]);
 });

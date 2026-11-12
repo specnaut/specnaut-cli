@@ -1,6 +1,7 @@
 import { join } from "@std/path";
 import { type BranchFetcher, ExportRefused } from "../application/untrusted_review_ports.ts";
 import { type BranchSource, FETCHED_REF, refspecOf } from "../domain/branch_source.ts";
+import { decode, firstLine } from "./git_text.ts";
 import { GitRefused, UNTRUSTED_GIT_FLAGS, UntrustedGit, untrustedGitEnv } from "./untrusted_git.ts";
 
 /**
@@ -118,9 +119,6 @@ function causeOf(stderr: Uint8Array): string {
   const causes = said.filter((l) => /^(fatal|error):/.test(l)).join("; ");
   return redacted((causes || said.at(-1) || "").slice(0, 300));
 }
-
-const decode = (b: Uint8Array) => new TextDecoder().decode(b);
-const firstLine = (b: Uint8Array) => decode(b).split("\n")[0];
 
 /** A URL's `user:secret@` replaced, in case git echoes the remote it was given. */
 export const redacted = (text: string) => text.replace(/\/\/[^/@\s]+@/g, "//***@");

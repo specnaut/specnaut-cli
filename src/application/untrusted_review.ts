@@ -1,4 +1,5 @@
-import { type BranchSource, isCommitSha, parseBranchSource } from "../domain/branch_source.ts";
+import { type BranchSource, parseBranchSource } from "../domain/branch_source.ts";
+import { isFullSha } from "../domain/commit_sha.ts";
 import {
   DEFAULT_TREE_CAPS,
   type ExportPlan,
@@ -89,7 +90,7 @@ async function removeAfter(store: ExportStore, failure: unknown): Promise<void> 
 
 /** The fetched id, once it is a full commit id and the one expected: it names folders next. */
 function checkedHead(sha: string, expected: string | undefined): string {
-  if (!isCommitSha(sha)) throw new ExportRefused("the fetched ref names no full commit id");
+  if (!isFullSha(sha)) throw new ExportRefused("the fetched ref names no full commit id");
   if (expected !== undefined && sha !== expected) {
     throw new ExportRefused(`the fetched head is ${sha}, not ${expected}`);
   }

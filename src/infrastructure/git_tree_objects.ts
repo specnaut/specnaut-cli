@@ -1,6 +1,8 @@
 import { ExportRefused, type TreeObjects } from "../application/untrusted_review_ports.ts";
-import { isCommitSha } from "../domain/branch_source.ts";
+import { isFullSha } from "../domain/commit_sha.ts";
+import { hex, idBytes } from "../domain/git_object_id.ts";
 import type { TreeEntry } from "../domain/tree_plan.ts";
+import { decode } from "./git_text.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 
 /**
@@ -17,10 +19,10 @@ export class GitTreeObjects implements TreeObjects {
   }
 
   async treeOf(commit: string): Promise<string> {
-    if (!isCommitSha(commit)) throw new ExportRefused("not a full commit id");
+    if (!isFullSha(commit)) throw new ExportRefused("not a full commit id");
     const args = ["--verify", "--quiet", "--end-of-options", `${commit}^{tree}`];
     const tree = decode(await this.#git.run("rev-parse", args)).trim();
-    if (!isCommitSha(tree)) throw new ExportRefused(`${commit} names no tree`);
+    if (!isFullSha(tree)) throw new ExportRefused(`${commit} names no tree`);
     return tree;
   }
 
@@ -41,7 +43,7 @@ export class GitTreeObjects implements TreeObjects {
   async readTrees(ids: readonly string[]): Promise<Map<string, TreeEntry[]>> {
     const trees = new Map<string, TreeEntry[]>();
     for (const [id, bytes] of await this.#batch(ids, "tree")) {
-      trees.set(id, parseTree(bytes, id.length / 2));
+      trees.set(id, parseTree(bytes, idBytes(id)));
     }
     return trees;
   }
@@ -93,7 +95,5 @@ export function parseTree(bytes: Uint8Array, width: number): TreeEntry[] {
   return entries;
 }
 
-const decode = (b: Uint8Array) => new TextDecoder().decode(b);
 const lines = (ids: readonly string[]) =>
   new TextEncoder().encode(ids.map((i) => `${i}\n`).join(""));
-const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");

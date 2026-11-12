@@ -7,9 +7,9 @@
 
 /**
  * Code points HFS+ ignores when it compares names, the list git's `is_hfs_dotgit` skips: with one
- * inside it, `.g‌it` opens as `.git` on such a volume.
+ * inside it, `.g\u200cit` opens as `.git` on such a volume.
  */
-const HFS_IGNORABLE = /[‌-‏‪-‮⁪-⁯﻿]/gu;
+const HFS_IGNORABLE = /[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]/gu;
 
 /** Characters a Windows path cannot hold in a name; `:` would open an alternate data stream. */
 const WINDOWS_RESERVED = /[<>:"|?*]/;

@@ -53,9 +53,4 @@ export function refspecOf(source: BranchSource): string {
   return source.kind === "pr" ? `refs/pull/${source.number}/head` : `refs/heads/${source.branch}`;
 }
 
-/** A full commit id, SHA-1 or SHA-256: checked before the id is used in any path or argument. */
-export function isCommitSha(text: string): boolean {
-  return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(text);
-}
-
 const refused = (why: string): ParsedSource => ({ kind: "refused", why });

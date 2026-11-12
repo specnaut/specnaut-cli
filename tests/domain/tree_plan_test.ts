@@ -88,7 +88,7 @@ Deno.test("every bad name is refused, with its path, and nothing is planned", ()
     `pkg/..: a '.' or '..' step`,
     `pkg/: an empty name`,
     `pkg/a/b: a path separator`,
-    `pkg/�: a name that is not UTF-8`,
+    `pkg/\ufffd: a name that is not UTF-8`,
   ]);
 });
 

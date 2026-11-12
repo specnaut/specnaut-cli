@@ -5,12 +5,22 @@ import { cacheEntries, exportOf, withWorld } from "../helpers/export_world.ts";
 
 /** Each name the path validator refuses, as a crafted tree: the export writes nothing at all. */
 
+/** A name for a test title: every byte outside printable ASCII written as an escape. */
+function escaped(name: string | Uint8Array): string {
+  if (typeof name !== "string") return `bytes [${[...name].join(", ")}]`;
+  const shown = [...name].map((c) =>
+    /[ -~]/.test(c) ? c : `\\u${c.codePointAt(0)!.toString(16).padStart(4, "0")}`
+  );
+  const text = shown.join("");
+  return text.length > 40 ? `"${text.slice(0, 8)}..." (${name.length} chars)` : `"${text}"`;
+}
+
 const BAD_NAMES: ReadonlyArray<readonly [string | Uint8Array, string]> = [
   [".git", "a spelling of .git"],
   [".GIT", "a spelling of .git"],
   [".git.", "a spelling of .git"],
   ["git~1", "a spelling of .git"],
-  [".g‌it", "a spelling of .git"],
+  [".g\u200cit", "a spelling of .git"],
   ["..", "a '.' or '..' step"],
   [".", "a '.' or '..' step"],
   ["", "an empty name"],
@@ -23,7 +33,7 @@ const BAD_NAMES: ReadonlyArray<readonly [string | Uint8Array, string]> = [
 ];
 
 for (const [name, reason] of BAD_NAMES) {
-  Deno.test(`a tree naming ${JSON.stringify(typeof name === "string" ? name : [...name])} writes nothing`, () =>
+  Deno.test(`a tree naming ${escaped(name)} writes nothing`, () =>
     withWorld(async (w) => {
       const id = await blob(w.repo, "payload\n");
       const { run } = await exportOf(w, [["100644", "ok.txt", id], ["100644", name, id]]);

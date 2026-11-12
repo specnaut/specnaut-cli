@@ -6,6 +6,7 @@ import {
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
 import type { BaseEntry } from "../domain/script_trust.ts";
+import { decode, firstLine } from "./git_text.ts";
 import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 
 /**
@@ -14,9 +15,6 @@ import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
  * nothing here touches the work tree: no `status`, no hashing of a file on disk, no diff against
  * it. A test greps this module for those subcommands.
  */
-
-const decode = (b: Uint8Array) => new TextDecoder().decode(b);
-const firstLine = (b: Uint8Array) => decode(b).split("\n")[0];
 
 export class GitObjects implements GitObjectReader {
   readonly #git: UntrustedGit;
