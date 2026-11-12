@@ -3,8 +3,8 @@ import { bwrapArgs } from "../../src/domain/sandbox_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
+import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
 import {
-  BwrapRunner,
   ContainerRunner,
   runnerFor,
   SeatbeltRunner,

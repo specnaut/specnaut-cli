@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_seccomp.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { BwrapRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
 import { exists, live, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
 
 /** Bubblewrap on a real Linux host that runs it, through the real launcher; skipped elsewhere. */
