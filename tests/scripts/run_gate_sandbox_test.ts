@@ -85,14 +85,17 @@ Deno.test("run-gate --sandbox: each configured command runs on the head in the s
   assertEquals([written.commit, written.result, written.valid], [head, "passed", true]);
 });
 
-Deno.test("run-gate --sandbox: 125 from the sandbox is NOT RUN, never a pass; another exit fails", async () => {
+Deno.test("run-gate --sandbox: 125 or 127 from the sandbox is NOT RUN, never a pass; another exit fails", async () => {
   const { repo, evidence, run, full } = await sandboxed();
-  const notRun = await run(["fast", "--base", repo.main, ...full], 125);
-  assertEquals(notRun.code, 125, notRun.stderr);
-  assertEquals(notRun.calls.length, 1, "the tier went on after nothing ran");
-  assertStringIncludes(notRun.stderr, "NOT RUN, never a pass");
-  assert(!notRun.stdout.includes("passed"), notRun.stdout);
-  assertEquals((await evidenceOf(evidence)).result, "not_run");
+  for (const rc of [125, 127]) {
+    const notRun = await run(["fast", "--base", repo.main, ...full], rc);
+    assertEquals(notRun.code, 125, notRun.stderr);
+    assertEquals(notRun.calls.length, 1, "the tier went on after nothing ran");
+    assertStringIncludes(notRun.stderr, `(exit ${rc}): ${SUITE}`);
+    assertStringIncludes(notRun.stderr, "NOT RUN, never a pass");
+    assert(!notRun.stdout.includes("passed"), notRun.stdout);
+    assertEquals((await evidenceOf(evidence)).result, "not_run");
+  }
   const failed = await run(["fast", "--base", repo.main, ...full], 3);
   assertEquals(failed.code, 1, failed.stderr);
   assertStringIncludes(failed.stderr, "the fast gate failed at command 1/3 (exit 3)");
@@ -104,10 +107,15 @@ Deno.test("run-gate --sandbox: with no declaration, the bare run goes through th
   assertEquals(r.code, 0, r.stderr);
   assertEquals(r.marks, [], "a command ran on the host");
   assertEquals(r.calls.map((c) => c.at(-1)), [SUITE, WEB_ONLY, ALWAYS]);
-  const notRun = await run(["fast", ...full], 125);
-  assertEquals(notRun.code, 125, notRun.stdout);
-  assertEquals(notRun.calls.length, 1);
-  assertStringIncludes(notRun.stderr, "the fast gate did not run at command 1/3");
+  for (const rc of [125, 127]) {
+    const notRun = await run(["fast", ...full], rc);
+    assertEquals(notRun.code, 125, notRun.stdout);
+    assertEquals(notRun.calls.length, 1);
+    assertStringIncludes(
+      notRun.stderr,
+      `the fast gate did not run at command 1/3 (exit ${rc}): ${SUITE}`,
+    );
+  }
 });
 
 Deno.test("run-gate --sandbox: the options it needs, and a head only with it", async () => {

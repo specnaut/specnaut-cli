@@ -5,8 +5,9 @@
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
 # its result is its exit code alone, never read from that output. 125 is the sandbox
-# saying nothing ran (no backend, no export, a refused layout): the tier stops there and
-# exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
+# saying nothing ran (no backend, no export, a refused layout), 127 a command not found
+# on the sandbox's PATH: nothing of the branch ran either way, so the tier stops there
+# and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
 GATE_LOGS="" GATE_RUNS=0
@@ -37,8 +38,18 @@ gate_run_sandboxed() {
   ) </dev/null
 }
 
-# gate_not_run <i/count> - the sandbox ran nothing at that command: stop, NOT RUN.
+# gate_sandbox_not_run <rc> - true when, in a sandbox, <rc> says nothing of the branch ran.
+gate_sandbox_not_run() { [ "$SANDBOX" = 1 ] && { [ "$1" -eq 125 ] || [ "$1" -eq 127 ]; }; }
+
+# gate_not_run_line <i/count> <rc> <command> - the line that says so, naming the command.
+gate_not_run_line() {
+  local why="the sandbox ran nothing"
+  [ "$2" -ne 127 ] || why="it was not found on the sandbox's PATH"
+  echo "the $TIER gate did not run at command $1 (exit $2): $(gate_ascii "$3") - $why, and a gate that did not run is NOT RUN, never a pass"
+}
+
+# gate_not_run <i/count> <rc> <command> - stop the bare run there, NOT RUN.
 gate_not_run() {
-  echo "the $TIER gate did not run at command $1: the sandbox ran nothing (exit 125), and a gate that did not run is NOT RUN, never a pass" >&2
+  gate_not_run_line "$@" >&2
   exit 125
 }

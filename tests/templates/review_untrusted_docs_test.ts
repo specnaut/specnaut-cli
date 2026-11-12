@@ -41,6 +41,7 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   assertStringIncludes(doc, "run-gate.sh <fast|full> --base");
   assertStringIncludes(doc, "--sandbox");
   assertStringIncludes(doc, "The result is the exit code alone");
+  assertStringIncludes(doc, "a command's 127 (not found on the sandbox's PATH) is NOT RUN too");
   assertStringIncludes(doc, "A log is briefed by its path, never pasted.");
   assertStringIncludes(
     doc,

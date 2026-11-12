@@ -22,7 +22,8 @@
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
-#   125 behind --sandbox: the sandbox ran nothing, so the tier is NOT RUN, never a pass
+#   125 behind --sandbox: the sandbox ran nothing, or a command was not on its PATH
+#       (127), so the tier is NOT RUN, never a pass
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # `specnaut sandbox exec` (_gate_sandbox.sh), its output to a new file under the
@@ -180,7 +181,7 @@ while IFS= read -r cmd; do
   # the tier would report them as passed without running them.
   if [ "$SANDBOX" = 1 ]; then gate_run_sandboxed "$cmd"; else ( cd "$REPO_ROOT" && eval "$cmd" ) </dev/null; fi
   rc=$?
-  [ "$SANDBOX" = 0 ] || [ "$rc" -ne 125 ] || gate_not_run "$i/$count"
+  [ "$SANDBOX" = 0 ] || ! gate_sandbox_not_run "$rc" || gate_not_run "$i/$count" "$rc" "$cmd"
   if [ "$rc" -ne 0 ]; then
     echo "  ✗ the $TIER gate failed at command $i/$count (exit $rc): $cmd" >&2
     exit 1

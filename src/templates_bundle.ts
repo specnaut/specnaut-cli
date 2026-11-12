@@ -1567,9 +1567,11 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "\$BASE_TIP" --head "
 
 \`run-gate.sh\` reads this checkout's \`gates.yml\`, runs each command through \`specnaut sandbox exec\`
 on the scratch copy, prints one \`log: <file>\` line per command, and writes its evidence under
-\`\$LOGS\`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. A log is briefed
-by its path, never pasted. Where \`specnaut sandbox probe\` exits 1 (no sandbox, as on Windows), the
-review is static only: every gate, the tests included, is \`NOT RUN\`.
+\`\$LOGS\`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
+\`--sandbox\`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: \`run-gate.sh\` stops
+there, exits 125 and names the command. A log is briefed by its path, never pasted. Where
+\`specnaut sandbox probe\` exits 1 (no sandbox, as on Windows), the review is static only: every
+gate, the tests included, is \`NOT RUN\`.
 
 **Windows is static only.** No gate runs there: \`run-gate.ps1\` refuses \`--sandbox\`, \`--head\`,
 \`--objects\` and \`--evidence\` with exit 5, which is \`NOT RUN\` too. The tests are reported \`NOT RUN\`,
@@ -29707,7 +29709,8 @@ generate_branch_name() {
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
-#   125 behind --sandbox: the sandbox ran nothing, so the tier is NOT RUN, never a pass
+#   125 behind --sandbox: the sandbox ran nothing, or a command was not on its PATH
+#       (127), so the tier is NOT RUN, never a pass
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # \`specnaut sandbox exec\` (_gate_sandbox.sh), its output to a new file under the
@@ -29865,7 +29868,7 @@ while IFS= read -r cmd; do
   # the tier would report them as passed without running them.
   if [ "\$SANDBOX" = 1 ]; then gate_run_sandboxed "\$cmd"; else ( cd "\$REPO_ROOT" && eval "\$cmd" ) </dev/null; fi
   rc=\$?
-  [ "\$SANDBOX" = 0 ] || [ "\$rc" -ne 125 ] || gate_not_run "\$i/\$count"
+  [ "\$SANDBOX" = 0 ] || ! gate_sandbox_not_run "\$rc" || gate_not_run "\$i/\$count" "\$rc" "\$cmd"
   if [ "\$rc" -ne 0 ]; then
     echo "  ✗ the \$TIER gate failed at command \$i/\$count (exit \$rc): \$cmd" >&2
     exit 1
@@ -30780,15 +30783,15 @@ run_selection() {
   done
 }
 
-# FR-013: a failed command stops at 1, whatever else is true; in a sandbox, its 125 is
-# 125, NOT RUN. Omitted commands with nothing run, or a tier emptied on the branch, is 4:
+# FR-013: a failed command stops at 1, whatever else is true; in a sandbox, its 125 or
+# 127 is 125, NOT RUN. Omitted commands with nothing run, or a tier emptied on the branch, is 4:
 # nothing was checked. Sets RESULT, CODE and OUTCOME.
 selected_outcome() {
   local count="\${#RUN_COMMANDS[@]}"
   RESULT=passed CODE=0
-  if [ "\$FAILED_AT" -ne 0 ] && [ "\$SANDBOX" = 1 ] && [ "\$FAILED_RC" -eq 125 ]; then
+  if [ "\$FAILED_AT" -ne 0 ] && gate_sandbox_not_run "\$FAILED_RC"; then
     RESULT=not_run CODE=125
-    OUTCOME="the \$TIER gate did not run at command \$FAILED_AT/\$count: the sandbox ran nothing (exit 125), and a gate that did not run is NOT RUN, never a pass"
+    OUTCOME="\$(gate_not_run_line "\$FAILED_AT/\$count" "\$FAILED_RC" "\${RUN_COMMANDS[\$((FAILED_AT - 1))]}")"
   elif [ "\$FAILED_AT" -ne 0 ]; then
     RESULT=failed CODE=1
     OUTCOME="the \$TIER gate failed at command \$FAILED_AT/\$count (exit \$FAILED_RC)"
@@ -30857,8 +30860,9 @@ run_selected() {
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
 # its result is its exit code alone, never read from that output. 125 is the sandbox
-# saying nothing ran (no backend, no export, a refused layout): the tier stops there and
-# exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
+# saying nothing ran (no backend, no export, a refused layout), 127 a command not found
+# on the sandbox's PATH: nothing of the branch ran either way, so the tier stops there
+# and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
 GATE_LOGS="" GATE_RUNS=0
@@ -30889,9 +30893,19 @@ gate_run_sandboxed() {
   ) </dev/null
 }
 
-# gate_not_run <i/count> - the sandbox ran nothing at that command: stop, NOT RUN.
+# gate_sandbox_not_run <rc> - true when, in a sandbox, <rc> says nothing of the branch ran.
+gate_sandbox_not_run() { [ "\$SANDBOX" = 1 ] && { [ "\$1" -eq 125 ] || [ "\$1" -eq 127 ]; }; }
+
+# gate_not_run_line <i/count> <rc> <command> - the line that says so, naming the command.
+gate_not_run_line() {
+  local why="the sandbox ran nothing"
+  [ "\$2" -ne 127 ] || why="it was not found on the sandbox's PATH"
+  echo "the \$TIER gate did not run at command \$1 (exit \$2): \$(gate_ascii "\$3") - \$why, and a gate that did not run is NOT RUN, never a pass"
+}
+
+# gate_not_run <i/count> <rc> <command> - stop the bare run there, NOT RUN.
 gate_not_run() {
-  echo "the \$TIER gate did not run at command \$1: the sandbox ran nothing (exit 125), and a gate that did not run is NOT RUN, never a pass" >&2
+  gate_not_run_line "\$@" >&2
   exit 125
 }
 `,

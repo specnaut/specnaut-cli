@@ -93,15 +93,15 @@ run_selection() {
   done
 }
 
-# FR-013: a failed command stops at 1, whatever else is true; in a sandbox, its 125 is
-# 125, NOT RUN. Omitted commands with nothing run, or a tier emptied on the branch, is 4:
+# FR-013: a failed command stops at 1, whatever else is true; in a sandbox, its 125 or
+# 127 is 125, NOT RUN. Omitted commands with nothing run, or a tier emptied on the branch, is 4:
 # nothing was checked. Sets RESULT, CODE and OUTCOME.
 selected_outcome() {
   local count="${#RUN_COMMANDS[@]}"
   RESULT=passed CODE=0
-  if [ "$FAILED_AT" -ne 0 ] && [ "$SANDBOX" = 1 ] && [ "$FAILED_RC" -eq 125 ]; then
+  if [ "$FAILED_AT" -ne 0 ] && gate_sandbox_not_run "$FAILED_RC"; then
     RESULT=not_run CODE=125
-    OUTCOME="the $TIER gate did not run at command $FAILED_AT/$count: the sandbox ran nothing (exit 125), and a gate that did not run is NOT RUN, never a pass"
+    OUTCOME="$(gate_not_run_line "$FAILED_AT/$count" "$FAILED_RC" "${RUN_COMMANDS[$((FAILED_AT - 1))]}")"
   elif [ "$FAILED_AT" -ne 0 ]; then
     RESULT=failed CODE=1
     OUTCOME="the $TIER gate failed at command $FAILED_AT/$count (exit $FAILED_RC)"
