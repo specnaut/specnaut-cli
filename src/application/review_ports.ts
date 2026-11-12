@@ -7,18 +7,22 @@ import type { CheckoutState } from "../domain/review_gate.ts";
  */
 
 /**
- * A pass as the gate left it: `granted` is `NaN`, `baseTip` empty and `checkout` `null` where the
- * file did not say.
+ * A pass as the gate left it: `granted` is `NaN`, `baseTip` and `session` empty and `checkout`
+ * `null` where the file did not say. `session` is the id on the hook's input the gate judged.
  */
 export type GrantedPass = {
   readonly granted: number;
   readonly baseTip: string;
   readonly checkout: CheckoutState | null;
+  readonly session: string;
 };
 
 export interface ReviewPass {
-  /** Leaves a pass for `checkout`, judged against `baseTip`, replacing any earlier one. */
-  grant(baseTip: string, checkout: CheckoutState): Promise<void>;
+  /**
+   * Leaves a pass for `checkout`, judged against `baseTip` for the session `session`, replacing
+   * any earlier one.
+   */
+  grant(baseTip: string, checkout: CheckoutState, session: string): Promise<void>;
   /** Removes the pass, if there is one. */
   revoke(): Promise<void>;
   /**
@@ -26,4 +30,17 @@ export interface ReviewPass {
    * one review; `null` when none.
    */
   take(): Promise<GrantedPass | null>;
+}
+
+/**
+ * The review lock of one checkout (`review_lock.ts` in the domain): a session `specnaut review
+ * start` locked stays locked until it ends. It lives beside the pass, in the worktree's own git
+ * directory, so no file of a branch can plant or remove one, and no command removes one: the
+ * lock is the session's for as long as the branch's text is in its context.
+ */
+export interface ReviewLock {
+  /** Locks the session `sessionId`; a lock already there stays as it is. */
+  lock(sessionId: string): Promise<void>;
+  /** Whether the session `sessionId` is locked; for `null`, whether any session is. */
+  holds(sessionId: string | null): Promise<boolean>;
 }

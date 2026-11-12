@@ -85,7 +85,11 @@ Deno.test("a record read that throws is a refusal with exit 2, never a pass", as
         findHarness,
       }, null),
   });
-  await (await FsReviewPass.open(root))!.grant("earlier", { head: null, ref: null, reflog: null });
+  await (await FsReviewPass.open(root))!.grant(
+    "earlier",
+    { head: null, ref: null, reflog: null },
+    "s",
+  );
   const run = await gate(root, hook("any-session"), throwing);
   assertEquals(run.code, 2);
   assertStringIncludes(run.err, "the checkout check could not finish: ELOOP: lstat");

@@ -5,17 +5,18 @@ import (
 	"strings"
 )
 
-// parseReview is review_parser.ts's parseReview: `gate` takes no word, `start` one non-empty
-// source and no option, `end` one full commit id. The Go binary answers each as not ported.
+// parseReview is review_parser.ts's parseReview: `gate` and `guard` take no word, `start` one
+// non-empty source and no option, `end` one full commit id. The Go binary answers each as not
+// ported.
 func parseReview(a Args, rest []string) Intent {
 	sub, words := "", []string{}
 	if len(rest) > 0 {
 		sub, words = rest[0], rest[1:]
 	}
 	switch sub {
-	case "gate":
+	case "gate", "guard":
 		if len(words) != 0 {
-			return unknown("review gate takes no argument")
+			return unknown("review " + sub + " takes no argument")
 		}
 	case "start":
 		if slices.ContainsFunc(a.Raw, func(w string) bool { return strings.HasPrefix(w, "-") }) {

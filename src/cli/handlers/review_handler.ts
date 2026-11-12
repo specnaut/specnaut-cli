@@ -14,13 +14,16 @@ import { GitBranchFetcher } from "../../infrastructure/git_branch_fetch.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { GitTreeObjects } from "../../infrastructure/git_tree_objects.ts";
 import type { ReviewIntent } from "../intent.ts";
+import { FsReviewLock } from "../../infrastructure/fs_review_lock.ts";
 import { runReviewGate } from "./review_gate_handler.ts";
+import { runReviewGuard } from "./review_guard_handler.ts";
 
 /**
  * `specnaut review gate|start|end`, a review that cannot trust its branch:
  *
  *   gate          the PreToolUse hook's check (review_gate_handler.ts)
- *   start <src>   takes the gate's pass, exports the branch (a PR number or `<remote>/<branch>`)
+ *   guard         the PreToolUse hook's review lock (review_guard_handler.ts)
+ *   start <src>   takes the gate's pass, locks the session it names, exports the branch (a PR number or `<remote>/<branch>`)
  *                 as inert files outside the project, and keeps it. On stdout: `HEAD <sha>`,
  *                 `SEATS <dir>` (the reviewers' copy), `SCRATCH <dir>` (the copy a sandbox runs),
  *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), then one
@@ -36,10 +39,12 @@ export type ReviewDeps = {
   readonly start: () => Promise<StartDeps | null>;
   readonly end: (sha: string) => Promise<boolean>;
   readonly gate: () => Promise<number>;
+  readonly guard: () => Promise<number>;
 };
 
 export async function runReview(intent: ReviewIntent, deps = defaultDeps()): Promise<number> {
   if (intent.sub === "gate") return await deps.gate();
+  if (intent.sub === "guard") return await deps.guard();
   try {
     if (intent.sub === "end") {
       const removed = await deps.end(intent.sha);
@@ -85,10 +90,11 @@ function defaultDeps(): ReviewDeps {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     gate: () => runReviewGate(),
+    guard: () => runReviewGuard(),
     end: (sha) => removeKeptExport(cache(), sha),
     start: async () => {
-      const pass = await FsReviewPass.open(cwd);
-      if (pass === null) return null;
+      const [pass, lock] = await Promise.all([FsReviewPass.open(cwd), FsReviewLock.open(cwd)]);
+      if (pass === null || lock === null) return null;
       const exportDeps = {
         fetcher: new GitBranchFetcher(cwd),
         objects: (gitDir: string) => new GitTreeObjects(gitDir),
@@ -98,7 +104,8 @@ function defaultDeps(): ReviewDeps {
       const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
       const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
       const checkout = () => checkoutState(cwd);
-      return { pass, now: Date.now, baseTip, checkout, exportBranch };
+      const lockSession = (id: string) => lock.lock(id);
+      return { pass, now: Date.now, baseTip, checkout, lock: lockSession, exportBranch };
     },
   };
 }

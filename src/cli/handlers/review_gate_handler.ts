@@ -75,7 +75,8 @@ export function openGate(cwd: string): GateDeps {
     // The repository first, so a folder in none is refused as such.
     checkout: async () => await opened().then(() => checkoutState(cwd)),
     pass: {
-      grant: async (tip, checkout) => await (await opened()).pass.grant(tip, checkout),
+      grant: async (tip, checkout, session) =>
+        await (await opened()).pass.grant(tip, checkout, session),
       // Not the repository's records: removing a pass needs the pass alone, and
       // outside a repository there is none to remove.
       revoke: async () => await (await FsReviewPass.open(cwd))?.revoke(),

@@ -20,11 +20,11 @@ export class FsReviewPass implements ReviewPass {
     return new FsReviewPass(join(firstLine(out.stdout), "specnaut", "review-pass.json"), now);
   }
 
-  async grant(baseTip: string, checkout: CheckoutState): Promise<void> {
+  async grant(baseTip: string, checkout: CheckoutState, session: string): Promise<void> {
     const dir = dirname(this.path);
     await realFolder(dir);
     const temp = join(dir, `.review-pass.${crypto.randomUUID()}.tmp`);
-    const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout })}\n`;
+    const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout, session })}\n`;
     await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
     try {
       await Deno.rename(temp, this.path);
@@ -61,16 +61,20 @@ export class FsReviewPass implements ReviewPass {
  */
 function passOf(text: string): GrantedPass {
   try {
-    const { granted, baseTip, checkout } = JSON.parse(text) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(text);
+    const fields = typeof parsed === "object" && parsed !== null ? parsed : {};
+    const { granted, baseTip, checkout, session } = fields as Record<string, unknown>;
+    const said = (v: unknown) => typeof v === "string" ? v : "";
     return {
       granted: typeof granted === "number" ? granted : NaN,
-      baseTip: typeof baseTip === "string" ? baseTip : "",
+      baseTip: said(baseTip),
       checkout: checkoutOf(checkout),
+      session: said(session),
     };
   } catch (err) {
     // Not swallowed: a pass that is not JSON is one that never holds.
     if (!(err instanceof SyntaxError)) throw err;
-    return { granted: NaN, baseTip: "", checkout: null };
+    return { granted: NaN, baseTip: "", checkout: null, session: "" };
   }
 }
 
@@ -84,13 +88,13 @@ function checkoutOf(v: unknown): CheckoutState | null {
 }
 
 /** `dir` made where missing; one existing as anything but a folder, a link included, is refused. */
-async function realFolder(dir: string): Promise<void> {
+export async function realFolder(dir: string): Promise<void> {
   const info = await lstatOrNull(dir);
   if (info === null) await Deno.mkdir(dir, { mode: 0o700 });
   else if (!info.isDirectory) throw new Error(`${dir} is not a folder: a link is not followed`);
 }
 
-async function lstatOrNull(path: string): Promise<Deno.FileInfo | null> {
+export async function lstatOrNull(path: string): Promise<Deno.FileInfo | null> {
   try {
     return await Deno.lstat(path);
   } catch (err) {

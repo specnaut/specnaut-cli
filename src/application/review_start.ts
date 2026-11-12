@@ -1,4 +1,5 @@
 import { type CheckoutState, passHolds, sameCheckout } from "../domain/review_gate.ts";
+import { isSessionId } from "../domain/session_record.ts";
 import type { ReviewPass } from "./review_ports.ts";
 import type { BranchExport } from "./untrusted_review.ts";
 
@@ -7,7 +8,9 @@ import type { BranchExport } from "./untrusted_review.ts";
  * exports the branch as inert files (`untrusted_review.ts`) and keeps the export for the
  * review's later commands. No pass, one past its time, one granted for a base tip that is no
  * longer the base's, or for a checkout that no longer reads the same, starts nothing and fetches
- * nothing: the verdict was taken on that checkout, against that tip.
+ * nothing: the verdict was taken on that checkout, against that tip. The session the gate judged
+ * is locked before the branch is fetched (`review_lock.ts` in the domain), so nothing of the branch
+ * reaches a session the lock does not hold.
  */
 
 export type StartDeps = {
@@ -17,6 +20,8 @@ export type StartDeps = {
   readonly baseTip: () => Promise<string | null>;
   /** The checkout now, read as the gate read it. */
   readonly checkout: () => Promise<CheckoutState>;
+  /** Locks the session `sessionId` until it ends. */
+  readonly lock: (sessionId: string) => Promise<void>;
   readonly exportBranch: (source: string) => Promise<BranchExport>;
 };
 
@@ -36,6 +41,8 @@ export const MOVED_PASS =
 
 export const CHANGED_PASS = "the checkout changed since its verdict: run this command again";
 
+export const NO_SESSION = "the checkout verdict names no session to lock: run this command again";
+
 export async function startReview(deps: StartDeps, source: string): Promise<StartOutcome> {
   const granted = await deps.pass.take();
   if (granted === null) return { kind: "refused", why: NO_PASS };
@@ -45,6 +52,8 @@ export async function startReview(deps: StartDeps, source: string): Promise<Star
   if (judged === null || !sameCheckout(judged, await deps.checkout())) {
     return { kind: "refused", why: CHANGED_PASS };
   }
+  if (!isSessionId(granted.session)) return { kind: "refused", why: NO_SESSION };
+  await deps.lock(granted.session);
   const exported = await deps.exportBranch(source);
   exported.keep();
   return { kind: "started", exported };

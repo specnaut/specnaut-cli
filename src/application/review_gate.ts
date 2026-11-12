@@ -45,7 +45,8 @@ async function checked(deps: GateDeps, sessionId: string): Promise<CheckoutOutco
     // Read before the check: a checkout that moves while it is judged no longer reads the same.
     const checkout = await deps.checkout();
     const outcome = await deps.verify(sessionId);
-    if (outcome.kind === "trusted") await deps.pass.grant(outcome.baseTip, checkout);
+    // The pass names the session judged, so the start locks that session and no other.
+    if (outcome.kind === "trusted") await deps.pass.grant(outcome.baseTip, checkout, sessionId);
     return outcome;
   } catch (err) {
     // Not swallowed: the failure is the refusal's reason, and the review does not start.

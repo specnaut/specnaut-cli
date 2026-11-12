@@ -30,6 +30,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
     out: (s: string) => said.push(s),
     err: (s: string) => said.push(s),
     gate: () => Promise.resolve(0),
+    guard: () => Promise.resolve(0),
     end: () => Promise.resolve(false),
     start: () =>
       Promise.resolve({
@@ -41,6 +42,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
         now: Date.now,
         baseTip: () => Promise.resolve(null),
         checkout: () => Promise.reject(new Error("read")),
+        lock: () => Promise.reject(new Error("locked")),
         exportBranch: () => Promise.reject(new Error("fetched")),
       }),
   };
@@ -65,4 +67,19 @@ Deno.test("end removes the kept export by its id, and refuses a link at that nam
   } finally {
     await Deno.remove(cache, { recursive: true });
   }
+});
+
+Deno.test("guard and gate each run their own hook's check, and answer with its exit", async () => {
+  const ran: string[] = [];
+  const deps = {
+    out: () => {},
+    err: () => {},
+    gate: () => Promise.resolve(void ran.push("gate")).then(() => 0),
+    guard: () => Promise.resolve(void ran.push("guard")).then(() => 2),
+    end: () => Promise.reject(new Error("unreached")),
+    start: () => Promise.reject(new Error("unreached")),
+  };
+  assertEquals(await runReview({ kind: "review", sub: "guard" }, deps), 2);
+  assertEquals(await runReview({ kind: "review", sub: "gate" }, deps), 0);
+  assertEquals(ran, ["guard", "gate"]);
 });

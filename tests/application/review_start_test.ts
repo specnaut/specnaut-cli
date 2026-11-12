@@ -1,8 +1,9 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import {
   CHANGED_PASS,
   MOVED_PASS,
   NO_PASS,
+  NO_SESSION,
   STALE_PASS,
   startReview,
 } from "../../src/application/review_start.ts";
@@ -24,19 +25,23 @@ function deps(
   tip: string | null = TIP,
   now: CheckoutState = JUDGED,
   judged: CheckoutState | null = JUDGED,
+  session = "s-1",
 ) {
   const exported = { sha: "a".repeat(40), keep: () => void done.push("kept") } as BranchExport;
   return {
     pass: {
       take: () =>
         Promise.resolve(void done.push("taken"))
-          .then(() => granted === null ? null : { granted, baseTip: TIP, checkout: judged }),
+          .then(() =>
+            granted === null ? null : { granted, baseTip: TIP, checkout: judged, session }
+          ),
       grant: () => Promise.reject(new Error("unreached")),
       revoke: () => Promise.reject(new Error("unreached")),
     },
     now: () => NOW,
     baseTip: () => Promise.resolve(tip),
     checkout: () => Promise.resolve(now),
+    lock: (id: string) => Promise.resolve(void done.push(`lock ${id}`)),
     exportBranch: (source: string) =>
       Promise.resolve(void done.push(`export ${source}`)).then(() => exported),
   };
@@ -54,7 +59,23 @@ Deno.test("a start on a fresh pass takes it, exports the source and keeps the ex
   const done: string[] = [];
   const outcome = await startReview(deps(NOW - 1000, done), "origin/topic");
   assertEquals(outcome.kind, "started");
-  assertEquals(done, ["taken", "export origin/topic", "kept"]);
+  assertEquals(done, ["taken", "lock s-1", "export origin/topic", "kept"]);
+});
+
+Deno.test("the session the pass names is locked before anything of the branch is fetched", async () => {
+  const done: string[] = [];
+  const failing = { ...deps(NOW - 1000, done), lock: () => Promise.reject(new Error("EACCES")) };
+  await assertRejects(() => startReview(failing, "12"), Error, "EACCES");
+  assertEquals(done, ["taken"], "a lock that cannot be written fetches nothing");
+});
+
+Deno.test("a pass that names no session id starts nothing, locks nothing and fetches nothing", async () => {
+  for (const session of ["", "../s", "s 1"]) {
+    const done: string[] = [];
+    const outcome = await startReview(deps(NOW - 1000, done, TIP, JUDGED, JUDGED, session), "12");
+    assertEquals(outcome, { kind: "refused", why: NO_SESSION }, session);
+    assertEquals(done, ["taken"]);
+  }
 });
 
 Deno.test("a pass granted for another base tip, or with no base now, starts nothing", async () => {

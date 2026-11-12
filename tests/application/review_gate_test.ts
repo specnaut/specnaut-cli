@@ -7,7 +7,8 @@ import type { CheckoutState } from "../../src/domain/review_gate.ts";
 /** A pass that records what the gate did with it. */
 function pass(said: string[]): ReviewPass {
   return {
-    grant: (tip, at) => Promise.resolve(void said.push(`grant ${tip}${at === JUDGED ? "" : " ?"}`)),
+    grant: (tip, at, session) =>
+      Promise.resolve(void said.push(`grant ${tip} ${session}${at === JUDGED ? "" : " ?"}`)),
     revoke: () => Promise.resolve(void said.push("revoke")),
     take: () => Promise.reject(new Error("the gate never takes a pass")),
   };
@@ -34,7 +35,8 @@ Deno.test("a command that starts no review is not gated: nothing is checked, and
 Deno.test("a pass lives only until the next command: one that starts no review leaves none", async () => {
   let held: GrantedPass | null = null;
   const memory: ReviewPass = {
-    grant: (baseTip, at) => Promise.resolve(void (held = { granted: 1, baseTip, checkout: at })),
+    grant: (baseTip, at, session) =>
+      Promise.resolve(void (held = { granted: 1, baseTip, checkout: at, session })),
     revoke: () => Promise.resolve(void (held = null)),
     take: () => Promise.resolve(held).finally(() => held = null),
   };
@@ -63,7 +65,7 @@ Deno.test("a start is checked for the session the hook names, and a holding chec
   });
   assertEquals(outcome.kind, "trusted");
   assertEquals(asked, ["s-9"]);
-  assertEquals(said, ["revoke", `grant ${TIP}`]);
+  assertEquals(said, ["revoke", `grant ${TIP} s-9`], "the pass names the session judged");
 });
 
 Deno.test("a gated command removes any pass, then reads the checkout its check is taken on, then checks", async () => {
@@ -78,7 +80,7 @@ Deno.test("a gated command removes any pass, then reads the checkout its check i
     sessionId: "s",
     command: START,
   });
-  assertEquals(said, ["revoke", "checkout", "verify", `grant ${TIP}`]);
+  assertEquals(said, ["revoke", "checkout", "verify", `grant ${TIP} s`]);
 });
 
 Deno.test("a checkout that does not hold removes any pass, and so does no session id", async () => {
