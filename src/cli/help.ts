@@ -18,8 +18,9 @@ ${bold("Usage:")}
                                       Map file, function and class sizes against the size limits
                                       (read-only, offline, no agent): where to look, not a verdict
   specnaut verify-scripts             Check .specnaut/scripts/ against a copy the branch does not carry,
-                                      before a review or a merge runs them (read-only). Exit 0 trusted,
-                                      1 untrusted, 3 no base
+                                      and the config a branch controls against the base, before resume,
+                                      groom, the backlog verbs, audit, review or merge run them
+                                      (read-only). Exit 0 trusted, 1 untrusted, 3 no base
   specnaut record-checkout            Record the checkout a session started on (HEAD and the instruction and
                                       config files it loaded), from a SessionStart hook's input on stdin
   specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other

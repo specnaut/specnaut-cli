@@ -60,12 +60,16 @@ Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one
   assertStringIncludes(a, "A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`");
   assertStringIncludes(a, "is never `auto`");
   const m = flat(phase("merge").content);
-  assertStringIncludes(m, "A `NAMES_FILE` listing `.specnaut/workflow.yml`, on any run");
+  assertStringIncludes(
+    m,
+    "A `NAMES_FILE` listing `.specnaut/workflow.yml`, or a `workflow` line other than " +
+      "`VERDICT workflow trusted`, on any run",
+  );
 });
 
 Deno.test("the board fence is stated once, before any backlog script of the merge", () => {
   const merge = phase("merge").content;
-  const fence = merge.indexOf("lists `.specnaut/backlog-config.yml`, no backlog");
+  const fence = merge.indexOf("`VERDICT backlog-repo trusted`, no backlog script runs");
   assert(fence >= 0, "merge.md has no board fence");
   assert(fence < merge.indexOf("move.sh"), "move.sh is named before the fence");
   const close = flat(phase("merge-close").content);

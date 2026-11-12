@@ -66,6 +66,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | `phases/remote-gates.md` | `auto-chain`, in remote mode |
 | `phases/orphan-specs.md` | `groom`, when specs are kept locally |
 | `phases/review-seats.md` | `review`, before its first seat brief |
+| `phases/script-gate.md` | `resume`, `groom`, `audit` and the backlog verbs, before their first script; its config verdicts by every verb that runs a gate |
 
 Unknown verb → look it up first in the `specnaut` skill's **Retired addresses** table: a verb
 retired from this router, or one from before it existed, is answered with where it went. Any other
@@ -98,7 +99,10 @@ item `/task add` creates, also generate its spec — read `spec-autogen.md` and 
 
 ## Routing
 
-1. **Read** the verb's reference file from the table, with the `Read` tool.
+1. **Read** the verb's reference file from the table, with the `Read` tool. For `resume`, `groom`,
+   `audit` and every verb of `backlog.md`, also read `phases/script-gate.md` and run its gate before
+   the verb's first script of the tree (`resume.md` and `phases/audit.md` name the step); `review`
+   and `merge` run their own.
 2. **Read the project addendum** `.specnaut/addenda/task/<verb>.md` if it exists, for `plan`,
    `implement`, `review`, `merge`, `audit`, `constitution` and `groom` — the project's own
    addition to that verb. It adds to the phase at the step it names and never replaces or skips a

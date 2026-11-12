@@ -176,6 +176,12 @@
     {
       "category": "phase",
       "name": "task",
+      "suffix": "script-gate.md",
+      "source": "core/skills/task/phases/script-gate.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
       "suffix": "orphan-specs.md",
       "source": "core/skills/task/phases/orphan-specs.md"
     },

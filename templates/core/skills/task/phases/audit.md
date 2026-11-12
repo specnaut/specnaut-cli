@@ -28,6 +28,14 @@ Accept the axis flags above and at most one scope argument. `--scan` takes no ax
 but `--path`: a size map cannot follow a commit range. Anything else → print the usage block above
 and **STOP**. Never silently fall back to a wider audit than the one asked for.
 
+## Before the map — the helper-script gate
+
+Load `phases/script-gate.md` and run its gate. Any outcome but `SCRIPTS TRUSTED` runs no script of
+the tree: `--scan` goes on, since it runs none; any other audit stops there. The gate's
+`size-limits` line must be `VERDICT size-limits trusted` for the map below to run, and its
+`boundaries` line for the boundary check a seat is briefed with; otherwise each is
+`NOT RUN: <the line>`.
+
 ## Before Step 2 — Map the repository
 
 Run the scan once, before any scope or seat, and keep its JSON:
@@ -66,7 +74,7 @@ Run the bundled scope resolver and read its block:
 .specnaut/scripts/audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
 ```
 
-- `--diff` is passed as `--range "$(bash .specnaut/scripts/bash/git-read.sh base main)"..HEAD`.
+- `--diff` is passed as `--range "<BASE>..HEAD"`, `<BASE>` the gate's `BASE` sha.
 - **An axis flag and no scope argument** → `--path .` (the whole repository).
 - **No axis flag and no scope argument** → pass nothing: the script auto-resolves, in priority
   order, unpushed (`origin/main..HEAD`) → since the latest tag → the last N commits (default 20).

@@ -1,0 +1,50 @@
+# The helper-script gate
+
+`resume`, `groom`, the backlog verbs and `audit` load this doc before the first script under
+`.specnaut/scripts/` runs. `review` and `merge` run their own gate step (`phases/review.md` step 1,
+`phases/merge.md` step 0); every verb that runs a gate reads § The config verdicts.
+
+## The gate
+
+Run this block as written, from the project's root, before the first script of the tree, and
+again after any `git switch`, `git rebase` or commit the verb makes:
+
+<!-- script-gate: verify-scripts -->
+```bash
+out=$(specnaut verify-scripts); rc=$?; printf '%s\n' "$out"
+base=$(printf '%s\n' "$out" | sed -n 's/^BASE \([0-9a-f]\{40,64\}\)$/\1/p')
+last=$(printf '%s\n' "$out" | tail -n 1)
+names=$(printf '%s\n' "$out" | sed -n 's/^NAMES_FILE //p'); [ -z "$names" ] || rm -f "$names"
+if [ "$rc" -eq 0 ] && [ -n "$base" ] && [ "$last" = "VERDICT scripts trusted" ]; then
+  echo "SCRIPTS TRUSTED"
+else
+  echo "SCRIPTS NOT RUN: verify-scripts exit $rc"
+fi
+```
+
+`SCRIPTS TRUSTED` is the one outcome under which the verb runs a script of the tree. Any other
+runs none in this run: report the `SCRIPTS NOT RUN` line and each `UNTRUSTED` line, and stop. No
+`BASE` line (exit 2 or 3, or no `specnaut` on the PATH) means the base or the verifier is
+missing: say which. Never fall back to a script of the tree, nor to a hand-run of what it does.
+The `BASE` sha is the base for any range the verb passes a script.
+
+## The config verdicts
+
+Before the gate's `VERDICT scripts` line, the verifier prints one line per config input a branch
+controls: `VERDICT <class> trusted`, or `VERDICT <class> untrusted <path> <reason>`. Trusted means
+the work tree holds the value the base branch's tip holds, so reading the tree reads the base.
+A verb that ran a gate reads an input only under that gate's trusted line. An untrusted line, or
+none, means the tree's value is never read, and the row below applies:
+
+| Class | Read by | Not trusted |
+| :--- | :--- | :--- |
+| `workflow` | the merge mode (`phases/auto-chain.md`) | the mode is `manual`, the reading that asks |
+| `size-limits` | `size-ratchet.sh`, and `specnaut scan`'s map | not run: report `NOT RUN: <the line>`, never a pass |
+| `boundaries` | `boundary-check.sh` | not run: report `NOT RUN: <the line>`, never a pass |
+| `backlog-repo` | every backlog script: they address the tracker through `repo:` | none runs: stop and say so (at merge, step 5 says what stands) |
+| `linked-issue` | `.specnaut/feature.json`'s `linked_issue` (`resume.md`, `phases/merge.md` step 5) | as the doc reading it says |
+| `gates` | `run-gate.sh` | `phases/merge.md` and `phases/review-seats.md` say |
+
+Under `merge`, a `size-limits` or `boundaries` check left unrun is handled as a changed
+`.specnaut/gates.yml` is (`phases/merge.md`, **The full tier**): the mode is `manual`, and the
+user's yes is what lands it.

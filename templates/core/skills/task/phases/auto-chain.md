@@ -21,7 +21,8 @@ plan → implement → review → merge → push
    untrusted verdict: behind the base only, it rebases and the mode is read below; any other
    untrusted reason is step 0's one question, asked instead of "Ready to merge?", so nothing is
    asked twice; anything else stops. A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`
-   and the script below does not run. A dirty tree (`git -c core.fsmonitor=false status
+   and the script below does not run; so does a `workflow` line other than `VERDICT workflow
+   trusted` (`phases/script-gate.md`). A dirty tree (`git -c core.fsmonitor=false status
    --porcelain` prints a line) is never `auto`: say so. Otherwise:
 
    ```

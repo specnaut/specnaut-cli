@@ -41,6 +41,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "constitution",
     "auto-chain",
     "remote-gates",
+    "script-gate",
     "orphan-specs",
     "epic-commits",
     "epic-fixups",

@@ -73,6 +73,8 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   // The review aggregation, loaded by review before its first seat brief (#678).
   { skill: "task", doc: "review-seats", parents: [tk("review")] },
   { skill: "task", doc: "plan-reentry", parents: [tk("plan")] },
+  // The helper-script gate: of the verbs that load it, groom and audit read an addendum.
+  { skill: "task", doc: "script-gate", parents: [tk("groom"), tk("audit")] },
 ];
 
 /**

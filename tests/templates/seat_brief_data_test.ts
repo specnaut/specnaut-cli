@@ -34,7 +34,7 @@ Deno.test("review's Phase 0 runs the fast gate for code-reviewer, unless the dif
   assert(s.includes("the fast tier declared on the branch under review"), "not the committed one");
   assert(
     s.includes(
-      "Do not run it when the verdict is not trusted, or when `NAMES_FILE` lists `.specnaut/gates.yml` or anything under `.specnaut/scripts/`",
+      "Do not run it when the verdict is not trusted, when its `gates` line is not `VERDICT gates trusted`, or when `NAMES_FILE` lists `.specnaut/gates.yml` or anything under `.specnaut/scripts/`",
     ),
     "a diff that rewrites the gate must not get it executed for the seat reviewing it",
   );
@@ -66,10 +66,13 @@ Deno.test("the review and audit phases read git only through git-read.sh", async
       /(`|\$\()git\s+(?:-\S+\s+)*(?:diff|log|show|ls-files|grep|merge-base|rev-parse|rev-list|blame|cat-file)\b[^`)]*/g,
     ) ?? [];
     assertEquals(raw, [], `${doc} runs git directly`);
-    // review.md reads its range from the verifier, which runs before any script of the tree.
+    // review.md and audit.md read their range from the verifier, which runs before any script
+    // of the tree: review.md runs it itself, audit.md through the gate doc.
     const reader = doc === REVIEW
       ? "specnaut verify-scripts"
-      : "bash .specnaut/scripts/bash/git-read.sh";
+      : doc === SEATS
+      ? "bash .specnaut/scripts/bash/git-read.sh"
+      : "phases/script-gate.md";
     assert(text.includes(reader), `${doc} names ${reader}`);
   }
 });

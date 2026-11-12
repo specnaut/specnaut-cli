@@ -203,6 +203,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "merge-squash",
     "auto-chain",
     "remote-gates",
+    "script-gate",
     "orphan-specs",
     "audit",
     "constitution",

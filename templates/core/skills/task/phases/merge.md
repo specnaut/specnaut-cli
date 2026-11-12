@@ -54,8 +54,10 @@ under `--no-close`, once more after the push: there the item's line must read `O
    - **Anything else** — exit 3, no `specnaut` on the PATH, output without those parts: stop on the
      branch and say so. Nothing lands.
 
-   A `NAMES_FILE` listing `.specnaut/workflow.yml`, on any run, makes the merge mode `manual`: ask
-   `phases/auto-chain.md`'s one question before step 3 unless the user already answered one.
+   A `NAMES_FILE` listing `.specnaut/workflow.yml`, or a `workflow` line other than `VERDICT
+   workflow trusted`, on any run, makes the merge mode `manual`: ask `phases/auto-chain.md`'s one
+   question before step 3 unless the user already answered one. Every other config line acts
+   where its input is read, per `phases/script-gate.md` § The config verdicts.
    Each run's `NAMES_FILE` is removed (`rm -f`) once the next run prints its own, and the last
    when this phase ends, landed or stopped.
 
@@ -81,8 +83,8 @@ under `--no-close`, once more after the push: there the item's line must read `O
 
    **The full tier** — exits 0 and 14 only, before the landing. Run the full gate tier once, but
    first: if `git diff --quiet "$(git merge-base HEAD <base>)" HEAD -- .specnaut/gates.yml` exits
-   non-zero, the branch edited the list that judges it, handled as step 0 handles a changed helper
-   script: this run's merge mode is `manual`; show that diff (the same call without `--quiet`) and
+   non-zero, or step 0's last run printed a `gates` line other than `VERDICT gates trusted`, the
+   branch edited the list that judges it, handled as step 0 handles a changed helper script: this run's merge mode is `manual`; show that diff (the same call without `--quiet`) and
    ask once: *"This branch changes `.specnaut/gates.yml`. Yes runs the branch's list as the full
    tier."* A no stops on the branch, nothing landed. The yes covers that diff, and a later one asks
    again; under it the report names that run as the branch's list, never the base's. Then run
@@ -134,11 +136,15 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
-   the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, no backlog
-   script runs — not `move.sh`, not `phases/merge-close.md`. Say so, naming the file: the branch
-   chose which board they write to. The merge itself stands. Otherwise, the
-   item is `.specnaut/feature.json`'s `linked_issue`, a positive whole number; none, or anything
-   else, means nothing to settle. The first row that matches decides:
+   the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its
+   `backlog-repo` line is not `VERDICT backlog-repo trusted`, no backlog script runs — not
+   `move.sh`, not `phases/merge-close.md`. Say so, naming the file: the branch chose which board
+   they write to. The merge itself stands. Otherwise, the item is `.specnaut/feature.json`'s
+   `linked_issue`, a positive whole number; none, or anything else, means nothing to settle. It
+   is read under the `VERDICT linked-issue trusted` of step 0's last run before step 3, or its
+   `untrusted … not on base` when the link names the item this run was started for (the branch
+   wrote the first link); any other `linked-issue` line settles nothing: say so, quoting it. The
+   first row that matches decides:
 
    | How the phase ends | The card |
    | :--- | :--- |

@@ -98,7 +98,7 @@ Deno.test("merge step 5 settles the card in one table, and the other exits point
   assert(rows[1]?.includes("`--pr`, whatever `--no-close` says"), "--pr must be the first row");
   assertStringIncludes(
     step5,
-    "a positive whole number; none, or anything\n   else, means nothing to settle",
+    "a positive whole number; none, or anything else, means nothing to settle",
   );
   assertStringIncludes(MERGE, "run step 5 and step 6, and **stop**");
   assertStringIncludes(MERGE, "A rule refused it (protected base, hook): run step 5, then stop");
