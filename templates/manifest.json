@@ -2284,6 +2284,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_gate_selected.sh",
+      "source": "core/specnaut/scripts/bash/_gate_selected.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/merge-mode.sh",
       "source": "core/specnaut/scripts/bash/merge-mode.sh",
       "executable": true
@@ -2526,6 +2533,12 @@
       "name": "specify",
       "suffix": "scripts/powershell/_gate_evidence.ps1",
       "source": "core/specnaut/scripts/powershell/_gate_evidence.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_selected.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_selected.ps1"
     },
     {
       "category": "spec-root",
