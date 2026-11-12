@@ -4,6 +4,7 @@
  */
 
 import type { OfferedBackend, SandboxedBackend } from "./sandbox.ts";
+import type { DockerLimits } from "./sandbox_hosts.ts";
 
 export type SandboxLimits = {
   readonly processes: number;
@@ -43,7 +44,8 @@ const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
 
 /**
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
- * option ends a run on time. Neither bubblewrap nor `sandbox-exec` can cap processes, memory or
+ * option ends a run on time. A container's arguments carry its caps, but docker's daemon drops
+ * one its host cannot apply ({@link dockerDrops}), and the run goes without it. Neither bubblewrap nor `sandbox-exec` can cap processes, memory or
  * CPU; bubblewrap caps its scratch tmpfs by size, and gets the other three from a systemd user
  * scope where cgroups are delegated (`scopeArgs`). Nothing does so around `sandbox-exec`.
  */
@@ -82,9 +84,32 @@ export function unenforcedCaps(backend: SandboxedBackend, scope = false): (keyof
     .filter(([, by]) => by === "unenforced" || (by === "scope" && !scope)).map(([cap]) => cap);
 }
 
-/** The caps a chosen backend runs without: bubblewrap in a user scope lacks none of the three. */
+/**
+ * The caps a chosen backend runs without: bubblewrap in a user scope lacks none of the three, and
+ * a container lacks those its engine drops on this host.
+ */
 export function capsWithout(backend: OfferedBackend): (keyof SandboxLimits)[] {
-  return unenforcedCaps(backend.kind, backend.kind === "bwrap" && backend.scope);
+  const without = unenforcedCaps(backend.kind, backend.kind === "bwrap" && backend.scope);
+  const dropped = backend.kind === "container" ? backend.dropped : [];
+  return (Object.keys(CAP_NAMES) as (keyof SandboxLimits)[])
+    .filter((cap) => without.includes(cap) || dropped.includes(cap));
+}
+
+/**
+ * The cap each limit docker reports carries. The memory cap counts swap in it (`--memory-swap`),
+ * so it holds only where both the memory and the swap limit do.
+ */
+const DOCKER_CAPS: Readonly<Record<keyof DockerLimits, keyof SandboxLimits>> = {
+  memory: "memoryBytes",
+  swap: "memoryBytes",
+  pids: "processes",
+  cpuQuota: "cpus",
+};
+
+/** The caps docker's daemon drops from a run on a host that can apply only `limits`. */
+export function dockerDrops(limits: DockerLimits): (keyof SandboxLimits)[] {
+  const lacking = (Object.keys(DOCKER_CAPS) as (keyof DockerLimits)[]).filter((l) => !limits[l]);
+  return [...new Set(lacking.map((l) => DOCKER_CAPS[l]))];
 }
 
 /**

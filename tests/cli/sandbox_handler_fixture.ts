@@ -14,6 +14,7 @@ export const MAC: BackendProbe = {
   podman: "absent",
   podmanCgroups: false,
   docker: false,
+  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "absent",
   bwrapVersion: null,
   bwrapScope: false,

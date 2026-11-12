@@ -186,6 +186,7 @@ const LINUX_BWRAP = {
   podman: "absent",
   podmanCgroups: false,
   docker: false,
+  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "usable",
   bwrapVersion: "bubblewrap 0.9.0",
   bwrapScope: false,

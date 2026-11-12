@@ -3,6 +3,8 @@ import { bwrapArgs, containerArgs, scopeArgs } from "../../src/domain/sandbox_ar
 import {
   CAP_ENFORCEMENT,
   CAP_NAMES,
+  capsWithout,
+  dockerDrops,
   LIMITS,
   STOP_LIMIT,
   unenforcedCaps,
@@ -74,6 +76,24 @@ Deno.test("unenforcedCaps: bubblewrap in a user scope lacks none; a scope means 
   assertEquals(unenforcedCaps("bwrap", true), []);
   assertEquals(unenforcedCaps("seatbelt", true), unenforcedCaps("seatbelt"));
   assertEquals(unenforcedCaps("container", true), []);
+});
+
+const ALL = { memory: true, swap: true, pids: true, cpuQuota: true };
+
+Deno.test("dockerDrops: each limit docker's host lacks drops its cap; memory needs swap too", () => {
+  assertEquals(dockerDrops(ALL), []);
+  assertEquals(dockerDrops({ ...ALL, memory: false }), ["memoryBytes"]);
+  assertEquals(dockerDrops({ ...ALL, swap: false }), ["memoryBytes"]);
+  assertEquals(dockerDrops({ ...ALL, memory: false, swap: false }), ["memoryBytes"]);
+  assertEquals(dockerDrops({ ...ALL, pids: false }), ["processes"]);
+  assertEquals(dockerDrops({ ...ALL, cpuQuota: false }), ["cpus"]);
+});
+
+Deno.test("capsWithout: a container lacks what its engine drops, in the table's order", () => {
+  const docker = { kind: "container", engine: "docker", image: RUN.image } as const;
+  assertEquals(capsWithout({ ...docker, dropped: [] }), []);
+  assertEquals(capsWithout({ ...docker, dropped: ["cpus", "processes"] }), ["processes", "cpus"]);
+  assertEquals(capsWithout({ kind: "bwrap", scope: false }), unenforcedCaps("bwrap"));
 });
 
 Deno.test("STOP_LIMIT: only sandbox-exec's stop misses a process that left the run's group", () => {

@@ -1,36 +1,13 @@
 import { assertEquals } from "@std/assert";
-import type { SubprocessOptions, SubprocessResult } from "../../src/application/ports.ts";
-import type { ImageSource } from "../../src/domain/sandbox_image.ts";
-import { HostBackendProber } from "../../src/infrastructure/sandbox_probe.ts";
+import { IMAGE, ok, prober } from "./sandbox_probe_fixture.ts";
 
 /**
  * What the host offers a sandbox, read from the tools themselves: podman's own report of rootless
- * and delegated cgroups, a docker daemon that answers, bubblewrap's version and a trial run, and a
- * trial `sandbox-exec`. Nothing is asked on Windows, and nothing is asked of a tool on an OS where
- * the domain would not use it.
+ * and delegated cgroups, bubblewrap's version and a trial run, and a trial `sandbox-exec`.
+ * Nothing is asked on Windows, and nothing is asked of a tool on an OS where the domain would not
+ * use it. Docker's report, and the limits it can apply, are `sandbox_probe_docker_test.ts`'s.
  */
 
-const IMAGE: ImageSource = { kind: "pinned", ref: `acme/dev@sha256:${"d".repeat(64)}` };
-const NOT_FOUND: SubprocessResult = { code: 127, stdout: "", stderr: "not found" };
-
-type Call = { cmd: string; args: string[] };
-
-function prober(os: string, answers: Record<string, SubprocessResult>) {
-  const calls: Call[] = [];
-  const run = {
-    run(cmd: string, args: string[], _opts?: SubprocessOptions): Promise<SubprocessResult> {
-      calls.push({ cmd, args });
-      const key = `${cmd} ${args[0]}`;
-      return Promise.resolve(answers[key] ?? answers[cmd] ?? NOT_FOUND);
-    },
-  };
-  return {
-    calls,
-    prober: new HostBackendProber(run, { os, arch: "x86_64" }, () => Promise.resolve(IMAGE)),
-  };
-}
-
-const ok = (stdout = ""): SubprocessResult => ({ code: 0, stdout, stderr: "" });
 const podmanInfo = (rootless: boolean, version: string, controllers: string[]) =>
   ok(JSON.stringify({
     host: { security: { rootless }, cgroupVersion: version, cgroupControllers: controllers },
@@ -45,6 +22,7 @@ Deno.test("probe: nothing installed on Linux reads as nothing offered", async ()
     podman: "absent",
     podmanCgroups: false,
     docker: false,
+    dockerLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
     bwrap: "absent",
     bwrapVersion: null,
     bwrapScope: false,
@@ -68,13 +46,6 @@ Deno.test("probe: podman whose report is not JSON is not used", async () => {
   const { prober: p } = prober("linux", { podman: ok("garbled") });
   const probed = await p.probe();
   assertEquals([probed.podman, probed.podmanCgroups], ["absent", false]);
-});
-
-Deno.test("probe: docker counts only when its daemon answers with a version", async () => {
-  assertEquals((await prober("linux", { docker: ok("27.1.0\n") }).prober.probe()).docker, true);
-  assertEquals((await prober("linux", { docker: ok("\n") }).prober.probe()).docker, false);
-  const down = { code: 1, stdout: "", stderr: "Cannot connect to the Docker daemon" };
-  assertEquals((await prober("linux", { docker: down }).prober.probe()).docker, false);
 });
 
 Deno.test("probe: bubblewrap's version, and a trial run that passes", async () => {
@@ -149,7 +120,7 @@ Deno.test("probe: bubblewrap is not asked on macOS, nor sandbox-exec on Linux", 
 });
 
 Deno.test("probe: on Windows nothing is run at all", async () => {
-  const { prober: p, calls } = prober("windows", { docker: ok("27.1.0") });
+  const { prober: p, calls } = prober("windows", { docker: ok('{"ServerVersion":"27.1.0"}') });
   const probed = await p.probe();
   assertEquals(calls, []);
   assertEquals([probed.docker, probed.podman, probed.bwrap], [false, "absent", "absent"]);

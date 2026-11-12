@@ -32,6 +32,7 @@ const LINUX_BWRAP: BackendProbe = {
   podman: "absent",
   podmanCgroups: false,
   docker: false,
+  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "usable",
   bwrapVersion: "bubblewrap 0.9.0",
   bwrapScope: false,
@@ -109,7 +110,12 @@ Deno.test("execInSandbox: a container runner is handed its engine and pinned ima
   };
   const { deps, seen } = world(probe);
   await execInSandbox(deps, REQUEST);
-  assertEquals(seen.runs[0].backend, { kind: "container", engine: "docker", image: IMAGE });
+  assertEquals(seen.runs[0].backend, {
+    kind: "container",
+    engine: "docker",
+    image: IMAGE,
+    dropped: [],
+  });
   assertEquals(seen.runs[0].policy.reads, [FOLDERS.tree]);
 });
 

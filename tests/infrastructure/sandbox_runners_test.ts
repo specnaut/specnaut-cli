@@ -159,7 +159,7 @@ Deno.test("runnerFor: one runner per backend", () => {
   const { launcher } = fakeLauncher(0);
   const host = { arch: "x86_64", path: "/usr/bin", bus: {} };
   const container = runnerFor(
-    { kind: "container", engine: "docker", image: IMAGE },
+    { kind: "container", engine: "docker", image: IMAGE, dropped: [] },
     launcher,
     host,
   );

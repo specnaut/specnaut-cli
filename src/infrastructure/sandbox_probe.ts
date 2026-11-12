@@ -22,8 +22,13 @@ const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
 type Podman = Pick<BackendProbe, "podman" | "podmanCgroups">;
+type Docker = Pick<BackendProbe, "docker" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
 const NO_PODMAN: Podman = { podman: "absent", podmanCgroups: false };
+const NO_DOCKER: Docker = {
+  docker: false,
+  dockerLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
+};
 const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null, bwrapScope: false };
 
 /**
@@ -46,7 +51,7 @@ export class HostBackendProber implements BackendProber {
     const { os, arch } = this.host;
     if (os === "windows") {
       const image: ImageSource = { kind: "none", why: "no sandbox on Windows" };
-      return { os, arch, image, ...NO_PODMAN, docker: false, ...NO_BWRAP, sandboxExec: false };
+      return { os, arch, image, ...NO_PODMAN, ...NO_DOCKER, ...NO_BWRAP, sandboxExec: false };
     }
     const [image, podman, docker, bwrap, sandboxExec] = await Promise.all([
       this.image(),
@@ -55,7 +60,7 @@ export class HostBackendProber implements BackendProber {
       os === "linux" ? this.#bwrap() : NO_BWRAP,
       os === "darwin" && this.#sandboxExec(),
     ]);
-    return { os, arch, image, ...podman, docker, ...bwrap, sandboxExec };
+    return { os, arch, image, ...podman, ...docker, ...bwrap, sandboxExec };
   }
 
   /** Podman's own report: whether it runs as the user, and which cgroup controllers it holds. */
@@ -73,13 +78,25 @@ export class HostBackendProber implements BackendProber {
     };
   }
 
-  async #docker(): Promise<boolean> {
-    const { code, stdout } = await this.runner.run("docker", [
-      "info",
-      "--format",
-      "{{.ServerVersion}}",
-    ]);
-    return code === 0 && stdout.trim() !== "";
+  /**
+   * Docker's own report: whether its daemon answers with a version, and which limits it can apply
+   * on its host. A limit it does not say it can (false, or left out) counts as one it cannot.
+   */
+  async #docker(): Promise<Docker> {
+    const { code, stdout } = await this.runner.run("docker", ["info", "--format", "{{json .}}"]);
+    if (code !== 0) return NO_DOCKER;
+    const info = parsed(stdout, "docker info");
+    if (typeof info?.ServerVersion !== "string" || info.ServerVersion === "") return NO_DOCKER;
+    const can = (flag: string) => info[flag] === true;
+    return {
+      docker: true,
+      dockerLimits: {
+        memory: can("MemoryLimit"),
+        swap: can("SwapLimit"),
+        pids: can("PidsLimit"),
+        cpuQuota: can("CpuCfsQuota"),
+      },
+    };
   }
 
   async #bwrap(): Promise<Bwrap> {

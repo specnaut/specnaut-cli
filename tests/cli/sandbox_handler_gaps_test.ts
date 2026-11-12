@@ -70,3 +70,18 @@ Deno.test("sandbox probe: bubblewrap in a user scope lacks only what the table s
   const bareLines = bare.out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
   assertEquals(bareLines, uncapped("bwrap"));
 });
+
+Deno.test("sandbox probe: docker on a host that cannot apply a limit runs UNCAPPED for its cap", async () => {
+  const docker: BackendProbe = {
+    ...MAC,
+    os: "linux",
+    sandboxExec: false,
+    docker: true,
+    dockerLimits: { memory: true, swap: false, pids: false, cpuQuota: true },
+    image: { kind: "pinned", ref: `acme/dev@sha256:${"e".repeat(64)}` },
+  };
+  const { d, out } = deps(docker, () => Promise.reject(new Error("unused")));
+  await runSandbox(PROBE, d);
+  const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
+  assertEquals(lines, ["UNCAPPED container processes,memory"]);
+});

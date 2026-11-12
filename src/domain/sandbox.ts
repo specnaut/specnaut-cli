@@ -21,7 +21,7 @@ import {
   SYSTEM,
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
-import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
+import { dockerDrops, LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
 import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
 
@@ -30,7 +30,13 @@ export type { BackendProbe };
 export type Engine = "podman" | "docker";
 
 export type Backend =
-  | { readonly kind: "container"; readonly engine: Engine; readonly image: string }
+  | {
+    readonly kind: "container";
+    readonly engine: Engine;
+    readonly image: string;
+    /** The caps its engine drops on this host: the run goes without them, and says so. */
+    readonly dropped: readonly (keyof SandboxLimits)[];
+  }
   /** `scope`: run inside a systemd user scope that caps memory, processes and CPU. */
   | { readonly kind: "bwrap"; readonly scope: boolean }
   | { readonly kind: "seatbelt" }
@@ -88,7 +94,11 @@ function containerStatus(probe: BackendProbe): BackendStatus {
   const podman = probe.podman === "rootless" && probe.podmanCgroups;
   const engine = podman ? "podman" : probe.docker ? "docker" : null;
   if (probe.image.kind === "pinned" && engine) {
-    return { kind: "container", offered: { kind: "container", engine, image: probe.image.ref } };
+    const dropped = engine === "docker" ? dockerDrops(probe.dockerLimits) : [];
+    return {
+      kind: "container",
+      offered: { kind: "container", engine, image: probe.image.ref, dropped },
+    };
   }
   const why = probe.image.kind === "none"
     ? `no container image: ${probe.image.why}`

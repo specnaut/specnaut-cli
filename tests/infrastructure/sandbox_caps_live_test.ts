@@ -1,11 +1,16 @@
 import { assert, assertEquals } from "@std/assert";
 import type { RunOutcome } from "../../src/application/sandbox_ports.ts";
 import { runSandbox } from "../../src/cli/handlers/sandbox_handler.ts";
-import type { OfferedBackend, SandboxPolicy } from "../../src/domain/sandbox.ts";
+import {
+  type BackendProbe,
+  chooseBackend,
+  type OfferedBackend,
+  type SandboxPolicy,
+} from "../../src/domain/sandbox.ts";
 import { CAP_NAMES, capsWithout, type SandboxLimits } from "../../src/domain/sandbox_limits.ts";
 import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
-import { deps, EXEC } from "../cli/sandbox_handler_fixture.ts";
+import { deps, EXEC, MAC } from "../cli/sandbox_handler_fixture.ts";
 import {
   killNamed,
   live,
@@ -78,22 +83,64 @@ const BOMBS: Readonly<Record<Cap, Bomb>> = {
   },
 };
 
-/** The probe line and the exec notice for `offered`, through the handler, as a user sees them. */
-async function reported(offered: OfferedBackend, outcome: RunOutcome): Promise<string[]> {
+/**
+ * The probe lines and the exec notice for `offered` on a host `probe` describes, through the
+ * handler, as a user sees them.
+ */
+async function reported(
+  probe: BackendProbe,
+  offered: OfferedBackend,
+  outcome: RunOutcome,
+): Promise<string[]> {
   const ran = {
     kind: "ran" as const,
     backend: offered.kind,
     outcome,
     unenforced: capsWithout(offered),
   };
-  const { d, out, err } = deps(
-    { ...probed, image: { kind: "pinned", ref: LIVE_IMAGE } },
-    () => Promise.resolve(ran),
-  );
+  const { d, out, err } = deps(probe, () => Promise.resolve(ran));
   await runSandbox({ kind: "sandbox", sub: "probe" }, d);
   await runSandbox(EXEC, d);
   return [...out.join("\n").split("\n"), ...err];
 }
+
+/** Asserts `lines` report `cap` UNCAPPED on `backend`, on probe and in the exec notice. */
+function assertUncapped(lines: string[], backend: string, cap: keyof SandboxLimits): void {
+  const uncapped = (prefix: string) =>
+    lines.some((l) =>
+      l.startsWith(`${prefix}UNCAPPED ${backend} `) &&
+      l.split(" ").at(-1)!.split(",").includes(CAP_NAMES[cap])
+    );
+  assert(uncapped(""), `no UNCAPPED line on probe: ${lines.join(" | ")}`);
+  assert(uncapped("notice: specnaut sandbox exec: "), `no exec notice: ${lines.join(" | ")}`);
+}
+
+/** A Linux host whose docker daemon can apply every limit, with a pinned image to run. */
+const DOCKER_HOST: BackendProbe = {
+  ...MAC,
+  os: "linux",
+  sandboxExec: false,
+  docker: true,
+  image: { kind: "pinned", ref: `acme/dev@sha256:${"e".repeat(64)}` },
+};
+
+/** The cap each limit docker reports carries. */
+const DOCKER_CAPS = {
+  memory: "memoryBytes",
+  swap: "memoryBytes",
+  pids: "processes",
+  cpuQuota: "cpus",
+} as const;
+
+Deno.test("caps: on docker whose host cannot apply a limit, its cap is reported UNCAPPED", async () => {
+  for (const [limit, cap] of Object.entries(DOCKER_CAPS)) {
+    const probe = { ...DOCKER_HOST, dockerLimits: { ...DOCKER_HOST.dockerLimits, [limit]: false } };
+    const offered = chooseBackend(probe);
+    assertEquals(offered.kind, "container", limit);
+    const lines = await reported(probe, offered as OfferedBackend, { kind: "exited", code: 0 });
+    assertUncapped(lines, "container", cap);
+  }
+});
 
 for (const status of STATUSES) {
   const missing = skipOf(status);
@@ -123,17 +170,8 @@ for (const status of STATUSES) {
             assert(out.startsWith("start\n"), `the bomb never ran: ${detail}`);
             assertEquals(bomb.stopped(outcome, out, Date.now() - started), enforced, detail);
             if (enforced) return;
-            const lines = await reported(offered!, outcome);
-            const uncapped = (prefix: string) =>
-              lines.some((l) =>
-                l.startsWith(`${prefix}UNCAPPED ${status.kind} `) &&
-                l.split(" ").at(-1)!.split(",").includes(CAP_NAMES[cap])
-              );
-            assert(uncapped(""), `no UNCAPPED line on probe: ${lines.join(" | ")}`);
-            assert(
-              uncapped("notice: specnaut sandbox exec: "),
-              `no exec notice: ${lines.join(" | ")}`,
-            );
+            const probe = { ...probed, image: { kind: "pinned", ref: LIVE_IMAGE } } as const;
+            assertUncapped(await reported(probe, offered!, outcome), status.kind, cap);
           } finally {
             killNamed(`sleep ${HANG}.5`);
             killNamed(`setsid sleep ${HANG}.5`);

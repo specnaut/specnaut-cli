@@ -21,36 +21,49 @@ const NOTHING: BackendProbe = {
   podman: "absent",
   podmanCgroups: false,
   docker: false,
+  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "absent",
   bwrapVersion: "bubblewrap 0.8.0",
   bwrapScope: false,
   sandboxExec: false,
 };
 
+/** A container on each engine, as offered on a host that can apply every cap. */
+const ON_PODMAN = { kind: "container", engine: "podman", image: IMAGE.ref, dropped: [] } as const;
+const ON_DOCKER = { kind: "container", engine: "docker", image: IMAGE.ref, dropped: [] } as const;
+
 const probe = (over: Partial<BackendProbe>): BackendProbe => ({ ...NOTHING, ...over });
 
 Deno.test("chooseBackend: rootless podman comes first, ahead of docker and bubblewrap", () => {
   const all = probe({ podman: "rootless", podmanCgroups: true, docker: true, bwrap: "usable" });
-  assertEquals(chooseBackend(all), { kind: "container", engine: "podman", image: IMAGE.ref });
+  assertEquals(chooseBackend(all), ON_PODMAN);
 });
 
 Deno.test("chooseBackend: podman running as root is passed over for docker", () => {
   const rooted = probe({ podman: "root", podmanCgroups: true, docker: true, bwrap: "usable" });
-  assertEquals(chooseBackend(rooted), { kind: "container", engine: "docker", image: IMAGE.ref });
+  assertEquals(chooseBackend(rooted), ON_DOCKER);
 });
 
 Deno.test("chooseBackend: rootless podman without delegated cgroups cannot cap a run", () => {
   const uncapped = probe({ podman: "rootless", docker: true });
-  assertEquals(chooseBackend(uncapped), { kind: "container", engine: "docker", image: IMAGE.ref });
+  assertEquals(chooseBackend(uncapped), ON_DOCKER);
   const alone = chooseBackend(probe({ podman: "rootless", bwrap: "usable" }));
   assertEquals(alone, { kind: "bwrap", scope: false });
   const nothing = chooseBackend(probe({ podman: "rootless" }));
   assertEquals(nothing.kind === "static" && nothing.why[0], CGROUPS_WHY);
 });
 
+Deno.test("chooseBackend: docker carries the caps its host cannot apply; podman runs only capped", () => {
+  const lacking = { memory: true, swap: false, pids: false, cpuQuota: true };
+  const docker = chooseBackend(probe({ docker: true, dockerLimits: lacking }));
+  assertEquals(docker, { ...ON_DOCKER, dropped: ["memoryBytes", "processes"] });
+  const podman = probe({ podman: "rootless", podmanCgroups: true, dockerLimits: lacking });
+  assertEquals(chooseBackend(podman), ON_PODMAN);
+});
+
 Deno.test("chooseBackend: docker comes before bubblewrap", () => {
   const both = probe({ docker: true, bwrap: "usable" });
-  assertEquals(chooseBackend(both), { kind: "container", engine: "docker", image: IMAGE.ref });
+  assertEquals(chooseBackend(both), ON_DOCKER);
 });
 
 Deno.test("chooseBackend: no digest-pinned image means no container, whatever engine exists", () => {
@@ -146,7 +159,7 @@ Deno.test("assessBackends: each backend in selection order, offered or with its 
   ]);
   const linux = probe({ docker: true, bwrap: "usable" });
   assertEquals(assessBackends(linux), [
-    { kind: "container", offered: { kind: "container", engine: "docker", image: IMAGE.ref } },
+    { kind: "container", offered: ON_DOCKER },
     { kind: "bwrap", offered: { kind: "bwrap", scope: false } },
     { kind: "seatbelt", why: "sandbox-exec: macOS only", onThisOs: false },
   ]);

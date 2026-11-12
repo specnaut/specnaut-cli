@@ -6,6 +6,17 @@
 
 import type { ImageSource } from "./sandbox_image.ts";
 
+/**
+ * The limits docker's daemon reports it can apply on its host (`docker info`): one whose cgroup
+ * controller the host lacks is discarded from a run, whatever its arguments say.
+ */
+export type DockerLimits = {
+  readonly memory: boolean;
+  readonly swap: boolean;
+  readonly pids: boolean;
+  readonly cpuQuota: boolean;
+};
+
 /** What the host offers, as the caller probed it. */
 export type BackendProbe = {
   /** `Deno.build.os`. */
@@ -19,6 +30,8 @@ export type BackendProbe = {
   readonly podmanCgroups: boolean;
   /** A docker daemon answers. */
   readonly docker: boolean;
+  /** What that daemon can limit; every one false when none answers. */
+  readonly dockerLimits: DockerLimits;
   /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */
   readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
   /** What `bwrap --version` printed, or `null` when it printed nothing. */
