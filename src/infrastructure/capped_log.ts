@@ -25,6 +25,7 @@ export async function openCappedLog(path: string, cap = LOG_CAP_BYTES): Promise<
     out: stream(),
     err: stream(),
     close: async () => {
+      await write(filter.end());
       await pending;
       if (filter.truncated) {
         await writeAll(file, new TextEncoder().encode(`\n[output cut at ${cap} bytes]\n`));
