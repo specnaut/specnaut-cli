@@ -1,62 +1,18 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import type { GitObjectReader } from "../../src/application/script_trust_ports.ts";
-import { type CheckoutOutcome, verifyCheckout } from "../../src/application/verify_checkout.ts";
+import { verifyCheckout } from "../../src/application/verify_checkout.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { CHECKOUT_REASON, RESTART_ADVICE } from "../../src/domain/checkout_trust.ts";
 import { REASON } from "../../src/domain/script_trust.ts";
-import { FsScriptTreeWalker } from "../../src/infrastructure/fs_script_tree_walker.ts";
-import { FsTreeWalker } from "../../src/infrastructure/fs_tree_walker.ts";
-import { GitObjects } from "../../src/infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
-import {
-  bundled,
-  commitAll,
-  fixture,
-  git,
-  GIT_READ,
-  LOCK,
-  write,
-} from "./verify_scripts_fixture.ts";
+import { check, reasons, SETTINGS, setUp } from "./verify_checkout_fixture.ts";
+import { commitAll, git, GIT_READ, write } from "./verify_scripts_fixture.ts";
 
 /**
  * The checkout precondition through its real adapters, on real repositories: a base on origin, a
  * branch from outside fetched as objects only, and the user's checkout at the base.
  */
-
-const POSIX = Deno.build.os !== "windows";
-const SETTINGS = ".claude/settings.json";
-const BASE_FILES = {
-  ".specnaut/installed.lock": LOCK,
-  [GIT_READ]: bundled(GIT_READ),
-  ".specnaut/workflow.yml": "merge: auto\n",
-  [SETTINGS]: "{}\n",
-  "AGENTS.md": "rules\n",
-  ".gitignore": ".claude/settings.local.json\n",
-};
-
-/** The fixture, plus a branch `outside` one commit past the base: its head sha. */
-async function setUp(files: Record<string, string> = BASE_FILES) {
-  const { root } = await fixture({ files });
-  await git(root, "checkout", "-q", "-b", "outside", "main");
-  await write(root, { "src/a.ts": "export const a = 1;\n" });
-  await commitAll(root, "outside work");
-  const head = (await git(root, "rev-parse", "HEAD")).trim();
-  await git(root, "checkout", "-q", "feature");
-  return { root, head };
-}
-
-async function check(root: string, head: string): Promise<CheckoutOutcome> {
-  return await verifyCheckout({
-    git: await GitObjects.open(root),
-    walker: new FsScriptTreeWalker(root),
-    checkout: new FsTreeWalker(root),
-    core: CORE_BUNDLE,
-    findHarness,
-  }, head);
-}
-
-const reasons = (o: CheckoutOutcome) => o.kind === "restart" ? o.reasons : [];
 
 Deno.test("a clean checkout at the base holds, and names the tip it was measured against", async () => {
   const { root, head } = await setUp();
@@ -141,25 +97,6 @@ Deno.test("files outside the checked ones change nothing", async () => {
   const { root, head } = await setUp();
   await write(root, { "README.md": "notes\n", ".specnaut/specs/001-x/plan.md": "# plan\n" });
   assertEquals((await check(root, head)).kind, "trusted");
-});
-
-Deno.test({
-  name: "a link the base has holds; the same link pointed elsewhere fails",
-  ignore: !POSIX,
-  fn: async () => {
-    const { root } = await fixture({ files: BASE_FILES });
-    await Deno.symlink("../AGENTS.md", join(root, ".claude/CLAUDE.md"));
-    await commitAll(root, "link");
-    await git(root, "checkout", "-q", "main");
-    await git(root, "merge", "-q", "--ff-only", "feature");
-    await git(root, "push", "-q", "origin", "main");
-    const head = (await git(root, "rev-parse", "HEAD")).trim();
-    assertEquals((await check(root, head)).kind, "trusted");
-    await Deno.remove(join(root, ".claude/CLAUDE.md"));
-    await Deno.symlink("../README.md", join(root, ".claude/CLAUDE.md"));
-    const found = reasons(await check(root, head));
-    assertEquals(found, [{ path: ".claude/CLAUDE.md", reason: REASON.differs }]);
-  },
 });
 
 Deno.test("an outside head that is not a full sha, or names no commit here, fails before git reads it", async () => {

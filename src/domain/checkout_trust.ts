@@ -1,4 +1,3 @@
-import { dirname, join, normalize } from "@std/path/posix";
 import {
   type BaseEntry,
   hasCaseTwin,
@@ -6,11 +5,10 @@ import {
   SCRIPTS_DIR,
   type ScriptVerdict,
   type TreeEntry,
-  type TreeWalk,
   type Untrusted,
 } from "./script_trust.ts";
 import { sameBytes } from "./bytes.ts";
-import { inCheckoutScope } from "./checkout_scope.ts";
+import { inCheckoutScope, inDeepRoot } from "./checkout_scope.ts";
 
 /**
  * Whether the checkout a session runs in may steer the review of a branch it does not trust. The
@@ -29,6 +27,23 @@ import { inCheckoutScope } from "./checkout_scope.ts";
  * Anything else stops the review, which never falls back to reading the checkout as it is.
  */
 
+/**
+ * Where a link leads, as the walk resolved it on disk: a path relative to the project's real root
+ * with the file's identity (`dev:ino`, `null` where the platform has none), or why it leads nowhere
+ * the check can follow.
+ */
+export type LinkEnd =
+  | { readonly kind: "inside"; readonly path: string; readonly id: string | null }
+  | { readonly kind: "outside" }
+  | { readonly kind: "unresolved"; readonly why: string };
+
+/** A tree entry as the checkout walk reads it: a file with its identity, a link with its end. */
+export type CheckoutEntry = TreeEntry & { readonly id?: string | null; readonly end?: LinkEnd };
+
+export type CheckoutWalk =
+  | { readonly kind: "walked"; readonly entries: readonly CheckoutEntry[] }
+  | { readonly kind: "blocked"; readonly path: string; readonly why: string };
+
 export type CheckoutInput = {
   /** The commits of base..HEAD. */
   readonly headCommits: readonly string[];
@@ -36,7 +51,7 @@ export type CheckoutInput = {
   readonly untrustedCommits: readonly string[];
   readonly scripts: ScriptVerdict;
   /** The walk of each `CHECKOUT_SCOPE` root, as the disk holds it. */
-  readonly tree: readonly TreeWalk[];
+  readonly tree: readonly CheckoutWalk[];
   /** The same roots at the base's tip. */
   readonly tip: readonly BaseEntry[];
 };
@@ -49,6 +64,8 @@ export const CHECKOUT_REASON = {
   headAhead: "HEAD holds this commit the base's tip lacks",
   scripts: "the helper scripts are untrusted",
   linkLeaves: "a link out of the checked files",
+  linkForm: "a link target with a backslash or a drive",
+  linkUnresolved: "a link that leads nowhere",
 } as const;
 
 /** What a failed check tells the user: the only way on. */
@@ -82,15 +99,16 @@ function scriptReasons(scripts: ScriptVerdict): readonly Untrusted[] {
 /** Each walk that stopped, each tree entry the tip does not match, each tip entry the tree lacks. */
 function configReasons(input: CheckoutInput): Untrusted[] {
   const out: Untrusted[] = [];
-  const entries: TreeEntry[] = [];
+  const entries: CheckoutEntry[] = [];
   for (const walk of input.tree) {
     if (walk.kind === "blocked") out.push({ path: walk.path, reason: walk.why });
     else entries.push(...walk.entries.filter((e) => inCheckoutScope(e.path)));
   }
   const tip = input.tip.filter((e) => inCheckoutScope(e.path));
   const atTip = new Map(tip.map((e) => [e.path, e]));
+  const ids = new Set(entries.flatMap((e) => e.kind === "file" && e.id ? [e.id] : []));
   for (const entry of entries) {
-    const reason = entryReason(entry, atTip);
+    const reason = entryReason(entry, atTip, ids);
     if (reason !== null) out.push({ path: entry.path, reason });
   }
   const inTree = new Set(entries.map((e) => e.path));
@@ -101,14 +119,18 @@ function configReasons(input: CheckoutInput): Untrusted[] {
   return out;
 }
 
-function entryReason(entry: TreeEntry, atTip: ReadonlyMap<string, BaseEntry>): string | null {
+function entryReason(
+  entry: CheckoutEntry,
+  atTip: ReadonlyMap<string, BaseEntry>,
+  ids: ReadonlySet<string>,
+): string | null {
   if (entry.kind === "other") return REASON.notRegular;
   if (entry.kind === "unreadable") return `unreadable: ${entry.why}`;
   const base = atTip.get(entry.path);
   if (base === undefined) {
     return hasCaseTwin(entry.path, atTip) ? REASON.caseDiffers : REASON.notOnBase;
   }
-  if (entry.kind === "link") return linkReason(entry, base);
+  if (entry.kind === "link") return linkReason(entry, base, ids);
   if (entry.links > 1) return REASON.hardLinked;
   if (base.kind === "blob" && sameBytes(entry.bytes, base.bytes)) return null;
   // A link checked out where links are off is a file holding the link's target: the tip's blob.
@@ -118,11 +140,24 @@ function entryReason(entry: TreeEntry, atTip: ReadonlyMap<string, BaseEntry>): s
   return REASON.differs;
 }
 
-/** A link holds only as the tip's own link, and only when it leads to another checked file. */
-function linkReason(entry: TreeEntry & { kind: "link" }, base: BaseEntry): string | null {
+/**
+ * A link holds only as the tip's own link, written with forward slashes and no drive, and only when
+ * it leads, on disk, to a file this check compared (the same `dev:ino`) or into a root it walks
+ * whole. A link into the project's other files, a subfolder no root walks, or out of the project
+ * leads where the check cannot vouch for.
+ */
+function linkReason(
+  entry: CheckoutEntry & { kind: "link" },
+  base: BaseEntry,
+  ids: ReadonlySet<string>,
+): string | null {
   if (base.kind !== "link" || entry.target === undefined || entry.target !== base.target) {
     return REASON.differs;
   }
-  const to = normalize(join(dirname(entry.path), entry.target));
-  return entry.target.startsWith("/") || !inCheckoutScope(to) ? CHECKOUT_REASON.linkLeaves : null;
+  if (/\\|^[A-Za-z]:/.test(entry.target)) return CHECKOUT_REASON.linkForm;
+  const end = entry.end;
+  if (end === undefined || end.kind === "outside") return CHECKOUT_REASON.linkLeaves;
+  if (end.kind === "unresolved") return `${CHECKOUT_REASON.linkUnresolved}: ${end.why}`;
+  if (end.id !== null && ids.has(end.id)) return null;
+  return inDeepRoot(end.path) ? null : CHECKOUT_REASON.linkLeaves;
 }

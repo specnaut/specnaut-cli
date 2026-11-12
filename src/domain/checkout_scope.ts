@@ -48,6 +48,12 @@ export function inScopeRoot(root: ScopeRoot, path: string): boolean {
   return root.names === undefined || root.names.some((n) => n.toLowerCase() === folded);
 }
 
+/** Whether `path` is inside a root the check walks whole: every file below it is compared. */
+export function inDeepRoot(path: string): boolean {
+  return !path.startsWith(`${SCRIPTS_DIR}/`) &&
+    CHECKOUT_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
+}
+
 /** Whether `path` is one of the checked files. */
 export function inCheckoutScope(path: string): boolean {
   return !path.startsWith(`${SCRIPTS_DIR}/`) && CHECKOUT_SCOPE.some((r) => inScopeRoot(r, path));

@@ -98,6 +98,17 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "a scripts folder that is itself a link stops the walk, with that one reason",
+  ignore: !POSIX,
+  fn: async () => {
+    const { root } = await fixture();
+    await Deno.rename(join(root, ".specnaut/scripts"), join(root, "elsewhere"));
+    await Deno.symlink("../elsewhere", join(root, ".specnaut/scripts"));
+    assertEquals((await verify(root)).untrusted, [".specnaut/scripts a link"]);
+  },
+});
+
 Deno.test("a local main holding commits origin lacks is untrusted", async () => {
   const { root } = await fixture();
   await git(root, "checkout", "-q", "main");

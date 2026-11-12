@@ -1,6 +1,7 @@
 import { assertEquals, assertMatch } from "@std/assert";
 import {
   CHECKOUT_REASON,
+  type CheckoutEntry,
   type CheckoutInput,
   judgeCheckout,
   RESTART_ADVICE,
@@ -25,7 +26,7 @@ const blob = (path: string, text: string): BaseEntry => ({ kind: "blob", path, b
 const CLEAN_TREE = [file(S, "{}\n"), file(A, "rules\n")];
 const CLEAN_TIP = [blob(S, "{}\n"), blob(A, "rules\n")];
 
-function judge(over: Partial<CheckoutInput> & { entries?: TreeEntry[] } = {}) {
+function judge(over: Partial<CheckoutInput> & { entries?: CheckoutEntry[] } = {}) {
   return judgeCheckout({
     headCommits: over.headCommits ?? [],
     untrustedCommits: over.untrustedCommits ?? [OUTSIDE],
@@ -110,47 +111,6 @@ Deno.test("a name that differs from the tip's only in case fails as such", () =>
       ],
     },
   );
-});
-
-Deno.test("a link holds when the tip has the same link and it points inside the checked files", () => {
-  const link = { kind: "link", path: ".claude/CLAUDE.md", target: "../AGENTS.md" } as const;
-  assertEquals(judge({ entries: [...CLEAN_TREE, link], tip: [...CLEAN_TIP, link] }), HOLDS);
-});
-
-Deno.test("a link to another target than the tip's fails", () => {
-  const tip = { kind: "link", path: ".claude/CLAUDE.md", target: "../AGENTS.md" } as const;
-  const tree = { ...tip, target: "../NOTES.md" };
-  assertEquals(
-    judge({ entries: [...CLEAN_TREE, tree], tip: [...CLEAN_TIP, tip] }),
-    fails(tip.path, REASON.differs),
-  );
-});
-
-Deno.test("a link with no known target never matches", () => {
-  const tip = { kind: "link", path: ".claude/CLAUDE.md" } as const;
-  assertEquals(
-    judge({ entries: [...CLEAN_TREE, tip], tip: [...CLEAN_TIP, tip] }),
-    fails(tip.path, REASON.differs),
-  );
-});
-
-Deno.test("a link the tip also has fails when it leads out of the checked files", () => {
-  const link = { kind: "link", path: ".claude/skills", target: "../tools/skills" } as const;
-  assertEquals(
-    judge({ entries: [...CLEAN_TREE, link], tip: [...CLEAN_TIP, link] }),
-    fails(link.path, CHECKOUT_REASON.linkLeaves),
-  );
-});
-
-Deno.test("a file holding the tip link's target holds: git's checkout where links are off", () => {
-  const tip = { kind: "link", path: ".claude/CLAUDE.md", target: "../AGENTS.md" } as const;
-  const tree = file(tip.path, "../AGENTS.md");
-  assertEquals(judge({ entries: [...CLEAN_TREE, tree], tip: [...CLEAN_TIP, tip] }), HOLDS);
-});
-
-Deno.test("a link where the tip has a file fails", () => {
-  const link = { kind: "link", path: A, target: "NOTES.md" } as const;
-  assertEquals(judge({ entries: [file(S, "{}\n"), link] }), fails(A, REASON.differs));
 });
 
 Deno.test("a submodule in the checked files fails, whatever the tree holds", () => {

@@ -7,7 +7,7 @@ export class FsScriptTreeWalker implements ScriptTreeWalker {
   readonly #walker: FsTreeWalker;
 
   constructor(root: string) {
-    this.#walker = new FsTreeWalker(root);
+    this.#walker = new FsTreeWalker(root, "block");
   }
 
   walk(): Promise<TreeWalk> {

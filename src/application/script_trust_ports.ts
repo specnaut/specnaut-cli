@@ -1,4 +1,5 @@
 import type { ScopeRoot } from "../domain/checkout_scope.ts";
+import type { CheckoutWalk } from "../domain/checkout_trust.ts";
 import type { BaseEntry, TreeWalk } from "../domain/script_trust.ts";
 
 /**
@@ -52,7 +53,7 @@ export interface ScriptTreeWalker {
   walk(): Promise<TreeWalk>;
 }
 
-/** Walks one root of the checked files in the work tree, following no link. */
+/** Walks one root of the checked files in the work tree, following no link but resolving each. */
 export interface CheckoutTreeWalker {
-  walk(root: ScopeRoot): Promise<TreeWalk>;
+  walk(root: ScopeRoot): Promise<CheckoutWalk>;
 }
