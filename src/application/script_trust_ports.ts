@@ -48,6 +48,12 @@ export interface GitObjectReader {
   changedNames(from: string, to: string): Promise<string[]>;
 }
 
+/** HEAD's reflog, read as commits: never a ref moved, never an entry expired. */
+export interface HeadReflogReader {
+  /** The commit each entry of HEAD's reflog names, newest first. */
+  headReflog(): Promise<string[]>;
+}
+
 /** Walks the scripts folder of the work tree, following no link. */
 export interface ScriptTreeWalker {
   walk(): Promise<TreeWalk>;

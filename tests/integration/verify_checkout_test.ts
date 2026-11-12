@@ -1,6 +1,9 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import type { GitObjectReader } from "../../src/application/script_trust_ports.ts";
+import type {
+  GitObjectReader,
+  HeadReflogReader,
+} from "../../src/application/script_trust_ports.ts";
 import { verifyCheckout } from "../../src/application/verify_checkout.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { CHECKOUT_REASON, restartAdvice } from "../../src/domain/checkout_trust.ts";
@@ -126,7 +129,7 @@ Deno.test("an unknown base fails, never a check measured against nothing", async
   const none = () => Promise.resolve(null);
   const git = { projectPrefix: "", originHead: none, globalDefaultBranch: none };
   const outcome = await verifyCheckout({
-    git: git as unknown as GitObjectReader,
+    git: git as unknown as GitObjectReader & HeadReflogReader,
     walker: { walk: () => Promise.reject(new Error("not reached")) },
     checkout: { walk: () => Promise.reject(new Error("not reached")) },
     session: { read: () => Promise.reject(new Error("not reached")) },

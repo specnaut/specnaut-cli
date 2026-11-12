@@ -13,12 +13,36 @@ import type { BaseEntry, Untrusted } from "./script_trust.ts";
 import { sha256HexBytes } from "./sha256.ts";
 
 /**
- * The checkout a session started on, as its `SessionStart` hook recorded it: HEAD's full sha and the
- * walk of every root of `CHECKOUT_SCOPE`, each file by the SHA-256 of its bytes, untracked and
- * ignored ones included. The harness loads its settings, hooks, agents and skills at that moment,
- * so the checkout check (`checkout_trust.ts`) judges this as well as the folder as it is later.
+ * The checkout a session started on, as its `SessionStart` hook recorded it: HEAD's full sha,
+ * where its reflog stood ({@link ReflogMark}), and the walk of every root of `CHECKOUT_SCOPE`, each
+ * file by the SHA-256 of its bytes, untracked and ignored ones included. The harness loads its
+ * settings, hooks, agents and skills at that moment, so the checkout check (`checkout_trust.ts`)
+ * judges this as well as the folder as it is later.
  */
-export type SessionRecord = { readonly head: string; readonly tree: readonly RecordedWalk[] };
+export type SessionRecord = {
+  readonly head: string;
+  readonly reflog: ReflogMark;
+  readonly tree: readonly RecordedWalk[];
+};
+
+/**
+ * Where HEAD's reflog stood at session start: how many entries it held, and the commit its newest
+ * one named. Every entry written since is a commit HEAD was on during the session, so a branch
+ * checked out and left again is still seen, though HEAD and the folder no longer show it.
+ */
+export type ReflogMark = { readonly entries: number; readonly newest: string };
+
+/**
+ * The commits the reflog entries written since `mark` name, each once, newest first; `now` is the
+ * commit of every entry, newest first. `null` when the entry `mark` names is not where it stood:
+ * the reflog was rewritten or expired, and what it held since cannot be told. A reflog shorter than
+ * at the start lands there too, since no entry stands at a negative index.
+ */
+export function reflogSince(mark: ReflogMark, now: readonly string[]): string[] | null {
+  const added = now.length - mark.entries;
+  if (now[added] !== mark.newest) return null;
+  return [...new Set(now.slice(0, added))];
+}
 
 /**
  * The `SessionStart` sources that take the record: each one is a harness process that has just
@@ -57,18 +81,22 @@ export const SESSION_REASON = {
   malformed: "the session-start record cannot be parsed",
   headUnknown: "the session started on a commit this repository does not have",
   atStart: "at session start",
+  visited: "HEAD was on this commit during the session, and the base's tip lacks it",
+  reflogRewritten: "HEAD's reflog no longer holds the entry the session started at: it was " +
+    "rewritten or expired since",
 } as const;
 
 /** The record of `tree` at `head`: each file's bytes replaced by their digest. */
 export async function recordOf(
   head: string,
+  reflog: ReflogMark,
   tree: readonly CheckoutWalk[],
 ): Promise<SessionRecord> {
   const walks = await Promise.all(tree.map(async (walk): Promise<RecordedWalk> => {
     if (walk.kind === "blocked") return walk;
     return { kind: "walked", entries: await Promise.all(walk.entries.map(recorded)) };
   }));
-  return { head, tree: walks };
+  return { head, reflog, tree: walks };
 }
 
 async function recorded(entry: CheckoutEntry): Promise<RecordedEntry> {

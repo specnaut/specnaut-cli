@@ -20,6 +20,8 @@ const S = ".claude/settings.json";
 const L = ".claude/skills/x";
 const HEAD = "c".repeat(40);
 const OUTSIDE = "a".repeat(40);
+/** HEAD's reflog at session start: three entries, the newest naming HEAD. */
+const MARK = { entries: 3, newest: HEAD };
 const blob = (path: string, text: string): BaseEntry => ({ kind: "blob", path, bytes: enc(text) });
 const TIP: BaseEntry[] = [blob(S, "{}\n"), { kind: "link", path: L, target: "../x" }];
 /** Where the link leads: a root the check walks whole. */
@@ -49,13 +51,14 @@ Deno.test("a session id is a file name and nothing that could name another folde
 });
 
 Deno.test("the record holds HEAD and each file by the SHA-256 of its bytes, the rest as walked", async () => {
-  const record = await recordOf(HEAD, [...WALK, {
+  const record = await recordOf(HEAD, MARK, [...WALK, {
     kind: "blocked",
     path: ".codex",
     why: "a link",
   }]);
   assertEquals(record, {
     head: HEAD,
+    reflog: MARK,
     tree: [
       {
         kind: "walked",
@@ -70,7 +73,7 @@ Deno.test("the record holds HEAD and each file by the SHA-256 of its bytes, the 
 });
 
 Deno.test("a record reads back as it was written", async () => {
-  const record = await recordOf(HEAD, [
+  const record = await recordOf(HEAD, MARK, [
     {
       kind: "walked",
       entries: [
@@ -93,13 +96,17 @@ Deno.test("a record reads back as it was written", async () => {
 });
 
 Deno.test("a record that is not one of this version's is malformed, never read in part", () => {
-  const ok = { version: 1, head: HEAD, tree: [] };
+  const ok = { version: 2, head: HEAD, reflog: MARK, tree: [] };
   const file = { kind: "file", path: S, sha256: "f".repeat(64), links: 1 };
   const cases: unknown[] = [
     null,
     [],
-    { ...ok, version: 2 },
+    { ...ok, version: 1 },
     { ...ok, head: "HEAD" },
+    { ...ok, reflog: undefined },
+    { ...ok, reflog: { ...MARK, entries: 0 } },
+    { ...ok, reflog: { ...MARK, entries: 1.5 } },
+    { ...ok, reflog: { ...MARK, newest: "HEAD" } },
     { ...ok, tree: {} },
     { ...ok, tree: [{ kind: "walked" }] },
     { ...ok, tree: [{ kind: "blocked", path: "x" }] },
@@ -143,11 +150,11 @@ async function judge(record: Awaited<ReturnType<typeof recordOf>>, headCommits: 
 }
 
 Deno.test("a record of the tip holds", async () => {
-  assertEquals(await judge(await recordOf(HEAD, WALK)), { holds: true, reasons: [] });
+  assertEquals(await judge(await recordOf(HEAD, MARK, WALK)), { holds: true, reasons: [] });
 });
 
 Deno.test("a record whose HEAD holds a commit the tip lacks fails, by rule 1", async () => {
-  const verdict = await judge(await recordOf(HEAD, WALK), [OUTSIDE]);
+  const verdict = await judge(await recordOf(HEAD, MARK, WALK), [OUTSIDE]);
   assertEquals(verdict.reasons, [{ path: OUTSIDE, reason: CHECKOUT_REASON.headHolds }]);
 });
 
@@ -156,7 +163,7 @@ Deno.test("a recorded file whose digest is not the tip's fails, as differing", a
     kind: "walked",
     entries: [{ kind: "file", path: S, bytes: enc('{"hooks":{}}\n'), links: 1 }],
   }];
-  const verdict = await judge(await recordOf(HEAD, walk));
+  const verdict = await judge(await recordOf(HEAD, MARK, walk));
   assertEquals(verdict.reasons, [
     { path: S, reason: REASON.differs },
     { path: L, reason: REASON.missing },
@@ -171,7 +178,7 @@ Deno.test("a recorded file holding the tip's link target holds, as on disk where
       { kind: "file", path: L, bytes: enc("../x"), links: 1 },
     ],
   }];
-  assertEquals((await judge(await recordOf(HEAD, walk))).holds, true);
+  assertEquals((await judge(await recordOf(HEAD, MARK, walk))).holds, true);
 });
 
 Deno.test("what the record found that the checkout now does not show is marked as found at session start", () => {

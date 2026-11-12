@@ -47,13 +47,16 @@ const exists = (path: string) => Deno.lstat(path).then(() => true, () => false);
 
 Deno.test("a session's start records HEAD and every checked file, untracked and ignored ones included", async () => {
   const { root } = await setUp();
+  await git(root, "commit", "-q", "--allow-empty", "-m", "HEAD's newest reflog entry"); // not its oldest
   await write(root, { ".claude/settings.local.json": "{}\n", ".mise.toml": "x\n" });
   const run = await session(root, "startup");
   assertEquals([run.code, run.stdout, said(run.stderr)], [0, "", false]);
   const path = await recordPath(root);
   const record = JSON.parse(await Deno.readTextFile(path));
-  assertEquals(record.version, 1);
+  assertEquals(record.version, 2);
   assertEquals(record.head, (await git(root, "rev-parse", "HEAD")).trim());
+  const reflog = (await git(root, "rev-list", "-g", "HEAD")).trim().split("\n");
+  assertEquals(record.reflog, { entries: reflog.length, newest: reflog[0] }, "HEAD's reflog");
   const files = new Map<string, string>();
   for (const walk of record.tree) {
     for (const e of walk.entries ?? []) if (e.kind === "file") files.set(e.path, e.sha256);

@@ -133,10 +133,10 @@ Deno.test("a record that is missing, not a file, or not a record is refused", as
   const [garbled] = reasons(await check(root, head));
   assertEquals(garbled.path, RECORD);
   assertStringIncludes(garbled.reason, `${SESSION_REASON.malformed}: not JSON`);
-  await Deno.writeTextFile(own, JSON.stringify({ version: 1, head: "HEAD", tree: [] }));
+  await Deno.writeTextFile(own, JSON.stringify({ version: 2, head: "HEAD", tree: [] }));
   assertEquals(reasons(await check(root, head)), [{
     path: RECORD,
-    reason: `${SESSION_REASON.malformed}: not a version 1 record`,
+    reason: `${SESSION_REASON.malformed}: not a version 2 record`,
   }]);
 });
 
@@ -149,5 +149,29 @@ Deno.test("a record whose HEAD this repository does not have is refused", async 
   assertEquals(reasons(await check(root, head)), [{
     path: gone,
     reason: atStart(SESSION_REASON.headUnknown),
+  }]);
+});
+
+Deno.test("a branch checked out and left after the session started fails, by HEAD's reflog", async () => {
+  const { root, head } = await setUp();
+  await git(root, "checkout", "-q", "outside");
+  assertEquals(
+    reasons(await check(root, head)),
+    [{ path: head, reason: CHECKOUT_REASON.headHolds }],
+    "each cause once while HEAD is still there",
+  );
+  await git(root, "checkout", "-q", "feature");
+  assertEquals(reasons(await check(root, head)), [{ path: head, reason: SESSION_REASON.visited }]);
+});
+
+Deno.test("a reflog rewritten since the session started fails, whatever it holds now", async () => {
+  const { root, head } = await setUp();
+  const entries = (await git(root, "rev-list", "-g", "HEAD")).trim().split("\n").length;
+  await git(root, "reflog", "delete", `HEAD@{${entries - 1}}`);
+  await git(root, "checkout", "-q", "outside");
+  await git(root, "checkout", "-q", "feature");
+  assertEquals(reasons(await check(root, head)), [{
+    path: "HEAD",
+    reason: SESSION_REASON.reflogRewritten,
   }]);
 });

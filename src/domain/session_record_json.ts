@@ -1,7 +1,7 @@
 import type { LinkEnd } from "./checkout_link.ts";
 import type { RecordedEntry, RecordedWalk } from "./checkout_trust.ts";
 import { isFullSha } from "./commit_sha.ts";
-import { isSessionId, type SessionRecord } from "./session_record.ts";
+import { isSessionId, type ReflogMark, type SessionRecord } from "./session_record.ts";
 
 /**
  * The session record as a file, and the `SessionStart` hook's input. A record is read back only
@@ -10,14 +10,15 @@ import { isSessionId, type SessionRecord } from "./session_record.ts";
  */
 
 /** The record format; a record of another version is malformed. */
-const VERSION = 1;
+const VERSION = 2;
 
 export type ParsedRecord =
   | { readonly kind: "parsed"; readonly record: SessionRecord }
   | { readonly kind: "malformed"; readonly why: string };
 
 export function recordText(record: SessionRecord): string {
-  return `${JSON.stringify({ version: VERSION, head: record.head, tree: record.tree })}\n`;
+  const { head, reflog, tree } = record;
+  return `${JSON.stringify({ version: VERSION, head, reflog, tree })}\n`;
 }
 
 export function parseRecord(text: string): ParsedRecord {
@@ -50,9 +51,19 @@ const isString = (v: unknown): v is string => typeof v === "string";
 
 function recordOfJson(v: unknown): SessionRecord | null {
   if (!isObject(v) || v.version !== VERSION || !isString(v.head) || !isFullSha(v.head)) return null;
-  if (!Array.isArray(v.tree)) return null;
+  const reflog = reflogOf(v.reflog);
+  if (reflog === null || !Array.isArray(v.tree)) return null;
   const tree = v.tree.map(walkOf);
-  return tree.every((w) => w !== null) ? { head: v.head, tree: tree as RecordedWalk[] } : null;
+  return tree.every((w) => w !== null)
+    ? { head: v.head, reflog, tree: tree as RecordedWalk[] }
+    : null;
+}
+
+function reflogOf(v: unknown): ReflogMark | null {
+  if (!isObject(v) || !Number.isInteger(v.entries) || (v.entries as number) < 1) return null;
+  return isString(v.newest) && isFullSha(v.newest)
+    ? { entries: v.entries as number, newest: v.newest }
+    : null;
 }
 
 function walkOf(v: unknown): RecordedWalk | null {

@@ -4,13 +4,19 @@ import { isFullSha } from "../domain/commit_sha.ts";
 import type { ScriptVerdict, Untrusted } from "../domain/script_trust.ts";
 import {
   judgeRecord,
+  reflogSince,
   SESSION_REASON,
   type SessionRecord,
   startReasons,
   tipDigests,
 } from "../domain/session_record.ts";
 import { parseRecord } from "../domain/session_record_json.ts";
-import type { CheckoutTreeWalker, SessionRecordReader } from "./script_trust_ports.ts";
+import type {
+  CheckoutTreeWalker,
+  GitObjectReader,
+  HeadReflogReader,
+  SessionRecordReader,
+} from "./script_trust_ports.ts";
 import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
 
 /**
@@ -18,12 +24,14 @@ import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
  * {@link judgeCheckout}'s, the base is `specnaut verify-scripts`' (origin's copy of the default
  * branch), and the branch is named by its head's full sha, already fetched as objects. The rule
  * judges the checkout twice: as it is now, and as the session's start record holds it
- * ({@link judgeRecord}), since the harness loaded it then. No record is a failure, never a check of
- * the checkout as it is now alone. Every way the check cannot conclude is a failure with a reason,
- * never a pass; a throw from git is the caller's to report as one.
+ * ({@link judgeRecord}), since the harness loaded it then; and each commit HEAD's reflog names
+ * since the start must be the tip's, so a branch checked out and left is seen. No record is a
+ * failure, never a check of the checkout as it is now alone. Every way the check cannot conclude is
+ * a failure with a reason, never a pass; a throw from git is the caller's to report as one.
  */
 
 export type VerifyCheckoutDeps = VerifyScriptsDeps & {
+  readonly git: GitObjectReader & HeadReflogReader;
   readonly checkout: CheckoutTreeWalker;
   readonly session: SessionRecordReader;
 };
@@ -63,7 +71,8 @@ async function judged(
 ): Promise<CheckoutOutcome> {
   const facts = await gather(deps, run.tip, run.untrustedHead);
   const now = judgeCheckout({ ...facts, scripts: run.scripts }).reasons;
-  const reasons = [...now, ...startReasons(now, await atStart(deps, record, run.tip, facts))];
+  const told = [...now, ...startReasons(now, await atStart(deps, record, run.tip, facts))];
+  const reasons = [...told, ...await sinceStart(deps, record, run.tip, told)];
   if (reasons.length === 0) return { kind: "trusted", baseTip: run.tip };
   return { kind: "restart", reasons, advice: restartAdvice(run.tip) };
 }
@@ -109,6 +118,27 @@ async function atStart(
     tip: facts.tip,
     tipDigests: await tipDigests(facts.tip),
   }).reasons;
+}
+
+/**
+ * The commits HEAD was on since the session started, by its reflog, that the tip does not hold:
+ * each one not already told, or one reason when the reflog no longer shows where it stood.
+ */
+async function sinceStart(
+  deps: VerifyCheckoutDeps,
+  record: SessionRecord,
+  tip: string,
+  told: readonly Untrusted[],
+): Promise<Untrusted[]> {
+  const since = reflogSince(record.reflog, await deps.git.headReflog());
+  if (since === null) return [{ path: "HEAD", reason: SESSION_REASON.reflogRewritten }];
+  const said = new Set(told.map((u) => u.path));
+  const visited: Untrusted[] = [];
+  for (const commit of since.filter((c) => !said.has(c))) {
+    if (await deps.git.mergeBase(commit, tip) === commit) continue;
+    visited.push({ path: commit, reason: SESSION_REASON.visited });
+  }
+  return visited;
 }
 
 function restart(path: string, reason: string, tip: string | null): CheckoutOutcome {
