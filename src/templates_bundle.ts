@@ -16931,6 +16931,9 @@ gu_base() {
 #   \`--objects <dir>\`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
 #   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
 #   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_options <args...> - the one loop over a command line of only those two
+#   options: returns 2 with EXPLICIT_REFUSAL set as explicit_head_option does, and 1 with it
+#   set for any other argument.
 # explicit_head_from_options <git...> - takes the head those options named, if any: refuses
 #   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
@@ -16953,6 +16956,18 @@ explicit_head_option() {
   case "\$1" in --head | --objects) ;; *) return 1 ;; esac
   [ -n "\${2:-}" ] || { EXPLICIT_REFUSAL="\$1 takes a value"; return 2; }
   if [ "\$1" = --head ]; then EXPLICIT_HEAD_OPTION="\$2"; else EXPLICIT_OBJECTS_OPTION="\$2"; fi
+}
+
+explicit_head_options() {
+  local rc
+  while [ "\$#" -gt 0 ]; do
+    rc=0 && explicit_head_option "\$@" || rc=\$?
+    case \$rc in
+      0) shift 2 ;;
+      2) return 2 ;;
+      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not \$1"; return 1 ;;
+    esac
+  done
 }
 
 explicit_head_from_options() {
@@ -29855,18 +29870,8 @@ gate_candidate_in_repo() {
 # gate_candidate_head [--head <sha> [--objects <dir>]] - takes the head; with no
 # argument, nothing changes. A refusal leaves its cause in EXPLICIT_REFUSAL and
 # returns 1.
-# shellcheck disable=SC2034  # EXPLICIT_REFUSAL is read by the script that calls this
 gate_candidate_head() {
-  local rc
-  while [ "\$#" -gt 0 ]; do
-    rc=0 && explicit_head_option "\$@" || rc=\$?
-    case \$rc in
-      0) shift 2 ;;
-      2) return 1 ;;
-      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not \$1"; return 1 ;;
-    esac
-  done
-  explicit_head_from_options gate_git || return 1
+  explicit_head_options "\$@" && explicit_head_from_options gate_git || return 1
 }
 
 # gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the
@@ -29954,10 +29959,10 @@ gate_candidate_same_tree() {
 # \`base <commit>\`, \`zero <remote ref>\` or \`unfetched <sha>\`; \`malformed <ref>\` for a
 # line that is not that. A deleted ref offers no tree, so it prints nothing.
 gate_candidate_read_refs() {
-  local ref local_sha remote_ref remote_sha commit hex='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  local ref local_sha remote_ref remote_sha commit
   while IFS=' ' read -r ref local_sha remote_ref remote_sha || [ -n "\$ref" ]; do
     remote_sha="\${remote_sha%\$'\\r'}"
-    if ! [[ \$local_sha =~ \$hex ]] || ! [[ \$remote_sha =~ \$hex ]]; then
+    if ! explicit_head_is_id "\$local_sha" || ! explicit_head_is_id "\$remote_sha"; then
       echo "malformed \$ref"
     elif ! [[ \$local_sha =~ ^0+\$ ]]; then
       echo "local \$local_sha"
@@ -32671,14 +32676,9 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "\$@"; }
 
-while [ "\$#" -gt 0 ]; do
-  rc=0 && explicit_head_option "\$@" || rc=\$?
-  case \$rc in
-    0) shift 2 ;;
-    2) fail "\$EXPLICIT_REFUSAL" ;;
-    *) usage ;;
-  esac
-done
+rc=0 && explicit_head_options "\$@" || rc=\$?
+[ "\$rc" -ne 2 ] || fail "\$EXPLICIT_REFUSAL"
+[ "\$rc" -eq 0 ] || usage
 
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "\$REPO_ROOT" || fail "cannot enter \$REPO_ROOT"
@@ -33034,6 +33034,9 @@ gu_base() {
 #   \`--objects <dir>\`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
 #   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
 #   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_options <args...> - the one loop over a command line of only those two
+#   options: returns 2 with EXPLICIT_REFUSAL set as explicit_head_option does, and 1 with it
+#   set for any other argument.
 # explicit_head_from_options <git...> - takes the head those options named, if any: refuses
 #   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
@@ -33056,6 +33059,18 @@ explicit_head_option() {
   case "\$1" in --head | --objects) ;; *) return 1 ;; esac
   [ -n "\${2:-}" ] || { EXPLICIT_REFUSAL="\$1 takes a value"; return 2; }
   if [ "\$1" = --head ]; then EXPLICIT_HEAD_OPTION="\$2"; else EXPLICIT_OBJECTS_OPTION="\$2"; fi
+}
+
+explicit_head_options() {
+  local rc
+  while [ "\$#" -gt 0 ]; do
+    rc=0 && explicit_head_option "\$@" || rc=\$?
+    case \$rc in
+      0) shift 2 ;;
+      2) return 2 ;;
+      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not \$1"; return 1 ;;
+    esac
+  done
 }
 
 explicit_head_from_options() {

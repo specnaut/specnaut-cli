@@ -94,14 +94,16 @@ Deno.test("gate impact --head: a head out of reach is refused, never looked for"
   ]]);
 });
 
-Deno.test("gate impact --head: an empty --head or --objects is refused, never read as none", async () => {
+Deno.test("gate impact --head: an empty --head or --objects, or another argument, is refused", async () => {
   const { repo, head } = await withHead();
-  for (const extra of [["--head", ""], ["--head", head, "--objects", ""]]) {
+  const cases: [string[], string][] = [
+    [["--head", ""], "--head takes a value"],
+    [["--head", head, "--objects", ""], "--objects takes a value"],
+    [["--head", head, "--since", head], "usage: [--head <sha> [--objects <dir>]], not --since"],
+  ];
+  for (const [extra, why] of cases) {
     const rows = await impact(repo, extra);
-    assertEquals(kinds(rows, "refused"), [[
-      "refused",
-      `head-refused: ${extra.at(-2)} takes a value`,
-    ]], extra.join(" "));
+    assertEquals(kinds(rows, "refused"), [["refused", `head-refused: ${why}`]], extra.join(" "));
   }
 });
 

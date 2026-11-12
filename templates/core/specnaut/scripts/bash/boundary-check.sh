@@ -48,14 +48,9 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "$@"; }
 
-while [ "$#" -gt 0 ]; do
-  rc=0 && explicit_head_option "$@" || rc=$?
-  case $rc in
-    0) shift 2 ;;
-    2) fail "$EXPLICIT_REFUSAL" ;;
-    *) usage ;;
-  esac
-done
+rc=0 && explicit_head_options "$@" || rc=$?
+[ "$rc" -ne 2 ] || fail "$EXPLICIT_REFUSAL"
+[ "$rc" -eq 0 ] || usage
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "$REPO_ROOT" || fail "cannot enter $REPO_ROOT"

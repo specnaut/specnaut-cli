@@ -43,6 +43,9 @@
 #   `--objects <dir>`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
 #   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
 #   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_options <args...> - the one loop over a command line of only those two
+#   options: returns 2 with EXPLICIT_REFUSAL set as explicit_head_option does, and 1 with it
+#   set for any other argument.
 # explicit_head_from_options <git...> - takes the head those options named, if any: refuses
 #   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
@@ -65,6 +68,18 @@ explicit_head_option() {
   case "$1" in --head | --objects) ;; *) return 1 ;; esac
   [ -n "${2:-}" ] || { EXPLICIT_REFUSAL="$1 takes a value"; return 2; }
   if [ "$1" = --head ]; then EXPLICIT_HEAD_OPTION="$2"; else EXPLICIT_OBJECTS_OPTION="$2"; fi
+}
+
+explicit_head_options() {
+  local rc
+  while [ "$#" -gt 0 ]; do
+    rc=0 && explicit_head_option "$@" || rc=$?
+    case $rc in
+      0) shift 2 ;;
+      2) return 2 ;;
+      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not $1"; return 1 ;;
+    esac
+  done
 }
 
 explicit_head_from_options() {

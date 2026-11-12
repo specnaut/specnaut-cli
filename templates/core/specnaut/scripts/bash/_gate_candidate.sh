@@ -44,18 +44,8 @@ gate_candidate_in_repo() {
 # gate_candidate_head [--head <sha> [--objects <dir>]] - takes the head; with no
 # argument, nothing changes. A refusal leaves its cause in EXPLICIT_REFUSAL and
 # returns 1.
-# shellcheck disable=SC2034  # EXPLICIT_REFUSAL is read by the script that calls this
 gate_candidate_head() {
-  local rc
-  while [ "$#" -gt 0 ]; do
-    rc=0 && explicit_head_option "$@" || rc=$?
-    case $rc in
-      0) shift 2 ;;
-      2) return 1 ;;
-      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not $1"; return 1 ;;
-    esac
-  done
-  explicit_head_from_options gate_git || return 1
+  explicit_head_options "$@" && explicit_head_from_options gate_git || return 1
 }
 
 # gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the
@@ -143,10 +133,10 @@ gate_candidate_same_tree() {
 # `base <commit>`, `zero <remote ref>` or `unfetched <sha>`; `malformed <ref>` for a
 # line that is not that. A deleted ref offers no tree, so it prints nothing.
 gate_candidate_read_refs() {
-  local ref local_sha remote_ref remote_sha commit hex='^[0-9a-f]{40}([0-9a-f]{24})?$'
+  local ref local_sha remote_ref remote_sha commit
   while IFS=' ' read -r ref local_sha remote_ref remote_sha || [ -n "$ref" ]; do
     remote_sha="${remote_sha%$'\r'}"
-    if ! [[ $local_sha =~ $hex ]] || ! [[ $remote_sha =~ $hex ]]; then
+    if ! explicit_head_is_id "$local_sha" || ! explicit_head_is_id "$remote_sha"; then
       echo "malformed $ref"
     elif ! [[ $local_sha =~ ^0+$ ]]; then
       echo "local $local_sha"
