@@ -21,6 +21,7 @@ import {
   SYSTEM,
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
+import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
 import { ancestors, overlaps, pathProblem, within } from "./sandbox_paths.ts";
 
 export type Engine = "podman" | "docker";
@@ -74,29 +75,6 @@ export function chooseBackend(probe: BackendProbe): Backend {
   }
   return { kind: "static", why };
 }
-
-export type SandboxLimits = {
-  readonly processes: number;
-  readonly memoryBytes: number;
-  readonly cpus: number;
-  readonly wallClockSeconds: number;
-  /** Per scratch folder. */
-  readonly scratchBytes: number;
-};
-
-const GIB = 1024 ** 3;
-
-/**
- * Enough for a test suite; a fork bomb, a memory bomb or a hang stops at them. A container's
- * arguments carry all but the wall clock, bubblewrap's the scratch cap; the launcher does the rest.
- */
-export const LIMITS: SandboxLimits = {
-  processes: 512,
-  memoryBytes: 4 * GIB,
-  cpus: 2,
-  wallClockSeconds: 30 * 60,
-  scratchBytes: GIB,
-};
 
 /** The host's layout, as the caller resolved it: real paths, no link on the way. */
 export type SandboxPaths = {

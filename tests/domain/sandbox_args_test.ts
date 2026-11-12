@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
-import { LIMITS, type SandboxPolicy } from "../../src/domain/sandbox.ts";
+import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
+import { LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
