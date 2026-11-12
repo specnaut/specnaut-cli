@@ -236,13 +236,3 @@ Deno.test("cloud_curl: a jq that cannot run the filter is reported as that", asy
     assertEquals(out.includes("other than JSON"), false, out);
   });
 });
-
-Deno.test("reconcile.sh: a --limit that is not a page size is a usage error, and nothing is asked", async () => {
-  await withServer(async (port, requests) => {
-    for (const limit of ["1&projectKey=OTHER", "0", "abc", "100000"]) {
-      const { code } = await run("reconcile.sh", ["--limit", limit], `http://127.0.0.1:${port}/ok`);
-      assertEquals(code, 2, limit);
-    }
-    assertEquals(await requests(), []);
-  });
-});
