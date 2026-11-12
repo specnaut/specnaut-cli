@@ -242,7 +242,7 @@ get_feature_paths() {
     if [[ -n "${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
         feature_dir_source="env"
         feature_dir=$(normalize_feature_path "$SPECIFY_FEATURE_DIRECTORY")
-    elif [[ -f "$repo_root/.specnaut/feature.json" ]]; then
+    elif [[ -e "$repo_root/.specnaut/feature.json" ]]; then
         feature_dir=$(_feature_json_dir "$repo_root/.specnaut/feature.json") || return 1
         [[ -z "$feature_dir" ]] || feature_dir_source="feature.json"
         feature_dir=$(normalize_feature_path "$feature_dir")
