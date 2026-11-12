@@ -6,6 +6,10 @@ import { REASON, SCRIPTS_DIR, type TreeEntry, type TreeWalk } from "../domain/sc
  * Walks `.specnaut/scripts/` as the disk holds it: every folder from the project's root down is
  * `lstat`ed, so a link on the way stops the walk; a link inside is recorded, never followed; dot
  * files are walked like any other. A file's bytes are read from the descriptor it was checked on.
+ *
+ * Its limit on Windows: Deno reports no `ino` and no `nlink` there, so a hard link reads as linked
+ * once (`links` is 1, and the trust rule's hard-link check never fires) and the descriptor check
+ * compares the device alone. Both checks hold on POSIX only.
  */
 export class FsScriptTreeWalker implements ScriptTreeWalker {
   constructor(private readonly root: string) {}
