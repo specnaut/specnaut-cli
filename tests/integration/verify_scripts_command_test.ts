@@ -109,6 +109,13 @@ Deno.test({
   },
 });
 
+Deno.test("a nested repository in the scripts folder is untrusted as one entry, its files unread", async () => {
+  const { root } = await fixture();
+  const nested = ".specnaut/scripts/bash/vendor";
+  await write(root, { [`${nested}/.git`]: "gitdir: elsewhere\n", [`${nested}/run.sh`]: "echo\n" });
+  assertEquals((await verify(root)).untrusted, [`${nested} not a regular file`]);
+});
+
 Deno.test("a local main holding commits origin lacks is untrusted", async () => {
   const { root } = await fixture();
   await git(root, "checkout", "-q", "main");
