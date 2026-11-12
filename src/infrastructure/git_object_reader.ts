@@ -3,7 +3,7 @@ import {
   type GitObjectReader,
   MAX_SCRIPT_BYTES,
 } from "../application/script_trust_ports.ts";
-import { inScopeRoot, type ScopeRoot } from "../domain/checkout_trust.ts";
+import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import type { BaseEntry } from "../domain/script_trust.ts";
 import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 

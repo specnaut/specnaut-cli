@@ -1,9 +1,5 @@
-import {
-  CHECKOUT_SCOPE,
-  judgeCheckout,
-  RESTART_ADVICE,
-  type ScopeRoot,
-} from "../domain/checkout_trust.ts";
+import { CHECKOUT_SCOPE, type ScopeRoot } from "../domain/checkout_scope.ts";
+import { judgeCheckout, RESTART_ADVICE } from "../domain/checkout_trust.ts";
 import type { Untrusted } from "../domain/script_trust.ts";
 import type { CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";

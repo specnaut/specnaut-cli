@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { inCheckoutScope } from "../../src/domain/checkout_trust.ts";
+import { inCheckoutScope } from "../../src/domain/checkout_scope.ts";
 
 /** Which paths the checkout check compares with the base: the files a session or a review reads. */
 

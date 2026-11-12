@@ -1,6 +1,6 @@
 import { join } from "@std/path";
 import { type CheckoutTreeWalker, MAX_SCRIPT_BYTES } from "../application/script_trust_ports.ts";
-import { inScopeRoot, type ScopeRoot } from "../domain/checkout_trust.ts";
+import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import { REASON, type TreeEntry, type TreeWalk } from "../domain/script_trust.ts";
 
 /**

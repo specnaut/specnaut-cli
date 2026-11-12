@@ -1,4 +1,4 @@
-import type { ScopeRoot } from "../domain/checkout_trust.ts";
+import type { ScopeRoot } from "../domain/checkout_scope.ts";
 import type { BaseEntry, TreeWalk } from "../domain/script_trust.ts";
 
 /**
