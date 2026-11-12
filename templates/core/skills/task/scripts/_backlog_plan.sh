@@ -74,21 +74,20 @@ PLAN_DEFS='
     and (explode | all(.[]; inert or . == 9 or . == 10));
 '
 
-# The validator, over the plan's raw lines (jq -n -R), given $ops, $targets,
-# $refs, $statuses, $labels, $authors ({n: login}), $cannot ("op" or
-# "op:qualifier") and $max. Out: {refused: [[class, path]], unsupported, ops},
-# each op normalised, its targets strings, its `line` (1-based) added.
+# The validator, over the plan's raw lines (jq -n -R), given $ops, $targets, $parents, $refs,
+# $statuses, $labels, $authors ({n: login}), $cannot ("op" or "op:qualifier") and $max. Out:
+# {refused: [[class, path]], unsupported, ops}, each op normalised, its targets strings, its line.
 # shellcheck disable=SC2016  # jq program.
 PLAN_JQ='
   def schema: {
-    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "parent?"},
     edit: {target: "target", title: "title?", append: "body?"},
     comment: {target: "target", body: "comment"},
     move: {target: "target", status: "status"},
     classify: {target: "target", axis: "axis", value: "value"},
     label: {target: "target", labels: "labels"},
     close: {target: "target", reason: "reason"},
-    link: {target: "target", parent: "target"} };
+    link: {target: "target", parent: "parent"} };
   def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"],
     StartDate: "date", TargetDate: "date", Estimate: "number"};
   def axis_value($a): (axes[$a]) as $s
@@ -99,12 +98,13 @@ PLAN_JQ='
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}$");
   def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+$"; "") | ascii_downcase];
-  def resolve($v; $st): if ($v | number) then ($v | tostring) as $n
-      | (if any($targets[]; . == $n) then $n else null end)
+  def resolve($v; $st; $in): if ($v | number) then ($v | tostring) as $n
+      | (if any($in[]; . == $n) then $n else null end)
     elif $refs and ($v | refname) and any($st.refs[]; . == $v) then $v
     else null end;
   def check($k; $kind; $v; $st; $o):
-    if $kind == "target" then (if resolve($v; $st) == null then "scope" else null end)
+    if $kind == "target" or $kind == "parent" then (if resolve($v; $st; $targets
+      + (if $kind == "parent" then $parents else [] end)) == null then "scope" else null end)
     elif $kind == "ref" then (if ($v | refname) and ($st.refs | index([$v]) == null) and $refs then null else "ref" end)
     elif $kind == "title" then (if $v | plan_title then null else "title" end)
     elif $kind == "body" then (if $v | plan_text(65536) then null else "text" end)
@@ -146,8 +146,8 @@ PLAN_JQ='
                  | ["mention", "\($at).\($k)"]]) as $bad
           | if ($bad | length) > 0 then .refused += $bad
             else ($o
-                   | (if has("target") then .target = resolve(.target; $st) else . end)
-                   | (if has("parent") then .parent = resolve(.parent; $st) else . end)
+                   | (if has("target") then .target = resolve(.target; $st; $targets) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; $st; $targets + $parents) else . end)
                    | .line = ($i + 1)) as $n
               | (if $n.op == "comment" and any(.said[]; . == $n.target)
                  then .refused += [["cap", "\($at).target"]] else . end)

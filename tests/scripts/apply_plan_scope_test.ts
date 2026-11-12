@@ -158,3 +158,43 @@ Deno.test("apply-plan: a close reaches the children its cascade check lists, not
     await p.cleanup();
   }
 });
+
+Deno.test("apply-plan: an add names the user's parent only as a parent, and edit links nothing", async () => {
+  const p = await ghProject(issues);
+  try {
+    const add = (...ops: unknown[]) => readThenApply(p, ["add", "--id", "9"], jsonl(...ops));
+    const created = { op: "create", ref: "@a", title: "Child", parent: 9 };
+    for (
+      const ops of [
+        [{ op: "comment", target: 9, body: "Decomposed." }],
+        [{ op: "move", target: 9, status: "Ready" }],
+        [{ op: "label", target: 9, labels: ["bug"] }],
+        [created, { op: "link", target: 9, parent: "@a" }],
+      ]
+    ) {
+      const out = await add(...ops);
+      const at = `${ops.length}.target`;
+      assertEquals(
+        [out.code, out.lines],
+        [3, [`REFUSED scope ${at}`, "RECEIPT: none"]],
+        out.stdout,
+      );
+      assert(!GH_WRITES.test(out.calls), out.calls);
+    }
+    const child = await add(created);
+    assertEquals(
+      [child.code, child.lines],
+      [0, ["APPLIED create 5", "RECEIPT: none"]],
+      child.stderr,
+    );
+    // Re-parenting is a groom's, over the items it read: an edit's plan holds no link.
+    const link = await readThenApply(
+      p,
+      ["edit", "--id", "7", "9"],
+      jsonl({ op: "link", target: 7, parent: 9 }),
+    );
+    assertEquals([link.code, link.lines], [3, ["REFUSED scope 1.op", "RECEIPT: none"]]);
+  } finally {
+    await p.cleanup();
+  }
+});
