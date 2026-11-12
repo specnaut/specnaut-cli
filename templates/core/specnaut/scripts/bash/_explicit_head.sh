@@ -42,6 +42,7 @@
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
+# explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with `-c core.commitGraph=false -c
@@ -67,10 +68,10 @@ explicit_head_from_options() {
 }
 
 explicit_head_take() {
-  local sha="$1" objects="$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?$'
+  local sha="$1" objects="$2" full
   shift 2
   EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
-  [[ $sha =~ $re ]] || { EXPLICIT_REFUSAL="not a full commit id: $sha"; return 2; }
+  explicit_head_is_id "$sha" || { EXPLICIT_REFUSAL="not a full commit id: $sha"; return 2; }
   if [ -n "$objects" ]; then
     EXPLICIT_REFUSAL="$(_explicit_head_objects_refusal "$objects" "$@")" || return 2
   fi
@@ -79,6 +80,11 @@ explicit_head_take() {
     "$@" rev-parse --verify --quiet --end-of-options "$sha^{commit}" 2>/dev/null)"
   [ "$full" = "$sha" ] || { EXPLICIT_REFUSAL="no commit $sha in reach"; return 2; }
   EXPLICIT_HEAD="$sha" EXPLICIT_OBJECTS="$objects" EXPLICIT_REFUSAL=""
+}
+
+explicit_head_is_id() {
+  local re='^[0-9a-f]{40}([0-9a-f]{24})?$'
+  [[ $1 =~ $re ]]
 }
 
 explicit_head_env() {

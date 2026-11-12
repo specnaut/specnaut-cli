@@ -2,7 +2,8 @@
 # _audit_scopes.sh - the one home of how each scope of collect-audit-scope.sh resolves:
 # each scope_<kind> sets SCOPE, SCOPE_LABEL, COMMITS and FILES. Sourced, never run, by
 # collect-audit-scope.sh, after _git_untrusted.sh: every read goes through its forms.
-# Reads TIP (HEAD, or the head given), and the script's PATH_ARG, RANGE_ARG and LAST_N.
+# Reads TIP (HEAD, or the head given), and the script's PATH_ARG, RANGE_ARG, LAST_N and
+# BASE_ARG.
 # shellcheck disable=SC2034  # SCOPE, SCOPE_LABEL, COMMITS and FILES are the script's
 
 # scope_read <form> <args...> - the form's output. A refusal by the library stops
@@ -19,6 +20,21 @@ scope_read() {
   fi
   rm -f "$err"
   printf '%s' "$out"
+}
+
+# scope_base - the head's scope against the base's tip, never HEAD: its commits since the
+# base, and its files since the merge base of the two, so the base's own later changes,
+# which a two-point diff would list reverted, stay out.
+scope_base() {
+  local fork
+  [ "$(_gu_git rev-parse --verify --quiet --end-of-options "$BASE_ARG^{commit}" 2>/dev/null)" = "$BASE_ARG" ] ||
+    { echo "error: --base: no commit $BASE_ARG in reach" >&2; exit 2; }
+  fork="$(scope_read gu_base "$BASE_ARG")"
+  [ -n "$fork" ] || { echo "error: --base: $BASE_ARG and the head share no history" >&2; exit 2; }
+  SCOPE="range"
+  SCOPE_LABEL="$BASE_ARG..$EXPLICIT_HEAD"
+  COMMITS="$(scope_read gu_log "$BASE_ARG..$EXPLICIT_HEAD")"
+  FILES="$(scope_read gu_names "$fork" "$EXPLICIT_HEAD")"
 }
 
 # scope_path - the tracked files under the subtree; no commit list for a path scope.

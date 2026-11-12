@@ -16521,6 +16521,13 @@ done
 # --head <sha> [--objects <dir>] puts that commit in HEAD's place, read from git's
 # objects only (_explicit_head.sh): --path lists its tree, and no range may name HEAD.
 #
+# --base <sha> --head <sha> [--objects <dir>] scopes a branch against the tip of the
+# branch it targets, both full commit ids (SCOPE: range, SCOPE_LABEL <base>..<head>):
+# COMMITS are <base>..<head>, and FILES are the diff from the merge base of the two to
+# the head, so a file only the base changed since the branch forked is not in scope.
+# HEAD is never read: the checkout may be the base's tip or behind it. It takes no
+# --path, --range or --last.
+#
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
@@ -16535,9 +16542,12 @@ done
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
+LAST_GIVEN=""
+BASE_ARG=""
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
+  echo "       collect-audit-scope.sh --base <sha> --head <sha> [--objects <dir>]" >&2
   # Known limitation: the --range allowlist excludes '{' '}', so no stash@{N}.
   echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
@@ -16583,6 +16593,13 @@ while [ \$# -gt 0 ]; do
         usage
         exit 2
       fi
+      LAST_GIVEN=1
+      shift 2
+      ;;
+    --base)
+      BASE_ARG="\${2:-}"
+      explicit_head_is_id "\$BASE_ARG" ||
+        { echo "error: --base takes a full commit id (got: \${BASE_ARG:-<empty>})" >&2; usage; exit 2; }
       shift 2
       ;;
     --head | --objects)
@@ -16596,6 +16613,13 @@ while [ \$# -gt 0 ]; do
       ;;
   esac
 done
+
+# A base scopes a head, and nothing else: no other scope can mix with it.
+if [ -n "\$BASE_ARG" ]; then
+  [ -n "\$EXPLICIT_HEAD_OPTION" ] || { echo "error: --base needs --head" >&2; usage; exit 2; }
+  [ -z "\$PATH_ARG\$RANGE_ARG\$LAST_GIVEN" ] ||
+    { echo "error: --base takes no --path, --range or --last" >&2; usage; exit 2; }
+fi
 
 # Git-repo guard — abort with a clear message, no block on stdout.
 if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -16612,7 +16636,9 @@ COMMITS=""
 FILES=""
 
 # Each scope resolves in _audit_scopes.sh; the first that applies wins.
-if [ -n "\$PATH_ARG" ]; then
+if [ -n "\$BASE_ARG" ]; then
+  scope_base
+elif [ -n "\$PATH_ARG" ]; then
   scope_path
 elif [ -n "\$RANGE_ARG" ]; then
   scope_range
@@ -16921,6 +16947,7 @@ gu_manifests() {
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
+# explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -16946,10 +16973,10 @@ explicit_head_from_options() {
 }
 
 explicit_head_take() {
-  local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  local sha="\$1" objects="\$2" full
   shift 2
   EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
-  [[ \$sha =~ \$re ]] || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
+  explicit_head_is_id "\$sha" || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
   if [ -n "\$objects" ]; then
     EXPLICIT_REFUSAL="\$(_explicit_head_objects_refusal "\$objects" "\$@")" || return 2
   fi
@@ -16958,6 +16985,11 @@ explicit_head_take() {
     "\$@" rev-parse --verify --quiet --end-of-options "\$sha^{commit}" 2>/dev/null)"
   [ "\$full" = "\$sha" ] || { EXPLICIT_REFUSAL="no commit \$sha in reach"; return 2; }
   EXPLICIT_HEAD="\$sha" EXPLICIT_OBJECTS="\$objects" EXPLICIT_REFUSAL=""
+}
+
+explicit_head_is_id() {
+  local re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  [[ \$1 =~ \$re ]]
 }
 
 explicit_head_env() {
@@ -17081,7 +17113,8 @@ EOF
 # _audit_scopes.sh - the one home of how each scope of collect-audit-scope.sh resolves:
 # each scope_<kind> sets SCOPE, SCOPE_LABEL, COMMITS and FILES. Sourced, never run, by
 # collect-audit-scope.sh, after _git_untrusted.sh: every read goes through its forms.
-# Reads TIP (HEAD, or the head given), and the script's PATH_ARG, RANGE_ARG and LAST_N.
+# Reads TIP (HEAD, or the head given), and the script's PATH_ARG, RANGE_ARG, LAST_N and
+# BASE_ARG.
 # shellcheck disable=SC2034  # SCOPE, SCOPE_LABEL, COMMITS and FILES are the script's
 
 # scope_read <form> <args...> - the form's output. A refusal by the library stops
@@ -17098,6 +17131,21 @@ scope_read() {
   fi
   rm -f "\$err"
   printf '%s' "\$out"
+}
+
+# scope_base - the head's scope against the base's tip, never HEAD: its commits since the
+# base, and its files since the merge base of the two, so the base's own later changes,
+# which a two-point diff would list reverted, stay out.
+scope_base() {
+  local fork
+  [ "\$(_gu_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)" = "\$BASE_ARG" ] ||
+    { echo "error: --base: no commit \$BASE_ARG in reach" >&2; exit 2; }
+  fork="\$(scope_read gu_base "\$BASE_ARG")"
+  [ -n "\$fork" ] || { echo "error: --base: \$BASE_ARG and the head share no history" >&2; exit 2; }
+  SCOPE="range"
+  SCOPE_LABEL="\$BASE_ARG..\$EXPLICIT_HEAD"
+  COMMITS="\$(scope_read gu_log "\$BASE_ARG..\$EXPLICIT_HEAD")"
+  FILES="\$(scope_read gu_names "\$fork" "\$EXPLICIT_HEAD")"
 }
 
 # scope_path - the tracked files under the subtree; no commit list for a path scope.
@@ -32945,6 +32993,7 @@ gu_manifests() {
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
+# explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -32970,10 +33019,10 @@ explicit_head_from_options() {
 }
 
 explicit_head_take() {
-  local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  local sha="\$1" objects="\$2" full
   shift 2
   EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
-  [[ \$sha =~ \$re ]] || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
+  explicit_head_is_id "\$sha" || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
   if [ -n "\$objects" ]; then
     EXPLICIT_REFUSAL="\$(_explicit_head_objects_refusal "\$objects" "\$@")" || return 2
   fi
@@ -32982,6 +33031,11 @@ explicit_head_take() {
     "\$@" rev-parse --verify --quiet --end-of-options "\$sha^{commit}" 2>/dev/null)"
   [ "\$full" = "\$sha" ] || { EXPLICIT_REFUSAL="no commit \$sha in reach"; return 2; }
   EXPLICIT_HEAD="\$sha" EXPLICIT_OBJECTS="\$objects" EXPLICIT_REFUSAL=""
+}
+
+explicit_head_is_id() {
+  local re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  [[ \$1 =~ \$re ]]
 }
 
 explicit_head_env() {

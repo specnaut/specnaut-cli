@@ -19,6 +19,13 @@
 # --head <sha> [--objects <dir>] puts that commit in HEAD's place, read from git's
 # objects only (_explicit_head.sh): --path lists its tree, and no range may name HEAD.
 #
+# --base <sha> --head <sha> [--objects <dir>] scopes a branch against the tip of the
+# branch it targets, both full commit ids (SCOPE: range, SCOPE_LABEL <base>..<head>):
+# COMMITS are <base>..<head>, and FILES are the diff from the merge base of the two to
+# the head, so a file only the base changed since the branch forked is not in scope.
+# HEAD is never read: the checkout may be the base's tip or behind it. It takes no
+# --path, --range or --last.
+#
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -33,9 +40,12 @@ done
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
+LAST_GIVEN=""
+BASE_ARG=""
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
+  echo "       collect-audit-scope.sh --base <sha> --head <sha> [--objects <dir>]" >&2
   # Known limitation: the --range allowlist excludes '{' '}', so no stash@{N}.
   echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
@@ -81,6 +91,13 @@ while [ $# -gt 0 ]; do
         usage
         exit 2
       fi
+      LAST_GIVEN=1
+      shift 2
+      ;;
+    --base)
+      BASE_ARG="${2:-}"
+      explicit_head_is_id "$BASE_ARG" ||
+        { echo "error: --base takes a full commit id (got: ${BASE_ARG:-<empty>})" >&2; usage; exit 2; }
       shift 2
       ;;
     --head | --objects)
@@ -94,6 +111,13 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+# A base scopes a head, and nothing else: no other scope can mix with it.
+if [ -n "$BASE_ARG" ]; then
+  [ -n "$EXPLICIT_HEAD_OPTION" ] || { echo "error: --base needs --head" >&2; usage; exit 2; }
+  [ -z "$PATH_ARG$RANGE_ARG$LAST_GIVEN" ] ||
+    { echo "error: --base takes no --path, --range or --last" >&2; usage; exit 2; }
+fi
 
 # Git-repo guard — abort with a clear message, no block on stdout.
 if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -110,7 +134,9 @@ COMMITS=""
 FILES=""
 
 # Each scope resolves in _audit_scopes.sh; the first that applies wins.
-if [ -n "$PATH_ARG" ]; then
+if [ -n "$BASE_ARG" ]; then
+  scope_base
+elif [ -n "$PATH_ARG" ]; then
   scope_path
 elif [ -n "$RANGE_ARG" ]; then
   scope_range
