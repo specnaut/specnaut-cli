@@ -21,6 +21,7 @@ import {
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
+import type { CredentialPatterns } from "./credential_check.ts";
 
 /** Typed result of awaiting / applying / cancelling. */
 export type ResolutionOutcome =
@@ -194,6 +195,8 @@ export function makeGateSession(deps: {
   env: (key: string) => string | undefined;
   /** Told why a headless token was withheld; the domain prints nothing itself. */
   warn?: (msg: string) => void;
+  /** What the clients check written text with; without it, no written text is sent. */
+  patterns?: CredentialPatterns;
   fetchFn?: FetchFn;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -213,7 +216,7 @@ export function makeGateSession(deps: {
     env("SPECNAUT_REMOTE") ?? env("SPECFLOW_REMOTE"),
   );
   const cloudClient = new CloudClient(apiUrl, fetchFn);
-  const gateClient = new GateClient(apiUrl, fetchFn);
+  const gateClient = new GateClient(apiUrl, fetchFn, deps.patterns);
 
   // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
   const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });

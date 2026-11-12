@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
@@ -44,6 +45,7 @@ const stubStore: CredentialStore = {
 
 function sessionWith(fetchFn: FetchFn) {
   const session = makeSpecSession({
+    patterns: PATTERNS,
     config: { apiUrl: API, projectKey: "CLOUD" },
     store: stubStore,
     fetchFn,

@@ -1,4 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
+import { PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 import { runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
 import { InvalidApiUrl } from "../../src/domain/cloud/cloud_config.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
@@ -35,6 +36,7 @@ function deps(over: Partial<SpecDeps>) {
 
 const session = (store: CredentialStore) =>
   makeSpecSession({
+    patterns: PATTERNS,
     config: { apiUrl: "https://cloud.example.test", projectKey: "CLOUD" },
     store,
     fetchFn: (() => Promise.resolve(new Response("{}", { status: 307 }))) as FetchFn,
@@ -85,6 +87,7 @@ for (const [when, expiry] of [["request", 8.64e15], ["refresh", 0]] as const) {
 Deno.test("spec pull: a refresh with no verdict is unexpected, and the login is kept", async () => {
   const proxy = (() => Promise.resolve(new Response("<html>", { status: 200 }))) as FetchFn;
   const s = makeSpecSession({
+    patterns: PATTERNS,
     config: { apiUrl: "https://cloud.example.test", projectKey: "CLOUD" },
     store: login(0),
     fetchFn: proxy,

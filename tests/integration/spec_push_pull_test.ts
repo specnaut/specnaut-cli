@@ -2,9 +2,8 @@ import { assertEquals } from "@std/assert";
 import { PULL_STALE_CACHE, runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
 import { makeSpecSession, SpecSession } from "../../src/domain/cloud/spec_session.ts";
 import type { SpecClient } from "../../src/domain/cloud/spec_client.ts";
-import type { CloudClient } from "../../src/domain/cloud/cloud_client.ts";
 import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
-import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { type CloudClient, type FetchFn, PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 import type { SpecBackend } from "../../src/domain/installed_lock.ts";
 
@@ -28,6 +27,7 @@ function sessionWith(fetchFn: FetchFn): SpecSession {
     config: { apiUrl: API, projectKey: "CLOUD" },
     store: stubStore,
     fetchFn,
+    patterns: PATTERNS,
     // The test deployment is named by the environment, so the headless token may go there.
     env: (k) => ({ SPECNAUT_CLOUD_TOKEN: "headless-token", SPECNAUT_CLOUD_API_URL: API })[k],
   })!;

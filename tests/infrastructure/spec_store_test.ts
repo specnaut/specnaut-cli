@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 import { CloudSpecStore } from "../../src/infrastructure/spec/cloud_spec_store.ts";
 import { LocalSpecStore } from "../../src/infrastructure/spec/local_spec_store.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
@@ -20,6 +21,7 @@ const stubStore: CredentialStore = {
 
 function cloudStore(fetchFn: FetchFn) {
   const session = makeSpecSession({
+    patterns: PATTERNS,
     config: { apiUrl: API, projectKey: "CLOUD" },
     store: stubStore,
     fetchFn,

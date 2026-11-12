@@ -1,5 +1,6 @@
 import { assert } from "@std/assert";
 import { credentialKind } from "../../src/domain/cloud/credential_check.ts";
+import { PATTERNS } from "./cloud_patterns_fixture.ts";
 
 /**
  * A long line costs time in proportion to its length, never to its square: every run
@@ -23,7 +24,7 @@ const SHAPES: Record<string, string> = {
 for (const [shape, line] of Object.entries(SHAPES)) {
   Deno.test(`a 1 MB line of ${shape} is judged within the budget`, () => {
     const start = performance.now();
-    credentialKind(line);
+    credentialKind(line, PATTERNS);
     const ms = performance.now() - start;
     assert(ms < 1500, `${shape}: ${Math.round(ms)} ms`);
   });

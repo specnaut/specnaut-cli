@@ -2,6 +2,8 @@ import { GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { GateSession, type TokenProvider } from "../../src/domain/cloud/gate_session.ts";
 import type { RemoteMode } from "../../src/domain/cloud/remote_mode.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { PATTERNS } from "./cloud_patterns_fixture.ts";
+export { PATTERNS };
 
 /** The in-memory gate backend and session both gate session test files drive. */
 
@@ -97,7 +99,7 @@ export function session(
     ((i: string | URL | Request, init?: RequestInit) => backend.fetch(i, init)) as FetchFn;
   return new GateSession({
     projectKey: "CLOUD",
-    client: new GateClient(API, lateFetch),
+    client: new GateClient(API, lateFetch, PATTERNS),
     remote,
     token,
     now,

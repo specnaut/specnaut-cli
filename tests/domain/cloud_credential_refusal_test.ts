@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { PATTERNS } from "./cloud_patterns_fixture.ts";
 import { CloudClient, type FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 import { SpecClient } from "../../src/domain/cloud/spec_client.ts";
 import { GateClient } from "../../src/domain/cloud/gate_client.ts";
@@ -45,28 +46,38 @@ const step = (over: Partial<Record<"key" | "name" | "body", string>> = {}) => ({
 
 /** Each call that sends written text, and the field a given text lands in. */
 const CALLS: { field: string; send: (f: FetchFn, text: string) => Promise<unknown> }[] = [
-  { field: "task title", send: (f, t) => new CloudClient(API, f).createTask("tok", "ACME", t) },
+  {
+    field: "task title",
+    send: (f, t) => new CloudClient(API, f, PATTERNS).createTask("tok", "ACME", t),
+  },
   {
     field: "project name",
-    send: (f, t) => new CloudClient(API, f).createProject("tok", "ACME", t),
+    send: (f, t) => new CloudClient(API, f, PATTERNS).createProject("tok", "ACME", t),
   },
   {
     field: "project key",
-    send: (f, t) => new CloudClient(API, f).createProject("tok", t, "Acme"),
+    send: (f, t) => new CloudClient(API, f, PATTERNS).createProject("tok", t, "Acme"),
   },
-  { field: "spec title", send: (f, t) => new SpecClient(API, f).ensure("tok", "ACME", 1, t) },
+  {
+    field: "spec title",
+    send: (f, t) => new SpecClient(API, f, PATTERNS).ensure("tok", "ACME", 1, t),
+  },
   {
     field: "step 1 key",
-    send: (f, t) => new SpecClient(API, f).putSteps("tok", "ACME", 1, [step({ key: t })]),
+    send: (f, t) => new SpecClient(API, f, PATTERNS).putSteps("tok", "ACME", 1, [step({ key: t })]),
   },
   {
     field: "step 1 name",
-    send: (f, t) => new SpecClient(API, f).putSteps("tok", "ACME", 1, [step({ name: t })]),
+    send: (f, t) =>
+      new SpecClient(API, f, PATTERNS).putSteps("tok", "ACME", 1, [step({ name: t })]),
   },
   {
     field: "step 2 body",
     send: (f, t) =>
-      new SpecClient(API, f).putSteps("tok", "ACME", 1, [step(), step({ body: `x\n${t}\n` })]),
+      new SpecClient(API, f, PATTERNS).putSteps("tok", "ACME", 1, [
+        step(),
+        step({ body: `x\n${t}\n` }),
+      ]),
   },
   { field: "gate title", send: (f, t) => gate(f, t, {}) },
   { field: "gate payload", send: (f, t) => gate(f, "Which auth?", { question: t }) },
@@ -77,7 +88,7 @@ const CALLS: { field: string; send: (f: FetchFn, text: string) => Promise<unknow
 ];
 
 function gate(f: FetchFn, title: string, payload: Record<string, unknown>) {
-  return new GateClient(API, f).open("tok", {
+  return new GateClient(API, f, PATTERNS).open("tok", {
     projectKey: "ACME",
     type: "decision",
     title,

@@ -1,12 +1,14 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { reasonForStatus, SpecApiError, SpecClient } from "../../src/domain/cloud/spec_client.ts";
-import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { type FetchFn, PATTERNS } from "./cloud_patterns_fixture.ts";
 
 // Spec 020 / SC-006 — the spec HTTP client. Mirrors gate_client_test: a scripted
 // fake fetch, status-only errors, and the § I boundary check that no backend
 // `error` string / `_id` ever surfaces in a CLI-owned message or the parsed spec.
 
 const API = "https://api.example.com";
+/** A client that may write: it carries the credential patterns. */
+const writer = (f: FetchFn) => new SpecClient(API, f, PATTERNS);
 
 function specJson(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -93,7 +95,7 @@ Deno.test("a connection dropped mid-body is transient, not a raw TypeError", asy
 
 Deno.test("an empty success body is still a success (putSteps needs none)", async () => {
   const fetchFn = (() => Promise.resolve(new Response(null, { status: 200 }))) as FetchFn;
-  await new SpecClient(API, fetchFn).putSteps("t", "CLOUD", 1, []);
+  await writer(fetchFn).putSteps("t", "CLOUD", 1, []);
 });
 
 Deno.test("ensure() posts projectKey/taskNumber and returns the parsed spec", async () => {
@@ -105,7 +107,7 @@ Deno.test("ensure() posts projectKey/taskNumber and returns the parsed spec", as
       body: { spec: specJson() },
     },
   ]);
-  const spec = await new SpecClient(API, fetchFn).ensure("tok", "CLOUD", 154, "Cloud-hosted specs");
+  const spec = await writer(fetchFn).ensure("tok", "CLOUD", 154, "Cloud-hosted specs");
   assertEquals(spec.taskNumber, 154);
   assertEquals(spec.steps.length, 2);
   const sent = JSON.parse(calls[0].body!);
@@ -151,7 +153,7 @@ Deno.test("putSteps() sends only key/name/order/body per step (§ I opaque shape
   const { fetchFn, calls } = scripted([
     { method: "PUT", test: (u) => u.endsWith("/specs/steps"), status: 200, body: {} },
   ]);
-  await new SpecClient(API, fetchFn).putSteps("tok", "CLOUD", 154, [
+  await writer(fetchFn).putSteps("tok", "CLOUD", 154, [
     { key: "specify", name: "Specify", order: 1, body: "b" },
   ]);
   const sent = JSON.parse(calls[0].body!);
@@ -170,7 +172,7 @@ Deno.test("a 422 maps to an invalid SpecApiError and never leaks the backend err
     },
   ]);
   const err = await assertRejects(
-    () => new SpecClient(API, fetchFn).putSteps("tok", "CLOUD", 1, []),
+    () => writer(fetchFn).putSteps("tok", "CLOUD", 1, []),
     SpecApiError,
   );
   assertEquals(err.reason, "invalid");

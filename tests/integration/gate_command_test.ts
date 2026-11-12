@@ -4,7 +4,7 @@ import { InvalidApiUrl } from "../../src/domain/cloud/cloud_config.ts";
 import { GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { GateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { RemoteMode } from "../../src/domain/cloud/remote_mode.ts";
-import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { type FetchFn, PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 
 const API = "https://api.example.com";
 const REMOTE_ON: RemoteMode = { enabled: true, awaitTimeoutMs: 60_000, pollIntervalMs: 5_000 };
@@ -91,7 +91,7 @@ function sessionWith(fetchFn: FetchFn, remote = REMOTE_ON): GateSession {
   const { now, sleep } = fakeClock();
   return new GateSession({
     projectKey: "CLOUD",
-    client: new GateClient(API, fetchFn),
+    client: new GateClient(API, fetchFn, PATTERNS),
     remote,
     token: () => Promise.resolve("tok"),
     now,

@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { GateApiError, GateClient, reasonForStatus } from "../../src/domain/cloud/gate_client.ts";
-import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { type FetchFn, PATTERNS } from "./cloud_patterns_fixture.ts";
 
 const API = "https://api.example.com";
 
@@ -66,7 +66,7 @@ Deno.test("open() posts the wire shape and returns the parsed gate", async () =>
       body: { gate: gateJson() },
     },
   ]);
-  const client = new GateClient(API, fetchFn);
+  const client = new GateClient(API, fetchFn, PATTERNS);
   const gate = await client.open("tok", {
     projectKey: "CLOUD",
     type: "clarification",
@@ -91,7 +91,7 @@ Deno.test("open() maps a 422 to an invalid GateApiError", async () => {
       body: { error: "internal-only-string" },
     },
   ]);
-  const client = new GateClient(API, fetchFn);
+  const client = new GateClient(API, fetchFn, PATTERNS);
   const err = await assertRejects(
     () =>
       client.open("tok", { projectKey: "CLOUD", type: "clarification", title: "t", payload: {} }),
@@ -213,7 +213,7 @@ Deno.test("a network failure surfaces as a transient GateApiError (status 0)", a
   const fetchFn = (() => Promise.reject(new TypeError("network down"))) as FetchFn;
   const err = await assertRejects(
     () =>
-      new GateClient(API, fetchFn).open("tok", {
+      new GateClient(API, fetchFn, PATTERNS).open("tok", {
         projectKey: "CLOUD",
         type: "clarification",
         title: "t",
@@ -237,7 +237,7 @@ Deno.test("a connection dropped mid-body is transient, like a failed fetch", asy
 
 Deno.test("a 2xx that is not the wire format is unexpected, not an outage", async () => {
   const malformed = (() => Promise.resolve(new Response("{}", { status: 200 }))) as FetchFn;
-  const c = new GateClient(API, malformed);
+  const c = new GateClient(API, malformed, PATTERNS);
   const calls = [
     () => c.open("t", { projectKey: "K", type: "clarification", title: "t", payload: {} }),
     () => c.apply("t", "K", "g"),

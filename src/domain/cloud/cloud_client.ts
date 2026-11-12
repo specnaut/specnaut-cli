@@ -13,7 +13,7 @@ import {
   strField,
 } from "./cloud_wire.ts";
 import { tokenPair } from "./token_pair.ts";
-import { refuseCredentials } from "./credential_check.ts";
+import { type CredentialPatterns, refuseCredentials } from "./credential_check.ts";
 
 export type DeviceStart = {
   deviceCode: string;
@@ -82,7 +82,12 @@ export class CloudClient {
   private readonly base: string;
   private readonly fetchFn: FetchFn;
 
-  constructor(apiUrl: string, fetchFn: FetchFn = fetch) {
+  /** `patterns` checks the text a create sends; with none, a create sends nothing. */
+  constructor(
+    apiUrl: string,
+    fetchFn: FetchFn = fetch,
+    private readonly patterns?: CredentialPatterns,
+  ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
   }
@@ -230,7 +235,7 @@ export class CloudClient {
     key: string,
     name: string,
   ): Promise<CloudProject> {
-    refuseCredentials([["project key", key], ["project name", name]]);
+    refuseCredentials(this.patterns, [["project key", key], ["project name", name]]);
     const { status, json } = await this.postJson("/projects", { key, name }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create project failed");
@@ -252,7 +257,7 @@ export class CloudClient {
     projectKey: string,
     title: string,
   ): Promise<CloudTask> {
-    refuseCredentials([["task title", title]]);
+    refuseCredentials(this.patterns, [["task title", title]]);
     const { status, json } = await this.postJson("/tasks", { projectKey, title }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create task failed");

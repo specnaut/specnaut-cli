@@ -1,17 +1,15 @@
 // Text the binary sends to Specnaut Cloud is checked for credentials before the
-// request. The patterns are the bash scan's (`scan_hard` in _report_text.sh), read
-// from their one home, `_secret_patterns.txt`, as the template bundle carries it:
-// this module keeps no list of its own. A refusal names the field and the class of
+// request. The patterns are the bash scan's (`scan_hard` in _report_text.sh), from
+// their one home, `_secret_patterns.txt`: this module compiles the text it is given
+// and keeps no list of its own. The composition layer looks the file up in the
+// template bundle and hands the compiled patterns to each client
+// (application/credential_patterns.ts). A refusal names the field and the class of
 // the pattern that matched, never the value.
 //
 // The patterns are POSIX ERE run by grep in the C locale, so they are matched the way
 // grep matches them: line by line, over the text's UTF-8 bytes.
 
-import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { assertPortable } from "./ere_portability.ts";
-
-/** Where the pattern file sits in the bundle: beside the bash scan that reads it too. */
-const PATTERNS_SUFFIX = "scripts/bash/_secret_patterns.txt";
 
 /** Which pattern matched: a token shape, a credential assigned a value, a scheme's value. */
 export type CredentialKind = "token" | "assignment" | "scheme";
@@ -73,20 +71,10 @@ export function compilePatterns(source: string): CredentialPatterns {
   return out as CredentialPatterns;
 }
 
-let bundled: CredentialPatterns | undefined;
-
-/** The bundled patterns, compiled on first use. */
-function bundledPatterns(): CredentialPatterns {
-  if (bundled) return bundled;
-  const file = CORE_BUNDLE.find((e) => e.suffix === PATTERNS_SUFFIX);
-  if (!file) throw new Error("this build carries no credential patterns");
-  return (bundled = compilePatterns(file.content));
-}
-
 /** The class of the first pattern the text matches, in the scan's order, or null. */
 export function credentialKind(
   text: string,
-  patterns: CredentialPatterns = bundledPatterns(),
+  patterns: CredentialPatterns,
 ): CredentialKind | null {
   const lines = bytesOf(text).split("\n");
   if (lines.some((l) => patterns.token.test(l))) return "token";
@@ -101,10 +89,17 @@ export function credentialKind(
   return null;
 }
 
-/** Throws CredentialRefused for the first field whose text holds a credential. */
-export function refuseCredentials(fields: Iterable<readonly [field: string, text: string]>): void {
+/**
+ * Throws CredentialRefused for the first field whose text holds a credential. A
+ * client given no patterns sends no written text at all: it fails closed.
+ */
+export function refuseCredentials(
+  patterns: CredentialPatterns | undefined,
+  fields: Iterable<readonly [field: string, text: string]>,
+): void {
+  if (!patterns) throw new Error("no credential patterns were given: no text is sent to Cloud");
   for (const [field, text] of fields) {
-    const kind = credentialKind(text);
+    const kind = credentialKind(text, patterns);
     if (kind) throw new CredentialRefused(field, kind);
   }
 }

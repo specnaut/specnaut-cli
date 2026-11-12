@@ -17,6 +17,7 @@ import { dim, green, red, yellow } from "@std/fmt/colors";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { isLocalFailure } from "./cloud_local_failure.ts";
+import { bundledCredentialPatterns } from "../../application/credential_patterns.ts";
 import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
@@ -73,6 +74,7 @@ function defaultDeps(intent: SpecIntent): SpecDeps {
         config: { ...config, apiUrl },
         store: defaultCredentialStore(),
         env: (k) => Deno.env.get(k),
+        patterns: bundledCredentialPatterns(),
         warn: (msg) => console.error(yellow(`warning: ${msg}`)),
       });
     },

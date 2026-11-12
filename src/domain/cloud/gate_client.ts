@@ -12,7 +12,7 @@
 import type { FetchFn } from "./cloud_client.ts";
 import { cloudFetch, isRedirectStatus, isUnavailableStatus, readJson } from "./cloud_wire.ts";
 import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
-import { jsonFields, refuseCredentials } from "./credential_check.ts";
+import { type CredentialPatterns, jsonFields, refuseCredentials } from "./credential_check.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type GateErrorReason =
@@ -53,7 +53,12 @@ export class GateClient {
   private readonly base: string;
   private readonly fetchFn: FetchFn;
 
-  constructor(apiUrl: string, fetchFn: FetchFn = fetch) {
+  /** `patterns` checks the text an open sends; with none, an open sends nothing. */
+  constructor(
+    apiUrl: string,
+    fetchFn: FetchFn = fetch,
+    private readonly patterns?: CredentialPatterns,
+  ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
   }
@@ -81,7 +86,10 @@ export class GateClient {
 
   /** POST /api/v1/gates — open a gate. 201 ⇒ the new `open` gate. */
   async open(token: string, req: GateRequest): Promise<Gate> {
-    refuseCredentials([["gate title", req.title], ...jsonFields("gate payload", req.payload)]);
+    refuseCredentials(this.patterns, [
+      ["gate title", req.title],
+      ...jsonFields("gate payload", req.payload),
+    ]);
     const { status, json } = await this.send("POST", "/gates", token, {
       projectKey: req.projectKey,
       type: req.type,

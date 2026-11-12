@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
+import { PATTERNS } from "../domain/cloud_patterns_fixture.ts";
 import { runSpec, type SpecIntent } from "../../src/cli/handlers/spec_handler.ts";
 import { type GateIntent, runGate } from "../../src/cli/handlers/gate_handler.ts";
 import { SpecSession } from "../../src/domain/cloud/spec_session.ts";
@@ -8,6 +9,8 @@ import { GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { GateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { SpecStep } from "../../src/domain/spec/spec_step.ts";
 import type { SpecBackend } from "../../src/domain/installed_lock.ts";
+import { bindingClient } from "../../src/cli/handlers/cloud_project_binding.ts";
+import { CredentialRefused } from "../../src/domain/cloud/credential_check.ts";
 
 /**
  * `spec push` and `gate raise` with a credential in what they would send: the command
@@ -33,8 +36,8 @@ Deno.test("spec push refuses a step that holds a credential, and sends nothing",
   const steps: SpecStep[] = [{ key: "plan", name: "Plan", order: 1, body: `Use ${VALUE}.` }];
   const session = new SpecSession({
     projectKey: "ACME",
-    client: new SpecClient(API, r.fetchFn),
-    cloudClient: new CloudClient(API, r.fetchFn),
+    client: new SpecClient(API, r.fetchFn, PATTERNS),
+    cloudClient: new CloudClient(API, r.fetchFn, PATTERNS),
     token: () => Promise.resolve("tok"),
   });
   const intent: SpecIntent = { kind: "spec", sub: "push", task: 7, apiUrl: null };
@@ -60,7 +63,7 @@ Deno.test("gate raise refuses a title that holds a credential, and sends nothing
   const r = recording();
   const session = new GateSession({
     projectKey: "ACME",
-    client: new GateClient(API, r.fetchFn),
+    client: new GateClient(API, r.fetchFn, PATTERNS),
     remote: { enabled: true, awaitTimeoutMs: 60_000, pollIntervalMs: 5_000 },
     token: () => Promise.resolve("tok"),
     now: () => 0,
@@ -85,4 +88,20 @@ Deno.test("gate raise refuses a title that holds a credential, and sends nothing
   assertEquals(r.err.length, 1);
   assertEquals(/gate title.*\(token\)/.test(r.err[0]), true, r.err[0]);
   assertEquals(r.err[0].includes(VALUE), false);
+});
+
+Deno.test("the client login binds with is handed the patterns: a name is refused unsent", async () => {
+  // Refused before any request, so the real fetch this client holds is never called.
+  const e = await assertRejects(
+    () => bindingClient(API).createProject("tok", "ACME", `Acme ${VALUE}`),
+    CredentialRefused,
+  );
+  assertEquals([e.field, e.kind], ["project name", "token"]);
+});
+
+Deno.test("a client handed no patterns sends no written text at all", async () => {
+  const r = recording();
+  await assertRejects(() => new CloudClient(API, r.fetchFn).createTask("tok", "ACME", "Clean"));
+  await assertRejects(() => new SpecClient(API, r.fetchFn).putSteps("tok", "ACME", 1, []));
+  assertEquals(r.calls(), 0);
 });

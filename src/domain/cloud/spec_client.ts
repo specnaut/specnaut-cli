@@ -11,7 +11,7 @@ import type { FetchFn } from "./cloud_client.ts";
 import { cloudFetch, isRedirectStatus, isUnavailableStatus, jsonObject } from "./cloud_wire.ts";
 import { parseSpec, type SpecWire } from "./spec_contract.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
-import { refuseCredentials } from "./credential_check.ts";
+import { type CredentialPatterns, refuseCredentials } from "./credential_check.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type SpecErrorReason =
@@ -51,7 +51,12 @@ export class SpecClient {
   private readonly base: string;
   private readonly fetchFn: FetchFn;
 
-  constructor(apiUrl: string, fetchFn: FetchFn = fetch) {
+  /** `patterns` checks the text a write sends; with none, a write sends nothing. */
+  constructor(
+    apiUrl: string,
+    fetchFn: FetchFn = fetch,
+    private readonly patterns?: CredentialPatterns,
+  ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
   }
@@ -88,7 +93,7 @@ export class SpecClient {
     taskNumber: number,
     title?: string,
   ): Promise<SpecWire> {
-    if (title !== undefined) refuseCredentials([["spec title", title]]);
+    if (title !== undefined) refuseCredentials(this.patterns, [["spec title", title]]);
     const { status, json } = await this.send("POST", "/specs", token, {
       projectKey,
       taskNumber,
@@ -124,11 +129,14 @@ export class SpecClient {
     taskNumber: number,
     steps: readonly SpecStep[],
   ): Promise<void> {
-    refuseCredentials(steps.flatMap((s, i): [string, string][] => [
-      [`step ${i + 1} key`, s.key],
-      [`step ${i + 1} name`, s.name],
-      [`step ${i + 1} body`, s.body],
-    ]));
+    refuseCredentials(
+      this.patterns,
+      steps.flatMap((s, i): [string, string][] => [
+        [`step ${i + 1} key`, s.key],
+        [`step ${i + 1} name`, s.name],
+        [`step ${i + 1} body`, s.body],
+      ]),
+    );
     const { status } = await this.send("PUT", "/specs/steps", token, {
       projectKey,
       taskNumber,

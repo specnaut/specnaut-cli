@@ -19,6 +19,7 @@ import {
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
+import type { CredentialPatterns } from "./credential_check.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
 /** A valid bearer token, or null when the user must re-authenticate. */
@@ -134,6 +135,8 @@ export function makeSpecSession(deps: {
   env: (key: string) => string | undefined;
   /** Told why a headless token was withheld; the domain prints nothing itself. */
   warn?: (msg: string) => void;
+  /** What the clients check written text with; without it, no written text is sent. */
+  patterns?: CredentialPatterns;
   fetchFn?: FetchFn;
   now?: () => number;
 }): SpecSession | null {
@@ -144,8 +147,8 @@ export function makeSpecSession(deps: {
   const now = deps.now ?? (() => Date.now());
   const fetchFn = deps.fetchFn ?? fetch;
 
-  const cloudClient = new CloudClient(apiUrl, fetchFn);
-  const specClient = new SpecClient(apiUrl, fetchFn);
+  const cloudClient = new CloudClient(apiUrl, fetchFn, deps.patterns);
+  const specClient = new SpecClient(apiUrl, fetchFn, deps.patterns);
 
   // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
   const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });

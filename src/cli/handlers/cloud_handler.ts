@@ -15,7 +15,7 @@
 
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/cloud/cloud_client.ts";
-import { bindProject } from "./cloud_project_binding.ts";
+import { bindingClient, bindProject } from "./cloud_project_binding.ts";
 import { deviceLogin } from "./cloud_login.ts";
 import { printToken, requireCloudToken } from "./cloud_token.ts";
 import { DEFAULT_CLOUD_API_URL, normalizeApiUrl } from "../../domain/cloud/cloud_config.ts";
@@ -235,7 +235,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   console.log(`  Connecting to:  ${bold(apiUrl)}`);
   console.log(dim(`  Source:         ${urlSourceLabel(resolved.source)}`));
 
-  const client = new CloudClient(apiUrl);
+  const client = bindingClient(apiUrl);
   const store = defaultCredentialStore();
 
   if (!await trustedTarget(resolved, store)) return 1;

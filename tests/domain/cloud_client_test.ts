@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { PATTERNS } from "./cloud_patterns_fixture.ts";
 import { CloudApiError, CloudClient, isUnavailable } from "../../src/domain/cloud/cloud_client.ts";
 
 const API = "https://api.example.com";
@@ -103,7 +104,7 @@ Deno.test("listProjects sends the bearer token and parses the array", async () =
 
 Deno.test("createProject posts key+name and parses the created project", async () => {
   const { fn, calls } = fakeFetch(201, { ok: true, project: { key: "NEW", name: "New" } });
-  const out = await new CloudClient(API, fn).createProject("AT", "new", "New");
+  const out = await new CloudClient(API, fn, PATTERNS).createProject("AT", "new", "New");
   assertEquals(calls[0].method, "POST");
   assertEquals(calls[0].body, { key: "new", name: "New" });
   assertEquals(calls[0].auth, "Bearer AT");
@@ -113,7 +114,7 @@ Deno.test("createProject posts key+name and parses the created project", async (
 Deno.test("createProject surfaces a conflict as CloudApiError", async () => {
   const { fn } = fakeFetch(409, { error: "project key NEW already exists" });
   await assertRejects(
-    () => new CloudClient(API, fn).createProject("AT", "NEW", "New"),
+    () => new CloudClient(API, fn, PATTERNS).createProject("AT", "NEW", "New"),
     CloudApiError,
     "already exists",
   );
@@ -203,13 +204,12 @@ Deno.test("refresh: a 5xx or an unreachable Cloud throws an unavailable CloudApi
 
 // cli#735 — an approving answer must carry a real pair, and cannot grant a token forever.
 Deno.test('pollToken: approved without a real token pair is invalid, never the string "undefined"', async () => {
-  for (
-    const json of [{ status: "approved" }, {
-      status: "approved",
-      access_token: "",
-      refresh_token: "r",
-    }]
-  ) {
+  const answers = [{ status: "approved" }, {
+    status: "approved",
+    access_token: "",
+    refresh_token: "r",
+  }];
+  for (const json of answers) {
     assertEquals(await new CloudClient(API, fakeFetch(200, json).fn).pollToken("d"), {
       status: "invalid",
     });
@@ -261,7 +261,7 @@ Deno.test("no control character from a server survives a client method", async (
     task,
     project: { key: dirty, name: dirty },
   };
-  const c = new CloudClient(API, fakeFetch(200, body).fn);
+  const c = new CloudClient(API, fakeFetch(200, body).fn, PATTERNS);
   const start = await c.startDevice();
   assertEquals([start.userCode, start.verificationUri, start.verificationUriComplete], [
     clean,

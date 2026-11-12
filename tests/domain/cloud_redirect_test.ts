@@ -10,7 +10,7 @@ import {
 import { accessToken } from "../../src/domain/cloud/auth_flow.ts";
 import { GateApiError, GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { SpecApiError, SpecClient } from "../../src/domain/cloud/spec_client.ts";
-import { Backend, session } from "./gate_fixture.ts";
+import { Backend, PATTERNS, session } from "./gate_fixture.ts";
 
 // cli#736 — the rule: no Cloud request follows a redirect, and a 3xx is its own
 // failure, never an outage worth retrying.
@@ -62,7 +62,7 @@ Deno.test("no client reaches fetch except through cloudFetch", async () => {
 
 Deno.test("every CloudClient request refuses a redirect, as a redirect and not as an outage", async () => {
   const { fn, modes } = redirecting();
-  const c = new CloudClient(API, fn);
+  const c = new CloudClient(API, fn, PATTERNS);
   const calls = covering(CloudClient, ["send", "postJson", "getJson"], {
     startDevice: () => c.startDevice(),
     pollToken: () => c.pollToken("d"),
@@ -83,7 +83,7 @@ Deno.test("every CloudClient request refuses a redirect, as a redirect and not a
 
 Deno.test("every SpecClient request refuses a redirect, and reads it as redirected", async () => {
   const { fn, modes } = redirecting();
-  const c = new SpecClient(API, fn);
+  const c = new SpecClient(API, fn, PATTERNS);
   const calls = covering(SpecClient, ["send"], {
     get: () => c.get("t", "K", 1),
     ensure: () => c.ensure("t", "K", 1),
@@ -98,7 +98,7 @@ Deno.test("every SpecClient request refuses a redirect, and reads it as redirect
 
 Deno.test("every GateClient request refuses a redirect, and reads it as redirected", async () => {
   const { fn, modes } = redirecting();
-  const c = new GateClient(API, fn);
+  const c = new GateClient(API, fn, PATTERNS);
   const calls = covering(GateClient, ["send"], {
     open: () => c.open("t", REQUEST),
     get: () => c.get("t", "K", "g"),

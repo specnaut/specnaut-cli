@@ -2,12 +2,18 @@
 // account's list or created by name, and write `.specnaut/backlog-config.yml`.
 
 import { bold, dim, green, red } from "@std/fmt/colors";
-import type { CloudClient, CloudProject } from "../../domain/cloud/cloud_client.ts";
+import { CloudClient, type CloudProject } from "../../domain/cloud/cloud_client.ts";
+import { bundledCredentialPatterns } from "../../application/credential_patterns.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 import { generateProjectKey } from "../../domain/cloud/project_key.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
 import { requireCloudToken } from "./cloud_token.ts";
+
+/** The client login binds with: it may create a project, so it checks the name it sends. */
+export function bindingClient(apiUrl: string): CloudClient {
+  return new CloudClient(apiUrl, fetch, bundledCredentialPatterns());
+}
 
 /** Bind the project: list, then select or create. */
 export async function bindProject(

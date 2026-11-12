@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { makeGateSession, type TokenProvider } from "../../src/domain/cloud/gate_session.ts";
 import { CloudApiError, type FetchFn } from "../../src/domain/cloud/cloud_client.ts";
-import { Backend, fakeClock, gate, gateObj, REMOTE, session } from "./gate_fixture.ts";
+import { Backend, fakeClock, gate, gateObj, PATTERNS, REMOTE, session } from "./gate_fixture.ts";
 
 // cli#735 — a refresh with no verdict is not a lost login: the gate says transient.
 const REQUEST = {
@@ -10,6 +10,15 @@ const REQUEST = {
   title: "t",
   payload: { question: "q" },
 } as const;
+
+/** A stored login whose access token has expired, which no test may delete. */
+const EXPIRED_LOGIN: Parameters<typeof makeGateSession>[0]["store"] = {
+  kind: "file",
+  load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
+  save: () => Promise.resolve(),
+  delete: () => Promise.reject(new Error("the login must be kept")),
+};
+
 const unavailable: TokenProvider = () => Promise.reject(new CloudApiError(503, "down"));
 
 Deno.test("a gate with no verdict on the token reports transient; with no login, its old reasons", async () => {
@@ -49,12 +58,7 @@ Deno.test("makeGateSession: an expired login meeting a 503 refresh is transient,
   }) as FetchFn;
   const s = makeGateSession({
     config: { apiUrl: "https://cloud.example.com", projectKey: "CLOUD", remote: { enabled: true } },
-    store: {
-      kind: "file",
-      load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
-      save: () => Promise.resolve(),
-      delete: () => Promise.reject(new Error("the login must be kept")),
-    },
+    store: EXPIRED_LOGIN,
     fetchFn,
     env: () => undefined,
   })!;
@@ -66,12 +70,7 @@ Deno.test("makeGateSession: an expired login meeting a redirected refresh says r
   const fetchFn = (() => Promise.resolve(new Response("{}", { status: 307 }))) as FetchFn;
   const s = makeGateSession({
     config: { apiUrl: "https://cloud.example.com", projectKey: "CLOUD", remote: { enabled: true } },
-    store: {
-      kind: "file",
-      load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
-      save: () => Promise.resolve(),
-      delete: () => Promise.reject(new Error("the login must be kept")),
-    },
+    store: EXPIRED_LOGIN,
     fetchFn,
     env: () => undefined,
   })!;
@@ -102,6 +101,7 @@ Deno.test("makeGateSession: a refresh redirected mid-await ends it as a redirect
         projectKey: "CLOUD",
         remote: { enabled: true },
       },
+      patterns: PATTERNS,
       // Good for the open; inside the refresh window by the first poll.
       store: {
         kind: "file",
@@ -263,12 +263,7 @@ Deno.test("makeGateSession: a 429 on the refresh, through the real wiring, is un
   }) as FetchFn;
   const s = makeGateSession({
     config: { apiUrl: "https://cloud.example.com", projectKey: "CLOUD", remote: { enabled: true } },
-    store: {
-      kind: "file",
-      load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
-      save: () => Promise.resolve(),
-      delete: () => Promise.reject(new Error("the login must be kept")),
-    },
+    store: EXPIRED_LOGIN,
     fetchFn,
     env: () => undefined,
   })!;
