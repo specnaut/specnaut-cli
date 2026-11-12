@@ -44,6 +44,11 @@ export function reasonForStatus(status: number): GateErrorReason {
   return isUnavailableStatus(status) ? "transient" : "unexpected";
 }
 
+/** The reason Cloud's answer carried, or `unknown` for an error that is not one. */
+export function gateReasonOf(e: unknown): GateErrorReason | "unknown" {
+  return e instanceof GateApiError ? e.reason : "unknown";
+}
+
 export class GateClient {
   private readonly base: string;
   private readonly fetchFn: FetchFn;

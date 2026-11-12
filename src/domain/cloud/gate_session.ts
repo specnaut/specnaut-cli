@@ -9,7 +9,7 @@
 // (timeout), or error — never an unbounded hang (FR-003 / SC-003).
 
 import { type Gate, type GateRequest, validatePayload } from "./gate_contract.ts";
-import { GateApiError, GateClient, type GateErrorReason } from "./gate_client.ts";
+import { GateApiError, GateClient, type GateErrorReason, gateReasonOf } from "./gate_client.ts";
 import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
 import {
   CloudApiError,
@@ -125,7 +125,7 @@ export class GateSession {
     try {
       return await this.deps.client.get(tok, this.deps.projectKey, id);
     } catch (e) {
-      const reason = reasonOf(e);
+      const reason = gateReasonOf(e);
       const flap = reason === "transient" || reason === "unexpected";
       if (flap || (reason === "unauthorized" && stale)) return "retry";
       return reason === "unauthorized" ? { kind: "error", reason } : errorOutcome(e);
@@ -227,10 +227,6 @@ export function makeGateSession(deps: {
     now,
     sleep,
   });
-}
-
-function reasonOf(e: unknown): GateErrorReason | "unknown" {
-  return e instanceof GateApiError ? e.reason : "unknown";
 }
 
 function errorOutcome(e: unknown): ResolutionOutcome {
