@@ -47,7 +47,7 @@ Deno.test("the lazy-fetch and plain-diff flags are the script's", () => {
 });
 
 Deno.test("the variables the script exports are set, and no system configuration is read", () => {
-  const exported = [...source.matchAll(/^ {2}export (GIT_[^\n]*)/gm)].flatMap((m) =>
+  const exported = [...source.matchAll(/^ {2}(?:\w+ && )?export (GIT_[^\n]*)/gm)].flatMap((m) =>
     m[1].split(/\s+/)
   );
   const fromScript = Object.fromEntries(exported.map((kv) => kv.split("=")));
