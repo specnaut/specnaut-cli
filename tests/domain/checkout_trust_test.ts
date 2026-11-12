@@ -45,12 +45,18 @@ Deno.test("a checkout at the base, scripts trusted, every config file equal to t
 Deno.test("HEAD holding a commit of the branch under review fails, naming the commit", () => {
   assertEquals(
     judge({ headCommits: [OWN, OUTSIDE] }),
-    fails(OUTSIDE, CHECKOUT_REASON.headHolds),
+    {
+      holds: false,
+      reasons: [
+        { path: OWN, reason: CHECKOUT_REASON.headAhead },
+        { path: OUTSIDE, reason: CHECKOUT_REASON.headHolds },
+      ],
+    },
   );
 });
 
-Deno.test("HEAD ahead of the base with its own commits only still holds", () => {
-  assertEquals(judge({ headCommits: [OWN] }), HOLDS);
+Deno.test("HEAD ahead of the base with a commit of its own fails too: HEAD must be the tip", () => {
+  assertEquals(judge({ headCommits: [OWN] }), fails(OWN, CHECKOUT_REASON.headAhead));
 });
 
 Deno.test("scripts the script check does not trust fail it, with that check's reasons", () => {

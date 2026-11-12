@@ -74,10 +74,24 @@ Deno.test("a checkout holding a commit of the outside branch fails, naming it", 
   if (outcome.kind === "restart") assertEquals(outcome.advice, RESTART_ADVICE);
 });
 
-Deno.test("a checkout with its own commit, leaving every checked file alone, holds", async () => {
+Deno.test("a checkout with a commit of its own fails, even leaving every checked file alone", async () => {
   const { root, head } = await setUp();
   await write(root, { "src/b.ts": "export const b = 2;\n" });
   await commitAll(root, "own work");
+  const own = (await git(root, "rev-parse", "HEAD")).trim();
+  assertEquals(reasons(await check(root, head)), [{
+    path: own,
+    reason: CHECKOUT_REASON.headAhead,
+  }]);
+});
+
+Deno.test("a checkout behind the base's tip holds the rule on commits", async () => {
+  const { root, head } = await setUp();
+  await git(root, "checkout", "-q", "main");
+  await write(root, { "src/c.ts": "export const c = 3;\n" });
+  await commitAll(root, "base moves");
+  await git(root, "push", "-q", "origin", "main");
+  await git(root, "checkout", "-q", "feature");
   assertEquals((await check(root, head)).kind, "trusted");
 });
 
@@ -92,7 +106,11 @@ Deno.test("an edited harness setting fails, committed or not", async () => {
   await write(root, { [SETTINGS]: '{"hooks":{}}\n' });
   assertEquals(reasons(await check(root, head)), [{ path: SETTINGS, reason: REASON.differs }]);
   await commitAll(root, "settings");
-  assertEquals(reasons(await check(root, head)), [{ path: SETTINGS, reason: REASON.differs }]);
+  const own = (await git(root, "rev-parse", "HEAD")).trim();
+  assertEquals(reasons(await check(root, head)), [
+    { path: own, reason: CHECKOUT_REASON.headAhead },
+    { path: SETTINGS, reason: REASON.differs },
+  ]);
 });
 
 Deno.test("an extra file fails, an ignored one included: local settings, a version manager, a feature", async () => {

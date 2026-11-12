@@ -18,7 +18,8 @@ import { sameBytes } from "./bytes.ts";
  * from the branch, the branch has already chosen how it is reviewed. So the checkout is trusted
  * only when all three hold:
  *
- * 1. HEAD holds no commit of base..<the branch's head>;
+ * 1. HEAD is the base's tip or one of its ancestors: it holds no commit the tip lacks, the
+ *    branch's or any other, since any of them could carry the branch's files;
  * 2. the helper scripts are trusted, as {@link judgeScripts} judges them (the bundle is their
  *    second copy);
  * 3. every file in {@link CHECKOUT_SCOPE} equals its blob at the base's tip, byte for byte, and the
@@ -83,7 +84,7 @@ export function inCheckoutScope(path: string): boolean {
 export type CheckoutInput = {
   /** The commits of base..HEAD. */
   readonly headCommits: readonly string[];
-  /** The commits of base..<the branch's head>. */
+  /** The commits of base..<the branch's head>: only to say which reason a commit of HEAD gets. */
   readonly untrustedCommits: readonly string[];
   readonly scripts: ScriptVerdict;
   /** The walk of each {@link CHECKOUT_SCOPE} root, as the disk holds it. */
@@ -97,6 +98,7 @@ export type CheckoutVerdict = { readonly holds: boolean; readonly reasons: reado
 /** The reasons this check adds to {@link REASON}. */
 export const CHECKOUT_REASON = {
   headHolds: "HEAD holds this commit of the branch under review",
+  headAhead: "HEAD holds this commit the base's tip lacks",
   scripts: "the helper scripts are untrusted",
   linkLeaves: "a link out of the checked files",
 } as const;
@@ -117,8 +119,10 @@ export function judgeCheckout(input: CheckoutInput): CheckoutVerdict {
 
 function commitReasons(input: CheckoutInput): Untrusted[] {
   const outside = new Set(input.untrustedCommits);
-  return input.headCommits.filter((c) => outside.has(c))
-    .map((path) => ({ path, reason: CHECKOUT_REASON.headHolds }));
+  return input.headCommits.map((path) => ({
+    path,
+    reason: outside.has(path) ? CHECKOUT_REASON.headHolds : CHECKOUT_REASON.headAhead,
+  }));
 }
 
 function scriptReasons(scripts: ScriptVerdict): readonly Untrusted[] {
