@@ -2286,6 +2286,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_secret_patterns.txt",
+      "source": "core/specnaut/scripts/bash/_secret_patterns.txt"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/_report_store.sh",
       "source": "core/specnaut/scripts/bash/_report_store.sh"
     },

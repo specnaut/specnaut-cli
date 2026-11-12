@@ -86,7 +86,15 @@ export async function project(backend: Backend): Promise<Project> {
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(join(dir, ".specnaut", "backlog"));
   await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
-  for (const f of ["common.sh", "_git_probe.sh", "template-resolution.sh", "_report_text.sh"]) {
+  for (
+    const f of [
+      "common.sh",
+      "_git_probe.sh",
+      "template-resolution.sh",
+      "_report_text.sh",
+      "_secret_patterns.txt",
+    ]
+  ) {
     await Deno.copyFile(join(BASH, f), join(dir, ".specnaut", "scripts", "bash", f));
   }
   await Deno.mkdir(join(dir, "bin"));
@@ -144,8 +152,8 @@ export async function project(backend: Backend): Promise<Project> {
  * Installs what every backlog writer needs beside its own scripts: the shared
  * write rules (`_backlog_plan.sh`, and the `_issue_text.sh` and
  * `_clean_text.sh` it sources) in `scriptsDir`, and the secret scan they run,
- * `_report_text.sh`, in the `../bash` directory where `_clean_text.sh` looks
- * for it.
+ * `_report_text.sh` and its patterns, in the `../bash` directory where
+ * `_clean_text.sh` looks for them.
  */
 export async function installWriterDeps(scriptsDir: string): Promise<void> {
   for (const name of ["_backlog_plan.sh", "_issue_text.sh", "_clean_text.sh"]) {
@@ -153,7 +161,9 @@ export async function installWriterDeps(scriptsDir: string): Promise<void> {
   }
   const bash = join(scriptsDir, "..", "bash");
   await Deno.mkdir(bash, { recursive: true });
-  await Deno.copyFile(join(BASH, "_report_text.sh"), join(bash, "_report_text.sh"));
+  for (const name of ["_report_text.sh", "_secret_patterns.txt"]) {
+    await Deno.copyFile(join(BASH, name), join(bash, name));
+  }
 }
 
 /** A local backlog item file, as `add.sh` writes it. */

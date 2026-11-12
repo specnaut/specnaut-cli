@@ -184,7 +184,7 @@ Deno.test("every harness installs both scripts where the phase runs them, the en
     const script = bundle[dest];
     assert(script, `${harness.key} does not install ${dest}`);
     assert(script.executable, `${harness.key} installs ${dest} not executable`);
-    for (const helper of ["_report_text.sh", "_report_store.sh"]) {
+    for (const helper of ["_report_text.sh", "_secret_patterns.txt", "_report_store.sh"]) {
       assert(bundle[`.specnaut/scripts/bash/${helper}`], `${harness.key}: no ${helper}`);
     }
   }

@@ -7,13 +7,13 @@
 export LC_ALL=C # The patterns are bytes: under UTF-8, grep's error on HIDDEN_RE would refuse all.
 NL=$'\n'
 CR=$'\r'
-SECRET_RE='gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|(AKIA|ASIA)[0-9A-Z]{12,}|npm_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{16,}|eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.|-----BEGIN|[A-Za-z][A-Za-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@'
-# Anchored: `task-x`, `global-x`, `risk_live` and `shelf_x` are words, not tokens.
-SECRET_RE="$SECRET_RE"'|(^|[^A-Za-z0-9])(gl(pat|ptt|dt|rt|cbt|oas|ft|imt|agent|soat|ffct)-[A-Za-z0-9_-]{16,}|sk-ant-|sk-[A-Za-z0-9_-]{16,}|[sr]k_live|sk_test_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9+/=]{8,}|pypi-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{16,}|SG\.[A-Za-z0-9_-]{16,}|shpat_[A-Za-z0-9]{8,}|dop_v1_[A-Za-z0-9]{8,}|ya29\.[A-Za-z0-9_-]{16,}|xapp-[A-Za-z0-9-]{8,}|dckr_pat_[A-Za-z0-9_-]{8,}|xox[a-z0-9]-)'
-# Case-insensitive. A placeholder such as <redacted> is not a value.
-SECRET_ANYCASE_RE="(pass(word|wd)?|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret|credential)[A-Za-z0-9_-]*[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^[:space:]\"'<]{8,}|authorization[\"']?[[:space:]]*[:=]|(cookie|x-api-key)[[:space:]]*:"
-SCHEME_VALUE_RE='(bearer|basic)[[:space:]]+[A-Za-z0-9._~+/=-]{8,}'
-TOKEN_LIKE_RE='[0-9_~+/=]|[a-z][A-Z]|[A-Za-z0-9]\.[A-Za-z0-9]'
+# The credential patterns, read from their one home beside it, which the binary reads too.
+SECRET_RE='' SECRET_ANYCASE_RE='' SCHEME_VALUE_RE='' TOKEN_LIKE_RE=''
+while IFS=' ' read -r _pat _re || [ -n "$_pat" ]; do
+  case $_pat in SECRET_RE | SECRET_ANYCASE_RE | SCHEME_VALUE_RE | TOKEN_LIKE_RE) ;; *) continue ;; esac
+  printf -v "$_pat" '%s' "${!_pat:+${!_pat}|}${_re%"$CR"}"
+done <"${BASH_SOURCE[0]%/*}/_secret_patterns.txt" || return 1
+[ -n "$SECRET_RE" ] && [ -n "$SECRET_ANYCASE_RE" ] && [ -n "$SCHEME_VALUE_RE" ] && [ -n "$TOKEN_LIKE_RE" ] || return 1
 HIDDEN_RE=$'[\x01-\x08\x0b-\x1f\x7f]|\xc2[\x80-\x9f\xad]|\xcd\x8f|\xd8\x9c|\xe1\x85[\x9f\xa0]|\xe1\x9e[\xb4\xb5]|\xe1\xa0[\x8b-\x8e]|\xe2\x80[\x8b-\x8f\xa8-\xae]|\xe2\x81[\xa0-\xaf]|\xe3\x85\xa4|\xef\xb8[\x80-\x8e]|\xef\xbb\xbf|\xef\xbe\xa0|\xef\xbf[\xb9-\xbb]|\xf3\xa0|<!--|^ {0,3}\\[[^]]*\\]:'
 ADDRESSING_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+|/(Users|home)/[^/[:space:]]+|(^|[^A-Za-z0-9])[A-Za-z]:\\|(^|[^A-Za-z0-9_.~-])~/|(^|[^A-Za-z0-9_./-])/(srv|workspaces|builds)/|(^|[^A-Za-z0-9_.-])@[A-Za-z0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+|(^|[^0-9.A-Za-z])(10\.[0-9]{1,3}|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]{1,3}\.[0-9]{1,3}'
 BARE_HOST_RE='(^|[^A-Za-z0-9_./@-])([A-Za-z0-9-]+\.)+(internal|local|corp|lan|com|net|org|io|dev|cloud)[^[:space:]]*'

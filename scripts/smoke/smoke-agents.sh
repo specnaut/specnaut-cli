@@ -146,7 +146,7 @@ check "specnaut-guide routes a report to /specnaut issue" \
 check "specnaut-guide composes and files nothing itself" \
   '! grep -qF "issues/new" .claude/agents/specnaut-guide.md'
 check "report-upstream.sh installs executable, beside its helpers" \
-  '[ -x .specnaut/scripts/bash/report-upstream.sh ] && [ -f .specnaut/scripts/bash/_report_text.sh ] && [ -f .specnaut/scripts/bash/_report_store.sh ]'
+  '[ -x .specnaut/scripts/bash/report-upstream.sh ] && [ -f .specnaut/scripts/bash/_report_text.sh ] && [ -f .specnaut/scripts/bash/_secret_patterns.txt ] && [ -f .specnaut/scripts/bash/_report_store.sh ]'
 # The token is assembled: this file is public, and it is a token's shape the scan refuses.
 # shellcheck disable=SC2034 # read by the check below, whose command string is eval'd
 token="ghp_$(printf "a%.0s" 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0)"

@@ -76,16 +76,34 @@ for (const { why, tool, status, line } of UNSCANNED) {
   });
 }
 
-Deno.test("text_refusal stops when no secret scan is installed, and gives no verdict", async () => {
-  const p = await project("local");
-  try {
-    await Deno.remove(join(p.dir, ".specnaut/scripts/bash/_report_text.sh"));
-    const missing = await verdicts(p, `c=$(text_refusal <<<"plain words"); echo "$? $c"`);
-    assertEquals([missing.lines, missing.stderr], [["2 "], "bash: the secret scan is missing\n"]);
-  } finally {
-    await p.cleanup();
-  }
-});
+/** What leaves no scan to run: the scan itself gone, its patterns gone, or one of them. */
+const UNINSTALLED: { why: string; breakIt: (bash: string) => Promise<void> }[] = [
+  { why: "no secret scan is installed", breakIt: (b) => Deno.remove(join(b, "_report_text.sh")) },
+  { why: "its patterns are missing", breakIt: (b) => Deno.remove(join(b, "_secret_patterns.txt")) },
+  {
+    why: "one of its patterns is missing",
+    breakIt: async (b) => {
+      const f = join(b, "_secret_patterns.txt");
+      const kept = (await Deno.readTextFile(f)).split("\n").filter((l) =>
+        !/^TOKEN_LIKE_RE /.test(l)
+      );
+      await Deno.writeTextFile(f, kept.join("\n"));
+    },
+  },
+];
+
+for (const { why, breakIt } of UNINSTALLED) {
+  Deno.test(`text_refusal stops when ${why}, and gives no verdict`, async () => {
+    const p = await project("local");
+    try {
+      await breakIt(join(p.dir, ".specnaut/scripts/bash"));
+      const missing = await verdicts(p, `c=$(text_refusal <<<"plain words"); echo "$? $c"`);
+      assertEquals([missing.lines, missing.stderr], [["2 "], "bash: the secret scan is missing\n"]);
+    } finally {
+      await p.cleanup();
+    }
+  });
+}
 
 Deno.test("text_refusal judges the same in a UTF-8 locale", async () => {
   const p = await project("local");

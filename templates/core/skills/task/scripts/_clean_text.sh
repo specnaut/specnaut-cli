@@ -4,7 +4,7 @@
 # `require_clean_text` and `require_clean_file` end a writer on a refusal.
 # Sourced, never run, by `_backlog_plan.sh`, so every script that sources the
 # plan's vocabulary has it; installed beside it. The scan itself
-# (`scan_hard`, the patterns' one home) is `_report_text.sh`, in `../bash`.
+# (`scan_hard`) is `_report_text.sh`, in `../bash`, its patterns `_secret_patterns.txt`.
 
 _TEXT_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -31,7 +31,7 @@ CLEAN_TEXT_JQ='
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
-# scan refuses (`scan_hard`, `_report_text.sh`: the patterns' one home) reaches
+# scan refuses (`scan_hard`, `_report_text.sh`, with `_secret_patterns.txt`) reaches
 # a tracker or a task file. It reads the bytes on stdin through the scan's own
 # `read_bytes`, so a NUL is judged rather than dropped. Its own subshell sources
 # the scan (only a caller that writes pays for it), in the C locale the scan
