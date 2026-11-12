@@ -5,7 +5,12 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { exportHead } from "./explicit_head_fixture.ts";
+import {
+  assertNoGraphs,
+  exportHead,
+  gitRecorder,
+  gitRecorderUnsure,
+} from "./explicit_head_fixture.ts";
 import { ifAbsent, impactRepo, type Repo } from "./gate_impact_fixture.ts";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import { spawn } from "./run_gate_fixture.ts";
@@ -13,12 +18,16 @@ import { spawn } from "./run_gate_fixture.ts";
 const BASH = ".specnaut/scripts/bash";
 
 /** The records gate-impact.sh wrote, one tab-split row per line. */
-async function impact(repo: Repo, extra: string[]): Promise<string[][]> {
+async function impact(
+  repo: Repo,
+  extra: string[],
+  env: Record<string, string> = {},
+): Promise<string[][]> {
   const commands = join(repo.outside, "commands");
   const records = join(repo.outside, "records");
   await Deno.writeTextFile(commands, "bash tools/mark.sh suite\n");
   const args = ["fast", bashPath(commands), bashPath(records), "--base", repo.main, ...extra];
-  const r = await spawn(["bash", `${BASH}/gate-impact.sh`, ...args], repo.root);
+  const r = await spawn(["bash", `${BASH}/gate-impact.sh`, ...args], repo.root, { env });
   assertEquals(r.code, 0, r.stderr);
   const text = await Deno.readTextFile(records);
   return text.replaceAll("\r", "").split("\n").filter(Boolean).map((l) => l.split("\t"));
@@ -50,6 +59,18 @@ Deno.test("gate impact --head: the candidate is the head, whatever the work tree
     "head-not-checked-out: the adapter describes a work tree",
   ]]);
   assertEquals(rows.at(-1), ["end"]);
+});
+
+Deno.test({
+  name: "gate impact --head: reads the objects folder with its graphs off",
+  ignore: gitRecorderUnsure,
+  fn: async () => {
+    const { repo, head, objects, tree } = await withHead();
+    const rec = await gitRecorder();
+    const rows = await impact(repo, ["--head", head, "--objects", objects], rec.env);
+    assertEquals(kinds(rows, "candidate"), [["candidate", tree, head]]);
+    assertNoGraphs(await rec.calls(), "gate-impact");
+  },
 });
 
 Deno.test("gate impact: without --head the same dirty tree is refused, as before", async () => {

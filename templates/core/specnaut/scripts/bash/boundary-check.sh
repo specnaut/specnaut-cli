@@ -45,6 +45,8 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
 { . "$here/_config.sh" && . "$here/_explicit_head.sh"; } ||
   fail "_config.sh or _explicit_head.sh is missing beside the script"
+# Every git call below, given an objects folder, reads it under explicit_head_git's settings.
+git() { explicit_head_git "$@"; }
 
 while [ "$#" -gt 0 ]; do
   rc=0 && explicit_head_option "$@" || rc=$?

@@ -14,6 +14,9 @@
 #                                     exist: no signature program, for any format
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
+#   -c core.commitGraph=false -c core.multiPackIndex=false, given an objects folder
+#                                     (_explicit_head.sh): its own graph and index
+#                                     are never read in place of its objects
 #
 # Four defaults are deliberate pairs, so dropping one leaves the other in force:
 # --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and GIT_NO_LAZY_FETCH=1;
@@ -96,7 +99,7 @@ _gu_env_run() (
   done
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
-  command git "$@"
+  explicit_head_git "$@"
 )
 
 _gu_git() {

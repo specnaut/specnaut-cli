@@ -61,6 +61,8 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
   exit 3
 }
+# Every git call below, given an objects folder, reads it under explicit_head_git's settings.
+git() { explicit_head_git "$@"; }
 
 SINCE="" REPORT=0
 while [ "$#" -gt 0 ]; do

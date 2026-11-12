@@ -61,10 +61,11 @@ export async function fixtureRepo(): Promise<string> {
 export async function scope(
   dir: string,
   args: string[],
+  extra: Record<string, string> = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   // On Windows the MSYS runtime expands a wildcard in the arguments a native process hands bash
   // (`*.json` arrives as `deno.json`); `noglob` passes them through as an agent's shell would.
-  const env: Record<string, string> = {};
+  const env: Record<string, string> = { ...extra };
   if (Deno.build.os === "windows") env.MSYS = "noglob";
   return await run("bash", [SCRIPT, ...args], dir, env);
 }

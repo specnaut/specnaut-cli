@@ -22,7 +22,7 @@ gate_git() {
   (
     for gate_var in $GATE_LOCAL_ENV; do unset "$gate_var"; done
     explicit_head_env
-    git -C "$REPO_ROOT" -c core.fsmonitor=false "$@"
+    explicit_head_git -C "$REPO_ROOT" -c core.fsmonitor=false "$@"
   )
 }
 

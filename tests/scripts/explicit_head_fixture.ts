@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { DELIMITER, join } from "@std/path";
 import { IDENTITY, type Result, run } from "../templates/child_fixture.ts";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 
@@ -91,8 +91,71 @@ export async function exportHead(
 }
 
 /** A bash script run from `cwd`, arguments whole on Windows too. */
-export function bashScript(script: string, args: string[], cwd: string): Promise<Result> {
-  const env: Record<string, string> = { ...IDENTITY };
+export function bashScript(
+  script: string,
+  args: string[],
+  cwd: string,
+  extra: Record<string, string> = {},
+): Promise<Result> {
+  const env: Record<string, string> = { ...IDENTITY, ...extra };
   if (Deno.build.os === "windows") env.MSYS = "noglob";
   return run("bash", [bashPath(script), ...args], cwd, env);
+}
+
+/** One git call a script made: the objects folder it was given, and its arguments. */
+export type GitCall = { readonly alternates: string; readonly args: string };
+
+/**
+ * A `git` placed first on the PATH that records each call and then runs the real one, so a test
+ * sees every git call a script makes, not only the ones it thought of. `env` puts it on the PATH
+ * under the name the platform already uses for it. Git for Windows' bash puts its own git first,
+ * so a test of it skips Windows (`gitRecorderUnsure`).
+ */
+export async function gitRecorder(): Promise<
+  { env: Record<string, string>; calls: () => Promise<GitCall[]> }
+> {
+  const dir = await Deno.makeTempDir({ prefix: "explicit-head-git-" });
+  const log = join(dir, "calls");
+  const shim = join(dir, "git");
+  await Deno.writeTextFile(
+    shim,
+    [
+      "#!/usr/bin/env bash",
+      'printf \'%s\\t%s\\n\' "${GIT_ALTERNATE_OBJECT_DIRECTORIES:-}" "$*" >>"$EXPLICIT_HEAD_GIT_LOG"',
+      'PATH="${PATH#*:}"',
+      'exec git "$@"',
+      "",
+    ].join("\n"),
+  );
+  await Deno.chmod(shim, 0o755);
+  await Deno.writeTextFile(log, "");
+  const key = Object.keys(Deno.env.toObject()).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  const env = {
+    [key]: `${dir}${DELIMITER}${Deno.env.get("PATH") ?? ""}`,
+    EXPLICIT_HEAD_GIT_LOG: log,
+  };
+  const calls = async () =>
+    (await Deno.readTextFile(log)).split("\n").filter(Boolean).map((line) => {
+      const [alternates, ...rest] = line.split("\t");
+      return { alternates, args: rest.join("\t") };
+    });
+  return { env, calls };
+}
+
+export const gitRecorderUnsure = Deno.build.os === "windows";
+
+/** The settings every git call given an objects folder must carry. */
+export const NO_GRAPHS = "-c core.commitGraph=false -c core.multiPackIndex=false";
+
+/**
+ * Every recorded call that read an objects folder carried NO_GRAPHS, and at least one did: a
+ * script that never reached git with the folder proves nothing.
+ */
+export function assertNoGraphs(calls: GitCall[], what: string): void {
+  const given = calls.filter((c) => c.alternates !== "");
+  if (given.length === 0) throw new Error(`${what}: no git call was given the objects folder`);
+  const bare = given.filter((c) => !c.args.startsWith(`${NO_GRAPHS} `));
+  if (bare.length > 0) {
+    throw new Error(`${what}: read the objects folder with its graphs on: ${bare[0].args}`);
+  }
 }

@@ -18,6 +18,21 @@
 # become readable and nothing else of its repository is read, neither refs, config nor
 # hooks. Without it, the head must already be in the repository.
 #
+# The precondition: the objects folder belongs to a fresh bare repository (`git init`
+# with no template) filled only by a fetch with transfer.fsckObjects and
+# fetch.fsckObjects, and never mounted in a sandbox, so nothing the branch runs could
+# write into it after fsck. The trees and blobs a commit reaches are read by id and not
+# hashed again here. What else such a folder could make git read is refused, or turned
+# off on each git call:
+#
+#   - a path git would split as a list (`:` or `;` past a drive letter) or unquote
+#     (a leading `"`): GIT_ALTERNATE_OBJECT_DIRECTORIES is a list;
+#   - info/http-alternates;
+#   - an info/alternates other than the one line GitBranchFetcher writes: this
+#     repository's own objects folder, absolute, compared once resolved;
+#   - its commit graphs and multi-pack indexes, which git reads in place of the
+#     objects: explicit_head_git runs git with both off.
+#
 # explicit_head_option <option> [<value>...] - the one parse of `--head <sha>` and
 #   `--objects <dir>`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
 #   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
@@ -29,6 +44,9 @@
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
+# explicit_head_git <args...> - git, with `-c core.commitGraph=false -c
+#   core.multiPackIndex=false` while an objects folder is taken. Every git call a
+#   script makes once explicit_head_env ran goes through it, the check above included.
 # explicit_head_names_head <rev> - true for a spelling of HEAD (`HEAD`, `@`, either
 #   followed by `~` or `^`), in any case: where the file system folds case, git
 #   resolves `head` to HEAD. A script given a head must not read it.
@@ -54,11 +72,7 @@ explicit_head_take() {
   EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
   [[ $sha =~ $re ]] || { EXPLICIT_REFUSAL="not a full commit id: $sha"; return 2; }
   if [ -n "$objects" ]; then
-    case "$objects" in
-      /* | [A-Za-z]:[/\\]*) ;;
-      *) EXPLICIT_REFUSAL="not an absolute path: $objects"; return 2 ;;
-    esac
-    [ -d "$objects" ] || { EXPLICIT_REFUSAL="not a folder: $objects"; return 2; }
+    EXPLICIT_REFUSAL="$(_explicit_head_objects_refusal "$objects" "$@")" || return 2
   fi
   # A 40-digit id in a SHA-256 repository is a prefix: only an exact answer passes.
   full="$(EXPLICIT_OBJECTS="$objects" && explicit_head_env &&
@@ -69,6 +83,48 @@ explicit_head_take() {
 
 explicit_head_env() {
   [ -z "$EXPLICIT_OBJECTS" ] || export GIT_ALTERNATE_OBJECT_DIRECTORIES="$EXPLICIT_OBJECTS"
+}
+
+explicit_head_git() {
+  if [ -n "$EXPLICIT_OBJECTS" ]; then
+    command git -c core.commitGraph=false -c core.multiPackIndex=false "$@"
+  else
+    command git "$@"
+  fi
+}
+
+# _explicit_head_objects_refusal <dir> <git...> - prints why <dir> is refused and returns
+# 1, or prints nothing. The list and quote checks come first: a path git would split or
+# unquote names folders this one does not.
+_explicit_head_objects_refusal() {
+  local dir="$1" info="$1/info"
+  shift
+  case "$dir" in \"*) echo "a path git would unquote: $dir"; return 1 ;; esac
+  case "${dir#[A-Za-z]:}" in *[:\;]*) echo "a path git would split as a list: $dir"; return 1 ;; esac
+  case "$dir" in /* | [A-Za-z]:[/\\]*) ;; *) echo "not an absolute path: $dir"; return 1 ;; esac
+  [ -d "$dir" ] || { echo "not a folder: $dir"; return 1; }
+  if [ -e "$info/http-alternates" ] || [ -L "$info/http-alternates" ]; then
+    echo "an objects folder naming http alternates: $dir"
+    return 1
+  fi
+  _explicit_head_own_alternates "$info/alternates" "$@" ||
+    { echo "an objects folder borrowing from more than this repository: $dir"; return 1; }
+}
+
+# _explicit_head_own_alternates <file> <git...> - true when <file> is absent, or a regular
+# file of exactly one line naming, absolutely, the objects folder of the repository
+# <git...> runs in: what GitBranchFetcher writes. A line in another form - relative, a
+# comment, quoted, a second line - is one git would read and this check could not judge.
+_explicit_head_own_alternates() {
+  local file="$1" line own
+  shift
+  [ -e "$file" ] || [ -L "$file" ] || return 0
+  [ -f "$file" ] && [ ! -L "$file" ] || return 1
+  # The first line is the whole file, but for the newline after it.
+  IFS= read -r line <"$file" && [ "$(cat -- "$file")" = "$line" ] || return 1
+  case "$line" in /*) ;; [A-Za-z]:[/\\]*) line="${line//\\//}" ;; *) return 1 ;; esac
+  own="$("$@" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  [ "$line" -ef "$own/objects" ]
 }
 
 explicit_head_names_head() {
