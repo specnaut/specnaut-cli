@@ -1,10 +1,10 @@
-import { assertEquals, assertMatch } from "@std/assert";
+import { assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
 import {
   CHECKOUT_REASON,
   type CheckoutEntry,
   type CheckoutInput,
   judgeCheckout,
-  RESTART_ADVICE,
+  restartAdvice,
 } from "../../src/domain/checkout_trust.ts";
 import { type BaseEntry, REASON, type TreeEntry } from "../../src/domain/script_trust.ts";
 
@@ -158,6 +158,14 @@ Deno.test("each failure is reported, in the order commits, scripts, config files
   assertEquals(v.reasons.map((r) => r.path), [OUTSIDE, "p", A]);
 });
 
-Deno.test("the advice says to restart from a clean checkout", () => {
-  assertMatch(RESTART_ADVICE, /restart the session from a clean checkout/i);
+Deno.test("the advice asks for a new harness process, never a branch switch in this one", () => {
+  const advice = restartAdvice(OWN);
+  assertMatch(advice, /a new harness process/i);
+  assertMatch(advice, /never switch branches/i);
+  assertMatch(advice, /outside `\.claude\/`/);
+});
+
+Deno.test("the advice gives the exact command, with the base's tip when it is known", () => {
+  assertStringIncludes(restartAdvice(OWN), `git worktree add --detach <dir> ${OWN}`);
+  assertStringIncludes(restartAdvice(null), "git worktree add --detach <dir> <BASE_TIP>");
 });

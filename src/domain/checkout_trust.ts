@@ -68,10 +68,19 @@ export const CHECKOUT_REASON = {
   linkUnresolved: "a link that leads nowhere",
 } as const;
 
-/** What a failed check tells the user: the only way on. */
-export const RESTART_ADVICE =
-  "This checkout is not the base: restart the session from a clean checkout of the base branch. " +
-  "The review does not run from this checkout as it is.";
+/**
+ * What a failed check tells the user: the only way on. The harness loaded this checkout's settings
+ * and hooks when the session started, so no change made inside the session can undo what they
+ * already did: a new process has to start from a clean copy. `baseTip` is `null` when the base
+ * could not be named.
+ */
+export function restartAdvice(baseTip: string | null): string {
+  return "This checkout is not the base, and this session already loaded its settings and " +
+    "instructions. A new harness process is required: never switch branches, reset or check " +
+    "anything out from this session. Create a clean checkout of the base in a folder outside " +
+    `\`.claude/\`: \`git worktree add --detach <dir> ${baseTip ?? "<BASE_TIP>"}\`, ` +
+    "then start a new session in that folder.";
+}
 
 export function judgeCheckout(input: CheckoutInput): CheckoutVerdict {
   const reasons = [

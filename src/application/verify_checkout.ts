@@ -1,5 +1,5 @@
 import { CHECKOUT_SCOPE, type ScopeRoot } from "../domain/checkout_scope.ts";
-import { judgeCheckout, RESTART_ADVICE } from "../domain/checkout_trust.ts";
+import { judgeCheckout, restartAdvice } from "../domain/checkout_trust.ts";
 import type { Untrusted } from "../domain/script_trust.ts";
 import type { CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
@@ -19,7 +19,7 @@ export type CheckoutOutcome =
   | {
     readonly kind: "restart";
     readonly reasons: readonly Untrusted[];
-    /** What the review tells the user: {@link RESTART_ADVICE}. */
+    /** What the review tells the user: {@link restartAdvice}. */
     readonly advice: string;
   };
 
@@ -30,16 +30,16 @@ export async function verifyCheckout(
   deps: VerifyCheckoutDeps,
   untrustedHead: string,
 ): Promise<CheckoutOutcome> {
-  if (!FULL_SHA.test(untrustedHead)) return restart("head", "not a full commit sha");
+  if (!FULL_SHA.test(untrustedHead)) return restart("head", "not a full commit sha", null);
   const scripts = await verifyScripts(deps);
   if (scripts.kind === "base_unknown") {
-    return restart("base", `the base is unknown: ${scripts.why}`);
+    return restart("base", `the base is unknown: ${scripts.why}`, null);
   }
   const { git } = deps;
-  if (await git.commitOf(untrustedHead) !== untrustedHead) {
-    return restart("head", "names no commit in this repository: fetch it first");
-  }
   const tip = scripts.baseTip;
+  if (await git.commitOf(untrustedHead) !== untrustedHead) {
+    return restart("head", "names no commit in this repository: fetch it first", tip);
+  }
   const [headCommits, untrustedCommits, tree, atTip] = await Promise.all([
     git.commitsAhead(tip, "HEAD"),
     git.commitsAhead(tip, untrustedHead),
@@ -54,7 +54,7 @@ export async function verifyCheckout(
     tip: atTip,
   });
   if (verdict.holds) return { kind: "trusted", baseTip: tip };
-  return { kind: "restart", reasons: verdict.reasons, advice: RESTART_ADVICE };
+  return { kind: "restart", reasons: verdict.reasons, advice: restartAdvice(tip) };
 }
 
 async function listScope(git: GitObjectReader, tip: string) {
@@ -62,6 +62,6 @@ async function listScope(git: GitObjectReader, tip: string) {
   return roots.flat();
 }
 
-function restart(path: string, reason: string): CheckoutOutcome {
-  return { kind: "restart", reasons: [{ path, reason }], advice: RESTART_ADVICE };
+function restart(path: string, reason: string, tip: string | null): CheckoutOutcome {
+  return { kind: "restart", reasons: [{ path, reason }], advice: restartAdvice(tip) };
 }

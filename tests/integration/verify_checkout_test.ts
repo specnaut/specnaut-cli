@@ -3,7 +3,7 @@ import { join } from "@std/path";
 import type { GitObjectReader } from "../../src/application/script_trust_ports.ts";
 import { verifyCheckout } from "../../src/application/verify_checkout.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
-import { CHECKOUT_REASON, RESTART_ADVICE } from "../../src/domain/checkout_trust.ts";
+import { CHECKOUT_REASON, restartAdvice } from "../../src/domain/checkout_trust.ts";
 import { REASON } from "../../src/domain/script_trust.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { check, reasons, SETTINGS, setUp } from "./verify_checkout_fixture.ts";
@@ -27,7 +27,8 @@ Deno.test("a checkout holding a commit of the outside branch fails, naming it", 
   const outcome = await check(root, head);
   assertEquals(outcome.kind, "restart");
   assertEquals(reasons(outcome), [{ path: head, reason: CHECKOUT_REASON.headHolds }]);
-  if (outcome.kind === "restart") assertEquals(outcome.advice, RESTART_ADVICE);
+  const tip = (await git(root, "rev-parse", "main")).trim();
+  if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(tip));
 });
 
 Deno.test("a checkout with a commit of its own fails, even leaving every checked file alone", async () => {
@@ -125,4 +126,5 @@ Deno.test("an unknown base fails, never a check measured against nothing", async
     path: "base",
     reason: "the base is unknown: no origin/HEAD and no global init.defaultBranch",
   }]);
+  if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(null));
 });
