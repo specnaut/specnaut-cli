@@ -17,6 +17,17 @@
 // authentication says `Authorization: Bearer <token>` or `token: required`, and a
 // placeholder or a plain word is no credential. The token shapes (SECRET_RE, URL
 // userinfo included) are refused the same in both.
+//
+// Two of scan_hard's rules are deliberately not applied here:
+// - its hidden-character scan (HIDDEN_RE): a spec step is Markdown, where an HTML
+//   comment or a reference definition is ordinary, and the rule guards public tracker
+//   text against concealed instructions, which is not what this check is for;
+// - its environment check (env_secret_in, the value of any variable named like a
+//   secret): the domain reads no environment, and listing it would take a new port at
+//   every client. What the session holds is compared instead (`held`), the token it
+//   signs in with included, SPECNAUT_CLOUD_TOKEN when that is the one.
+// report-upstream.sh's literal and addressing scans are not scan_hard: they keep a
+// public report from naming its project, and Cloud text names its project by design.
 
 import { assertPortable } from "./ere_portability.ts";
 
