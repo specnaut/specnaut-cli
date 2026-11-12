@@ -8651,9 +8651,11 @@ fi
 if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
   LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
 fi
-AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
-  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
-  refused items-file authors
+# Each item's author, off its title tag: attributes by name, never by position.
+AUTHORS=\$(jq_lf -n -R -c --arg nonce "\$NONCE" '[inputs | sub("\\r\$"; "") | select(startswith("<untrusted-issue-text "))
+  | [scan("([a-z_]+)=\\"([^\\"]*)\\"") | {(.[0]): .[1]}] | add | select(.nonce == \$nonce and .field == "title")
+  | select((.item | test("^[1-9][0-9]*\$")) and (.author // "" | test("^[A-Za-z0-9._-]+\$"))) | {(.item): .author}]
+  | add // {}' "\$ITEMS_FILE") || refused items-file authors
 stop_if_refused
 ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
 RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
@@ -11843,9 +11845,11 @@ fi
 if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
   LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
 fi
-AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
-  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
-  refused items-file authors
+# Each item's author, off its title tag: attributes by name, never by position.
+AUTHORS=\$(jq_lf -n -R -c --arg nonce "\$NONCE" '[inputs | sub("\\r\$"; "") | select(startswith("<untrusted-issue-text "))
+  | [scan("([a-z_]+)=\\"([^\\"]*)\\"") | {(.[0]): .[1]}] | add | select(.nonce == \$nonce and .field == "title")
+  | select((.item | test("^[1-9][0-9]*\$")) and (.author // "" | test("^[A-Za-z0-9._-]+\$"))) | {(.item): .author}]
+  | add // {}' "\$ITEMS_FILE") || refused items-file authors
 stop_if_refused
 ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
 RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
@@ -14264,9 +14268,11 @@ fi
 if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
   LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
 fi
-AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
-  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
-  refused items-file authors
+# Each item's author, off its title tag: attributes by name, never by position.
+AUTHORS=\$(jq_lf -n -R -c --arg nonce "\$NONCE" '[inputs | sub("\\r\$"; "") | select(startswith("<untrusted-issue-text "))
+  | [scan("([a-z_]+)=\\"([^\\"]*)\\"") | {(.[0]): .[1]}] | add | select(.nonce == \$nonce and .field == "title")
+  | select((.item | test("^[1-9][0-9]*\$")) and (.author // "" | test("^[A-Za-z0-9._-]+\$"))) | {(.item): .author}]
+  | add // {}' "\$ITEMS_FILE") || refused items-file authors
 stop_if_refused
 ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
 RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
@@ -15952,9 +15958,11 @@ fi
 if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
   LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
 fi
-AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
-  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
-  refused items-file authors
+# Each item's author, off its title tag: attributes by name, never by position.
+AUTHORS=\$(jq_lf -n -R -c --arg nonce "\$NONCE" '[inputs | sub("\\r\$"; "") | select(startswith("<untrusted-issue-text "))
+  | [scan("([a-z_]+)=\\"([^\\"]*)\\"") | {(.[0]): .[1]}] | add | select(.nonce == \$nonce and .field == "title")
+  | select((.item | test("^[1-9][0-9]*\$")) and (.author // "" | test("^[A-Za-z0-9._-]+\$"))) | {(.item): .author}]
+  | add // {}' "\$ITEMS_FILE") || refused items-file authors
 stop_if_refused
 ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
 RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
