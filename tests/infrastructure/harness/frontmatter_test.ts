@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   frontmatterField,
   splitFrontmatter,
@@ -42,4 +42,10 @@ Deno.test("frontmatterField: returns null for non-string values", () => {
   const fmBody = "count: 5\nflag: true\n";
   assertEquals(frontmatterField(fmBody, "count"), null);
   assertEquals(frontmatterField(fmBody, "flag"), null);
+});
+
+// Every caller reads a bundled agent, and a grant read off broken YAML as "no tools line" would
+// render as the harness default: every tool. Broken frontmatter is a defect to stop on.
+Deno.test("frontmatterField: malformed YAML throws, naming the key, never reads as absent", () => {
+  assertThrows(() => frontmatterField("tools: [Read, Grep\n", "tools"), Error, "tools");
 });

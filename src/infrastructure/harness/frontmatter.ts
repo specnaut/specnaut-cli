@@ -22,16 +22,22 @@ export function splitFrontmatter(content: string): FrontmatterParts | null {
  * the key is absent or the value is not a string. Properly handles block
  * scalars (`|`, `>`), multi-line values, and other valid YAML shapes by
  * delegating to `@std/yaml`.
+ *
+ * Malformed YAML throws rather than reading as absent: every caller reads a
+ * bundled agent, and a `tools` line lost that way renders as the harness
+ * default, every tool (tests/templates/frontmatter_parses_test.ts keeps the
+ * shipped frontmatter strict).
  */
 export function frontmatterField(fmBody: string, key: string): string | null {
+  let parsed: unknown;
   try {
-    const parsed = parseYaml(fmBody);
-    if (parsed && typeof parsed === "object" && key in parsed) {
-      const value = (parsed as Record<string, unknown>)[key];
-      return typeof value === "string" ? value : null;
-    }
-  } catch {
-    // malformed YAML → null
+    parsed = parseYaml(fmBody);
+  } catch (e) {
+    throw new Error(`frontmatter is not valid YAML, so "${key}" cannot be read`, { cause: e });
+  }
+  if (parsed && typeof parsed === "object" && key in parsed) {
+    const value = (parsed as Record<string, unknown>)[key];
+    return typeof value === "string" ? value : null;
   }
   return null;
 }
