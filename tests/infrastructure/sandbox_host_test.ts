@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
+import { execInSandbox } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import { readDevcontainerImage } from "../../src/infrastructure/devcontainer_image.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
@@ -147,3 +148,45 @@ Deno.test({
       });
     }),
 });
+
+Deno.test({
+  name: "real: a --toolchain link to the home or into the checkout is refused, never bound",
+  ignore: !posix,
+  fn: () =>
+    withTemp(async (dir) => {
+      const root = await exportIn(dir);
+      await Deno.mkdir(join(dir, "home"));
+      await Deno.mkdir(join(dir, "checkout", "bin"), { recursive: true });
+      await Deno.mkdir(join(dir, "tools"));
+      await Deno.symlink(join(dir, "home"), join(dir, "tools", "to-home"));
+      await Deno.symlink(join(dir, "checkout", "bin"), join(dir, "tools", "to-checkout"));
+      const runs: string[] = [];
+      const deps = {
+        prober: { probe: () => Promise.resolve(LINUX_BWRAP) },
+        host: hostOver(root, dir),
+        runnerFor: () => ({ run: () => (runs.push("ran"), Promise.reject(new Error("ran"))) }),
+      };
+      for (const [link, why] of [["to-home", "holds the home"], ["to-checkout", "overlaps"]]) {
+        const toolchain = [join(dir, "tools", link)];
+        const result = await execInSandbox(deps, { sha: SHA, toolchain, command: ["make"] });
+        assertEquals(result.kind, "not_run", link);
+        assert(result.kind === "not_run" && result.why.includes(why), JSON.stringify(result));
+      }
+      assertEquals(runs, []);
+      const missing = [join(dir, "tools", "none")];
+      const run = () => execInSandbox(deps, { sha: SHA, toolchain: missing, command: ["make"] });
+      await assertRejects(run, SandboxRefused, "none");
+    }),
+});
+
+const LINUX_BWRAP = {
+  os: "linux",
+  arch: "x86_64",
+  image: { kind: "none", why: "no devcontainer" },
+  podman: "absent",
+  podmanCgroups: false,
+  docker: false,
+  bwrap: "usable",
+  bwrapVersion: "bubblewrap 0.9.0",
+  sandboxExec: false,
+} as const;

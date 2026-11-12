@@ -39,6 +39,12 @@ export class FsSandboxHost implements SandboxHost {
     return { tree, home: await real(this.home, "no home folder"), checkout: await this.checkout() };
   }
 
+  async real(folders: readonly string[]): Promise<string[]> {
+    const found: string[] = [];
+    for (const folder of folders) found.push(await real(folder, `no folder ${folder}`));
+    return found;
+  }
+
   async scratch(): Promise<ScratchFolder> {
     const path = await Deno.realPath(await Deno.makeTempDir({ prefix: "specnaut-sandbox-" }));
     const disarm = armExitTrap(() => removeSync(path));

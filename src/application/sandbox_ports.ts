@@ -34,6 +34,11 @@ export type ScratchFolder = {
 export interface SandboxHost {
   /** The folders of a run on the export of `sha`; refuses an export that is not there. */
   locate(sha: string): Promise<HostFolders>;
+  /**
+   * `folders` as real paths, in order: a link is judged by where it leads, so one to the home or
+   * into the checkout is refused like the folder itself. Refuses a folder that is not there.
+   */
+  real(folders: readonly string[]): Promise<string[]>;
   scratch(): Promise<ScratchFolder>;
 }
 

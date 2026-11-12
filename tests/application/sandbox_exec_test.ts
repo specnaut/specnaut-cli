@@ -42,6 +42,9 @@ type Seen = {
   runs: { backend: RunnableBackend; policy: SandboxPolicy; command: readonly string[] }[];
 };
 
+/** A link as the host resolves it: the one folder the tests make a link of, to the home. */
+const LINKS: Record<string, string> = { "/opt/tools": "/home/dev" };
+
 function world(probe: BackendProbe, outcome: RunOutcome = { kind: "exited", code: 7 }) {
   const seen: Seen = { located: [], removed: 0, runs: [] };
   const deps: ExecDeps = {
@@ -51,6 +54,7 @@ function world(probe: BackendProbe, outcome: RunOutcome = { kind: "exited", code
         seen.located.push(sha);
         return Promise.resolve(FOLDERS);
       },
+      real: (folders) => Promise.resolve(folders.map((f) => LINKS[f] ?? f)),
       scratch: () =>
         Promise.resolve({
           path: SCRATCH,
@@ -145,4 +149,11 @@ Deno.test("execInSandbox: the wall clock's end is reported, not turned into an e
     backend: "bwrap",
     outcome: { kind: "timed_out", seconds: 1800 },
   });
+});
+
+Deno.test("execInSandbox: a toolchain folder is judged by where it leads, never by its name", async () => {
+  const { deps, seen } = world(LINUX_BWRAP);
+  const result = await execInSandbox(deps, { ...REQUEST, toolchain: ["/opt/tools"] });
+  assertEquals(result, { kind: "not_run", why: "/home/dev is or holds the home folder" });
+  assertEquals(seen.runs, []);
 });

@@ -10,7 +10,8 @@ import type {
 /**
  * Runs one command on an export's scratch copy in a sandbox: the backend is the domain's choice
  * for what the host offers now, the policy the domain's for the host's folders, and the runner the
- * one for that backend. Nothing runs when the choice is static only or the layout is refused. The
+ * one for that backend. The toolchain is judged by the real folders it names, never by a link.
+ * Nothing runs when the choice is static only or the layout is refused. The
  * scratch folder holding the sandbox's home and temp is removed after the run, whatever happened.
  */
 
@@ -38,9 +39,9 @@ export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promi
     return { kind: "not_run", why: `no backend: ${backend.why.join("; ")}` };
   }
   const folders = await deps.host.locate(request.sha);
+  const toolchain = await deps.host.real(request.toolchain);
   const scratch = await deps.host.scratch();
   try {
-    const { toolchain } = request;
     const paths = { ...folders, scratch: scratch.path, toolchain, path: toolchain };
     const result = sandboxPolicy(backend.kind, paths);
     if (!result.ok) return { kind: "not_run", why: result.why };

@@ -44,7 +44,10 @@ function parseExec(
   return { kind: "sandbox", sub: "exec", sha: before[0], toolchain, command };
 }
 
-/** `--toolchain /a:/b`: absolute folders, `:` between them, as PATH lists them; none when absent. */
+/**
+ * `--toolchain /a:/b`: absolute folders, `:` between them, as PATH lists them; none when absent.
+ * Only their shape is checked here: the host resolves them before any layout check.
+ */
 function toolchainOf(raw: unknown): string[] | null {
   if (raw === undefined) return [];
   if (typeof raw !== "string") return null;
