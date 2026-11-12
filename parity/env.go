@@ -121,7 +121,7 @@ func isolationVars(work, home string) []string {
 		"GIT_CONFIG_GLOBAL=" + filepath.Join(home, ".gitconfig"),
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_ALLOW_PROTOCOL=file",
-		"GIT_AUTHOR_DATE=2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE=2026-01-01T00:00:00Z",
+		"GIT_AUTHOR_DATE=" + PinnedInstant, "GIT_COMMITTER_DATE=" + PinnedInstant,
 	}
 }
 
@@ -168,6 +168,7 @@ func stubDirectory() (string, error) {
 func Commands() map[string]func(*testscript.TestScript, bool, []string) {
 	return map[string]func(*testscript.TestScript, bool, []string){
 		"cloud-session": seedCloudSession,
+		"pin-clock":     pinClock,
 	}
 }
 

@@ -34,6 +34,11 @@ type Rule struct {
 const versionEdge = `(^|[^0-9.])`
 const versionTail = `(\.?(?:[^0-9.]|$))`
 
+// isoTimestamp is a wall-clock instant as the CLI records it. The
+// iso-timestamp rule absorbs it in a record; pin-clock (clock.go) pins it in a
+// fixture, so the two can never disagree on what a timestamp is.
+const isoTimestamp = `[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z`
+
 // Rules is the whole normalisation table. Nothing else in the harness rewrites
 // a record: a value that varies between two runs of one binary and is not
 // absorbed here is a difference, by design.
@@ -52,7 +57,7 @@ var Rules = []Rule{
 	},
 	{
 		Name:        "iso-timestamp",
-		Pattern:     `[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z`,
+		Pattern:     isoTimestamp,
 		Replacement: `<TIMESTAMP>`,
 		Why:         "installed.lock records installed_at per entry and the upgrade marker records `at`, both from the wall clock",
 	},
@@ -66,7 +71,10 @@ var Rules = []Rule{
 		Name:        "verify-scripts-commit",
 		Pattern:     `(?m)^(BASE|BASE_TIP) [0-9a-f]{40}$`,
 		Replacement: `$1 <COMMIT>`,
-		Why:         "verify-scripts prints the base's commit ids, and a commit hashes its tree, whose installed.lock carries installed_at from the wall clock; only these two labels, so no other id is hidden",
+		Why: "the commit ids verify-scripts prints are part of its contract (a caller trusts only a full BASE sha), so they are compared whenever both binaries write the same installed.lock: " +
+			"the scenario pins its timestamps (pin-clock, clock.go) and git's dates (env.go). Only when the two `--version` outputs differ does the committed lock differ by " +
+			"its templates version, and every id with it; only these two labels, so no other id is hidden",
+		When: func(c Context) bool { return c.VersionsDiffer },
 	},
 	{
 		Name:        "binary-version",

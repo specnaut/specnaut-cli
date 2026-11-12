@@ -8,6 +8,9 @@ cd project
 exec git init -q -b main
 exec git remote add origin file://$WORK/origin.git
 specnaut init --here --ai claude --backlog local --scheme semver --spec-backend local
+# The base commit holds installed.lock, whose installed_at is the wall clock;
+# pinned, like git's dates, so the commit ids verify-scripts prints are compared.
+pin-clock .specnaut/installed.lock
 exec git add -A
 exec git commit -q -m base
 exec git push -q origin main
@@ -26,9 +29,8 @@ mkdir .specnaut
 ! specnaut verify-scripts
 ! specnaut verify-scripts extra
 # The two repositories are git's, not the binary's, and no two runs agree on
-# them: the index holds each file's stat times, and every object hashes the
-# committed installed.lock, whose installed_at is the wall clock. verify-scripts
-# only reads them, so they leave the record; its output above is what it says.
+# them: the index holds each file's stat times. verify-scripts only reads them,
+# so they leave the record; its output above is what it says.
 rm $WORK/project/.git
 rm $WORK/origin.git
 
