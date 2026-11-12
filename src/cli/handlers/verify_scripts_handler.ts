@@ -1,9 +1,16 @@
 import { red } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
-import type { GitObjectReader, ScriptTreeWalker } from "../../application/script_trust_ports.ts";
+import { verifyConfig } from "../../application/verify_config.ts";
+import type {
+  CheckoutTreeWalker,
+  GitObjectReader,
+  ScriptTreeWalker,
+} from "../../application/script_trust_ports.ts";
+import type { ConfigVerdict } from "../../domain/config_trust.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
+import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { findHarness } from "../harnesses.ts";
@@ -23,8 +30,11 @@ import { findHarness } from "../harnesses.ts";
  * `NAMES_FILE <path>` (the paths changed since BASE, one per line, in a new temp file outside the
  * repository, which the caller removes once read), `NAMES_RELATIVE_TO <folder>` (those paths are
  * relative to the project's folder, named from the repository's top, `.` at the top),
- * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers), the
- * `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. Every other exit of this
+ * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers), one
+ * `VERDICT <class> trusted` or `VERDICT <class> untrusted <path> <reason>` per config input a
+ * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
+ * them), the `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. A class with no
+ * `trusted` line, on any exit, is untrusted. Every other exit of this
  * handler, a crash included, ends with `VERDICT scripts untrusted` too. A caller trusts the scripts
  * only on exit 0 with that final `trusted` line and a full `BASE` sha; anything else, the binary
  * missing included, is untrusted. `scripts` names the class checked, so others can be added without breaking a caller.
@@ -32,11 +42,13 @@ import { findHarness } from "../harnesses.ts";
 const EXIT = { trusted: 0, untrusted: 1, usage: 2, couldNotRun: 3 } as const;
 const UNTRUSTED = "VERDICT scripts untrusted";
 
+type Opened = { git: GitObjectReader; walker: ScriptTreeWalker; config: CheckoutTreeWalker };
+
 export type VerifyScriptsDeps = {
   readonly cwd: string;
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
-  readonly open: (cwd: string) => Promise<{ git: GitObjectReader; walker: ScriptTreeWalker }>;
+  readonly open: (cwd: string) => Promise<Opened>;
   readonly writeNames: (names: string) => Promise<string>;
 };
 
@@ -45,7 +57,11 @@ function defaultDeps(): VerifyScriptsDeps {
     cwd: Deno.cwd(),
     out: (s) => console.log(s),
     err: (s) => console.error(s),
-    open: async (cwd) => ({ git: await GitObjects.open(cwd), walker: new FsScriptTreeWalker(cwd) }),
+    open: async (cwd) => ({
+      git: await GitObjects.open(cwd),
+      walker: new FsScriptTreeWalker(cwd),
+      config: new FsTreeWalker(cwd, "block"),
+    }),
     writeNames: async (names) => {
       const path = await Deno.makeTempFile({ prefix: "specnaut-names-" });
       await Deno.writeTextFile(path, names);
@@ -59,16 +75,24 @@ export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()):
     if (!await fileExists(`${deps.cwd}/.specnaut`)) {
       return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
     }
-    const { git, walker } = await deps.open(deps.cwd);
+    const { git, walker, config } = await deps.open(deps.cwd);
     const outcome = await verifyScripts({ git, walker, core: CORE_BUNDLE, findHarness });
-    return await answer(outcome, deps);
+    const base = outcome.kind === "judged"
+      ? { tip: outcome.baseTip, mergeBase: outcome.base }
+      : null;
+    const verdicts = base === null ? [] : await verifyConfig({ git, tree: config }, base);
+    return await answer(outcome, verdicts, deps);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
   }
 }
 
-async function answer(outcome: VerifyOutcome, deps: VerifyScriptsDeps): Promise<number> {
+async function answer(
+  outcome: VerifyOutcome,
+  config: readonly ConfigVerdict[],
+  deps: VerifyScriptsDeps,
+): Promise<number> {
   if (outcome.kind === "base_unknown") {
     return refuse(deps, EXIT.couldNotRun, `the base is unknown: ${outcome.why}`);
   }
@@ -80,6 +104,7 @@ async function answer(outcome: VerifyOutcome, deps: VerifyScriptsDeps): Promise<
     `NAMES_FILE ${terminalText(await deps.writeNames(names))}`,
     `NAMES_RELATIVE_TO ${terminalText(outcome.namesRelativeTo)}`,
     `SCRIPTS_DIGEST ${outcome.digest}`,
+    ...config.map(configLine),
     ...outcome.verdict.untrusted.map((u) =>
       `UNTRUSTED ${terminalText(u.path)} ${terminalText(u.reason)}`
     ),
@@ -87,6 +112,11 @@ async function answer(outcome: VerifyOutcome, deps: VerifyScriptsDeps): Promise<
   ];
   deps.out(lines.join("\n"));
   return outcome.verdict.trusted ? EXIT.trusted : EXIT.untrusted;
+}
+
+function configLine(v: ConfigVerdict): string {
+  if (v.trusted) return `VERDICT ${v.class} trusted`;
+  return `VERDICT ${v.class} untrusted ${v.path} ${terminalText(v.reason)}`;
 }
 
 function refuse(deps: VerifyScriptsDeps, code: number, why: string): number {
