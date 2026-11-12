@@ -8,6 +8,7 @@ import { FsHeadReflog } from "../../infrastructure/fs_head_reflog.ts";
 import { FsSessionRecords } from "../../infrastructure/fs_session_records.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
+import { parsedInput, readHookInput } from "./hook_input.ts";
 
 /**
  * `specnaut record-checkout`: what the Claude Code `SessionStart` hook
@@ -25,9 +26,6 @@ import { GitObjects } from "../../infrastructure/git_object_reader.ts";
  */
 const EXIT = { done: 0, failed: 1, usage: 2 } as const;
 
-/** The most bytes of hook input read: far above any `SessionStart` payload. */
-const MAX_INPUT_BYTES = 1024 * 1024;
-
 export type RecordCheckoutHandlerDeps = {
   readonly cwd: string;
   /** The hook's input, or `null` when stdin is a terminal. */
@@ -41,7 +39,7 @@ export type RecordCheckoutHandlerDeps = {
 function defaultDeps(): RecordCheckoutHandlerDeps {
   return {
     cwd: Deno.cwd(),
-    input: readInput,
+    input: readHookInput,
     env: (name) => Deno.env.get(name),
     err: (s) => console.error(s),
     open: async (cwd) => {
@@ -73,7 +71,7 @@ export async function runRecordCheckout(
 async function fromHook(deps: RecordCheckoutHandlerDeps): Promise<number> {
   const text = await deps.input();
   if (text === null) return fail(deps, EXIT.usage, "reads a SessionStart hook's input on stdin");
-  const start = sessionStartOf(parsed(text));
+  const start = sessionStartOf(parsedInput(text));
   if (start === null) {
     return fail(deps, EXIT.usage, "the input names no session id and source of a SessionStart");
   }
@@ -102,36 +100,7 @@ async function take(
   return EXIT.done;
 }
 
-/** The input as JSON, or `undefined`: the caller refuses either way the payload is not one. */
-function parsed(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    // Not swallowed: an input that is not JSON is refused as a usage error by the caller.
-    if (!(err instanceof SyntaxError)) throw err;
-    return undefined;
-  }
-}
-
 function fail(deps: RecordCheckoutHandlerDeps, code: number, why: string): number {
   deps.err(red(`error: specnaut record-checkout: ${terminalText(why)}`));
   return code;
-}
-
-async function readInput(): Promise<string | null> {
-  if (Deno.stdin.isTerminal()) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for await (const chunk of Deno.stdin.readable) {
-    size += chunk.length;
-    if (size > MAX_INPUT_BYTES) throw new Error(`the input is over ${MAX_INPUT_BYTES} bytes`);
-    chunks.push(chunk);
-  }
-  const bytes = new Uint8Array(size);
-  let at = 0;
-  for (const c of chunks) {
-    bytes.set(c, at);
-    at += c.length;
-  }
-  return new TextDecoder().decode(bytes);
 }
