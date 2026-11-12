@@ -122,32 +122,32 @@ Deno.test("objects fsck refuses are not received", async () => {
   }
 });
 
+/**
+ * A HOME whose git config names an ssh command that hangs. `; :` swallows the host and the command
+ * git appends, quoted since `;` opens a comment in git's config.
+ */
+async function hangingSshHome(w: World): Promise<string> {
+  const home = join(w.out, "..", "home");
+  await Deno.mkdir(home);
+  await Deno.writeTextFile(join(home, ".gitconfig"), '[core]\n\tsshCommand = "sleep 20; :"\n');
+  await git(w.project, ["remote", "set-url", "origin", "ssh://example.invalid/x.git"]);
+  return home;
+}
+
 Deno.test({
   name: "a fetch that outlives its timeout is killed, not waited for",
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const w = await world();
-    const home = Deno.env.get("HOME");
     try {
-      // The user's own config names an ssh command that hangs; `; :` swallows the host and the
-      // command git appends, quoted since `;` opens a comment in git's config. The fetch must be
-      // stopped, not waited for.
-      const fakeHome = join(w.out, "..", "home");
-      await Deno.mkdir(fakeHome);
-      await Deno.writeTextFile(
-        join(fakeHome, ".gitconfig"),
-        '[core]\n\tsshCommand = "sleep 20; :"\n',
-      );
-      await git(w.project, ["remote", "set-url", "origin", "ssh://example.invalid/x.git"]);
-      Deno.env.set("HOME", fakeHome);
-      const fetcher = new GitBranchFetcher(w.project, { timeoutMs: 500 });
+      const home = await hangingSshHome(w);
+      const env = (name: string) => name === "HOME" ? home : Deno.env.get(name);
+      const fetcher = new GitBranchFetcher(w.project, { timeoutMs: 500, env });
       const source = { kind: "ref", remote: "origin", branch: "topic" } as const;
       const started = Date.now();
       await assertRejects(() => fetcher.fetch(source, w.out), ExportRefused, "did not finish");
       assertEquals(Date.now() - started < 10_000, true, "the fetch was waited for, not killed");
     } finally {
-      if (home === undefined) Deno.env.delete("HOME");
-      else Deno.env.set("HOME", home);
       await w.cleanup();
     }
   },

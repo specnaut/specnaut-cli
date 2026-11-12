@@ -21,7 +21,12 @@ export const DEFAULT_PROTOCOLS: readonly string[] = ["https", "ssh"];
 
 export const FETCH_TIMEOUT_MS = 120_000;
 
-export type FetchOptions = { readonly protocols?: readonly string[]; readonly timeoutMs?: number };
+export type FetchOptions = {
+  readonly protocols?: readonly string[];
+  readonly timeoutMs?: number;
+  /** Where the fetch reads the caller's variables from; the process's own by default. */
+  readonly env?: (name: string) => string | undefined;
+};
 
 /** The fetch's whole command line, its options before `--` and the URL and refspec after. */
 export function fetchArgs(url: string, refspec: string, protocols: readonly string[]): string[] {
@@ -42,11 +47,13 @@ export class GitBranchFetcher implements BranchFetcher {
   readonly #project: UntrustedGit;
   readonly #protocols: readonly string[];
   readonly #timeoutMs: number;
+  readonly #env: (name: string) => string | undefined;
 
   constructor(readonly projectDir: string, options: FetchOptions = {}) {
     this.#project = new UntrustedGit(projectDir);
     this.#protocols = options.protocols ?? DEFAULT_PROTOCOLS;
     this.#timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
+    this.#env = options.env ?? ((name) => Deno.env.get(name));
   }
 
   async remotes(): Promise<string[]> {
@@ -83,7 +90,7 @@ export class GitBranchFetcher implements BranchFetcher {
       args,
       cwd,
       clearEnv: true,
-      env: fetchEnv((name) => Deno.env.get(name)),
+      env: fetchEnv(this.#env),
       stdin: "null",
       stdout: "null",
       stderr: "piped",
