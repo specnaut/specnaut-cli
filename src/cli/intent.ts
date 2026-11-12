@@ -25,6 +25,15 @@ export type SandboxIntent =
   | { kind: "sandbox"; sub: "probe" }
   | { kind: "sandbox"; sub: "exec"; sha: string; toolchain: string[]; command: string[] };
 
+/**
+ * `specnaut review`: `gate` is the hook's checkout check, `start` exports the branch `source`
+ * names once the gate passed, `end` removes the export of `sha` (review_handler.ts).
+ */
+export type ReviewIntent =
+  | { kind: "review"; sub: "gate" }
+  | { kind: "review"; sub: "start"; source: string }
+  | { kind: "review"; sub: "end"; sha: string };
+
 export type Intent =
   | { kind: "version" }
   | { kind: "help" }
@@ -174,4 +183,5 @@ export type Intent =
   /** `specnaut verify-scripts`: whether `.specnaut/scripts/` matches the base (verify_scripts_handler.ts). */
   | { kind: "verify-scripts" }
   /** `specnaut record-checkout`: a `SessionStart` hook records the checkout (record_checkout_handler.ts). */
-  | { kind: "record-checkout" };
+  | { kind: "record-checkout" }
+  | ReviewIntent;

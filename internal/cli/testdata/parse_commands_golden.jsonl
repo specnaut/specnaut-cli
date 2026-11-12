@@ -103,3 +103,17 @@
 {"args":["record-checkout","--help"],"intent":{"kind":"help"}}
 {"args":["record-checkout","a","b"],"intent":{"kind":"unknown","received":"record-checkout takes no argument"}}
 {"args":["--force","record-checkout"],"intent":{"kind":"record-checkout"}}
+{"args":["review"],"intent":{"kind":"unknown","received":"review"}}
+{"args":["review","gate"],"intent":{"kind":"review","sub":"gate"}}
+{"args":["review","gate","x"],"intent":{"kind":"unknown","received":"review gate takes no argument"}}
+{"args":["review","start"],"intent":{"kind":"unknown","received":"review start takes one source"}}
+{"args":["review","start","12"],"intent":{"kind":"review","sub":"start","source":"12"}}
+{"args":["review","start","origin/topic"],"intent":{"kind":"review","sub":"start","source":"origin/topic"}}
+{"args":["review","start",""],"intent":{"kind":"unknown","received":"review start takes one source"}}
+{"args":["review","start","a","b"],"intent":{"kind":"unknown","received":"review start takes one source"}}
+{"args":["review","end"],"intent":{"kind":"unknown","received":"review end takes one full commit id"}}
+{"args":["review","end","0123456789abcdef0123456789abcdef01234567"],"intent":{"kind":"review","sub":"end","sha":"0123456789abcdef0123456789abcdef01234567"}}
+{"args":["review","end","HEAD"],"intent":{"kind":"unknown","received":"review end takes one full commit id"}}
+{"args":["review","merge"],"intent":{"kind":"unknown","received":"review merge"}}
+{"args":["review","start","12","--force"],"intent":{"kind":"review","sub":"start","source":"12"}}
+{"args":["--help","review","gate"],"intent":{"kind":"help"}}

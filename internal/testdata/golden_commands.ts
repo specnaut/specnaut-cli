@@ -56,6 +56,11 @@ const argv: string[][] = [
   // `specnaut record-checkout`: no argument; its input is stdin, never argv.
   ["record-checkout"], ["record-checkout", "x"], ["record-checkout", "--path", "x"],
   ["record-checkout", "--help"], ["record-checkout", "a", "b"], ["--force", "record-checkout"],
+  // `specnaut review`: gate takes nothing, start one source, end one full commit id.
+  ["review"], ["review", "gate"], ["review", "gate", "x"], ["review", "start"], ["review", "start", "12"],
+  ["review", "start", "origin/topic"], ["review", "start", ""], ["review", "start", "a", "b"],
+  ["review", "end"], ["review", "end", SHA], ["review", "end", "HEAD"], ["review", "merge"],
+  ["review", "start", "12", "--force"], ["--help", "review", "gate"],
 ];
 
 function intentOf(args: string[]): unknown {

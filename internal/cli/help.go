@@ -28,6 +28,13 @@ const helpTemplate = `{bold:specnaut} — AI project scaffolding CLI with auto-c
                                       (read-only). Exit 0 trusted, 1 untrusted, 3 no base
   specnaut record-checkout            Record the checkout a session started on (HEAD and the instruction and
                                       config files it loaded), from a SessionStart hook's input on stdin
+  specnaut review gate                Check, from a Claude Code PreToolUse hook's input on stdin, that the
+                                      session's checkout may start a review of a branch it cannot trust.
+                                      Exit 0 let through, 2 refused
+  specnaut review start <pr|remote/branch>
+                                      Once the gate let it through: export the branch as inert files
+                                      outside the project, and print where (HEAD, SEATS, SCRATCH, OBJECTS)
+  specnaut review end <sha>           Remove the export of <sha>
   specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other
                                       one cannot (read-only). Exit 0 one is available, 1 none: static only
   specnaut sandbox exec <sha> [--toolchain <dir>[:<dir>...]] -- <command> [<arg>...]

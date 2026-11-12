@@ -46,6 +46,7 @@ var Commands = map[string]func(Args, []string) Intent{
 	"sandbox":         parseSandbox,
 	"verify-scripts":  parseVerifyScripts,
 	"record-checkout": parseRecordCheckout,
+	"review":          parseReview,
 }
 
 // Subcommand words, as parser.ts accepts them.

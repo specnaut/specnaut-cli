@@ -54,3 +54,9 @@ specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567 --toolchain rel -
 # record-checkout refusals: it takes no argument.
 specnaut record-checkout extra
 specnaut record-checkout a b
+# review refusals: a sub-command, gate takes nothing, start one source, end one full commit id.
+specnaut review
+specnaut review gate x
+specnaut review start
+specnaut review start a b
+specnaut review end HEAD

@@ -148,3 +148,22 @@ async function claimNew(root: string): Promise<void> {
 function ignoreNotFound(err: unknown): void {
   if (!(err instanceof Deno.errors.NotFound)) throw err;
 }
+
+/**
+ * Removes the kept export of `sha` under `cacheRoot`: `false` when none is there. Only a folder
+ * named by a full commit id is removed; a link at that name is refused, never followed.
+ */
+export async function removeKeptExport(cacheRoot: string, sha: string): Promise<boolean> {
+  if (!isFullSha(sha)) throw new ExportRefused("not a full commit id");
+  const root = join(cacheRoot, sha);
+  let info: Deno.FileInfo;
+  try {
+    info = await Deno.lstat(root);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
+  if (!info.isDirectory) throw new ExportRefused(`${root} is not a folder: a link is not followed`);
+  await Deno.remove(root, { recursive: true });
+  return true;
+}
