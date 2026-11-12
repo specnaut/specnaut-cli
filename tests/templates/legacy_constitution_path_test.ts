@@ -44,14 +44,22 @@ const PENDING: Readonly<Record<string, readonly ("legacy" | "heading")[]>> = {};
 
 type Finding = { path: string; kind: "legacy" | "heading" };
 
+/**
+ * The bundle's RELEASE_HISTORY quotes past releases' highlights verbatim: a record of what shipped,
+ * never rewritten, which names the old address where a release did. It sends no agent anywhere.
+ */
+const HISTORY = "export const RELEASE_HISTORY";
+function withoutReleaseHistory(path: string, text: string): string {
+  const at = path === "src/templates_bundle.ts" ? text.indexOf(HISTORY) : -1;
+  return at < 0 ? text : text.slice(0, at);
+}
+
 async function shippedFiles(): Promise<{ path: string; text: string }[]> {
   const out: { path: string; text: string }[] = [];
   for (const dir of ["templates", "plugin", "src"]) {
     for await (const e of walk(`${ROOT}${dir}`, { includeDirs: false })) {
-      out.push({
-        path: relative(ROOT, e.path).replaceAll("\\", "/"),
-        text: await Deno.readTextFile(e.path),
-      });
+      const path = relative(ROOT, e.path).replaceAll("\\", "/");
+      out.push({ path, text: withoutReleaseHistory(path, await Deno.readTextFile(e.path)) });
     }
   }
   for (const path of ["README.md", "AGENTS.md"]) {
