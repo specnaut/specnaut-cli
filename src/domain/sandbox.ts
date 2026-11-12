@@ -11,8 +11,8 @@
  * Pure — no IO. The probe of what the host has, and the launch, are the caller's.
  */
 
-import type { ImageSource } from "./sandbox_image.ts";
 import {
+  type BackendProbe,
   DEVICES,
   NO_SEATBELT_RULES,
   SEATBELT_RULES,
@@ -21,7 +21,10 @@ import {
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
 import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
+import { isFilterArch } from "./sandbox_seccomp.ts";
 import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
+
+export type { BackendProbe };
 
 export type Engine = "podman" | "docker";
 
@@ -34,63 +37,70 @@ export type Backend =
 /** A backend that runs something: every one but static only. */
 export type SandboxedBackend = Exclude<Backend["kind"], "static">;
 
-/** What the host offers, as the caller probed it. */
-export type BackendProbe = {
-  /** `Deno.build.os`. */
-  readonly os: string;
-  readonly image: ImageSource;
-  /** Podman running as the user, as root (passed over), or not installed. */
-  readonly podman: "rootless" | "root" | "absent";
-  /** Rootless podman can cap a run: cgroup v2, with pids, memory and cpu delegated to the user. */
-  readonly podmanCgroups: boolean;
-  /** A docker daemon answers. */
-  readonly docker: boolean;
-  /** Bubblewrap ran a trial command, or was stopped by the user-namespace restriction. */
-  readonly bwrap: "usable" | "userns_restricted" | "absent";
-  /** What `bwrap --version` printed, or `null` when it printed nothing. */
-  readonly bwrapVersion: string | null;
-  readonly sandboxExec: boolean;
-};
+/** One backend as a probe finds it: what it offers here, or why not, and if it is this OS's. */
+export type BackendStatus =
+  | { readonly kind: SandboxedBackend; readonly offered: Backend }
+  | { readonly kind: SandboxedBackend; readonly why: string; readonly onThisOs: boolean };
 
 const UNCAPPED_PODMAN =
   "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
+const WINDOWS = "no sandbox on Windows";
 
-/** The best backend `probe` offers; static only on Windows, where no backend is supported. */
+/** The best backend `probe` offers: the first {@link assessBackends} offers, else static only. */
 export function chooseBackend(probe: BackendProbe): Backend {
-  if (probe.os === "windows") return { kind: "static", why: ["no sandbox on Windows"] };
+  if (probe.os === "windows") return { kind: "static", why: [WINDOWS] };
   const why: string[] = [];
-  const container = containerOn(probe, why);
-  if (container !== null) return container;
-  if (probe.os === "linux") {
-    const passedOver = bwrapWhy(probe);
-    if (passedOver === null) return { kind: "bwrap" };
-    why.push(passedOver);
-  }
-  if (probe.os === "darwin") {
-    if (probe.sandboxExec) return { kind: "seatbelt" };
-    why.push("sandbox-exec: not available");
+  for (const status of assessBackends(probe)) {
+    if ("offered" in status) return status.offered;
+    if (status.onThisOs) why.push(status.why);
   }
   return { kind: "static", why };
 }
 
-/** The container backend `probe` offers, or `null` with the reason added to `why`. */
-function containerOn(probe: BackendProbe, why: string[]): Backend | null {
+/** Every backend in selection order: a container, bubblewrap, then `sandbox-exec`. */
+export function assessBackends(probe: BackendProbe): BackendStatus[] {
+  const { os } = probe;
+  if (os === "windows") return KINDS.map((kind) => ({ kind, why: WINDOWS, onThisOs: false }));
+  const bwrap = os === "linux" ? bwrapWhy(probe) : "bubblewrap: Linux only";
+  const mac = os !== "darwin" ? "sandbox-exec: macOS only" : "sandbox-exec: not available";
+  const seatbelt = os === "darwin" && probe.sandboxExec ? null : mac;
+  return [
+    containerStatus(probe),
+    bwrap === null ? OFFERED.bwrap : { kind: "bwrap", why: bwrap, onThisOs: os === "linux" },
+    seatbelt === null
+      ? OFFERED.seatbelt
+      : { kind: "seatbelt", why: seatbelt, onThisOs: os === "darwin" },
+  ];
+}
+
+const KINDS: readonly SandboxedBackend[] = ["container", "bwrap", "seatbelt"];
+const OFFERED = {
+  bwrap: { kind: "bwrap", offered: { kind: "bwrap" } },
+  seatbelt: { kind: "seatbelt", offered: { kind: "seatbelt" } },
+} as const;
+
+/** The container backend `probe` offers, or why there is none. */
+function containerStatus(probe: BackendProbe): BackendStatus {
   const podman = probe.podman === "rootless" && probe.podmanCgroups;
   const engine = podman ? "podman" : probe.docker ? "docker" : null;
   if (probe.image.kind === "pinned" && engine) {
-    return { kind: "container", engine, image: probe.image.ref };
+    return { kind: "container", offered: { kind: "container", engine, image: probe.image.ref } };
   }
-  if (probe.image.kind === "none") why.push(`no container image: ${probe.image.why}`);
-  else if (probe.podman === "rootless") why.push(UNCAPPED_PODMAN);
-  else why.push("container: no rootless podman and no docker");
-  return null;
+  const why = probe.image.kind === "none"
+    ? `no container image: ${probe.image.why}`
+    : probe.podman === "rootless"
+    ? UNCAPPED_PODMAN
+    : "container: no rootless podman and no docker";
+  return { kind: "container", why, onThisOs: true };
 }
 
-/** Why bubblewrap cannot run on this host, or `null` when it can. */
+/** Why bubblewrap cannot run on this Linux host, or `null` when it can. */
 function bwrapWhy(probe: BackendProbe): string | null {
   if (probe.bwrap === "absent") return "bubblewrap: not installed";
   if (probe.bwrap === "userns_restricted") return "bubblewrap: user namespaces restricted";
-  return forbidsNestedUserns(probe.bwrapVersion) ? null : OLD_BWRAP;
+  if (probe.bwrap === "trial_failed") return "bubblewrap: a trial run failed";
+  if (!forbidsNestedUserns(probe.bwrapVersion)) return OLD_BWRAP;
+  return isFilterArch(probe.arch) ? null : `bubblewrap: no syscall filter for ${probe.arch}`;
 }
 
 const OLD_BWRAP = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";

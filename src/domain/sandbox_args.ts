@@ -9,6 +9,7 @@ import type { SandboxPolicy } from "./sandbox.ts";
 import type { SandboxLimits } from "./sandbox_limits.ts";
 import { isPinned } from "./sandbox_image.ts";
 import { safePath } from "./sandbox_paths.ts";
+import { SECCOMP_FD } from "./sandbox_seccomp.ts";
 
 /**
  * One container run: its pinned image, and a name the caller makes unique, so that the launcher
@@ -86,7 +87,8 @@ const SHM = "/dev/shm";
  * own; the user namespace always, so that `--disable-userns` can forbid the process from making a
  * nested one, where it would hold every capability again), killed with its parent, a new
  * session (no terminal to inject keystrokes into), an empty environment refilled from the
- * policy, no capabilities. System folders are bound read-only when
+ * policy, no capabilities, and the syscall filter (`sandbox_seccomp.ts`) read from
+ * {@link SECCOMP_FD}, which the launcher opens. System folders are bound read-only when
  * the host has them, the toolchain and the tree always; the scratch folders and shared memory are
  * size-capped tmpfs. The sandbox's own root is remounted read-only last, so nothing outside those
  * folders can be created in it. `--` ends the options: a command starting with `-` is never one.
@@ -96,6 +98,7 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
   return [
     ...["--unshare-all", "--unshare-user", "--disable-userns"],
     ...["--die-with-parent", "--new-session", "--clearenv", "--cap-drop", "ALL"],
+    ...["--seccomp", String(SECCOMP_FD)],
     ...bwrapNetwork(policy.network),
     ...policy.system.flatMap((p) => ["--ro-bind-try", safePath(p), p]),
     ...policy.reads.flatMap((p) => ["--ro-bind", safePath(p), p]),

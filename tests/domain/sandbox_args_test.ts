@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
+import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import { CAP_ENFORCEMENT, LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
@@ -125,7 +126,7 @@ Deno.test("containerArgs: the image is pinned by digest and the command follows 
 
 Deno.test("bwrapArgs: every namespace unshared, tied to its parent, new session, bare environment", () => {
   const args = bwrap();
-  assertEquals(args.slice(0, 8), [
+  assertEquals(args.slice(0, 10), [
     "--unshare-all",
     "--unshare-user",
     "--disable-userns",
@@ -134,6 +135,8 @@ Deno.test("bwrapArgs: every namespace unshared, tied to its parent, new session,
     "--clearenv",
     "--cap-drop",
     "ALL",
+    "--seccomp",
+    String(SECCOMP_FD),
   ]);
   assertEquals(args.filter((a) => a.startsWith("--share") || a === "--cap-add"), []);
 });

@@ -4,6 +4,28 @@
  * carries, and is the one home of what a sandbox may touch.
  */
 
+import type { ImageSource } from "./sandbox_image.ts";
+
+/** What the host offers, as the caller probed it. */
+export type BackendProbe = {
+  /** `Deno.build.os`. */
+  readonly os: string;
+  /** `Deno.build.arch`: bubblewrap runs only where a syscall filter exists for it. */
+  readonly arch: string;
+  readonly image: ImageSource;
+  /** Podman running as the user, as root (passed over), or not installed. */
+  readonly podman: "rootless" | "root" | "absent";
+  /** Rootless podman can cap a run: cgroup v2, with pids, memory and cpu delegated to the user. */
+  readonly podmanCgroups: boolean;
+  /** A docker daemon answers. */
+  readonly docker: boolean;
+  /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */
+  readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
+  /** What `bwrap --version` printed, or `null` when it printed nothing. */
+  readonly bwrapVersion: string | null;
+  readonly sandboxExec: boolean;
+};
+
 /**
  * macOS services a sandboxed process may never look up: each reads or acts on the user's
  * session (the keychain's secrets, opening apps, scripting them, the clipboard). Launchd job

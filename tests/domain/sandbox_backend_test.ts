@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { type BackendProbe, chooseBackend } from "../../src/domain/sandbox.ts";
+import { assessBackends, type BackendProbe, chooseBackend } from "../../src/domain/sandbox.ts";
 import type { ImageSource } from "../../src/domain/sandbox_image.ts";
 
 /**
@@ -16,6 +16,7 @@ const NO_IMAGE: ImageSource = { kind: "none", why: "no devcontainer" };
 
 const NOTHING: BackendProbe = {
   os: "linux",
+  arch: "x86_64",
   image: IMAGE,
   podman: "absent",
   podmanCgroups: false,
@@ -111,5 +112,60 @@ Deno.test("chooseBackend: with no backend it is static only, and says why for ea
       "no container image: no devcontainer",
       "bubblewrap: not installed",
     ]);
+  }
+});
+
+Deno.test("chooseBackend: bubblewrap whose trial run failed is passed over, with that reason", () => {
+  assertEquals(chooseBackend(probe({ bwrap: "trial_failed" })), {
+    kind: "static",
+    why: [NO_ENGINE_WHY, "bubblewrap: a trial run failed"],
+  });
+});
+
+Deno.test("chooseBackend: bubblewrap needs a syscall filter for the host's architecture", () => {
+  assertEquals(chooseBackend(probe({ bwrap: "usable", arch: "aarch64" })), { kind: "bwrap" });
+  assertEquals(chooseBackend(probe({ bwrap: "usable", arch: "riscv64" })), {
+    kind: "static",
+    why: [NO_ENGINE_WHY, "bubblewrap: no syscall filter for riscv64"],
+  });
+});
+
+Deno.test("assessBackends: each backend in selection order, offered or with its reason", () => {
+  const mac = probe({ os: "darwin", image: NO_IMAGE, sandboxExec: true });
+  assertEquals(assessBackends(mac), [
+    { kind: "container", why: "no container image: no devcontainer", onThisOs: true },
+    { kind: "bwrap", why: "bubblewrap: Linux only", onThisOs: false },
+    { kind: "seatbelt", offered: { kind: "seatbelt" } },
+  ]);
+  const linux = probe({ docker: true, bwrap: "usable" });
+  assertEquals(assessBackends(linux), [
+    { kind: "container", offered: { kind: "container", engine: "docker", image: IMAGE.ref } },
+    { kind: "bwrap", offered: { kind: "bwrap" } },
+    { kind: "seatbelt", why: "sandbox-exec: macOS only", onThisOs: false },
+  ]);
+});
+
+Deno.test("assessBackends: on Windows no backend runs, each for that reason", () => {
+  const win = probe({ os: "windows", docker: true, bwrap: "usable", sandboxExec: true });
+  assertEquals(assessBackends(win).map((s) => "why" in s && s.why), [
+    "no sandbox on Windows",
+    "no sandbox on Windows",
+    "no sandbox on Windows",
+  ]);
+});
+
+Deno.test("chooseBackend: the first backend assessBackends offers, whatever the host", () => {
+  for (const os of ["linux", "darwin"]) {
+    for (const docker of [true, false]) {
+      for (const bwrap of ["usable", "absent"] as const) {
+        for (const sandboxExec of [true, false]) {
+          const host = probe({ os, docker, bwrap, sandboxExec });
+          const first = assessBackends(host).find((s) => "offered" in s);
+          const chosen = chooseBackend(host);
+          assertEquals(chosen, first && "offered" in first ? first.offered : chosen);
+          if (first === undefined) assertEquals(chosen.kind, "static");
+        }
+      }
+    }
   }
 });
