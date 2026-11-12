@@ -69,6 +69,11 @@ echo "═══ local: edit, classify, link and close through the executor ═�
 scaffold local ""
 bash .specnaut/scripts/backlog/add.sh "Epic" "Why." >/dev/null
 bash .specnaut/scripts/backlog/add.sh "Child" "Why." >/dev/null
+RC=0; OUT=$(bash .specnaut/scripts/backlog/add.sh "Stray" --labels x 2>&1) || RC=$?
+check "_backlog_args.sh: a writer refuses a flag it would not record, and writes nothing" \
+  '[ -f .specnaut/scripts/backlog/_backlog_args.sh ] && [ "$RC" = 2 ] &&
+   printf "%s\n" "$OUT" | grep -qF "add.sh: unknown flag '"'"'--labels'"'"'" &&
+   [ -z "$(find .specnaut/backlog -name "*stray*")" ]'
 apply "edit --id 1" '{"op":"edit","target":1,"title":"Renamed epic","append":"Added."}
 {"op":"classify","target":1,"axis":"Size","value":"M"}'
 check "read-items.sh writes the item through item-record.sh: its title a block, its status a line" \
@@ -177,5 +182,9 @@ check "apply-plan.sh keeps the terminal column out of a move; item-record.sh rea
 apply "close --id 3" '{"op":"close","target":3,"reason":"completed"}'
 check "a close moves the task into the column the board names last" \
   'said 0 "APPLIED close 3" "RECEIPT: none" && printf "%s\n" "$CALLS" | grep -qF "\"status\":\"Shipped\""'
+check "_cloud_send.sh: that body reached curl from a file, never as an argument" \
+  'argv=$(printf "%s\n" "$CALLS" | grep "^curl") && [ -f .specnaut/scripts/backlog/_cloud_send.sh ] &&
+   printf "%s\n" "$argv" | grep "PATCH" | grep -qF -e "$(printf -- "--data-binary\t@")" &&
+   case "$argv" in *Shipped*) false ;; esac'
 
 finish "BACKLOG-PLAN"

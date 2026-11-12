@@ -30,6 +30,9 @@ check "phase doc issue.md scaffolded, and routed by the /specnaut router (cli#72
   '[ -f .claude/skills/specnaut/phases/issue.md ] && grep -qF "phases/issue.md" .claude/skills/specnaut/SKILL.md'
 check "plan-reentry.md scaffolded, and plan.md loads it before step 2 (cli#774)" \
   '[ -f .claude/skills/task/phases/plan-reentry.md ] && grep -qF "phases/plan-reentry.md" .claude/skills/task/phases/plan.md'
+check "script-gate.md scaffolded with its gate block, and resume loads it" \
+  'f=.claude/skills/task/phases/script-gate.md; grep -qF "<!-- script-gate: verify-scripts -->" $f &&
+   grep -qF "out=\$(specnaut verify-scripts)" $f && grep -qF "phases/script-gate.md" .claude/skills/task/resume.md'
 
 echo
 echo "═══ spec 037  /task audit replaced the audit skills ═══"
