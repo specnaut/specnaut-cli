@@ -42,12 +42,16 @@ export function containerArgs(
   ];
 }
 
+/** `--dev` brings a writable shared-memory folder of its own; a capped tmpfs replaces it. */
+const SHM = "/dev/shm";
+
 /**
  * `bwrap` arguments: every namespace unshared (network included, so loopback is the sandbox's
  * own), killed with its parent, a new session (no terminal to inject keystrokes into), an empty
  * environment refilled from the policy, no capabilities. System folders are bound read-only when
- * the host has them, the toolchain and the tree always; the scratch folders are size-capped tmpfs.
- * `--` ends the options, so a command starting with `-` is never read as one.
+ * the host has them, the toolchain and the tree always; the scratch folders and shared memory are
+ * size-capped tmpfs. The sandbox's own root is remounted read-only last, so nothing outside those
+ * folders can be created in it. `--` ends the options: a command starting with `-` is never one.
  */
 export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): string[] {
   const size = String(policy.limits.scratchBytes);
@@ -57,9 +61,10 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
     ...policy.system.flatMap((p) => ["--ro-bind-try", safePath(p), p]),
     ...policy.reads.flatMap((p) => ["--ro-bind", safePath(p), p]),
     ...["--proc", "/proc", "--dev", "/dev"],
-    ...policy.writes.flatMap((p) => ["--size", size, "--tmpfs", safePath(p)]),
+    ...[SHM, ...policy.writes].flatMap((p) => ["--size", size, "--tmpfs", safePath(p)]),
     ...["--chdir", safePath(policy.workdir)],
     ...Object.entries(policy.env).flatMap(([k, v]) => ["--setenv", k, v]),
+    ...["--remount-ro", "/"],
     "--",
     ...command,
   ];

@@ -129,12 +129,22 @@ Deno.test("bwrapArgs: system folders, the toolchain and the tree are bound read-
   assertEquals(args.filter((a) => a === "--bind" || a === "--bind-try" || a === "--dev-bind"), []);
 });
 
-Deno.test("bwrapArgs: writes go only to size-capped tmpfs scratch folders", () => {
+Deno.test("bwrapArgs: writes go only to size-capped tmpfs: shared memory and scratch", () => {
   const args = bwrap();
-  assertEquals(after(args, "--tmpfs"), [SCRATCH_HOME, SCRATCH_TMP]);
-  assertEquals(after(args, "--size"), [String(LIMITS.scratchBytes), String(LIMITS.scratchBytes)]);
-  const firstTmpfs = args.indexOf("--tmpfs");
-  assertEquals(args.slice(firstTmpfs - 2, firstTmpfs), ["--size", String(LIMITS.scratchBytes)]);
+  assertEquals(after(args, "--tmpfs"), ["/dev/shm", SCRATCH_HOME, SCRATCH_TMP]);
+  args.forEach((a, i) => {
+    if (a === "--tmpfs") {
+      assertEquals(args.slice(i - 2, i), ["--size", String(LIMITS.scratchBytes)]);
+    }
+  });
+  assert(args.indexOf("--tmpfs") > args.indexOf("--dev"), "the shm tmpfs replaces --dev's own");
+});
+
+Deno.test("bwrapArgs: the sandbox's root is remounted read-only as the last option", () => {
+  const args = bwrap();
+  const end = args.indexOf("--");
+  assertEquals(args.slice(end - 2, end), ["--remount-ro", "/"]);
+  assertEquals(after(args, "--remount-ro"), ["/"]);
 });
 
 Deno.test("bwrapArgs: the environment is exactly the policy's, and the command follows `--`", () => {
