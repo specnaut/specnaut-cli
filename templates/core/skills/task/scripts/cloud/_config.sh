@@ -70,9 +70,9 @@ if ! printf '%s\n' "$PROJECT_KEY" | LC_ALL=C grep -Eq '^[A-Za-z0-9][A-Za-z0-9_-]
 fi
 
 # curl is handed this string, and is not the parser `specnaut cloud token` judged
-# it with: only a plain http(s) base passes, the grammar normalizeApiUrl holds
-# (tests/scripts/cloud_config_sh_test.ts keeps the two equal). LC_ALL=C keeps the
-# classes ASCII whatever the locale.
+# it with: only a plain http(s) base passes, and plain http only to a loopback
+# host -- the rule normalizeApiUrl holds (tests/scripts/cloud_config_sh_test.ts
+# keeps the two equal). LC_ALL=C keeps the classes ASCII whatever the locale.
 if ! printf '%s\n' "$API_URL" |
   LC_ALL=C grep -Eq '^https?://([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*|\[::1\])(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then
   echo "error: backlog-config.yml api_url is not a plain http(s) URL." >&2

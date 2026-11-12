@@ -30,12 +30,20 @@ export type CloudConfig = {
 const PLAIN_API_URL =
   /^https?:\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[::1\])(?::[0-9]+)?(?:\/[A-Za-z0-9._~\/-]*)?$/;
 
-/** A plain API base, trailing slashes dropped, or null. */
+/**
+ * The hosts plain http may reach. The bearer token travels with every request,
+ * and over plain http it crosses the network in clear; loopback traffic never
+ * leaves the host. The same set guards `scripts/cloud/_config.sh`.
+ */
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** A plain API base, trailing slashes dropped, or null: plain http only to a loopback host. */
 export function normalizeApiUrl(raw: string): string | null {
   const trimmed = raw.trim().replace(/\/+$/, "");
   const host = PLAIN_API_URL.exec(trimmed)?.[1]?.toLowerCase();
   // A host `URL` rewrites (`127.0x.0.1`) is not the one curl reads.
-  return host && URL.canParse(trimmed) && new URL(trimmed).hostname === host ? trimmed : null;
+  if (!host || !URL.canParse(trimmed) || new URL(trimmed).hostname !== host) return null;
+  return trimmed.startsWith("http://") && !LOOPBACK_HOSTS.has(host) ? null : trimmed;
 }
 
 /** An `api_url` is set, and is not a plain http(s) base: not the same as no link at all. */

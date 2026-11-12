@@ -121,6 +121,14 @@ Deno.test("cloud _config.sh and normalizeApiUrl agree on what a plain API base i
       "https://a b.example",
       "file:///etc/passwd",
       "ftp://collector.invalid",
+      // The scheme policy: plain http to a loopback host only.
+      "http://cloud.example.com",
+      "http://10.0.0.5:8080/base",
+      "http://127.0.0.2:3000",
+      "http://localhost.:3000",
+      "http://LOCALHOST:3000",
+      "http://[::1]:3000",
+      "https://[::1]:3000",
     ]
   ) {
     const r = await source(`backend: cloud\napi_url: "${url}"\nproject_key: CLOUD\n`);
