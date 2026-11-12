@@ -32,6 +32,15 @@ export type BackendProbe = {
 };
 
 /**
+ * Whether a bubblewrap of `version` (what `bwrap --version` printed) has `--disable-userns`,
+ * which arrived in 0.8; an unreadable version counts as older.
+ */
+export function forbidsNestedUserns(version: string | null): boolean {
+  const found = version?.match(/(\d+)\.(\d+)/);
+  return found ? Number(found[1]) > 0 || Number(found[2]) >= 8 : false;
+}
+
+/**
  * macOS services a sandboxed process may never look up: each reads or acts on the user's
  * session (the keychain's secrets, opening apps, scripting them, the clipboard). Launchd job
  * submission is an operation, not a service: the profile denies `job-creation` instead.

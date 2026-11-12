@@ -14,6 +14,7 @@
 import {
   type BackendProbe,
   DEVICES,
+  forbidsNestedUserns,
   NO_SEATBELT_RULES,
   SEATBELT_RULES,
   type Sysctls,
@@ -107,12 +108,6 @@ function bwrapWhy(probe: BackendProbe): string | null {
 }
 
 const OLD_BWRAP = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";
-
-/** `--disable-userns` arrived in bubblewrap 0.8; an unreadable version counts as older. */
-function forbidsNestedUserns(version: string | null): boolean {
-  const found = version?.match(/(\d+)\.(\d+)/);
-  return found ? Number(found[1]) > 0 || Number(found[2]) >= 8 : false;
-}
 
 /** What a sandboxed process may touch. Anything not named here is out of its reach. */
 export type SandboxPolicy = {
