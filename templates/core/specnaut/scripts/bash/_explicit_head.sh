@@ -18,18 +18,24 @@
 # become readable and nothing else of its repository is read, neither refs, config nor
 # hooks. Without it, the head must already be in the repository.
 #
-# The precondition: the objects folder belongs to a fresh bare repository (`git init`
-# with no template) filled only by a fetch with transfer.fsckObjects and
-# fetch.fsckObjects, and never mounted in a sandbox, so nothing the branch runs could
-# write into it after fsck. The trees and blobs a commit reaches are read by id and not
-# hashed again here. What else such a folder could make git read is refused, or turned
-# off on each git call:
+# The precondition is the control: the objects folder belongs to a fresh bare repository
+# (`git init` with no template) that GitBranchFetcher filled by one fetch with
+# transfer.fsckObjects and fetch.fsckObjects, and that is never mounted in a sandbox, so
+# nothing the branch runs could write into it after fsck. The checks below stand behind
+# that precondition, never in its place: they read the folder before git's own read, so
+# a folder something could still write into between the two is not one they can judge.
+# The trees and blobs a commit reaches are read by id and not hashed again here. What else
+# such a folder could make git read is refused, or turned off on each git call:
 #
-#   - a path git would split as a list (`:` or `;` past a drive letter) or unquote
-#     (a leading `"`): GIT_ALTERNATE_OBJECT_DIRECTORIES is a list;
+#   - a path git would split as a list (`:` or `;`, past a drive letter under MSYS only)
+#     or unquote (a leading `"`): GIT_ALTERNATE_OBJECT_DIRECTORIES is a list;
 #   - info/http-alternates;
 #   - an info/alternates other than the one line GitBranchFetcher writes: this
-#     repository's own objects folder, absolute, compared once resolved;
+#     repository's own objects folder, absolute, compared once resolved. The line is
+#     taken as git reads it, so what the two would read differently is refused: a NUL
+#     or another control byte, a `.` or `..` component (git resolves them by spelling,
+#     the file system through links), a drive letter outside MSYS (git reads it there
+#     as a relative path);
 #   - its commit graphs and multi-pack indexes, which git reads in place of the
 #     objects: explicit_head_git runs git with both off.
 #
@@ -103,10 +109,12 @@ explicit_head_git() {
 # 1, or prints nothing. The list and quote checks come first: a path git would split or
 # unquote names folders this one does not.
 _explicit_head_objects_refusal() {
-  local dir="$1" info="$1/info"
+  local dir="$1" info="$1/info" list="$1"
   shift
+  # Only Git for Windows reads a drive letter as a path's start, not as a list's first item.
+  ! _explicit_head_msys || list="${dir#[A-Za-z]:}"
   case "$dir" in \"*) echo "a path git would unquote: $dir"; return 1 ;; esac
-  case "${dir#[A-Za-z]:}" in *[:\;]*) echo "a path git would split as a list: $dir"; return 1 ;; esac
+  case "$list" in *[:\;]*) echo "a path git would split as a list: $dir"; return 1 ;; esac
   case "$dir" in /* | [A-Za-z]:[/\\]*) ;; *) echo "not an absolute path: $dir"; return 1 ;; esac
   [ -d "$dir" ] || { echo "not a folder: $dir"; return 1; }
   if [ -e "$info/http-alternates" ] || [ -L "$info/http-alternates" ]; then
@@ -120,18 +128,30 @@ _explicit_head_objects_refusal() {
 # _explicit_head_own_alternates <file> <git...> - true when <file> is absent, or a regular
 # file of exactly one line naming, absolutely, the objects folder of the repository
 # <git...> runs in: what GitBranchFetcher writes. A line in another form - relative, a
-# comment, quoted, a second line - is one git would read and this check could not judge.
+# comment, quoted, a second line, a control byte, a `.` or `..` component, a drive letter
+# outside MSYS - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
   local file="$1" line own
   shift
   [ -e "$file" ] || [ -L "$file" ] || return 0
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
+  # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
+  [ "$(LC_ALL=C tr -dc '\000-\011\013-\037\177' <"$file" | wc -c | tr -d ' ')" = 0 ] || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"$file" && [ "$(cat -- "$file")" = "$line" ] || return 1
-  case "$line" in /*) ;; [A-Za-z]:[/\\]*) line="${line//\\//}" ;; *) return 1 ;; esac
+  case "$line" in
+    /*) ;;
+    [A-Za-z]:[/\\]*) _explicit_head_msys || return 1; line="${line//\\//}" ;;
+    *) return 1 ;;
+  esac
+  case "$line/" in */./* | */../*) return 1 ;; esac
   own="$("$@" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
   [ "$line" -ef "$own/objects" ]
 }
+
+# _explicit_head_msys - true under Git for Windows' bash, whose git reads a drive letter as
+# the start of an absolute path.
+_explicit_head_msys() { case "${OSTYPE:-}" in msys*) return 0 ;; *) return 1 ;; esac; }
 
 explicit_head_names_head() {
   local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?$'

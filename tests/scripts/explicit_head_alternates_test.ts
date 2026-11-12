@@ -1,6 +1,7 @@
 // `--objects <dir>` makes git read the objects of that folder, and nothing else of it that could
 // stand in for them: a folder that names further alternates (over http, or any but the one line
-// GitBranchFetcher writes), or a path git would split or unquote, is refused by _explicit_head.sh.
+// GitBranchFetcher writes, or that line in a shape git reads otherwise than the check), or a path
+// git would split or unquote, is refused by _explicit_head.sh.
 // The refusals are driven through git-read.sh, since every script takes the folder through the
 // same check.
 
@@ -113,4 +114,60 @@ Deno.test("explicit head: an objects path git would split as a list or unquote i
   for (const [objects, why] of cases) {
     assertStringIncludes(await filesWith(repo, objects), `--head: ${why}: ${objects}`, objects);
   }
+});
+
+/**
+ * Lines that name this repository's own objects folder once the file system resolves them, as the
+ * check compares, but that git reads otherwise: up to a NUL, with a control byte kept, with `.` and
+ * `..` taken lexically, or with a drive letter that only Windows reads as absolute. `prepare` makes
+ * the file system resolve the line to the folder, so the shape alone is what is refused.
+ */
+const lineShapes: {
+  what: string;
+  line: (own: string) => string;
+  prepare?: (root: string, own: string) => Promise<void>;
+}[] = [
+  { what: "a NUL byte", line: (own) => `${own}\0` },
+  { what: "a `..` component", line: (own) => `${own}/../objects` },
+  { what: "a `.` component", line: (own) => own.replace(/\/objects$/, "/./objects") },
+  ...(Deno.build.os === "windows" ? [] : [
+    {
+      what: "a carriage return",
+      line: (own: string) => `${own}\r`,
+      prepare: (_root: string, own: string) => Deno.symlink(own, `${own}\r`),
+    },
+    {
+      what: "a drive letter outside Windows",
+      line: (own: string) => `C:${own}`,
+      prepare: (root: string) => Deno.symlink("/", join(root, "C:")),
+    },
+  ]),
+];
+
+for (const shape of lineShapes) {
+  Deno.test(`explicit head: an alternates line with ${shape.what} is refused`, async () => {
+    const repo = await fixture();
+    const alternates = join(repo.objects, "info", "alternates");
+    const own = (await Deno.readTextFile(alternates)).trimEnd();
+    await shape.prepare?.(repo.root, own);
+    await Deno.writeTextFile(alternates, `${shape.line(own)}\n`);
+    assertStringIncludes(
+      await filesWith(repo, repo.objects),
+      `--head: an objects folder borrowing from more than this repository: ${repo.objects}`,
+    );
+  });
+}
+
+Deno.test({
+  name: "explicit head: outside Windows, a drive letter in an objects path is a list git splits",
+  ignore: Deno.build.os === "windows", // there, a drive letter is what an absolute path holds
+  fn: async () => {
+    const repo = await fixture();
+    await Deno.symlink("/", join(repo.root, "C:"));
+    const objects = `C:${repo.objects}`;
+    assertStringIncludes(
+      await filesWith(repo, objects),
+      `--head: a path git would split as a list: ${objects}`,
+    );
+  },
 });
