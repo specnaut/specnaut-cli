@@ -142,3 +142,12 @@ export const stagedEntryRefusal = (
       `  project:  ${terminalText(root)}\n` +
       `Specnaut reads and deletes only the plain copies it staged inside the staging folder.`,
   );
+
+/** A staged entry replaced between its check and its read (cli#776): read nothing from it. */
+export const changedStagedEntryRefusal = (root: string, abs: string) =>
+  new ContainmentRefusal(
+    `refusing to read a staged path that changed between its check and its read:\n` +
+      `  path:    ${terminalText(abs)}\n` +
+      `  project: ${terminalText(root)}\n` +
+      `Something replaced it while Specnaut read it; run the command again.`,
+  );

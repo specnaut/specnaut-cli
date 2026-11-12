@@ -24,6 +24,7 @@ const builders: Record<string, () => Error> = {
   "projectDirectoryRefusal": () => refusals.projectDirectoryRefusal(root, abs),
   "linkedStagingRefusal": () => refusals.linkedStagingRefusal(root, abs),
   "stagedEntryRefusal": () => refusals.stagedEntryRefusal(root, abs, other, "read"),
+  "changedStagedEntryRefusal": () => refusals.changedStagedEntryRefusal(root, abs),
 };
 
 Deno.test("every refusal builder fs_refusals.ts exports has a case below", () => {

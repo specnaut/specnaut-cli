@@ -92,3 +92,25 @@ function lockOf(path: string): InstalledLock {
     }]]),
   };
 }
+
+Deno.test("a staged copy swapped between its check and its open is refused (cli#776)", async () => {
+  // The race, made deterministic: `Deno.open` is wrapped to swap another file
+  // into place just before the real open, after the store's `lstat`.
+  const proj = await Deno.makeTempDir({ prefix: "staging-read-swap-" });
+  const staged = join(proj, ".specnaut/upgrade-staging", REL);
+  const realOpen = Deno.open;
+  try {
+    await Deno.mkdir(join(staged, ".."), { recursive: true });
+    await Deno.writeTextFile(staged, "UPSTREAM\n");
+    await Deno.writeTextFile(join(proj, "swap"), "SWAPPED\n");
+    Deno.open = async (path, options) => {
+      if (String(path) === staged) await Deno.rename(join(proj, "swap"), staged);
+      return realOpen(path, options);
+    };
+    const err = await new FsStagingStore().read(proj, REL).then(() => null, (e: unknown) => e);
+    assertIsError(err, PathRefusal, "changed between its check and its read");
+  } finally {
+    Deno.open = realOpen;
+    await Deno.remove(proj, { recursive: true });
+  }
+});

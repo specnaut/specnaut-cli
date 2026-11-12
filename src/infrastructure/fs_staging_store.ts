@@ -9,7 +9,11 @@ import {
   resolveProjectRoot,
 } from "./fs_containment.ts";
 import { pruneEmptyParents } from "./fs_prune.ts";
-import { linkedStagingRefusal, stagedEntryRefusal } from "./fs_refusals.ts";
+import {
+  changedStagedEntryRefusal,
+  linkedStagingRefusal,
+  stagedEntryRefusal,
+} from "./fs_refusals.ts";
 
 const STAGING_REL = ".specnaut/upgrade-staging";
 
@@ -48,18 +52,44 @@ async function assertStagingNotLinked(projectDir: string): Promise<void> {
  *
  * For the layout on disk at check time. A concurrent writer inside staging is out
  * of scope (Deno has no dirfd-relative unlink), so this is the last await before
- * the read or the removal. A missing entry throws `NotFound`, which each caller
+ * the removal; a read checks the handle it opens against the `lstat` returned
+ * here (`readSameEntry`). A missing entry throws `NotFound`, which each caller
  * already maps to "nothing staged".
  */
 async function assertPlainStagedEntry(
   root: string,
   full: string,
   action: "read" | "delete",
-): Promise<void> {
+): Promise<Deno.FileInfo> {
   const rel = await resolvedRelative(root, full);
-  if (!rel.startsWith(`${STAGING_REL}/`) || (await Deno.lstat(full)).isSymlink) {
+  const seen = rel.startsWith(`${STAGING_REL}/`) ? await Deno.lstat(full) : null;
+  if (seen === null || seen.isSymlink) {
     throw stagedEntryRefusal(root, full, join(root, rel), action);
   }
+  return seen;
+}
+
+/**
+ * The text of the staged entry `seen` describes, read from one handle that is
+ * still that entry (cli#776): between the check and the open, the entry can be
+ * swapped for a link or another file, and `open` follows whatever is there.
+ * The handle's `fstat` must name the device and inode `lstat` saw, as
+ * `readChecked` in `fs_tree_walker.ts` does for a checkout.
+ */
+async function readSameEntry(root: string, full: string, seen: Deno.FileInfo): Promise<string> {
+  const file = await Deno.open(full, { read: true });
+  let info: Deno.FileInfo;
+  try {
+    info = await file.stat();
+  } catch (err) {
+    file.close();
+    throw err;
+  }
+  if (info.dev !== seen.dev || info.ino !== seen.ino) {
+    file.close();
+    throw changedStagedEntryRefusal(root, full);
+  }
+  return await new Response(file.readable).text();
 }
 
 /**
@@ -78,7 +108,7 @@ async function stagedEntry(
   projectDir: string,
   relPath: string,
   action: "read" | "delete",
-): Promise<string | null> {
+): Promise<{ root: string; full: string; seen: Deno.FileInfo } | null> {
   assertSafeDestination(relPath);
   await assertStagingNotLinked(projectDir);
   const root = await resolveProjectRoot(projectDir);
@@ -86,8 +116,7 @@ async function stagedEntry(
   // The entry it acts on, never where that leads: judge one, act on another (cli#751).
   await assertRemovableInProject(root, full);
   try {
-    await assertPlainStagedEntry(root, full, action);
-    return full;
+    return { root, full, seen: await assertPlainStagedEntry(root, full, action) };
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return null;
     throw err;
@@ -113,10 +142,10 @@ export class FsStagingStore implements StagingStore {
   }
 
   async read(projectDir: string, relPath: string): Promise<string | null> {
-    const full = await stagedEntry(projectDir, relPath, "read");
-    if (full === null) return null;
+    const entry = await stagedEntry(projectDir, relPath, "read");
+    if (entry === null) return null;
     try {
-      return await Deno.readTextFile(full);
+      return await readSameEntry(entry.root, entry.full, entry.seen);
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) return null;
       throw err;
@@ -124,8 +153,8 @@ export class FsStagingStore implements StagingStore {
   }
 
   async delete(projectDir: string, relPath: string): Promise<string[]> {
-    const full = await stagedEntry(projectDir, relPath, "delete");
-    if (full === null) return [];
+    const full = (await stagedEntry(projectDir, relPath, "delete"))?.full;
+    if (full === undefined) return [];
     try {
       await Deno.remove(full);
     } catch (err) {
