@@ -1,5 +1,6 @@
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
+import { SCRIPTS_DIR } from "../domain/script_trust.ts";
 import type { Bundle } from "../domain/template.ts";
 import type { BundleOptions } from "./bundle_options.ts";
 import type { Harness } from "./ports.ts";
@@ -28,4 +29,15 @@ export function bundleForLock(
 ): Bundle | null {
   const harness = findHarness(lock.harness);
   return harness === null ? null : harness.mapBundle(core, bundleOptionsOf(lock));
+}
+
+/** The bundle's regular files under the scripts folder, by destination: what the script check reads. */
+export function bundledScripts(bundle: Bundle): Map<string, string> {
+  const files = new Map<string, string>();
+  for (const [dest, entry] of Object.entries(bundle)) {
+    if (dest.startsWith(`${SCRIPTS_DIR}/`) && entry.symlinkTo === undefined) {
+      files.set(dest, entry.content);
+    }
+  }
+  return files;
 }

@@ -16,6 +16,8 @@
  * settings are out of its reach, and a review already runs the branch's own tests.
  */
 
+import { sameBytes } from "./bytes.ts";
+
 /** The folder checked, relative to the project's root. */
 export const SCRIPTS_DIR = ".specnaut/scripts";
 
@@ -189,10 +191,4 @@ function withoutCr(bytes: Uint8Array): Uint8Array {
     if (!(bytes[i] === 0x0d && bytes[i + 1] === 0x0a)) out.push(bytes[i]);
   }
   return Uint8Array.from(out);
-}
-
-function sameBytes(a: Uint8Array, b: Uint8Array | undefined): boolean {
-  if (b === undefined || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
 }

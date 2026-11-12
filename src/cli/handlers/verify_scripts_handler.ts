@@ -2,6 +2,7 @@ import { red } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
 import type { GitObjectReader, ScriptTreeWalker } from "../../application/script_trust_ports.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
+import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
@@ -53,7 +54,7 @@ function defaultDeps(): VerifyScriptsDeps {
 
 export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()): Promise<number> {
   try {
-    if (!await exists(`${deps.cwd}/.specnaut`)) {
+    if (!await fileExists(`${deps.cwd}/.specnaut`)) {
       return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
     }
     const { git, walker } = await deps.open(deps.cwd);
@@ -90,14 +91,4 @@ function refuse(deps: VerifyScriptsDeps, code: number, why: string): number {
   deps.err(red(`error: specnaut verify-scripts: ${terminalText(why)}`));
   deps.out(UNTRUSTED);
   return code;
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await Deno.lstat(path);
-    return true;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
-    throw err;
-  }
 }

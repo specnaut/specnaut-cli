@@ -1,4 +1,5 @@
 import type { TrackedEntry, TrackedListing } from "../application/structural_scan_ports.ts";
+import { sameBytes } from "../domain/bytes.ts";
 
 /** Names decoded fatally: a name that is not UTF-8 is skipped, never read under a guessed name. */
 export const NAME = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -41,10 +42,4 @@ function addEntry(
     if (!(err instanceof TypeError)) throw err;
     listing.undecodable++; // not UTF-8: counted, and reported as skipped
   }
-}
-
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
 }

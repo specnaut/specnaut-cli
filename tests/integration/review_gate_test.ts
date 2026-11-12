@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
-import { bundleForLock } from "../../src/application/lock_bundle.ts";
+import { bundledScripts, bundleForLock } from "../../src/application/lock_bundle.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
@@ -33,13 +33,7 @@ function gateBlock(): string {
 
 /** Every script the bundle installs, the lock beside them: a project as `specnaut init` leaves it. */
 function installedScripts(): Record<string, string> {
-  const files: Record<string, string> = { ".specnaut/installed.lock": LOCK };
-  for (const [dest, file] of Object.entries(BUNDLE)) {
-    if (dest.startsWith(".specnaut/scripts/") && file.symlinkTo === undefined) {
-      files[dest] = file.content;
-    }
-  }
-  return files;
+  return { ".specnaut/installed.lock": LOCK, ...Object.fromEntries(bundledScripts(BUNDLE)) };
 }
 
 /** The scope script with a first command that writes the marker. */

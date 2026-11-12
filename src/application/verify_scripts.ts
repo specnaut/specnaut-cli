@@ -10,8 +10,7 @@ import {
   SCRIPTS_DIR,
   type ScriptVerdict,
 } from "../domain/script_trust.ts";
-import type { Bundle } from "../domain/template.ts";
-import { bundleForLock } from "./lock_bundle.ts";
+import { bundledScripts, bundleForLock } from "./lock_bundle.ts";
 import type { Harness } from "./ports.ts";
 import type { GitObjectReader, ScriptTreeWalker } from "./script_trust_ports.ts";
 
@@ -138,7 +137,11 @@ async function bundleRule(deps: VerifyScriptsDeps, baseTip: string): Promise<Bun
   if (bundle === null) {
     return unavailable(`names a harness this binary does not know: ${lock.harness}`);
   }
-  return { kind: "mapped", files: scriptFiles(bundle) };
+  const enc = new TextEncoder();
+  const files = new Map(
+    [...bundledScripts(bundle)].map(([dest, text]) => [dest, enc.encode(text)]),
+  );
+  return { kind: "mapped", files };
 }
 
 /** The lock at the base's tip, parsed, or the rule that applies without one. */
@@ -155,18 +158,6 @@ async function baseLock(
     // Reported as the verdict's reason: the caller prints it on the lock's UNTRUSTED line.
     return unavailable(err instanceof Error ? err.message : String(err));
   }
-}
-
-/** The bundle's regular files under the scripts folder, as bytes. */
-function scriptFiles(bundle: Bundle): Map<string, Uint8Array> {
-  const files = new Map<string, Uint8Array>();
-  const encoder = new TextEncoder();
-  for (const [dest, entry] of Object.entries(bundle)) {
-    if (dest.startsWith(`${SCRIPTS_DIR}/`) && entry.symlinkTo === undefined) {
-      files.set(dest, encoder.encode(entry.content));
-    }
-  }
-  return files;
 }
 
 const unavailable = (why: string): BundleRule => ({ kind: "unavailable", why });
