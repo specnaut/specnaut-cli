@@ -104,6 +104,12 @@ export class FsExportStore implements ExportStore {
     }
   }
 
+  keep(): void {
+    this.#made.splice(0);
+    this.#disarm?.();
+    this.#disarm = undefined;
+  }
+
   /** The trap's cleanup: synchronous, since `unload` waits for nothing. */
   #removeSync(): void {
     for (const path of this.#made.splice(0).reverse()) {

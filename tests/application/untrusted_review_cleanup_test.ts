@@ -15,6 +15,7 @@ function deps(removed: string[]) {
       removed.push("tried");
       return Promise.reject(new Error("a folder is busy"));
     },
+    keep: () => {},
   };
   return {
     fetcher: { remotes: () => Promise.resolve(["origin"]), fetch: () => Promise.reject(failure) },

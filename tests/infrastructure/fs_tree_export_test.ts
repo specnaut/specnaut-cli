@@ -126,7 +126,7 @@ const PROBE = fromFileUrl(new URL("./fs_tree_export_trap_probe.ts", import.meta.
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
 
 /** Runs the probe, which stages an export and then ends as `how` says; returns what it staged. */
-async function probe(base: string, how: "exit" | "return" | "signal"): Promise<string> {
+async function probe(base: string, how: "exit" | "return" | "signal" | "keep"): Promise<string> {
   const child = new Deno.Command(Deno.execPath(), {
     args: ["run", "--allow-read", "--allow-write", "--allow-env", PROBE, base, how],
     cwd: ROOT,
@@ -164,3 +164,27 @@ for (const how of ["exit", "return", "signal"] as const) {
     },
   });
 }
+
+Deno.test("a kept export outlives its process", async () => {
+  const base = await tempDir("trap-");
+  try {
+    const staged = await probe(base, "keep");
+    assertEquals(await exists(dirname(staged)), true, `${staged} was removed though kept`);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("a remove after keep leaves the kept export alone", async () => {
+  const base = await tempDir("keep-");
+  try {
+    await Deno.mkdir(join(base, "project"));
+    const store = new FsExportStore(join(base, "project"), join(base, "cache"));
+    const staged = await store.stage();
+    store.keep();
+    await store.remove();
+    assertEquals(await exists(dirname(staged)), true);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});

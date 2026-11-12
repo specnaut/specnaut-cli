@@ -55,4 +55,9 @@ export interface ExportStore {
   /** Re-hashes the reviewers' copy against the plan; refuses any difference. */
   verify(plan: ExportPlan): Promise<void>;
   remove(): Promise<void>;
+  /**
+   * Keeps every folder the export made past this process: the exit trap is disarmed, and a later
+   * `remove` removes nothing. A review that runs over several commands keeps its export so.
+   */
+  keep(): void;
 }

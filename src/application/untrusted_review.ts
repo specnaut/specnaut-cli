@@ -44,6 +44,8 @@ export type BranchExport = ExportHome & {
   /** Links, submodules, instruction files and odd modes: listed with their id, never written. */
   readonly listed: readonly ListedEntry[];
   readonly remove: () => Promise<void>;
+  /** Keeps the export past this process (`ExportStore.keep`); its folder is removed by name later. */
+  readonly keep: () => void;
 };
 
 export async function exportBranchTree(
@@ -75,7 +77,13 @@ async function exportInto(
   const plan = await planTree(objects, await objects.treeOf(sha), caps, deps.windows);
   await store.write(plan, objects);
   await store.verify(plan);
-  return { ...home, sha, listed: plan.listed, remove: () => store.remove() };
+  return {
+    ...home,
+    sha,
+    listed: plan.listed,
+    remove: () => store.remove(),
+    keep: () => store.keep(),
+  };
 }
 
 /** Removes a failed export; a cleanup that fails too keeps the first failure as its cause. */
