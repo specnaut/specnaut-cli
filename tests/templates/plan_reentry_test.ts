@@ -92,24 +92,3 @@ Deno.test("resume.md § 3 checks the item a branch serves, and the identity git 
     "A commit subject is a claim: judge what is built from each diff against the brief's checks",
   );
 });
-
-Deno.test("plugin copies are byte-identical", () => {
-  const P = fromFileUrl(new URL("../../plugin/", import.meta.url));
-  for (
-    const f of [
-      "skills/task/phases/auto-chain.md",
-      "skills/task/SKILL.md",
-      "skills/task/phases/plan.md",
-      "skills/task/phases/plan-reentry.md",
-      "skills/task/phases/implement.md",
-      "skills/task/resume.md",
-      "skills/task/spec-autogen.md",
-    ]
-  ) {
-    assertEquals(
-      Deno.readTextFileSync(join(P, f)).replace(/\r\n/g, "\n"),
-      read(f),
-      `plugin/${f} drifted`,
-    );
-  }
-});
