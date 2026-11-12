@@ -16613,37 +16613,6 @@ scope_read() {
   printf '%s' "\$out"
 }
 
-# Classifies a newline-separated file list into the four CATEGORY SIGNAL
-# counters in a SINGLE pass over the list. Each file is tested against every
-# category's glob set independently (a file can count toward more than one
-# category, e.g. a frontend test file). Sets FRONTEND_COUNT / TEST_COUNT /
-# DEP_COUNT / INFRA_COUNT. The globs live in _scope_globs.sh, sourced by the
-# library. One pass instead of four is a perf optimization only.
-
-classify_files() {
-  local list="\$1"
-  FRONTEND_COUNT=0
-  TEST_COUNT=0
-  DEP_COUNT=0
-  INFRA_COUNT=0
-  local f
-  while IFS= read -r f; do
-    [ -z "\$f" ] && continue
-    # \`matches_any … && COUNT=\$((…))\` relies on \`set -e\` NOT aborting on a
-    # failed \`&&\` compound list (a non-match is expected, not an error). This is
-    # bash semantics; a future shebang switch to /bin/sh would need an explicit
-    # \`if matches_any …; then COUNT=…; fi\` rewrite to stay safe.
-    matches_any "\$f" "\${SCOPE_FRONTEND_GLOBS[@]}" && FRONTEND_COUNT=\$((FRONTEND_COUNT + 1))
-    matches_any "\$f" "\${SCOPE_TEST_GLOBS[@]}" && TEST_COUNT=\$((TEST_COUNT + 1))
-    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && DEP_COUNT=\$((DEP_COUNT + 1))
-    matches_any "\$f" "\${SCOPE_INFRA_GLOBS[@]}" && INFRA_COUNT=\$((INFRA_COUNT + 1))
-  done <<EOF
-\$list
-EOF
-  # A trailing non-match leaves \$? non-zero; the job is the counters, not a status.
-  return 0
-}
-
 if [ -n "\$PATH_ARG" ]; then
   SCOPE="path"
   SCOPE_LABEL="\$PATH_ARG"
@@ -16707,7 +16676,7 @@ fi
 # \`/task review\` has \`code-reviewer\` run its test checklist; INFRA_COUNT is
 # INFORMATIONAL only (no seat consumes it) — all four are always emitted per
 # the #379 contract.
-classify_files "\$FILES"
+scope_classify "\$FILES"
 
 # Emit the fixed block.
 echo "CODE-AUDIT SCOPE"
@@ -16944,8 +16913,8 @@ gu_manifests() {
     content: `# shellcheck shell=bash
 # _scope_globs.sh - the one home of which paths count as front-end, test,
 # dependency-manifest and infrastructure files. Sourced by _git_untrusted.sh,
-# so collect-audit-scope.sh's CATEGORY SIGNALS and git-read.sh's \`manifests\`
-# form read the same lists. The globs are heuristic: good enough to pick which
+# so collect-audit-scope.sh's CATEGORY SIGNALS (scope_classify) and git-read.sh's
+# \`manifests\` form read the same lists. The globs are heuristic: good enough to pick which
 # expert seats run.
 
 SCOPE_FRONTEND_GLOBS=('*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*'
@@ -16968,6 +16937,27 @@ matches_any() {
     esac
   done
   return 1
+}
+
+# scope_classify <newline-separated files> - sets FRONTEND_COUNT, TEST_COUNT,
+# DEP_COUNT and INFRA_COUNT in one pass. Each file is tested against every
+# category on its own, so one file can count toward several (a front-end test).
+# \`matches_any ... && COUNT=...\` relies on \`set -e\` not aborting on a failed \`&&\`
+# list: bash semantics, which a switch to /bin/sh would need to rewrite.
+scope_classify() {
+  local f
+  FRONTEND_COUNT=0 TEST_COUNT=0 DEP_COUNT=0 INFRA_COUNT=0
+  while IFS= read -r f; do
+    [ -z "\$f" ] && continue
+    matches_any "\$f" "\${SCOPE_FRONTEND_GLOBS[@]}" && FRONTEND_COUNT=\$((FRONTEND_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_TEST_GLOBS[@]}" && TEST_COUNT=\$((TEST_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && DEP_COUNT=\$((DEP_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_INFRA_GLOBS[@]}" && INFRA_COUNT=\$((INFRA_COUNT + 1))
+  done <<EOF
+\$1
+EOF
+  # A trailing non-match leaves \$? non-zero; the job is the counters, not a status.
+  return 0
 }
 `,
     executable: true,
@@ -32541,8 +32531,8 @@ gu_manifests() {
     content: `# shellcheck shell=bash
 # _scope_globs.sh - the one home of which paths count as front-end, test,
 # dependency-manifest and infrastructure files. Sourced by _git_untrusted.sh,
-# so collect-audit-scope.sh's CATEGORY SIGNALS and git-read.sh's \`manifests\`
-# form read the same lists. The globs are heuristic: good enough to pick which
+# so collect-audit-scope.sh's CATEGORY SIGNALS (scope_classify) and git-read.sh's
+# \`manifests\` form read the same lists. The globs are heuristic: good enough to pick which
 # expert seats run.
 
 SCOPE_FRONTEND_GLOBS=('*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*'
@@ -32565,6 +32555,27 @@ matches_any() {
     esac
   done
   return 1
+}
+
+# scope_classify <newline-separated files> - sets FRONTEND_COUNT, TEST_COUNT,
+# DEP_COUNT and INFRA_COUNT in one pass. Each file is tested against every
+# category on its own, so one file can count toward several (a front-end test).
+# \`matches_any ... && COUNT=...\` relies on \`set -e\` not aborting on a failed \`&&\`
+# list: bash semantics, which a switch to /bin/sh would need to rewrite.
+scope_classify() {
+  local f
+  FRONTEND_COUNT=0 TEST_COUNT=0 DEP_COUNT=0 INFRA_COUNT=0
+  while IFS= read -r f; do
+    [ -z "\$f" ] && continue
+    matches_any "\$f" "\${SCOPE_FRONTEND_GLOBS[@]}" && FRONTEND_COUNT=\$((FRONTEND_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_TEST_GLOBS[@]}" && TEST_COUNT=\$((TEST_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && DEP_COUNT=\$((DEP_COUNT + 1))
+    matches_any "\$f" "\${SCOPE_INFRA_GLOBS[@]}" && INFRA_COUNT=\$((INFRA_COUNT + 1))
+  done <<EOF
+\$1
+EOF
+  # A trailing non-match leaves \$? non-zero; the job is the counters, not a status.
+  return 0
 }
 `,
     executable: true,
