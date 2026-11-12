@@ -153,14 +153,20 @@ function mismatchReason(
   const { atTip, tipBytes, bundled } = copies;
   if (atTip !== undefined && atTip.kind !== "blob") return REASON.baseNotRegular;
   if (atTip === undefined && bundled === undefined) {
+    // The tip deleted or renamed a file the branch never touched: the rebase settles it.
+    if (isBehind(path, bytes, ctx)) return REASON.behind;
     if (hasCaseTwin(path, ctx.tip)) return REASON.caseDiffers;
     return ctx.bundle.kind === "no_lock_at_base" ? REASON.firstInstall : REASON.notOnBase;
   }
   const lf = withoutCr(bytes);
   if (sameBytes(lf, tipBytes) || sameBytes(lf, bundled)) return REASON.lineEndings;
+  return isBehind(path, bytes, ctx) ? REASON.behind : REASON.differs;
+}
+
+/** The bytes are the merge base's: only the base moved since the branch left it. */
+function isBehind(path: string, bytes: Uint8Array, ctx: Context): boolean {
   const atMergeBase = ctx.mergeBase.get(path);
-  if (atMergeBase?.kind === "blob" && sameBytes(bytes, atMergeBase.bytes)) return REASON.behind;
-  return REASON.differs;
+  return atMergeBase?.kind === "blob" && sameBytes(bytes, atMergeBase.bytes);
 }
 
 /**

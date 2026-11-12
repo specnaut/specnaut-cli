@@ -128,6 +128,20 @@ Deno.test("a file equal to its merge-base blob, where only the tip moved, is beh
   assertEquals(judge({ tip, bundle: OTHER_BUNDLE }), untrusted(P, REASON.behind));
 });
 
+Deno.test("a file the base tip deleted, untouched since the merge base, is behind base", () => {
+  // The rebase removes it, and then nothing is untrusted: that is the action the reason names.
+  assertEquals(judge({ tip: [], bundle: mapped() }), untrusted(P, REASON.behind));
+  assertEquals(
+    judge({ tip: [], bundle: { kind: "no_lock_at_base" } }),
+    untrusted(P, REASON.behind),
+  );
+  const edited = judge({ entries: [file(P, "echo edited\n")], tip: [], bundle: mapped() });
+  assertEquals(edited, untrusted(P, REASON.notOnBase));
+  // The tip renamed it to another case: the rebase carries the rename, so behind wins.
+  const renamed = [blob(".specnaut/scripts/bash/Git-read.sh", BASE)];
+  assertEquals(judge({ tip: renamed, bundle: mapped() }), untrusted(P, REASON.behind));
+});
+
 Deno.test("an older copy the merge base does not hold is not called behind", () => {
   const verdict = judge({ entries: [file(P, "echo old\n")], tip: [blob(P, "echo new\n")] });
   assertEquals(verdict, untrusted(P, REASON.differs));
