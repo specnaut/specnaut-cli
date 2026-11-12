@@ -8,7 +8,8 @@
  * forbidden service by name. Pure — the caller writes the profile and runs `sandbox-exec`.
  */
 
-import { FORBIDDEN_SERVICES, type SandboxPolicy } from "./sandbox.ts";
+import type { SandboxPolicy } from "./sandbox.ts";
+import { FORBIDDEN_SERVICES } from "./sandbox_hosts.ts";
 import { safePath } from "./sandbox_paths.ts";
 
 /** The profile text, one rule per line. */

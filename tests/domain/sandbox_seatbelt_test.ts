@@ -1,10 +1,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
-import {
-  ALLOWED_SERVICES,
-  FORBIDDEN_SERVICES,
-  type SandboxPolicy,
-} from "../../src/domain/sandbox.ts";
+import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
+import { ALLOWED_SERVICES, FORBIDDEN_SERVICES } from "../../src/domain/sandbox_hosts.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**

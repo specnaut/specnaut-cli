@@ -1,11 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
-import {
-  ALLOWED_SERVICES,
-  FORBIDDEN_SERVICES,
-  LIMITS,
-  type SandboxPaths,
-  sandboxPolicy,
-} from "../../src/domain/sandbox.ts";
+import { LIMITS, type SandboxPaths, sandboxPolicy } from "../../src/domain/sandbox.ts";
+import { ALLOWED_SERVICES, FORBIDDEN_SERVICES } from "../../src/domain/sandbox_hosts.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
