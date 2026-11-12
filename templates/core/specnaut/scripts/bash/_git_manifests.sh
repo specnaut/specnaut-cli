@@ -12,7 +12,7 @@ gu_manifests() {
   _gu_need_rev "$1" && _gu_need_rev "$2" || return 2
   local out names f rc=0 picked=()
   out="$(mktemp "${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
-  names="$(mktemp "${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  names="$(mktemp "${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || { rm -f "$out"; return 1; }
   _gu_git diff --name-only -z "${_GU_PLAIN[@]}" --end-of-options "$1" "$2" -- >"$names" || rc=$?
   while IFS= read -r -d '' f; do
     matches_any "$f" "${SCOPE_DEP_GLOBS[@]}" && picked+=("$f")

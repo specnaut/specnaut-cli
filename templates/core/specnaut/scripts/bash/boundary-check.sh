@@ -86,9 +86,9 @@ is_exempt() { config_exempt "$1" ${exempt[@]+"${exempt[@]}"}; }
 
 # `ls-files -z` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.
-listing="$(mktemp "${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary file"
-blob="$listing.blob"
-trap 'rm -f -- "$listing" "$blob"' EXIT
+work="$(mktemp -d "${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary folder"
+listing="$work/listing" blob="$work/blob"
+trap 'rm -rf -- "$work"' EXIT
 
 list_domain() {
   if [ -n "$EXPLICIT_HEAD" ]; then

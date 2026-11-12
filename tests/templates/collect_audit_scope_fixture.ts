@@ -83,8 +83,11 @@ export function count(block: string, key: string): number {
   return Number(m[1]);
 }
 
-/** The lines of the block between `<from>:` and the next label `<to>`. */
+/**
+ * The lines of the block between the line `<from>:` and the next line that starts `<to>:`. Each
+ * label is matched at a line's start, so a file name or a commit subject holding it does not cut.
+ */
 export function section(block: string, from: string, to: string): string[] {
-  const body = block.split(`${from}:\n`)[1]?.split(`${to}`)[0] ?? "";
-  return body.split("\n").filter(Boolean);
+  const body = `\n${block}`.split(`\n${from}:\n`)[1] ?? "";
+  return `\n${body}`.split(`\n${to}:`)[0].split("\n").filter(Boolean);
 }
