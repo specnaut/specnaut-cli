@@ -1,8 +1,5 @@
-import {
-  type SandboxedBackend,
-  type SandboxPaths,
-  sandboxPolicy,
-} from "../../src/domain/sandbox.ts";
+import { type SandboxedBackend, sandboxPolicy } from "../../src/domain/sandbox.ts";
+import type { SandboxPaths } from "../../src/domain/sandbox_paths.ts";
 
 /** A host layout for the sandbox tests: the export and scratch sit in a cache under the home. */
 export const PATHS: SandboxPaths = {

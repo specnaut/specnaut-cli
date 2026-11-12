@@ -23,7 +23,7 @@ import {
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
 import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
-import { ancestors, overlaps, pathProblem, within } from "./sandbox_paths.ts";
+import { ancestors, overlaps, pathProblem, type SandboxPaths, within } from "./sandbox_paths.ts";
 
 export type Engine = "podman" | "docker";
 export type SandboxedBackend = "container" | "bwrap" | "seatbelt";
@@ -92,22 +92,6 @@ function forbidsNestedUserns(version: string | null): boolean {
   const found = version?.match(/(\d+)\.(\d+)/);
   return found ? Number(found[1]) > 0 || Number(found[2]) >= 8 : false;
 }
-
-/** The host's layout, as the caller resolved it: real paths, no link on the way. */
-export type SandboxPaths = {
-  /** The exported copy of the branch's tree: read-only, the working folder. */
-  readonly tree: string;
-  /** An empty private folder; the sandbox's home and temporary folders are made in it. */
-  readonly scratch: string;
-  /** Read-only folders holding the gates' tools; a container uses its image's instead. */
-  readonly toolchain: readonly string[];
-  /** Folders searched before the system's, each inside a folder that is read. */
-  readonly path: readonly string[];
-  /** The user's real home: neither it nor a folder holding it is ever visible. */
-  readonly home: string;
-  /** The user's checkout: no visible folder lies inside it or holds it. */
-  readonly checkout: string;
-};
 
 /** What a sandboxed process may touch. Anything not named here is out of its reach. */
 export type SandboxPolicy = {

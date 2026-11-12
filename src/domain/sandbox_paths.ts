@@ -1,5 +1,6 @@
 /**
- * The shape a path must have before a sandbox backend is given it, and how two paths relate.
+ * The host layout a sandbox is built over, the shape a path must have before a backend is given
+ * it, and how two paths relate.
  *
  * A sandbox path ends up inside a quoted `sandbox-exec` rule, a comma-separated container mount
  * and a colon-separated tmpfs option. One character in the wrong place widens the sandbox rather
@@ -9,6 +10,22 @@
  */
 
 import { dirname, normalize } from "@std/path/posix";
+
+/** The host's layout, as the caller resolved it: real paths, no link on the way. */
+export type SandboxPaths = {
+  /** The exported copy of the branch's tree: read-only, the working folder. */
+  readonly tree: string;
+  /** An empty private folder; the sandbox's home and temporary folders are made in it. */
+  readonly scratch: string;
+  /** Read-only folders holding the gates' tools; a container uses its image's instead. */
+  readonly toolchain: readonly string[];
+  /** Folders searched before the system's, each inside a folder that is read. */
+  readonly path: readonly string[];
+  /** The user's real home: neither it nor a folder holding it is ever visible. */
+  readonly home: string;
+  /** The user's checkout: no visible folder lies inside it or holds it. */
+  readonly checkout: string;
+};
 
 /** A character one of the backends' syntaxes would read as structure, or a control character. */
 // deno-lint-ignore no-control-regex
