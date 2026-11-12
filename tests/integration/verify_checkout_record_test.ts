@@ -56,12 +56,12 @@ Deno.test({
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const { root, head } = await setUp();
-    const own = await startSession(root);
+    await startSession(root, "startup", "fixture-session-linked");
     const specnaut = join(root, ".git", "specnaut");
     const elsewhere = join(root, "..", "elsewhere");
     await Deno.rename(specnaut, elsewhere);
     await Deno.symlink(elsewhere, specnaut);
-    assertEquals(reasons(await check(root, head, { named: own })), [{
+    assertEquals(reasons(await check(root, head, { id: "fixture-session-linked" })), [{
       path: RECORD,
       reason: `${SESSION_REASON.unreadable}: ${specnaut} is not a folder`,
     }]);
@@ -78,44 +78,20 @@ Deno.test("a session still on the branch is told each cause once, as the checkou
   ]);
 });
 
-Deno.test("a session naming no record is refused, told what drops it and to restart, before the checkout is judged", async () => {
+Deno.test("a hook input naming no session id is refused, told to restart, before the checkout is judged", async () => {
   const { root, head } = await setUp();
-  // Codex, Copilot, Cursor, OpenCode and Antigravity register no SessionStart record: the variable
-  // is never set there, and a Claude Code `/clear` may drop it. The checkout itself is clean, so
-  // only the missing record can refuse it.
-  for (const named of [undefined, ""]) {
-    const outcome = await check(root, head, { named });
-    assertEquals(reasons(outcome), [{ path: RECORD, reason: SESSION_REASON.none }]);
-    for (const told of ["no session-start record", "`/clear`", "start a new session"]) {
-      assertStringIncludes(SESSION_REASON.none, told);
-    }
+  // Only a Claude Code hook is given a session id. The checkout itself is clean, so only the
+  // missing id can refuse it.
+  const own = await startSession(root);
+  const notIds = ["", " ", "../fixture-session", "a/b", ".fixture-session", own, `${own}.bak`];
+  for (const id of notIds) {
+    const outcome = await check(root, head, { id });
+    assertEquals(reasons(outcome), [{ path: RECORD, reason: SESSION_REASON.none }], id);
     const tip = (await git(root, "rev-parse", "main")).trim();
     if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(tip));
   }
-});
-
-Deno.test("a record named outside this checkout's record folder is refused, never read", async () => {
-  const { root, head } = await setUp();
-  const own = await startSession(root);
-  const folder = join(root, ".git", "specnaut", "session");
-  const elsewhere = [
-    join(root, "fixture-session.json"),
-    join(root, ".git", "specnaut", "fixture-session.json"),
-    // Spelled past the folder and back: never resolved, since `x/..` past a link leads elsewhere.
-    `${folder}/x/../fixture-session.json`,
-    `${folder}/../session/fixture-session.json`,
-    `${folder}//fixture-session.json`,
-    "fixture-session.json",
-    `${own}.bak`,
-    join(folder, ".fixture-session.json"),
-  ];
-  await Deno.copyFile(own, join(root, "fixture-session.json"));
-  for (const named of elsewhere) {
-    assertEquals(
-      reasons(await check(root, head, { named })),
-      [{ path: RECORD, reason: `${SESSION_REASON.outside}: ${named}` }],
-      named,
-    );
+  for (const told of ["names no session id", "start a new Claude Code session"]) {
+    assertStringIncludes(SESSION_REASON.none, told);
   }
 });
 
@@ -123,15 +99,15 @@ Deno.test("a record that is missing, not a file, or not a record is refused", as
   const { root, head } = await setUp();
   const own = await startSession(root);
   const other = join(root, ".git", "specnaut", "session", "another-session.json");
-  assertEquals(reasons(await check(root, head, { named: other })), [{
+  assertEquals(reasons(await check(root, head, { id: "another-session" })), [{
     path: RECORD,
     reason: SESSION_REASON.missing,
   }]);
-  for (const told of ["unused for 30 days is removed", "start a new session"]) {
+  for (const told of ["unused for 30 days is removed", "`/clear`", "start a new session"]) {
     assertStringIncludes(SESSION_REASON.missing, told);
   }
   await Deno.mkdir(other);
-  assertEquals(reasons(await check(root, head, { named: other })), [{
+  assertEquals(reasons(await check(root, head, { id: "another-session" })), [{
     path: RECORD,
     reason: `${SESSION_REASON.unreadable}: not a regular file`,
   }]);

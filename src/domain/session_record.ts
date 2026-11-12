@@ -56,17 +56,19 @@ export const RECORD_RETENTION_MS = RECORD_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 /** The variable that names the record to the session's later commands, set through `CLAUDE_ENV_FILE`. */
 export const SESSION_RECORD_VAR = "SPECNAUT_SESSION_RECORD";
 
-/** The reasons the record adds to the check's. Every one about the record itself is filed under `path`. */
+/**
+ * The reasons the record adds to the check's. Every one about the record itself is filed under
+ * `path`. The record is the one of the session id the harness gave the checking hook on its stdin,
+ * never one a variable names: a `/clear` starts a session under a new id, which takes no record.
+ */
 export const SESSION_REASON = {
-  path: SESSION_RECORD_VAR,
-  // `/clear` runs the hook with a source that takes no record, and may drop the variable the start
-  // set: the session then names none, and only a new one, which takes its own, can be checked.
-  none: "this session names no session-start record: only a Claude Code session whose " +
-    "SessionStart hook ran `specnaut record-checkout` has one, and a `/clear` may drop it; " +
+  path: "session-start record",
+  none: "the hook's input names no session id: only a Claude Code hook is given one, and only " +
+    "that session's own record is read; start a new Claude Code session",
+  missing: "this session has no session-start record: only a Claude Code session whose " +
+    "SessionStart hook ran `specnaut record-checkout` takes one, a `/clear` starts a session " +
+    `that takes none, and a record unused for ${RECORD_RETENTION_DAYS} days is removed; ` +
     "start a new session",
-  outside: "names a file outside this checkout's session records",
-  missing: `the session-start record is missing: a record unused for ${RECORD_RETENTION_DAYS} ` +
-    "days is removed; start a new session",
   unreadable: "the session-start record cannot be read",
   malformed: "the session-start record cannot be parsed",
   headUnknown: "the session started on a commit this repository does not have",

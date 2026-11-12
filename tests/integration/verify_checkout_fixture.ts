@@ -47,8 +47,8 @@ export async function setUp(files: Record<string, string> = BASE_FILES, prefix?:
   return { root, project, head };
 }
 
-/** The session's record path, by the folder it started in, as `SPECNAUT_SESSION_RECORD` holds it. */
-const records = new Map<string, string>();
+/** The id of the session that started last in each folder, as the harness gives it to a hook. */
+const sessionIds = new Map<string, string>();
 
 let sessions = 0;
 
@@ -88,22 +88,18 @@ export async function onBase(root: string, change: () => Promise<void>) {
   await startSession(root);
 }
 
-/**
- * The check, run in `root` by the session that started there, or by one whose
- * `SPECNAUT_SESSION_RECORD` is `session.named` (`undefined`: the variable is not set).
- */
+/** The check, run in `root` by the session that started there last, or by the one `session.id` names. */
 export async function check(
   root: string,
   head: string,
-  session: { named: string | undefined } = { named: records.get(root) },
+  session: { id: string } = { id: sessionIds.get(root) ?? "" },
 ): Promise<CheckoutOutcome> {
-  const { named } = session;
   return await verifyCheckout({
     git: await GitObjects.open(root),
     reflog: await FsHeadReflog.open(root),
     walker: new FsScriptTreeWalker(root),
     checkout: new FsTreeWalker(root),
-    session: (await FsSessionRecords.open(root))!.reader(named),
+    session: (await FsSessionRecords.open(root))!.reader(session.id),
     core: CORE_BUNDLE,
     findHarness,
   }, head);

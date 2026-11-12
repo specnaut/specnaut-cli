@@ -63,7 +63,7 @@ Deno.test("a check reading a record renews it", async () => {
   const store = await records();
   const own = (await store.write("own-session", "{}\n")).path;
   await aged(own);
-  assertEquals((await store.reader(own).read()).kind, "read");
+  assertEquals((await store.reader("own-session").read()).kind, "read");
   assert(await fresh(own));
 });
 

@@ -1,4 +1,4 @@
-import { basename, dirname, join } from "@std/path";
+import { dirname, join } from "@std/path";
 import type {
   RecordRead,
   RecordWrite,
@@ -73,43 +73,37 @@ export class FsSessionRecords implements SessionRecordWriter {
     return { kind: "existing", path };
   }
 
-  /** The record `named` names (`SPECNAUT_SESSION_RECORD`), read only from this folder. */
-  reader(named: string | undefined): SessionRecordReader {
-    return { read: () => this.#read(named) };
+  /**
+   * The record of the session `sessionId`, read only from this folder. The id is the one the
+   * harness gave a hook on its stdin: never a path, and never a variable the session's own
+   * commands can set, since instruction files alone could point one at another session's record.
+   */
+  reader(sessionId: string): SessionRecordReader {
+    return { read: () => this.#read(sessionId) };
   }
 
-  async #read(named: string | undefined): Promise<RecordRead> {
-    if (named === undefined || named === "") return refused(SESSION_REASON.none);
-    if (!this.#holds(named)) return refused(`${SESSION_REASON.outside}: ${named}`);
+  async #read(sessionId: string): Promise<RecordRead> {
+    if (!isSessionId(sessionId)) return refused(SESSION_REASON.none);
     for (const dir of [dirname(this.dir), this.dir]) {
       const folder = await lstatOrNull(dir);
       if (folder !== null && !folder.isDirectory) {
         return refused(`${SESSION_REASON.unreadable}: ${dir} is not a folder`);
       }
     }
-    const info = await lstatOrNull(named);
+    const path = join(this.dir, `${sessionId}.json`);
+    const info = await lstatOrNull(path);
     if (info === null) return refused(SESSION_REASON.missing);
     if (!info.isFile) return refused(`${SESSION_REASON.unreadable}: not a regular file`);
     if (info.size > MAX_RECORD_BYTES) {
       return refused(`${SESSION_REASON.unreadable}: over ${MAX_RECORD_BYTES} bytes`);
     }
     try {
-      await renew(named);
-      return { kind: "read", text: await Deno.readTextFile(named) };
+      await renew(path);
+      return { kind: "read", text: await Deno.readTextFile(path) };
     } catch (err) {
       if (err instanceof Deno.errors.NotCapable || !(err instanceof Error)) throw err;
       return refused(`${SESSION_REASON.unreadable}: ${err.message}`);
     }
-  }
-
-  /**
-   * Whether `named` is a record of this folder, spelled exactly as {@link write} returns it:
-   * `<dir>/<session id>.json`. No other spelling is resolved, since `x/..` past a link leads
-   * wherever the link does.
-   */
-  #holds(named: string): boolean {
-    const name = /^(.+)\.json$/.exec(basename(named));
-    return name !== null && isSessionId(name[1]) && named === join(this.dir, basename(named));
   }
 
   /**
