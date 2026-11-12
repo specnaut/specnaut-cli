@@ -11,20 +11,9 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-hooks.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
 # A repository of its own: the guards resolve the project through
-# `git rev-parse --show-toplevel`, and sandbox/ sits inside this one — without
-# it every path is read relative to the CLI checkout and nothing matches.
-(cd "$DIR" && git init -q && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
+# `git rev-parse --show-toplevel`.
+smoke_scaffold "$NAME" repo
 
 echo "═══ #88 + spec 036  hooks bundled and registered (Claude) ═══"
 check ".claude/settings.json scaffolded" '[ -f .claude/settings.json ]'
@@ -73,7 +62,7 @@ check ".specnaut/logs/ in bundled .gitignore" \
 
 echo
 echo "═══ spec 036  hooks registered (Codex) ═══"
-# Inside the scenario tree, so the EXIT trap above removes it too.
+# Inside the scenario tree, so the EXIT trap smoke_scaffold set removes it too.
 CODEX_DIR="$DIR/codex-probe"
 mkdir -p "$CODEX_DIR"
 (cd "$CODEX_DIR" && git init -q && deno run --allow-all "$CLI/src/main.ts" \
@@ -157,8 +146,8 @@ echo "$last" | grep -q '"agent":"unknown"' \
 
 echo
 echo "═══ no lock present (e.g. uninitialised project) ═══"
-# Moved aside INSIDE the scenario tree, not into /tmp. The EXIT trap at the
-# top of this file already removes that tree, so an abort between the two
+# Moved aside INSIDE the scenario tree, not into /tmp. The EXIT trap smoke_scaffold
+# set already removes that tree, so an abort between the two
 # moves leaks nothing — and no second trap is added, because bash replaces
 # rather than appends and that would silently drop the cleanup.
 # /tmp/spec-lock-backup-$$ was also PID-predictable in a world-writable

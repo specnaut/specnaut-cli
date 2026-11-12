@@ -13,22 +13,9 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-gates.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
-# A repository of its own: both gates list files through git, and sandbox/
-# sits inside this checkout — without it they would read the CLI's history.
-(cd "$DIR" && git init -q && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
-# Commits need an identity; a CI runner has none configured.
-commit() { git add -A && git -c user.name=smoke -c user.email=smoke@example.invalid commit -qm "$1"; }
-commit "scaffold"
+# A repository of its own: both gates list files through git.
+smoke_scaffold "$NAME" repo
+smoke_commit "scaffold"
 BASE="$(git rev-parse HEAD)"
 
 echo "═══ spec 038  the constitution is project-owned, at docs/constitution.md ═══"
@@ -47,7 +34,7 @@ check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)"
 check "_config.sh, the one reader of the gate configs, installed beside it" \
   '[ -f .specnaut/scripts/bash/_config.sh ]'
 echo "- one more principle" >>docs/constitution.md
-commit "grow the constitution"
+smoke_commit "grow the constitution"
 # With no config the defaults apply, and the bootstrap constitution sits well
 # inside them — so a red run below is the config's doing, not the file's.
 out=$(bash "$RATCHET" --since "$BASE" 2>&1; echo "ec=$?")
@@ -80,7 +67,7 @@ fi
 printf 'domain:\n  - src/domain\nforbid:\n  - import .*express\n' >.specnaut/boundaries.yml
 mkdir -p src/domain
 echo 'import express from "express";' >src/domain/order.ts
-commit "a domain file that imports a framework"
+smoke_commit "a domain file that imports a framework"
 out=$(bash "$BOUNDARY" 2>&1; echo "ec=$?")
 if echo "$out" | grep -q "ec=1" && echo "$out" | grep -qF "src/domain/order.ts:1: import .*express"; then
   pass "a tracked domain file matching a forbid: pattern fails the gate (exit 1)"
@@ -88,7 +75,7 @@ else
   fail "boundary-check.sh missed a forbidden import" "$out"
 fi
 echo 'export interface Order { id: string }' >src/domain/order.ts
-commit "the domain file no longer imports it"
+smoke_commit "the domain file no longer imports it"
 out=$(bash "$BOUNDARY" 2>&1; echo "ec=$?")
 [ "$(echo "$out" | tail -1)" = "ec=0" ] && pass "a clean domain passes the gate (exit 0)" \
   || fail "boundary-check.sh refused a clean domain" "$out"

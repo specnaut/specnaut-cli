@@ -10,24 +10,12 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-impact-gates.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# A merge.md the anchoring check must refuse, outside the scenario's repository.
-FIXTURE="$(mktemp "${TMPDIR:-/tmp}/smoke-impact-gates.XXXXXX")"
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
-trap 'rm -f "$FIXTURE"; bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
-# A repository of its own: the gates list files through git, and sandbox/
-# sits inside this checkout - without it they would read the CLI's history.
-(cd "$DIR" && git init -q && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
-# Commits need an identity; a CI runner has none configured.
-commit() { git add -A && git -c user.name=smoke -c user.email=smoke@example.invalid commit -qm "$1"; }
-commit "scaffold"
+# A repository of its own: the gates list files through git.
+smoke_scaffold "$NAME" repo
+# The merge.md copies the anchoring check must refuse: inside .git/, so they are
+# outside the work tree the gates read and wiped with the scenario.
+FIXTURE=.git/smoke-merge-ask.md FIXTURE_FULL=.git/smoke-merge-full.md
+smoke_commit "scaffold"
 BASE="$(git rev-parse HEAD)"
 
 echo "═══ #725  impact-aware gates: run-gate.sh behind a flag, on a real scaffold ═══"
@@ -79,6 +67,12 @@ sed 's/ask once: \*"This branch changes/ask: *"This branch changes/' "$MERGE" >"
 printf '\n%s Yes runs the branch list."*\n' "$ASK" >>"$FIXTURE"
 check "a merge.md whose ask sits outside the full-tier block fails that check" \
   'grep -qF "$ASK" "$FIXTURE" && ! asks_in_full_tier "$FIXTURE"'
+# The same text with the gates.yml check moved past the block (cli#786).
+sed 's/first: if `git diff --quiet/first: if `git diff --stat/' "$MERGE" >"$FIXTURE_FULL"
+printf '\n%s`git diff --quiet "$(git merge-base HEAD <base>)" HEAD -- .specnaut/gates.yml` exits.\n' \
+  "$FULL" >>"$FIXTURE_FULL"
+check "a merge.md whose gates.yml check sits outside the full-tier block fails that check" \
+  'grep -qF "$FULL\`git diff --quiet" "$FIXTURE_FULL" && ! asks_in_full_tier "$FIXTURE_FULL"'
 out=$(bash "$GATE" fast --base "$BASE" 2>&1; echo "ec=$?")
 bare=$(bash "$GATE" fast 2>&1; echo "ec=$?")
 [ "$out" = "$bare" ] && pass "with no declaration the flag is the bare run, to the byte" \
@@ -99,12 +93,12 @@ cat >.specnaut/impact.json <<'DECLARATION'
 DECLARATION
 printf 'fast_gate:\n  - echo whole-suite\nfull_gate:\n  - echo whole-suite\n' >.specnaut/gates.yml
 git config init.defaultBranch "$(git symbolic-ref --short HEAD)"
-commit "opt in"
+smoke_commit "opt in"
 START="$(git rev-parse HEAD)"
 git switch -q -c feature
 
 echo changed >apps/two/a.txt
-commit "change the dependent"
+smoke_commit "change the dependent"
 out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
 if echo "$out" | grep -q "ec=0" && echo "$out" | grep -qx "scope: owners two" && echo "$out" | grep -qx "scoped-to two"; then
   pass "a change runs its owner's scoped command, with the owners in the variable"
@@ -112,7 +106,7 @@ else
   fail "the scoped command did not run for its owner" "$out"
 fi
 echo changed >apps/one/a.txt
-commit "change what it depends on"
+smoke_commit "change what it depends on"
 out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
 echo "$out" | grep -qx "scoped-to one two" && pass "a change reaches its reverse dependents" \
   || fail "the closure did not reach the dependent" "$out"
@@ -123,7 +117,7 @@ else
   fail "an unscoped tier did not run whole" "$out"
 fi
 echo stray >stray.txt
-commit "a path no owner holds"
+smoke_commit "a path no owner holds"
 out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
 if echo "$out" | grep -qx "whole-suite" && echo "$out" | grep -qx "fallback: unowned: stray.txt"; then
   pass "an unowned path widens to the whole tier, and names why"
@@ -137,7 +131,7 @@ else
   fail "a run that checked nothing did not exit 4" "$out"
 fi
 printf 'fast_gate:\nfull_gate:\n  - echo whole-suite\n' >.specnaut/gates.yml
-commit "empty the tier"
+smoke_commit "empty the tier"
 out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
 if echo "$out" | grep -q "ec=4" && echo "$out" | grep -qx "removed: echo whole-suite"; then
   pass "a tier emptied on the branch is exit 4, and names what left it"

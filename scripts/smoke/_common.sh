@@ -137,19 +137,26 @@ smoke_require_name() {
 scenario_dir() { smoke_require_name "${1:-}"; echo "$SANDBOX_ROOT/$1"; }
 
 # --- The scaffold most scripts start from (cli#719) ----------------------
-# smoke_scaffold <name> — a fresh Vite project under the scenario tree, wiped on
-# every exit path, success or failure, with a Claude scaffold on the local backend,
+# smoke_scaffold <name> [repo] — a fresh Vite project under the scenario tree, wiped
+# on every exit path, success or failure, with a Claude scaffold on the local backend,
 # and the caller standing in it. Sets DIR and the EXIT trap in the CALLER'S shell,
 # so never call it inside $(...): the trap would fire when that subshell ends.
+# `repo` makes the scenario a git repository of its own first: sandbox/ sits inside
+# this checkout, so a script reading files or history through git would read the CLI's.
 smoke_scaffold() {
   DIR="$(scenario_dir "$1")"
   SCAFFOLD_NAME="$1"
   trap 'bash "$SMOKE_DIR/clean.sh" "$SCAFFOLD_NAME" >/dev/null 2>&1 || true' EXIT
   bash "$SMOKE_DIR/bootstrap-vite.sh" "$1" >/dev/null
+  if [ "${2:-}" = repo ]; then (cd "$DIR" && git init -q) || exit 1; fi
   (cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
     init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
   cd "$DIR" || exit 1
 }
+
+# smoke_commit "<message>" — stages everything and commits it; a CI runner has no
+# identity configured, so the commit carries its own.
+smoke_commit() { git add -A && git -c user.name=smoke -c user.email=smoke@example.invalid commit -qm "$1"; }
 
 # --- Assertion harness (plan.md §5 R4) ----------------------------------
 # Nine scripts each carried their own pass/fail/counter and printed one of

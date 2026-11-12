@@ -118,6 +118,10 @@ const PHRASINGS: [sentence: string, flagged: boolean][] = [
   ["Priority and size are chosen, never asked.", true],
   ["Priority and size are the product owner's.", true],
   ["An item's type and size is up to the product owner.", true],
+  // After a colon, or as a list its sentence introduces (cli#786).
+  ["The product owner decides two things: the priority and the size of every item.", true],
+  ["The product owner decides:\n\n- the priority of every item;\n- the size of every item.", true],
+  ["The product owner decides:\n- the priority of every item.\n- the size of every item.", true],
   // Neutral prose: a mechanism or a field, nobody deciding.
   ["The choice of the priority and size fields is documented once.", false],
   ["Each call of the priority and size reader costs one request.", false],
@@ -128,6 +132,15 @@ const PHRASINGS: [sentence: string, flagged: boolean][] = [
     false,
   ],
   ["Priority and size are fields on the board.", false],
+  // A bare verb or possessive with no decider as its subject (cli#786).
+  ["The edit script sets the priority and size fields in one request.", false],
+  ["The pre-commit hook calls the priority and size reader.", false],
+  ["The board reader picks the priority and size columns.", false],
+  ["The script's call to the priority and size reader is cached.", false],
+  [
+    "The product owner decides the order:\n\n- one at a time.\n\nOn fields.\n\n- priority and size.",
+    false,
+  ],
 ];
 
 Deno.test("the single-home guard flags active, passive and nominal restatements", () => {

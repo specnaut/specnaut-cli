@@ -5,7 +5,7 @@
 // both; its row pins that. A reader that fails to start is not the file's
 // fault: the next reader answers.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import {
   assertOutcome,
@@ -125,35 +125,56 @@ const WINDOWS_PATH = [
   "IFS=$_ifs; PATH=${_p#:}\n",
 ].join("\n");
 
-/** What the python3 on WINDOWS_PATH is, as the row's label; or why the row cannot run. */
-async function windowsPython3(): Promise<{ label: string; skip?: string }> {
+/** What the probe finds on WINDOWS_PATH: `fails` (the Store alias), `starts`, `jq`, `none`, or an error. */
+async function windowsPython3(): Promise<string> {
   const r = await run(BASH, [
     "-c",
     `${WINDOWS_PATH}if command -v jq >/dev/null; then echo jq; elif ! command -v python3 >/dev/null; then echo none; elif python3 -c '' >/dev/null 2>&1; then echo starts; else echo fails; fi`,
   ], ".");
-  const found = r.stdout.trim();
-  if (found === "fails") return { label: "python3 is the Store alias, which fails to start" };
-  if (found === "none") {
-    return { label: "no python3 on PATH (no Store alias on this runner: the stub row stands in)" };
-  }
+  return r.code === 0 ? r.stdout.trim() : `the probe failed (${r.code}): ${r.stderr.trim()}`;
+}
+
+type Row = { label: string; skip?: string; fail?: string };
+/**
+ * The Windows row, from what the probe found: off CI, no Store alias is a note; on
+ * CI a run that never reaches the alias fails, never passes on nothing (cli#786).
+ */
+export function storeRow(found: string, onCi: boolean): Row {
+  const label = "python3 is the Store alias, which fails to start";
+  if (found === "fails") return { label };
   const why = found === "jq"
     ? "a jq sits among Git's tools and would answer first"
     : found === "starts"
     ? "the WindowsApps python3 starts, so no launcher fails here"
-    : `the probe failed (${r.code}): ${r.stderr.trim()}`;
+    : found === "none"
+    ? "no python3 on PATH, so no Store alias"
+    : found;
+  if (onCi) return { label, fail: `the Windows row never reached the Store alias on CI: ${why}` };
+  if (found === "none") return { label: "no python3 on PATH (the stub row stands in)" };
   return { label: "the runner's own python3", skip: why };
 }
 
+Deno.test("the Windows row fails on CI when the probe never reaches the Store alias", () => {
+  const reached = storeRow("fails", true);
+  assertEquals([reached.skip, reached.fail], [undefined, undefined]);
+  for (const found of ["jq", "starts", "none", "the probe failed (2): x"]) {
+    assertStringIncludes(storeRow(found, true).fail ?? "", "never reached the Store alias");
+    assertEquals(storeRow(found, false).fail, undefined, "off CI: a note, never a failure");
+  }
+});
+
 // The python3 that fails to start, on a real Windows launcher rather than a
 // stub: the grep reader answers, and the file is never refused for it.
-const STORE = WINDOWS ? await windowsPython3() : null;
+const STORE = WINDOWS ? storeRow(await windowsPython3(), Deno.env.get("CI") === "true") : null;
 if (STORE?.skip) console.warn(`  note: ${STORE.skip} — the Windows python3 row did not run`);
 Deno.test({
   name: `feature.json [bash, Windows]: ${STORE?.label ?? "a real python3 launcher"} — ${
     outcome(ELSEWHERE)
   }`,
   ignore: !WINDOWS || STORE?.skip !== undefined,
-  fn: resolveIn(ONE_LINE, () => Promise.resolve({ before: { bash: WINDOWS_PATH } }), driveForm),
+  fn: STORE?.fail
+    ? () => Promise.reject(new Error(STORE.fail))
+    : resolveIn(ONE_LINE, () => Promise.resolve({ before: { bash: WINDOWS_PATH } }), driveForm),
 });
 
 // The grep reader's "no key" is grep matching nothing: under pipefail its status
