@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { crossedReleases, releaseUrl } from "../../src/domain/release_notes.ts";
 import { SemVer } from "../../src/domain/release.ts";
 
@@ -16,6 +16,8 @@ const HISTORY = [
   { version: "10.0.0", content: "**Ten.**\n" },
   { version: "9.2.0", content: "**Nine two.**\n" },
   { version: "9.0.1", content: "" },
+  // A release candidate sorts inside (9.1.0, 9.2.0]: whether it is crossed is a rule, not an accident.
+  { version: "9.2.0-rc.1", content: "**Nine two, candidate.**\n" },
 ];
 
 const versions = (from: string, to: string) => {
@@ -72,4 +74,25 @@ Deno.test("a downgrade or a version that is not SemVer crosses nothing", () => {
   assertEquals(crossedReleases("10.0.0", "9.2.0", HISTORY), { kind: "none" });
   assertEquals(crossedReleases("dev", "9.2.0", HISTORY), { kind: "none" });
   assertEquals(crossedReleases("9.2.0", "", HISTORY), { kind: "none" });
+});
+
+/**
+ * A stable target skips prerelease records; a prerelease target keeps them
+ * (cli#775). The stable release's own record already says what its candidates
+ * shipped, so listing them repeats it under names the user never installed;
+ * a user who opted into a prerelease follows candidates and wants each one.
+ */
+Deno.test("a stable-to-stable upgrade across a recorded candidate does not list it", () => {
+  assertEquals(versions("9.1.0", "9.2.0"), ["9.2.0"]);
+});
+
+Deno.test("an upgrade to a prerelease lists the prereleases it crossed", () => {
+  assertEquals(versions("9.0.1", "9.2.0-rc.1"), ["9.1.0", "9.2.0-rc.1"]);
+});
+
+Deno.test("a history entry whose version does not parse fails loudly, never vanishes", () => {
+  // The bundler owns the name rule and refuses such a file; one reaching here
+  // is a broken bundle, which must not print a shorter list as if it were whole.
+  const broken = [...HISTORY, { version: "nine", content: "**Lost.**\n" }];
+  assertThrows(() => crossedReleases("9.0.0", "10.0.0", broken), Error, '"nine"');
 });

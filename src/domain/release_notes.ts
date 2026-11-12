@@ -41,19 +41,32 @@ export function releaseUrl(version: SemVer): string {
 /**
  * The releases an upgrade from `from` to `to` crossed: every history entry in
  * (from, to], in SemVer order. A release with no entry is not invented — the
- * history is the list. Never throws: the notes must not decide an upgrade's
- * outcome, so a version that does not parse yields `none`.
+ * history is the list.
+ *
+ * Prereleases are crossed only on the way to a prerelease (cli#775): a stable
+ * release's own record already says what its candidates shipped, so listing
+ * them would repeat it under names the user never installed, while a user who
+ * opted into a prerelease follows the candidates and wants each one.
+ *
+ * Never throws on `from` or `to`: the notes must not decide an upgrade's
+ * outcome, so a version that does not parse yields `none`. A history entry that
+ * does not parse does throw — the bundler owns the name rule and refuses such a
+ * file, so one reaching here is a broken bundle, never a shorter list.
  */
 export function crossedReleases(from: string, to: string, history: ReleaseHistory): ReleaseNotes {
+  const parsed = history.map((e) => {
+    const version = SemVer.tryParse(e.version);
+    if (version === null) throw new Error(`Release history entry "${e.version}" is not SemVer`);
+    return { version, text: e.content };
+  });
   const a = SemVer.tryParse(from);
   const b = SemVer.tryParse(to);
   if (a === null || b === null) return { kind: "none" };
   const order = a.compare(b);
   if (order === 0) return { kind: "no-change" };
   if (order > 0) return { kind: "none" };
-  const recorded = history
-    .map((e) => ({ version: SemVer.tryParse(e.version), text: e.content }))
-    .filter((e): e is { version: SemVer; text: string } => e.version !== null)
+  const recorded = parsed
+    .filter((e) => b.prerelease !== null || e.version.prerelease === null)
     .sort((x, y) => x.version.compare(y.version));
   const oldest = recorded[0]?.version;
   return {
