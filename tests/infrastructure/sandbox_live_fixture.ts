@@ -23,6 +23,22 @@ export const probed = await new HostBackendProber(
   () => Promise.resolve({ kind: "none", why: "not read here" }),
 ).probe();
 
+/** A live test's name: what it shows, then why it is skipped when `missing` names what is absent. */
+export function live(title: string, missing: string | null): string {
+  return missing === null ? title : `${title} (skipped: needs ${missing})`;
+}
+
+/** Whether `path` exists on this host. */
+export function exists(path: string): boolean {
+  try {
+    Deno.statSync(path);
+    return true;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
+}
+
 /** Output captured from the launcher's pipes. */
 export function capture() {
   const chunks: Uint8Array[] = [];
