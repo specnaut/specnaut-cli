@@ -19,6 +19,8 @@ import {
   type Capability,
   grantedCapabilities,
   isReadOnlyGrant,
+  isReadOnlyTool,
+  type ReadOnlyTool,
   toolNames,
 } from "../../domain/tool_grant.ts";
 
@@ -35,8 +37,12 @@ const ALLOWED: Readonly<Record<Capability, PermissionValue>> = {
   websearch: "ask",
 };
 
-/** OpenCode's own tools behind each read-only Claude Code tool; `list` reads a directory. */
-const READ_TOOLS: Readonly<Record<string, ReadonlyArray<string>>> = {
+/**
+ * OpenCode's own tools behind each read-only Claude Code tool; `list` reads a
+ * directory. Keyed by `READ_ONLY_TOOLS`, so a tool that list gains cannot ship
+ * without the names it is allowed back under here.
+ */
+const READ_TOOLS: Readonly<Record<ReadOnlyTool, ReadonlyArray<string>>> = {
   Read: ["read", "list"],
   Grep: ["grep"],
   Glob: ["glob", "list"],
@@ -63,7 +69,7 @@ function translateToolsToPermissions(toolsField: string | null): PermissionMap |
   const map: PermissionMap = {};
   if (isReadOnlyGrant(toolsField)) {
     map["*"] = "deny";
-    const own = toolNames(toolsField ?? "").flatMap((t) => READ_TOOLS[t] ?? []);
+    const own = toolNames(toolsField ?? "").filter(isReadOnlyTool).flatMap((t) => READ_TOOLS[t]);
     for (const tool of READ_ONLY_DENIED) if (!own.includes(tool)) map[tool] = "deny";
     for (const tool of own) map[tool] = tool.startsWith("web") ? "ask" : "allow";
     return map;

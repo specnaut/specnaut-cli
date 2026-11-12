@@ -8,7 +8,11 @@ import {
   frontmatterField,
   splitFrontmatter,
 } from "../../../src/infrastructure/harness/frontmatter.ts";
-import { grantedCapabilities, isReadOnlyGrant } from "../../../src/domain/tool_grant.ts";
+import {
+  grantedCapabilities,
+  isReadOnlyGrant,
+  READ_ONLY_TOOLS,
+} from "../../../src/domain/tool_grant.ts";
 import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 /**
@@ -131,6 +135,22 @@ Deno.test("a read-only grant on OpenCode denies by default, MCP, task and skill 
     list: "allow",
     webfetch: "ask",
   });
+});
+
+// The read-only list is tool_grant.ts's; a tool it names that OpenCode cannot allow back is a seat
+// rendered without the tool its grant names, and no other case would say so.
+Deno.test("every tool a read-only grant may name is allowed back on OpenCode", () => {
+  const bundle = new OpenCodeHarness().mapBundle(
+    READ_ONLY_TOOLS.map((t) => agentEntry(t, t)),
+    OPTS,
+  );
+  for (const tool of READ_ONLY_TOOLS) {
+    const { map } = permissionOf(bundle[`.opencode/agents/specnaut-${tool}.md`].content);
+    const back = Object.entries(map).filter(([k, v]) =>
+      k !== "*" && (v === "allow" || v === "ask")
+    );
+    assert(back.length > 0, `${tool}: ${JSON.stringify(map)}`);
+  }
 });
 
 Deno.test("agent maps NotebookEdit to edit", () => {

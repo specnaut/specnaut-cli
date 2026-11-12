@@ -42,15 +42,17 @@ const TOOL_TO_CAPABILITY: Readonly<Record<string, Capability>> = {
 /**
  * Tools that run nothing and write nothing. A grant is read-only only when every
  * tool it names is one of these: an unknown name, or `Agent`, which spawns seats
- * whose own grants this line does not bound, is not.
+ * whose own grants this line does not bound, is not. A renderer that allows a
+ * read-only seat its tools back keys its own names by this list (`ReadOnlyTool`).
  */
-const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
-  "Read",
-  "Grep",
-  "Glob",
-  "WebFetch",
-  "WebSearch",
-]);
+export const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "WebFetch", "WebSearch"] as const;
+export type ReadOnlyTool = typeof READ_ONLY_TOOLS[number];
+const READ_ONLY: ReadonlySet<string> = new Set(READ_ONLY_TOOLS);
+
+/** True when `name` is one of `READ_ONLY_TOOLS`. */
+export function isReadOnlyTool(name: string): name is ReadOnlyTool {
+  return READ_ONLY.has(name);
+}
 
 /** The entries of a `tools:` value, split at depth 0, each specifier kept. */
 export function toolEntries(tools: string): string[] {
@@ -94,5 +96,5 @@ export function grantedCapabilities(tools: string | null): ReadonlySet<Capabilit
 /** True when a `tools:` value is present and names only tools that run and write nothing. */
 export function isReadOnlyGrant(tools: string | null): boolean {
   if (tools === null || tools.trim().length === 0) return false;
-  return toolNames(tools).every((name) => READ_ONLY_TOOLS.has(name));
+  return toolNames(tools).every(isReadOnlyTool);
 }
