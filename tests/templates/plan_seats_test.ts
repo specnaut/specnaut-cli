@@ -31,7 +31,7 @@ Deno.test("technical forks are decided by the expert seats, never asked (#630)",
   // The no-stop rule's home is the chain, not the plan (cli#709).
   assertStringIncludes(chain, "Nothing open → a report, then `implement`");
 
-  const review = phase("review").content;
+  const review = flat(phase("review").content);
   assertStringIncludes(review, "Choosing *between* technical fixes is never the user's call");
 
   const { content: agents } = rootAgents();

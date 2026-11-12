@@ -98,37 +98,34 @@ Read `phases/review-gates.md`: which commands run, and when the test command doe
 
 ## Phase 3 — Fix loop
 
-For each finding the routing rule below says to fix — which is most of them, not
-only the CRITICAL and HIGH ones — spawn the `developer` agent with the finding
-and the target file:line. After the developer reports the fix, re-run the
-specific check that failed (or the full quality gate if the fix is broad), after re-running the
-step 1 block: a fix may have touched `.specnaut/scripts/`, and the last verdict no longer holds.
+For each finding the routing rule below says to fix — which is most of them, not only the CRITICAL
+and HIGH ones — spawn the `developer` agent with the finding and the target file:line. After the
+developer reports the fix, re-run the specific check that failed (or the full quality gate if the
+fix is broad), after re-running the step 1 block: a fix may have touched `.specnaut/scripts/`, and
+the last verdict no longer holds.
 
-Batch the cheap ones into a single dispatch. Ten one-line fixes are one commit
-and one round trip, not ten.
+Batch the cheap ones into a single dispatch. Ten one-line fixes are one commit and one round trip,
+not ten.
 
-Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
-resolution — in the latter case, stop and escalate to the user as a blocker.
-Choosing *between* technical fixes is never the user's call: the seat that
-found the issue ranks the options and the developer applies the top one.
+Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without resolution — in the latter
+case, stop and escalate to the user as a blocker. Choosing *between* technical fixes is never the
+user's call: the seat that found the issue ranks the options and the developer applies the top one.
 
-**Do not ask the user between cycles.** The fix loop runs before the merge; they
-asked for a working branch, not for a vote on every round.
+**Do not ask the user between cycles.** The fix loop runs before the merge; they asked for a working
+branch, not for a vote on every round.
 
-**Report harm, not labels.** Sort each finding into *"would hurt a user, a
-maintainer, or the data if shipped"* versus *"should be better"*, and choose by
-the harm rather than the severity word. A finding labelled HIGH that describes a
-lost log line is not worth a cycle; one labelled MEDIUM that loses data is.
-**"Nothing here would hurt anyone" is a valid and valuable verdict**, not a
-failure to find things.
+**Report harm, not labels.** Sort each finding into *"would hurt a user, a maintainer, or the data
+if shipped"* versus *"should be better"*, and choose by the harm rather than the severity word. A
+finding labelled HIGH that describes a lost log line is not worth a cycle; one labelled MEDIUM that
+loses data is. **"Nothing here would hurt anyone" is a valid and valuable verdict**, not a failure
+to find things.
 
 ## 🔒 Route by the cost of the FIX, never by the severity word
 
-**The default is: fix it now, in this branch, in this turn.** A review that
-converts its own findings into backlog items is not reviewing — it is
-redistributing work, and it does it faster than anyone can absorb it. A run that
-lands one item and leaves four behind has made the backlog longer than it found
-it, every time, forever.
+**The default is: fix it now, in this branch, in this turn.** A review that converts its own
+findings into backlog items is not reviewing — it is redistributing work, and it does it faster than
+anyone can absorb it. A run that lands one item and leaves four behind has made the backlog longer
+than it found it, every time, forever.
 
 Ask one question per finding, and it is not "how severe is this":
 
@@ -145,22 +142,19 @@ Ask one question per finding, and it is not "how severe is this":
   this branch does not touch**; it needs a **migration** or a coordinated
   release; or **the fix is larger than the original task**.
 
-**"Out of scope" is not a reason — it is the label put on a finding nobody
-costed.** The scope is to leave the code better than it was found. If a finding
-is filed, the report says **why it could not be fixed here**, in one sentence, in
-the finding itself. A filed finding with no such sentence is a defect in the
-review, not an item for the backlog.
+**"Out of scope" is not a reason — it is the label put on a finding nobody costed.** The scope is to
+leave the code better than it was found. If a finding is filed, the report says **why it could not
+be fixed here**, in one sentence, in the finding itself. A filed finding with no such sentence is a
+defect in the review, not an item for the backlog.
 
-**What gets filed gets filed loudly.** Anything that survives the four reasons is
-by definition significant, so it is opened at **P0 or P1** — never P2, never P3.
-A backlog where the real problems sit at the same priority as a naming nit is a
-backlog where the real problems are invisible. If a finding does not deserve P1,
-it did not deserve a ticket; it deserved a fix.
+**What gets filed gets filed loudly.** Anything that survives the four reasons is by definition
+significant, so it is opened at **P0 or P1** — never P2, never P3. A backlog where the real problems
+sit at the same priority as a naming nit is a backlog where the real problems are invisible. If a
+finding does not deserve P1, it did not deserve a ticket; it deserved a fix.
 
-**Re-reviewing because the last review found *something* is not a reason** — it
-is always true, and a loop with no exit criterion does not terminate. The exit is
-"nothing left that would hurt a user, a maintainer, or the data", not "nothing
-left at all".
+**Re-reviewing because the last review found *something* is not a reason** — it is always true, and
+a loop with no exit criterion does not terminate. The exit is "nothing left that would hurt a user,
+a maintainer, or the data", not "nothing left at all".
 
 ## An epic's children, and a missing seat
 
