@@ -91,6 +91,15 @@ Deno.test("names that one filesystem would merge fold to one key", () => {
 
 /** Instruction and harness config files, as path names, at the root and below it. */
 const INSTRUCTION_PATHS: readonly string[][] = [
+  ["AGENT.md"],
+  ["x", ".rules"],
+  [".clinerules", "style.md"],
+  [".roo", "rules", "a.md"],
+  [".kiro", "steering", "a.md"],
+  [".continue", "config.yaml"],
+  [".junie", "guidelines.md"],
+  [".amazonq", "rules", "a.md"],
+  [".devcontainer", "devcontainer.json"],
   ["CLAUDE.md"],
   ["pkg", "claude.md"],
   ["CLAUDE.local.md"],

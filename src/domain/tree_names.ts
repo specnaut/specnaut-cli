@@ -82,6 +82,7 @@ const INSTRUCTION_FILES = new Set([
   "claude.local.md",
   "agents.md",
   "agents.override.md",
+  "agent.md",
   "gemini.md",
   ".mcp.json",
   ".cursorrules",
@@ -89,9 +90,13 @@ const INSTRUCTION_FILES = new Set([
   ".clinerules",
   "opencode.json",
   "opencode.jsonc",
+  ".rules",
 ]);
 
-/** Folders whose whole content is a harness's own: settings, skills, agents, hooks, rules. */
+/**
+ * Folders whose whole content is a harness's own (settings, skills, agents, hooks, rules), and
+ * `.devcontainer/`, whose definition names commands and mounts a host runs.
+ */
 const INSTRUCTION_DIRS = new Set([
   ".claude",
   ".codex",
@@ -102,6 +107,13 @@ const INSTRUCTION_DIRS = new Set([
   ".windsurf",
   ".vscode",
   ".specnaut",
+  ".clinerules",
+  ".roo",
+  ".kiro",
+  ".continue",
+  ".junie",
+  ".amazonq",
+  ".devcontainer",
 ]);
 
 /** What Copilot reads under `.github/`; the rest of that folder (workflows, owners) is plain. */
