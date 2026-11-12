@@ -2,8 +2,8 @@ import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
-import { CAP_ENFORCEMENT, LIMITS } from "../../src/domain/sandbox_limits.ts";
-import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
+import { LIMITS } from "../../src/domain/sandbox_limits.ts";
+import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
  * The arguments each launcher is given carry the policy and nothing else: every isolation flag is
@@ -14,11 +14,6 @@ const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
 const NAME = "specnaut-gate-3f9c2a71";
 const RUN = { image: IMAGE, name: NAME };
-
-/** Each value that follows `flag`, in order. */
-function after(args: readonly string[], flag: string): string[] {
-  return args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
-}
 
 /** The pairs `[a, b]` that follow `flag`, for flags taking two values. */
 function pairsAfter(args: readonly string[], flag: string): string[][] {
@@ -200,39 +195,5 @@ Deno.test("containerArgs: a named run, an init reaping its children, and no engi
       "",
       name,
     );
-  }
-});
-
-Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and no other", () => {
-  const ctr = container();
-  const wall = (args: readonly string[]) => args.some((a) => a.includes("timeout"));
-  const carried = {
-    container: {
-      processes: after(ctr, "--pids-limit").includes(String(LIMITS.processes)),
-      memoryBytes: after(ctr, "--memory").includes(String(LIMITS.memoryBytes)),
-      cpus: after(ctr, "--cpus").includes(String(LIMITS.cpus)),
-      wallClockSeconds: wall(ctr),
-      scratchBytes: after(ctr, "--tmpfs").every((t) => t.includes(`size=${LIMITS.scratchBytes}`)),
-    },
-    bwrap: {
-      processes: false,
-      memoryBytes: false,
-      cpus: false,
-      wallClockSeconds: wall(bwrap()),
-      scratchBytes: after(bwrap(), "--size").length === after(bwrap(), "--tmpfs").length,
-    },
-    seatbelt: {
-      processes: false,
-      memoryBytes: false,
-      cpus: false,
-      wallClockSeconds: false,
-      scratchBytes: false,
-    },
-  };
-  for (const [backend, caps] of Object.entries(carried)) {
-    const expected = Object.fromEntries(
-      Object.entries(caps).map(([cap, inArgs]) => [cap, inArgs ? "arguments" : "launcher"]),
-    );
-    assertEquals(CAP_ENFORCEMENT[backend as keyof typeof CAP_ENFORCEMENT], expected, backend);
   }
 });

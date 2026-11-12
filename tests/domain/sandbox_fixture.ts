@@ -20,3 +20,8 @@ export function policyOf(backend: SandboxedBackend, paths: SandboxPaths = PATHS)
   if (!result.ok) throw new Error(result.why);
   return result.policy;
 }
+
+/** Each value that follows `flag`, in order. */
+export function after(args: readonly string[], flag: string): string[] {
+  return args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
+}
