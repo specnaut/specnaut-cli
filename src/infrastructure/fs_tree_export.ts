@@ -7,7 +7,7 @@ import {
 } from "../application/untrusted_review_ports.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
 import type { ExportPlan } from "../domain/tree_plan.ts";
-import { isInside } from "../domain/template.ts";
+import { isInside } from "../domain/destination.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { verifyCopy, writeCopies } from "./fs_export_files.ts";
 import { securePrivateFolder } from "./private_folder.ts";

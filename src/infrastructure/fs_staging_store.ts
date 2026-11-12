@@ -1,7 +1,7 @@
 import { dirname, join, relative, resolve } from "@std/path";
 import { walk } from "@std/fs/walk";
 import type { StagingStore } from "../application/ports.ts";
-import { assertSafeDestination } from "../domain/template.ts";
+import { assertSafeDestination } from "../domain/destination.ts";
 import {
   assertInsideProject,
   assertRemovableInProject,

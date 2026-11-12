@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
-import { isInside } from "../domain/template.ts";
+import { isInside } from "../domain/destination.ts";
 import {
   DeniedLandingError,
   resolveDeepestExisting,

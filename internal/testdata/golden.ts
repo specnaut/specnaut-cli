@@ -10,7 +10,7 @@
 // its case list, and `deno fmt` (which does not read .jsonl) never re-wraps it.
 import { parseArgs } from "../../src/cli/parser.ts";
 import { parseLock, RemovedHarnessError } from "../../src/domain/installed_lock.ts";
-import { assertSafeDestination } from "../../src/domain/template.ts";
+import { assertSafeDestination } from "../../src/domain/destination.ts";
 import { retiredConfigNotices } from "../../src/application/upgrade_retired_notices.ts";
 import type { FsReader } from "../../src/application/ports.ts";
 import { AGENT_FOLDERS } from "../../src/domain/agent_folders.ts";

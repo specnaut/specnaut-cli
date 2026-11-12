@@ -6,7 +6,7 @@ import {
 } from "../application/untrusted_review_ports.ts";
 import { formatOf, gitBlobId } from "../domain/git_object_id.ts";
 import type { ExportPlan, PlannedFile } from "../domain/tree_plan.ts";
-import { isInside } from "../domain/template.ts";
+import { isInside } from "../domain/destination.ts";
 
 /**
  * The export's two copies on disk: written file by file, every folder and file created new so no

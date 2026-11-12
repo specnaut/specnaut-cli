@@ -1,6 +1,6 @@
 import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
-import { assertSafeDestination } from "../domain/template.ts";
+import { assertSafeDestination } from "../domain/destination.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
 import { ReadFault } from "../application/read_fault.ts";
 import {

@@ -1,5 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
-import { assertSafeDestination } from "./template.ts";
+import { assertSafeDestination } from "./destination.ts";
 
 /**
  * Every harness the CLI can install *and* read back.

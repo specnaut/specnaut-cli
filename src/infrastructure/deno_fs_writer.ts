@@ -1,10 +1,6 @@
 import { dirname, join, resolve } from "@std/path";
-import {
-  assertSafeDestination,
-  type Bundle,
-  type MergeJsonFlavor,
-  type TemplateFile,
-} from "../domain/template.ts";
+import { assertSafeDestination } from "../domain/destination.ts";
+import type { Bundle, MergeJsonFlavor, TemplateFile } from "../domain/template.ts";
 import {
   assertInsideProject,
   assertLinkTargetInProject,

@@ -13,7 +13,7 @@ import (
 // Lock keys stay inside the project (cli#574). Two halves, as in TypeScript:
 //
 //   - SafeDestination, the string half (`assertSafeDestination` in
-//     src/domain/template.ts): a key is a project-relative file name, or the
+//     src/domain/destination.ts): a key is a project-relative file name, or the
 //     lock is refused. A committed lock comes from whoever pushed it, and a
 //     key of `../../../../etc/passwd` used to be read.
 //   - the filesystem half, which TypeScript does with realPath comparisons
