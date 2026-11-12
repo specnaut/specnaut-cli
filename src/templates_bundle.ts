@@ -1077,7 +1077,7 @@ and an older cache reused: do not review against an empty or stale spec.
 4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
    finding (\`.specnaut/memory/size-limits.md\`) is routed the same way — no special case, and
    its severity is fixed there, not re-judged.
-5. Produce a final pass/fail report.
+5. Produce a final pass/fail report, then \`rm -f\` each \`NAMES_FILE\` step 1 printed.
 
 ## Phase 0 — Measure
 
@@ -1515,6 +1515,8 @@ under \`--no-close\`, once more after the push: there the item's line must read 
 
    A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\`, on any run, makes the merge mode \`manual\`: ask
    \`phases/auto-chain.md\`'s one question before step 3 unless the user already answered one.
+   Each run's \`NAMES_FILE\` is removed (\`rm -f\`) once the next run prints its own, and the last
+   when this phase ends, landed or stopped.
 
 1. **Shape the history.** Ask the branch, not the board — \`bash .specnaut/scripts/bash/epic-status.sh\`
    reads its \`Epic: #\` trailers, and only before the landing: after it, the range is empty. Keep its

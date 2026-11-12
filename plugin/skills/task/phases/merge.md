@@ -56,6 +56,8 @@ under `--no-close`, once more after the push: there the item's line must read `O
 
    A `NAMES_FILE` listing `.specnaut/workflow.yml`, on any run, makes the merge mode `manual`: ask
    `phases/auto-chain.md`'s one question before step 3 unless the user already answered one.
+   Each run's `NAMES_FILE` is removed (`rm -f`) once the next run prints its own, and the last
+   when this phase ends, landed or stopped.
 
 1. **Shape the history.** Ask the branch, not the board — `bash .specnaut/scripts/bash/epic-status.sh`
    reads its `Epic: #` trailers, and only before the landing: after it, the range is empty. Keep its

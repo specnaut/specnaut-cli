@@ -42,7 +42,7 @@ and an older cache reused: do not review against an empty or stale spec.
 4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
    finding (`.specnaut/memory/size-limits.md`) is routed the same way — no special case, and
    its severity is fixed there, not re-judged.
-5. Produce a final pass/fail report.
+5. Produce a final pass/fail report, then `rm -f` each `NAMES_FILE` step 1 printed.
 
 ## Phase 0 — Measure
 

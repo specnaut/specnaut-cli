@@ -84,3 +84,15 @@ Deno.test("review runs the gate block first and never falls back to a script of 
   assertStringIncludes(seats, "every signal-gated seat is dispatched");
   assertStringIncludes(seats, "`TEST_COUNT` is unknown, counted as above 0");
 });
+
+Deno.test("each NAMES_FILE is removed once read: review at its report, merge run by run", () => {
+  assertStringIncludes(
+    flat(phase("review").content),
+    "Produce a final pass/fail report, then `rm -f` each `NAMES_FILE` step 1 printed.",
+  );
+  assertStringIncludes(
+    flat(phase("merge").content),
+    "Each run's `NAMES_FILE` is removed (`rm -f`) once the next run prints its own, and the last " +
+      "when this phase ends, landed or stopped.",
+  );
+});
