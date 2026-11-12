@@ -33,10 +33,15 @@ Deno.test("apply-plan: a plan that does not follow its read is refused", async (
       apply: ["edit", "--id", "8"],
     });
     assertEquals([id.code, id.lines[0]], [3, "REFUSED id header.id"]);
+    // The header names the same unknown verb, so only scope_for can refuse it.
     const unknown = await readThenApply(p, ["edit", "--id", "7"], comment, {
       apply: ["triage", "--id", "7"],
+      between: async (items) => {
+        const text = await Deno.readTextFile(items);
+        await Deno.writeTextFile(items, text.replace(/^verb: edit$/m, "verb: triage"));
+      },
     });
-    assertEquals(unknown.code, 3);
+    assertEquals([unknown.code, unknown.lines], [3, ["REFUSED verb verb", "RECEIPT: none"]]);
     for (const r of [moved, verb, id, unknown]) assert(!GH_WRITES.test(r.calls), r.calls);
   } finally {
     await p.cleanup();

@@ -131,20 +131,24 @@ export interface Applied extends Result {
 
 /**
  * read-items.sh <readArgs>, then apply-plan.sh <verb> [--id] <plan> <items>; `between` runs in the
- * gap, and `env` is added to apply-plan.sh's environment.
+ * gap, given the items file's path, and `env` is added to apply-plan.sh's environment.
  */
 export async function readThenApply(
   p: Project,
   readArgs: string[],
   plan: string,
-  o: { apply?: string[]; between?: () => Promise<void>; env?: Record<string, string> } = {},
+  o: {
+    apply?: string[];
+    between?: (items: string) => Promise<void>;
+    env?: Record<string, string>;
+  } = {},
 ): Promise<Applied> {
   const { r, read } = await readItems(p, readArgs);
   assert(read, `read-items failed: ${r.stderr}`);
   const dir = await Deno.makeTempDir({ prefix: "plan-" });
   try {
     await Deno.writeTextFile(join(dir, "plan.jsonl"), plan);
-    await o.between?.();
+    await o.between?.(read.path);
     const at = readArgs.indexOf("--id");
     const verbAndId = o.apply ?? [readArgs[0], ...(at >= 0 ? ["--id", readArgs[at + 1]] : [])];
     const out = await p.run(
