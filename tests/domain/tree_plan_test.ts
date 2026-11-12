@@ -148,3 +148,39 @@ Deno.test("the defaults are bounded", () => {
   assertEquals(caps.entries <= 100_000 && caps.depth <= 32 && caps.pathBytes <= 1024, true);
   assertEquals(caps.bytes <= 256 * 2 ** 20, true);
 });
+
+Deno.test("a folder laid out as a git repository is listed whole, never written", () => {
+  const layouts = [
+    ["HEAD", "objects", "refs"],
+    ["Head", "OBJECTS", "refs"],
+    ["commondir"],
+    ["gitdir"],
+  ];
+  for (const layout of layouts) {
+    const p = planner();
+    const [dir] = p.admit(ROOT, [entry("40000", "fixture", sha("1"))]);
+    const inside = layout.map((n, i) =>
+      entry(n === "HEAD" ? "100644" : "40000", n, sha(`${i + 2}`))
+    );
+    assertEquals(p.admit(dir, [...inside, entry("100644", "config")]), [], layout.join(","));
+    assertEquals(p.finish(), {
+      files: [],
+      listed: [{ path: "fixture", sha: sha("1"), kind: "repository" }],
+    });
+  }
+});
+
+Deno.test("the root tree itself is judged as a repository too", () => {
+  const p = planner();
+  p.admit(ROOT, [entry("100644", "HEAD"), entry("40000", "objects"), entry("40000", "refs")]);
+  assertEquals(p.finish(), {
+    files: [],
+    listed: [{ path: ".", sha: sha("0"), kind: "repository" }],
+  });
+});
+
+Deno.test("two of the three repository names are an ordinary folder", () => {
+  const p = planner();
+  p.admit(ROOT, [entry("100644", "HEAD"), entry("100644", "objects")]);
+  assertEquals(p.finish().files.map((f) => f.path), ["HEAD", "objects"]);
+});

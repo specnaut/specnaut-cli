@@ -164,3 +164,32 @@ Deno.test("bytes that differ from the commit are caught by the re-hash, and noth
     await assertRejects(run, ExportRefused, "differs from the commit");
     assertEquals(await cacheEntries(w), []);
   }));
+
+/** A folder laid out as a bare repository: `HEAD`, `config`, `objects/` and `refs/`. */
+async function repositoryLayout(repo: string): Promise<string> {
+  const keep = await blob(repo, "");
+  return await tree(repo, [
+    ["100644", "HEAD", await blob(repo, "ref: refs/heads/main\n")],
+    ["100644", "config", await blob(repo, "[core]\n\tbare = true\n")],
+    ["40000", "objects", await tree(repo, [["100644", "keep", keep]])],
+    ["40000", "refs", await tree(repo, [["100644", "keep", keep]])],
+  ]);
+}
+
+Deno.test("a folder laid out as a repository is listed, and nothing of it reaches either copy", () =>
+  withWorld(async (w) => {
+    const fixture = await repositoryLayout(w.repo);
+    const readme = await blob(w.repo, "x\n");
+    const { run } = await exportOf(w, [["40000", "fixture", fixture], [
+      "100644",
+      "README",
+      readme,
+    ]]);
+    const out = await run();
+    for (const copy of [out.seats, out.scratch]) {
+      assertEquals(await exists(join(copy, "fixture")), false, `${copy}/fixture was written`);
+      assertEquals(await exists(join(copy, "README")), true);
+    }
+    assertEquals(out.listed, [{ path: "fixture", sha: fixture, kind: "repository" }]);
+    await out.remove();
+  }));

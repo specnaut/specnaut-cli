@@ -1,4 +1,4 @@
-import { foldKey, instructionPath, nameFault } from "./tree_names.ts";
+import { foldKey, instructionPath, nameFault, repositoryShaped } from "./tree_names.ts";
 
 /**
  * What of a fetched tree is written as files, and what is only listed. Every entry passes the name
@@ -62,8 +62,15 @@ export class TreePlanner {
 
   constructor(readonly caps: TreeCaps, readonly windows: boolean) {}
 
-  /** Judges one tree's entries; returns the subtrees to read next. Throws at a cap. */
+  /**
+   * Judges one tree's entries; returns the subtrees to read next. Throws at a cap. A folder laid
+   * out as a repository, the root included, is listed whole and nothing in it is written.
+   */
   admit(dir: TreeToRead, entries: readonly TreeEntry[]): TreeToRead[] {
+    if (repositoryShaped(entries.map((e) => shown(e.name)))) {
+      this.#listed.push({ path: dir.names.join("/") || ".", sha: dir.sha, kind: "repository" });
+      return [];
+    }
     const seen = new Set<string>();
     return entries.flatMap((e) => this.#admitOne(dir, e, seen));
   }

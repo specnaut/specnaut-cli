@@ -111,3 +111,16 @@ export function instructionPath(names: readonly string[]): boolean {
     INSTRUCTION_DIRS.has(k) || (k === ".github" && GITHUB_INSTRUCTIONS.has(keys[i + 1] ?? ""))
   );
 }
+
+/**
+ * Whether a folder's entries make it a git repository to any git started inside it: `objects`,
+ * `refs` and a `HEAD` together (git's `is_git_directory`, a bare repository's layout), or a
+ * `commondir` or `gitdir` entry, which point a linked worktree's folder at its repository. Written
+ * out, such a folder is discovered by a prompt, an editor or a session working in the copy, and its
+ * `config` names programs (`core.fsmonitor`) that git then runs on the host.
+ */
+export function repositoryShaped(names: readonly string[]): boolean {
+  const keys = new Set(names.map(foldKey));
+  return (keys.has("head") && keys.has("objects") && keys.has("refs")) ||
+    keys.has("commondir") || keys.has("gitdir");
+}
