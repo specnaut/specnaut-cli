@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import {
   CAP_ENFORCEMENT,
+  CAP_NAMES,
   LIMITS,
   STOP_LIMIT,
   unenforcedCaps,
@@ -61,4 +62,11 @@ Deno.test("STOP_LIMIT: only sandbox-exec's stop misses a process that left the r
   assertEquals(STOP_LIMIT.container, null);
   assertEquals(STOP_LIMIT.bwrap, null);
   assertEquals(typeof STOP_LIMIT.seatbelt, "string");
+});
+
+Deno.test("CAP_NAMES: one plain, distinct name per cap, as the probe prints it", () => {
+  assertEquals(Object.keys(CAP_NAMES).sort(), Object.keys(LIMITS).sort());
+  const names = Object.values(CAP_NAMES);
+  assertEquals(new Set(names).size, names.length);
+  for (const name of names) assertEquals(/^[a-z][a-z-]*$/.test(name), true, name);
 });

@@ -8,6 +8,7 @@ import {
 } from "../../src/application/sandbox_ports.ts";
 import type { BackendProbe, SandboxPolicy } from "../../src/domain/sandbox.ts";
 import { sandboxPolicy } from "../../src/domain/sandbox.ts";
+import { unenforcedCaps } from "../../src/domain/sandbox_limits.ts";
 
 /**
  * Running a command on an export in a sandbox: the backend `chooseBackend` picks, the policy
@@ -79,7 +80,12 @@ const REQUEST = { sha: SHA, toolchain: ["/opt/deno/bin"], command: ["deno", "tes
 Deno.test("execInSandbox: the chosen backend's runner runs the command under its policy", async () => {
   const { deps, seen } = world(LINUX_BWRAP);
   const result = await execInSandbox(deps, REQUEST);
-  assertEquals(result, { kind: "ran", backend: "bwrap", outcome: { kind: "exited", code: 7 } });
+  assertEquals(result, {
+    kind: "ran",
+    backend: "bwrap",
+    outcome: { kind: "exited", code: 7 },
+    unenforced: unenforcedCaps("bwrap"),
+  });
   assertEquals(seen.located, [SHA]);
   assertEquals(seen.runs.length, 1);
   const expected = sandboxPolicy("bwrap", {
@@ -148,6 +154,7 @@ Deno.test("execInSandbox: the wall clock's end is reported, not turned into an e
     kind: "ran",
     backend: "bwrap",
     outcome: { kind: "timed_out", seconds: 1800 },
+    unenforced: unenforcedCaps("bwrap"),
   });
 });
 
@@ -156,4 +163,16 @@ Deno.test("execInSandbox: a toolchain folder is judged by where it leads, never 
   const result = await execInSandbox(deps, { ...REQUEST, toolchain: ["/opt/tools"] });
   assertEquals(result, { kind: "not_run", why: "/home/dev is or holds the home folder" });
   assertEquals(seen.runs, []);
+});
+
+Deno.test("execInSandbox: a run carries the caps its backend ran without, from the table", async () => {
+  const container = {
+    ...LINUX_BWRAP,
+    docker: true,
+    image: { kind: "pinned", ref: IMAGE },
+  } as const;
+  const ran = await execInSandbox(world(container).deps, REQUEST);
+  assertEquals(ran.kind === "ran" && ran.unenforced, unenforcedCaps("container"));
+  const bwrap = await execInSandbox(world(LINUX_BWRAP).deps, REQUEST);
+  assertEquals(bwrap.kind === "ran" && bwrap.unenforced, unenforcedCaps("bwrap"));
 });

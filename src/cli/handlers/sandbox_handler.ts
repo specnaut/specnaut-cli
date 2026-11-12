@@ -11,7 +11,12 @@ import {
   chooseBackend,
   type SandboxedBackend,
 } from "../../domain/sandbox.ts";
-import { STOP_LIMIT } from "../../domain/sandbox_limits.ts";
+import {
+  CAP_NAMES,
+  type SandboxLimits,
+  STOP_LIMIT,
+  unenforcedCaps,
+} from "../../domain/sandbox_limits.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
@@ -27,12 +32,13 @@ import type { SandboxIntent } from "../intent.ts";
  * the exit codes live here:
  *
  *   probe  one line per backend in selection order, `AVAILABLE <backend>` or
- *          `UNAVAILABLE <backend> <reason>`; under an available one, `LIMIT <backend> <what>` when
- *          stopping a run on it cannot reach every process. Then `BACKEND <backend|static>`: the
- *          one a run would use. Exit 0 when a backend is available, 1 when a run would be static.
- *   exec   the command's own exit code; after a run, each `LIMIT` line of its backend on stderr,
- *          prefixed `notice: specnaut sandbox exec: `. 124: the wall clock ran out and the run was
- *          stopped.
+ *          `UNAVAILABLE <backend> <reason>`; under an available one, `UNCAPPED <backend> <cap,...>`
+ *          when it runs without a resource cap, and `LIMIT <backend> <what>` when stopping a run
+ *          on it cannot reach every process. Then `BACKEND <backend|static>`: the one a run would
+ *          use. Exit 0 when a backend is available, 1 when a run would be static.
+ *   exec   the command's own exit code, whatever caps it ran without; after a run, its backend's
+ *          `UNCAPPED` and `LIMIT` lines on stderr, prefixed `notice: specnaut sandbox exec: `, so
+ *          stdout stays the command's. 124: the wall clock ran out and the run was stopped.
  *          125: nothing ran (static only, no such export, a layout the policy refuses, or a
  *          launcher that could not start). Every 124 and 125 says why on stderr; the command's own
  *          output is passed through unchanged.
@@ -64,7 +70,7 @@ async function probe(deps: SandboxDeps): Promise<number> {
   const found = await deps.probe();
   const lines = assessBackends(found).flatMap((s) =>
     "offered" in s
-      ? [`AVAILABLE ${s.kind}`, ...gaps(s.kind)]
+      ? [`AVAILABLE ${s.kind}`, ...gaps(s.kind, unenforcedCaps(s.kind))]
       : [`UNAVAILABLE ${s.kind} ${terminalText(s.why)}`]
   );
   const chosen = chooseBackend(found).kind;
@@ -72,15 +78,24 @@ async function probe(deps: SandboxDeps): Promise<number> {
   return chosen === "static" ? EXIT.staticOnly : EXIT.available;
 }
 
-/** What a run on `backend` goes without, one line each: the same lines on probe and after exec. */
-function gaps(backend: SandboxedBackend): string[] {
+/**
+ * What a run on `backend` goes without, one line each, the same on probe and after exec: the caps
+ * it runs without (`UNCAPPED`), then what stopping it cannot reach (`LIMIT`).
+ */
+function gaps(backend: SandboxedBackend, unenforced: readonly (keyof SandboxLimits)[]): string[] {
+  const caps = unenforced.map((cap) => CAP_NAMES[cap]).join(",");
   const limit = STOP_LIMIT[backend];
-  return limit === null ? [] : [`LIMIT ${backend} ${limit}`];
+  return [
+    ...(caps === "" ? [] : [`UNCAPPED ${backend} ${caps}`]),
+    ...(limit === null ? [] : [`LIMIT ${backend} ${limit}`]),
+  ];
 }
 
 function answer(outcome: ExecOutcome, deps: SandboxDeps): number {
   if (outcome.kind === "not_run") return notRun(deps, outcome.why);
-  for (const line of gaps(outcome.backend)) deps.err(`notice: specnaut sandbox exec: ${line}`);
+  for (const line of gaps(outcome.backend, outcome.unenforced)) {
+    deps.err(`notice: specnaut sandbox exec: ${line}`);
+  }
   if (outcome.outcome.kind === "exited") return outcome.outcome.code;
   const seconds = outcome.outcome.seconds;
   deps.err(red(`error: specnaut sandbox exec: the wall clock ran out after ${seconds} s`));

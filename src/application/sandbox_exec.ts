@@ -1,4 +1,6 @@
 import { chooseBackend, type SandboxedBackend, sandboxPolicy } from "../domain/sandbox.ts";
+import { type SandboxLimits, unenforcedCaps } from "../domain/sandbox_limits.ts";
+import type { SandboxPaths } from "../domain/sandbox_paths.ts";
 import type {
   BackendProber,
   RunnableBackend,
@@ -30,7 +32,13 @@ export type ExecRequest = {
 };
 
 export type ExecOutcome =
-  | { readonly kind: "ran"; readonly backend: SandboxedBackend; readonly outcome: RunOutcome }
+  | {
+    readonly kind: "ran";
+    readonly backend: SandboxedBackend;
+    readonly outcome: RunOutcome;
+    /** The caps the run went without (`unenforcedCaps`): reported, never a reason not to run. */
+    readonly unenforced: readonly (keyof SandboxLimits)[];
+  }
   | { readonly kind: "not_run"; readonly why: string };
 
 export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promise<ExecOutcome> {
@@ -43,11 +51,21 @@ export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promi
   const scratch = await deps.host.scratch();
   try {
     const paths = { ...folders, scratch: scratch.path, toolchain, path: toolchain };
-    const result = sandboxPolicy(backend.kind, paths);
-    if (!result.ok) return { kind: "not_run", why: result.why };
-    const outcome = await deps.runnerFor(backend).run(result.policy, request.command);
-    return { kind: "ran", backend: backend.kind, outcome };
+    return await runUnder(deps, backend, paths, request.command);
   } finally {
     await scratch.remove();
   }
+}
+
+/** Runs `command` on `backend` under its policy over `paths`, or nothing when the layout is refused. */
+async function runUnder(
+  deps: ExecDeps,
+  backend: RunnableBackend,
+  paths: SandboxPaths,
+  command: readonly string[],
+): Promise<ExecOutcome> {
+  const result = sandboxPolicy(backend.kind, paths);
+  if (!result.ok) return { kind: "not_run", why: result.why };
+  const outcome = await deps.runnerFor(backend).run(result.policy, command);
+  return { kind: "ran", backend: backend.kind, outcome, unenforced: unenforcedCaps(backend.kind) };
 }

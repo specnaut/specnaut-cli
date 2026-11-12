@@ -3,7 +3,12 @@ import { runSandbox, type SandboxDeps } from "../../src/cli/handlers/sandbox_han
 import type { ExecOutcome } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import type { BackendProbe, SandboxedBackend } from "../../src/domain/sandbox.ts";
-import { STOP_LIMIT } from "../../src/domain/sandbox_limits.ts";
+import {
+  CAP_ENFORCEMENT,
+  CAP_NAMES,
+  type SandboxLimits,
+  STOP_LIMIT,
+} from "../../src/domain/sandbox_limits.ts";
 import type { SandboxIntent } from "../../src/cli/intent.ts";
 
 /**
@@ -54,6 +59,7 @@ Deno.test("sandbox probe: each backend, available or why not, then the one a run
       "UNAVAILABLE container no container image: no devcontainer",
       "UNAVAILABLE bwrap bubblewrap: Linux only",
       "AVAILABLE seatbelt",
+      ...uncapped("seatbelt"),
       `LIMIT seatbelt ${STOP_LIMIT.seatbelt}`,
       "BACKEND seatbelt",
     ].join("\n"),
@@ -74,6 +80,7 @@ Deno.test("sandbox exec: the command's exit code is the exit code", async () => 
     kind: "ran",
     backend: "container",
     outcome: { kind: "exited", code: 42 },
+    unenforced: [],
   };
   const { d, err } = deps(MAC, () => Promise.resolve(ran));
   assertEquals(await runSandbox(EXEC, d), 42);
@@ -85,6 +92,7 @@ Deno.test("sandbox exec: the wall clock running out is 124, and said", async () 
     kind: "ran",
     backend: "seatbelt",
     outcome: { kind: "timed_out", seconds: 1800 },
+    unenforced: [],
   };
   const { d, err } = deps(MAC, () => Promise.resolve(late));
   assertEquals(await runSandbox(EXEC, d), 124);
@@ -106,21 +114,34 @@ Deno.test("sandbox exec: a refusal or a launcher that cannot start is 125, never
   }
 });
 
-const ran = (backend: SandboxedBackend): ExecOutcome => ({
+/** The caps the table says `backend` runs without, by their names, read from the table itself. */
+function capsWithout(backend: SandboxedBackend): (keyof SandboxLimits)[] {
+  return (Object.keys(CAP_ENFORCEMENT[backend]) as (keyof SandboxLimits)[])
+    .filter((cap) => CAP_ENFORCEMENT[backend][cap] === "unenforced");
+}
+
+/** The UNCAPPED line the table calls for, if any. */
+function uncapped(backend: SandboxedBackend): string[] {
+  const caps = capsWithout(backend);
+  return caps.length === 0
+    ? []
+    : [`UNCAPPED ${backend} ${caps.map((c) => CAP_NAMES[c]).join(",")}`];
+}
+
+const ran = (backend: SandboxedBackend): Extract<ExecOutcome, { kind: "ran" }> => ({
   kind: "ran",
   backend,
   outcome: { kind: "exited", code: 0 },
+  unenforced: capsWithout(backend),
 });
 
-Deno.test("sandbox exec: a run says on stderr what its backend's stop cannot reach, if anything", async () => {
+Deno.test("sandbox exec: a run says on stderr the caps it went without and what its stop missed", async () => {
   for (const backend of ["container", "bwrap", "seatbelt"] as const) {
     const { d, out, err } = deps(MAC, () => Promise.resolve(ran(backend)));
     assertEquals(await runSandbox(EXEC, d), 0);
     const limit = STOP_LIMIT[backend];
-    const expected = limit === null
-      ? []
-      : [`notice: specnaut sandbox exec: LIMIT ${backend} ${limit}`];
-    assertEquals(err, expected, backend);
+    const lines = [...uncapped(backend), ...(limit === null ? [] : [`LIMIT ${backend} ${limit}`])];
+    assertEquals(err, lines.map((l) => `notice: specnaut sandbox exec: ${l}`), backend);
     assertEquals(out, [], backend);
   }
 });
@@ -131,4 +152,28 @@ Deno.test("sandbox probe: no LIMIT line for a backend whose stop reaches every p
   const { d, out } = deps(withBwrap, () => Promise.reject(new Error("unused")));
   assertEquals(await runSandbox(PROBE, d), 0);
   assertEquals(out.join("\n").split("\n").filter((l) => l.startsWith("LIMIT")), []);
+});
+
+Deno.test("sandbox probe: an UNCAPPED line per available backend the table leaves a cap off", async () => {
+  const linux: BackendProbe = {
+    ...MAC,
+    os: "linux",
+    arch: "x86_64",
+    sandboxExec: false,
+    bwrap: "usable",
+    bwrapVersion: "bubblewrap 0.9.0",
+    docker: true,
+    image: { kind: "pinned", ref: `acme/dev@sha256:${"e".repeat(64)}` },
+  };
+  const { d, out } = deps(linux, () => Promise.reject(new Error("unused")));
+  await runSandbox(PROBE, d);
+  const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
+  assertEquals(lines, [...uncapped("container"), ...uncapped("bwrap")]);
+});
+
+Deno.test("sandbox exec: a run on a backend without caps is still a run, with its own exit code", async () => {
+  const late: ExecOutcome = { ...ran("seatbelt"), outcome: { kind: "exited", code: 3 } };
+  const { d, err } = deps(MAC, () => Promise.resolve(late));
+  assertEquals(await runSandbox(EXEC, d), 3);
+  assertEquals(err.some((l) => l.includes("not run")), false);
 });

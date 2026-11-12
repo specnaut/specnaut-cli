@@ -59,6 +59,15 @@ export const CAP_ENFORCEMENT: Readonly<
   seatbelt: WALL_CLOCK_ONLY,
 };
 
+/** Each cap by the name the probe and a run's notice give it. */
+export const CAP_NAMES: Readonly<Record<keyof SandboxLimits, string>> = {
+  processes: "processes",
+  memoryBytes: "memory",
+  cpus: "cpu",
+  wallClockSeconds: "wall-clock",
+  scratchBytes: "scratch",
+};
+
 /** The caps `backend` runs without. */
 export function unenforcedCaps(backend: SandboxedBackend): (keyof SandboxLimits)[] {
   return (Object.entries(CAP_ENFORCEMENT[backend]) as [keyof SandboxLimits, CapEnforcer][])
