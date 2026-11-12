@@ -35,6 +35,7 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
       : []),
     networkRule(policy.network),
     "(deny job-creation)",
+    ...(policy.hidden.length > 0 ? [`(deny file-read* ${rules("subpath", policy.hidden)})`] : []),
     `(deny mach-lookup ${forbidden.map(service).join(" ")})`,
     "",
   ].join("\n");

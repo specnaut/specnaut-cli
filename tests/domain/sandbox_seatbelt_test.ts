@@ -120,3 +120,11 @@ Deno.test("seatbeltProfile: only named kernel values may be read, never all of t
   const odd = { names: ['kern.x") (allow default) ("'], prefixes: [] };
   assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), sysctls: odd }));
 });
+
+Deno.test("seatbeltProfile: the data volume stays unread, even below an allowed folder", () => {
+  const all = lines();
+  const deny = '(deny file-read* (subpath "/System/Volumes/Data"))';
+  const lastAllow = all.findLastIndex((l) => l.startsWith("(allow"));
+  assert(all.indexOf(deny) > lastAllow);
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), hidden: ['/x") (allow default'] }));
+});

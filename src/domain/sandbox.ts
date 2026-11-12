@@ -15,6 +15,7 @@ import type { ImageSource } from "./sandbox_image.ts";
 import {
   ALLOWED_SERVICES,
   DEVICES,
+  SEATBELT_HIDDEN,
   SEATBELT_LISTINGS,
   SEATBELT_SYSCTLS,
   type Sysctls,
@@ -125,6 +126,8 @@ export type SandboxPolicy = {
   readonly lookups: readonly string[];
   /** Folders whose names (not what lies beneath) may be listed, on macOS. */
   readonly listings: readonly string[];
+  /** Folders never read, on macOS, even below an allowed one. */
+  readonly hidden: readonly string[];
   /** Device files read and written (bubblewrap and a container provide their own `/dev`). */
   readonly devices: readonly string[];
   /** No network at all: loopback, unix sockets and dependency installs included. */
@@ -160,6 +163,7 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
     writes,
     lookups: onMac ? ancestors([...system, ...reads, ...writes]) : [],
     listings: onMac ? SEATBELT_LISTINGS : [],
+    hidden: onMac ? SEATBELT_HIDDEN : [],
     devices: DEVICES,
     network: "none",
     services: onMac ? ALLOWED_SERVICES : [],

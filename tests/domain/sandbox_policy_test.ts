@@ -43,7 +43,7 @@ Deno.test("sandboxPolicy: reads are system and toolchain folders and the tree; w
   assertEquals(policy.reads, ["/home/dev/.deno/bin", PATHS.tree]);
   assertEquals(policy.writes, [SCRATCH_HOME, SCRATCH_TMP]);
   assertEquals(policy.workdir, PATHS.tree);
-  assert(policy.system.includes("/usr") && policy.system.includes("/System"));
+  assert(policy.system.includes("/usr/bin") && policy.system.includes("/System"));
   assert(policyOf("bwrap").system.includes("/usr"));
 });
 
@@ -68,7 +68,7 @@ Deno.test("sandboxPolicy: a folder inside, or holding, the checkout is refused",
   assert(refusal({ tree: "/home/dev/src/my-app/.specnaut/sandbox/abc" }).includes("checkout"));
   assert(refusal({ toolchain: ["/home/dev/src"] }).includes("checkout"));
   assert(refusal({ scratch: "/home/dev/src/my-app/tmp" }).includes("checkout"));
-  assert(refusal({ checkout: "/usr/src/my-app" }, "seatbelt").includes("checkout"));
+  assert(refusal({ checkout: "/usr/share/my-app" }, "seatbelt").includes("checkout"));
 });
 
 Deno.test("sandboxPolicy: scratch may not overlap a folder that is only read", () => {
@@ -151,4 +151,14 @@ Deno.test("sandboxPolicy: on macOS only the folders above a visible one may be l
 Deno.test("sandboxPolicy: kernel values are named on macOS only", () => {
   assertEquals(policyOf("seatbelt").sysctls, SEATBELT_SYSCTLS);
   assertEquals(policyOf("bwrap").sysctls, { names: [], prefixes: [] });
+});
+
+Deno.test("sandboxPolicy: macOS reads named folders of /usr, and never the data volume", () => {
+  const { system, hidden } = policyOf("seatbelt");
+  for (const usr of ["/usr/bin", "/usr/lib", "/usr/libexec", "/usr/sbin", "/usr/share"]) {
+    assert(system.includes(usr), usr);
+  }
+  assertEquals(system.filter((p) => p === "/usr" || p === "/usr/local"), []);
+  assertEquals(hidden, ["/System/Volumes/Data"]);
+  assertEquals(policyOf("bwrap").hidden, []);
 });

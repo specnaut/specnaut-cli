@@ -27,7 +27,11 @@ const LINUX_ETC = ["alternatives", "ld.so.cache", "localtime", "passwd", "group"
 export const SYSTEM = {
   bwrap: ["/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", ...LINUX_ETC],
   seatbelt: [
-    "/usr",
+    "/usr/bin",
+    "/usr/lib",
+    "/usr/libexec",
+    "/usr/sbin",
+    "/usr/share",
     "/bin",
     "/sbin",
     "/System",
@@ -57,3 +61,9 @@ export const SEATBELT_SYSCTLS: Sysctls = {
   names: ["hw.ncpu", "hw.pagesize_compat", "kern.argmax", "kern.osrelease"],
   prefixes: ["hw.optional."],
 };
+
+/**
+ * Folders never read on macOS, even below an allowed one: `/System/Volumes/Data` is the data
+ * volume, whose own entries `/System` would otherwise expose.
+ */
+export const SEATBELT_HIDDEN: readonly string[] = ["/System/Volumes/Data"];
