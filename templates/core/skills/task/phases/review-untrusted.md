@@ -40,7 +40,9 @@ bash .specnaut/scripts/audit/collect-audit-scope.sh --base "$BASE_TIP" --head "$
 
 Phase 0 passes `--head "$HEAD" --objects "$OBJECTS"` to every script: `size-ratchet.sh --since
 "$BASE_TIP" --head … --report`, `boundary-check.sh --head …`, `git-read.sh --head … manifests
-"$BASE_TIP" "$HEAD"`. The fast tier runs only in a sandbox, as Phase 2 says.
+"$BASE_TIP" "$HEAD"`. The size step also needs `VERDICT size-limits trusted` and the boundary step
+`VERDICT boundaries trusted`, else each is briefed `NOT RUN: <the line>` (`phases/script-gate.md`).
+The fast tier runs only in a sandbox, as Phase 2 says.
 
 ## The seats' brief
 
@@ -61,7 +63,8 @@ specnaut sandbox exec "$HEAD" --log "$LOGS/<n>.log" [--toolchain <dir>[:<dir>...
 bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "$BASE_TIP" --head "$HEAD" --objects "$OBJECTS" --evidence "$LOGS" --sandbox
 ```
 
-`run-gate.sh` reads this checkout's `gates.yml`, runs each command through `specnaut sandbox exec`
+`run-gate.sh` runs only under `VERDICT gates trusted`, else the tiers are NOT RUN: <the line>. It
+reads this checkout's `gates.yml`, runs each command through `specnaut sandbox exec`
 on the scratch copy, prints one `log: <file>` line per command, and writes its evidence under
 `$LOGS`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
 `--sandbox`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: `run-gate.sh` stops
