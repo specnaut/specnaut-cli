@@ -54,7 +54,18 @@ Deno.test("a start is checked for the session the hook names, and a holding chec
   });
   assertEquals(outcome.kind, "trusted");
   assertEquals(asked, ["s-9"]);
-  assertEquals(said, [`grant ${TIP}`]);
+  assertEquals(said, ["revoke", `grant ${TIP}`]);
+});
+
+Deno.test("a gated command removes any pass before its check runs: one stopped part-way leaves none", async () => {
+  const said: string[] = [];
+  const verify = () =>
+    Promise.resolve(void said.push("verify")).then((): CheckoutOutcome => ({
+      kind: "trusted",
+      baseTip: TIP,
+    }));
+  await gateReview({ verify, pass: pass(said) }, { sessionId: "s", command: START });
+  assertEquals(said, ["revoke", "verify", `grant ${TIP}`]);
 });
 
 Deno.test("a checkout that does not hold removes any pass, and so does no session id", async () => {

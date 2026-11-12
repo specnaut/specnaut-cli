@@ -8,7 +8,8 @@ import { LOCK } from "./verify_scripts_fixture.ts";
 
 /**
  * The `PreToolUse` hook that runs `specnaut review gate`, as Claude Code runs it: its input on
- * stdin. A stub `specnaut` first on the PATH stands for the binary and says what it was given.
+ * stdin. A stub `specnaut` first on the PATH stands for the binary and says what it was given,
+ * and whether a pass was still there when it ran.
  */
 
 const HOOK = fromFileUrl(
@@ -19,7 +20,10 @@ async function runHook(input: string, stubExit: number, path?: string, project?:
   const dir = await Deno.makeTempDir({ prefix: "review-hook-" });
   try {
     const seen = join(dir, "seen");
-    const stub = `#!/usr/bin/env bash\n{ echo "$*"; cat; } >"${seen}"\nexit ${stubExit}\n`;
+    const held = join(dir, "held");
+    const stub = `#!/usr/bin/env bash\n{ echo "$*"; cat; } >"${seen}"\n` +
+      `[ -e "$CLAUDE_PROJECT_DIR/.git/specnaut/review-pass.json" ] && : >"${held}"\n` +
+      `exit ${stubExit}\n`;
     await Deno.writeTextFile(join(dir, "specnaut"), stub, { mode: 0o755 });
     const out = await new Deno.Command("bash", {
       args: [HOOK],
@@ -33,7 +37,7 @@ async function runHook(input: string, stubExit: number, path?: string, project?:
     await writer.close();
     const { code } = await out.output();
     const called = await Deno.readTextFile(seen).catch(() => null);
-    return { code, called };
+    return { code, called, held: await Deno.lstat(held).then(() => true, () => false) };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -54,12 +58,12 @@ Deno.test({
     assertEquals((await runHook(START, 2)).code, 2);
     assertEquals((await runHook(START, 1)).code, 2, "every failure of the gate stops it");
     const other = await runHook(JSON.stringify({ tool_input: { command: "ls" } }), 2);
-    assertEquals(other, { code: 0, called: null });
+    assertEquals(other, { code: 0, called: null, held: false });
   },
 });
 
 Deno.test({
-  name: "a command the gate never sees still removes the pass: one with no review, or no specnaut",
+  name: "every command removes the pass before anything else runs, the gate's own included",
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const project = await Deno.makeTempDir({ prefix: "review-hook-project-" });
@@ -68,13 +72,62 @@ Deno.test({
       const pass = join(project, ".git", "specnaut", "review-pass.json");
       await Deno.mkdir(join(project, ".git", "specnaut"));
       const ls = JSON.stringify({ tool_input: { command: "ls" } });
-      for (const [input, path] of [[ls, undefined], [START, "/usr/bin:/bin"]] as const) {
+      const runs = [[ls, undefined, false], [START, "/usr/bin:/bin", false], [
+        START,
+        undefined,
+        true,
+      ]];
+      for (const [input, path, gated] of runs as [string, string | undefined, boolean][]) {
         await Deno.writeTextFile(pass, '{"granted":1,"baseTip":""}\n');
         const run = await runHook(input, 0, path, project);
-        assertEquals([run.code, run.called], [0, null], input);
+        assertEquals([run.code, run.called !== null, run.held], [0, gated, false], input);
         const left = await Deno.lstat(pass).then(() => true, () => false);
         assertEquals(left, false, `the pass outlived ${input}`);
       }
+    } finally {
+      await Deno.remove(project, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "a project whose git directory cannot be found stops every command; one in no repository does not",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const project = await Deno.makeTempDir({ prefix: "review-hook-project-" });
+    try {
+      const ls = JSON.stringify({ tool_input: { command: "ls" } });
+      assertEquals((await runHook(ls, 0, undefined, project)).code, 0, "no repository, no pass");
+      for (const named of [`gitdir: ${join(project, "missing")}`, "not a gitdir line"]) {
+        await Deno.writeTextFile(join(project, ".git"), `${named}\n`);
+        for (const input of [ls, START]) {
+          const run = await runHook(input, 0, undefined, project);
+          assertEquals(run, { code: 2, called: null, held: false }, `${named}: ${input}`);
+        }
+      }
+      const gone = join(project, "gone");
+      assertEquals((await runHook(ls, 0, undefined, gone)).code, 2, "no project folder");
+    } finally {
+      await Deno.remove(project, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "where git cannot read the repository, the pass is removed from the folder .git names",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const project = await Deno.makeTempDir({ prefix: "review-hook-project-" });
+    try {
+      await Deno.mkdir(join(project, "store", "specnaut"), { recursive: true });
+      const pass = join(project, "store", "specnaut", "review-pass.json");
+      await Deno.writeTextFile(pass, '{"granted":1,"baseTip":""}\n');
+      await Deno.writeTextFile(join(project, ".git"), "gitdir: store\r\n");
+      const ls = JSON.stringify({ tool_input: { command: "ls" } });
+      const run = await runHook(ls, 0, undefined, project);
+      assertEquals(run.code, 0);
+      assertEquals(await Deno.lstat(pass).then(() => true, () => false), false);
     } finally {
       await Deno.remove(project, { recursive: true });
     }

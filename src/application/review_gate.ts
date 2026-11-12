@@ -5,11 +5,11 @@ import type { CheckoutOutcome } from "./verify_checkout.ts";
 
 /**
  * The gate a `PreToolUse` hook runs before a shell command (`review_gate.ts` in the domain says
- * why it is a hook). A command that does not start a review is not gated, and removes any pass
- * left earlier: a pass lives only until the next command. One that does is let through only when
- * the checkout check holds for the session the hook's input names, and a pass is left for the
- * start; any other outcome removes a pass left earlier. The check never ends in a
- * throw: whatever stops it, the record's reads included, is a refusal naming why.
+ * why it is a hook). Every command first removes any pass left earlier: a pass lives only until
+ * the next command, and a gate stopped part-way leaves none. A command that does not start a
+ * review is not gated. One that does is let through only when the checkout check holds for the
+ * session the hook's input names, and only then is a pass left for the start. The check never
+ * ends in a throw: whatever stops it, the record's reads included, is a refusal naming why.
  */
 
 export type GateDeps = {
@@ -31,13 +31,10 @@ export type GateOutcome = { readonly kind: "not_gated" } | CheckoutOutcome;
 export const CHECK_PATH = "checkout check";
 
 export async function gateReview(deps: GateDeps, input: GateInput): Promise<GateOutcome> {
-  if (input.command === null || !startsReview(input.command)) {
-    await deps.pass.revoke();
-    return { kind: "not_gated" };
-  }
+  await deps.pass.revoke();
+  if (input.command === null || !startsReview(input.command)) return { kind: "not_gated" };
   const outcome = await checked(deps, input.sessionId ?? "");
   if (outcome.kind === "trusted") await deps.pass.grant(outcome.baseTip);
-  else await deps.pass.revoke();
   return outcome;
 }
 
