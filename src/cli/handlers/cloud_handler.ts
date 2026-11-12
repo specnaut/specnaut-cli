@@ -235,8 +235,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   console.log(`  Connecting to:  ${bold(apiUrl)}`);
   console.log(dim(`  Source:         ${urlSourceLabel(resolved.source)}`));
 
-  const client = bindingClient(apiUrl);
-  const store = defaultCredentialStore();
+  const { client, store } = bindingClient(apiUrl, defaultCredentialStore());
 
   if (!await trustedTarget(resolved, store)) return 1;
 

@@ -58,6 +58,8 @@ export class GateClient {
     apiUrl: string,
     fetchFn: FetchFn = fetch,
     private readonly patterns?: CredentialPatterns,
+    /** The tokens the session holds beyond the one a call is given: none a field may carry. */
+    private readonly held: () => readonly string[] = () => [],
   ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
@@ -89,7 +91,7 @@ export class GateClient {
     refuseCredentials(this.patterns, [
       ["gate title", req.title],
       ...jsonFields("gate payload", req.payload),
-    ]);
+    ], [token, ...this.held()]);
     const { status, json } = await this.send("POST", "/gates", token, {
       projectKey: req.projectKey,
       type: req.type,

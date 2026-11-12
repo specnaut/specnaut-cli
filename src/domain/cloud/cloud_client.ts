@@ -87,6 +87,8 @@ export class CloudClient {
     apiUrl: string,
     fetchFn: FetchFn = fetch,
     private readonly patterns?: CredentialPatterns,
+    /** The tokens the session holds beyond the one a call is given: none a field may carry. */
+    private readonly held: () => readonly string[] = () => [],
   ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
@@ -235,7 +237,8 @@ export class CloudClient {
     key: string,
     name: string,
   ): Promise<CloudProject> {
-    refuseCredentials(this.patterns, [["project key", key], ["project name", name]]);
+    const fields = [["project key", key], ["project name", name]] as const;
+    refuseCredentials(this.patterns, fields, [accessToken, ...this.held()]);
     const { status, json } = await this.postJson("/projects", { key, name }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create project failed");
@@ -257,7 +260,7 @@ export class CloudClient {
     projectKey: string,
     title: string,
   ): Promise<CloudTask> {
-    refuseCredentials(this.patterns, [["task title", title]]);
+    refuseCredentials(this.patterns, [["task title", title]], [accessToken, ...this.held()]);
     const { status, json } = await this.postJson("/tasks", { projectKey, title }, accessToken);
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create task failed");

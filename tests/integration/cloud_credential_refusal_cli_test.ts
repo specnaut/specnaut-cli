@@ -90,13 +90,26 @@ Deno.test("gate raise refuses a title that holds a credential, and sends nothing
   assertEquals(r.err[0].includes(VALUE), false);
 });
 
-Deno.test("the client login binds with is handed the patterns: a name is refused unsent", async () => {
+Deno.test("the client login binds with checks the name against patterns and the stored login", async () => {
   // Refused before any request, so the real fetch this client holds is never called.
-  const e = await assertRejects(
-    () => bindingClient(API).createProject("tok", "ACME", `Acme ${VALUE}`),
+  const refresh = crypto.randomUUID();
+  const { client, store } = bindingClient(API, {
+    kind: "file",
+    load: () => Promise.resolve({ accessToken: "a", refreshToken: refresh, accessExpiresAt: 0 }),
+    save: () => Promise.resolve(),
+    delete: () => Promise.resolve(),
+  });
+  const named = await assertRejects(
+    () => client.createProject("tok", "ACME", `Acme ${VALUE}`),
     CredentialRefused,
   );
-  assertEquals([e.field, e.kind], ["project name", "token"]);
+  assertEquals([named.field, named.kind], ["project name", "token"]);
+  await store.load(API); // the login, as `cloud login` reads it before binding
+  const held = await assertRejects(
+    () => client.createProject("tok", "ACME", `Acme ${refresh}`),
+    CredentialRefused,
+  );
+  assertEquals([held.field, held.kind], ["project name", "session"]);
 });
 
 Deno.test("a client handed no patterns sends no written text at all", async () => {

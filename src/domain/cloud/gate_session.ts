@@ -20,7 +20,7 @@ import {
 } from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
-import type { CredentialStore } from "./credentials.ts";
+import { type CredentialStore, watchedStore } from "./credentials.ts";
 import type { CredentialPatterns } from "./credential_check.ts";
 
 /** Typed result of awaiting / applying / cancelling. */
@@ -201,7 +201,8 @@ export function makeGateSession(deps: {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }): GateSession | null {
-  const { config, store, env } = deps;
+  const { config, env } = deps;
+  const { store, held } = watchedStore(deps.store);
   const apiUrl = linkedApiUrl(config.apiUrl);
   if (!apiUrl || !config.projectKey) return null;
 
@@ -216,7 +217,7 @@ export function makeGateSession(deps: {
     env("SPECNAUT_REMOTE") ?? env("SPECFLOW_REMOTE"),
   );
   const cloudClient = new CloudClient(apiUrl, fetchFn);
-  const gateClient = new GateClient(apiUrl, fetchFn, deps.patterns);
+  const gateClient = new GateClient(apiUrl, fetchFn, deps.patterns, held);
 
   // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
   const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });

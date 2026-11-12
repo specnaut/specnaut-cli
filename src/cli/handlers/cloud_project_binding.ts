@@ -4,15 +4,22 @@
 import { bold, dim, green, red } from "@std/fmt/colors";
 import { CloudClient, type CloudProject } from "../../domain/cloud/cloud_client.ts";
 import { bundledCredentialPatterns } from "../../application/credential_patterns.ts";
-import type { CredentialStore } from "../../domain/cloud/credentials.ts";
+import { type CredentialStore, watchedStore } from "../../domain/cloud/credentials.ts";
 import { generateProjectKey } from "../../domain/cloud/project_key.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
 import { requireCloudToken } from "./cloud_token.ts";
 
-/** The client login binds with: it may create a project, so it checks the name it sends. */
-export function bindingClient(apiUrl: string): CloudClient {
-  return new CloudClient(apiUrl, fetch, bundledCredentialPatterns());
+/**
+ * The client login binds with, and the store it signs in through: it may create a
+ * project, so it checks the name it sends, against the tokens that store holds too.
+ */
+export function bindingClient(
+  apiUrl: string,
+  credentials: CredentialStore,
+): { client: CloudClient; store: CredentialStore } {
+  const { store, held } = watchedStore(credentials);
+  return { client: new CloudClient(apiUrl, fetch, bundledCredentialPatterns(), held), store };
 }
 
 /** Bind the project: list, then select or create. */

@@ -56,6 +56,8 @@ export class SpecClient {
     apiUrl: string,
     fetchFn: FetchFn = fetch,
     private readonly patterns?: CredentialPatterns,
+    /** The tokens the session holds beyond the one a call is given: none a field may carry. */
+    private readonly held: () => readonly string[] = () => [],
   ) {
     this.base = `${apiUrl.replace(/\/+$/, "")}/api/v1`;
     this.fetchFn = fetchFn;
@@ -93,7 +95,9 @@ export class SpecClient {
     taskNumber: number,
     title?: string,
   ): Promise<SpecWire> {
-    if (title !== undefined) refuseCredentials(this.patterns, [["spec title", title]]);
+    if (title !== undefined) {
+      refuseCredentials(this.patterns, [["spec title", title]], [token, ...this.held()]);
+    }
     const { status, json } = await this.send("POST", "/specs", token, {
       projectKey,
       taskNumber,
@@ -136,6 +140,7 @@ export class SpecClient {
         [`step ${i + 1} name`, s.name],
         [`step ${i + 1} body`, s.body],
       ]),
+      [token, ...this.held()],
     );
     const { status } = await this.send("PUT", "/specs/steps", token, {
       projectKey,

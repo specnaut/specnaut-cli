@@ -12,12 +12,13 @@
 import { assertPortable } from "./ere_portability.ts";
 
 /** Which pattern matched: a token shape, a credential assigned a value, a scheme's value. */
-export type CredentialKind = "token" | "assignment" | "scheme";
+export type CredentialKind = "token" | "assignment" | "scheme" | "session";
 
 const WHAT: Record<CredentialKind, string> = {
   token: "a token",
   assignment: "a credential assigned a value, or an auth header",
   scheme: "a Bearer or Basic credential",
+  session: "the Cloud token this session signs in with",
 };
 
 export class CredentialRefused extends Error {
@@ -90,15 +91,21 @@ export function credentialKind(
 }
 
 /**
- * Throws CredentialRefused for the first field whose text holds a credential. A
- * client given no patterns sends no written text at all: it fails closed.
+ * Throws CredentialRefused for the first field whose text holds a credential: one a
+ * pattern matches, or one of `held`, the tokens the session itself holds, whatever
+ * their shape. They are compared in memory and never named. A client given no
+ * patterns sends no written text at all: it fails closed.
  */
 export function refuseCredentials(
   patterns: CredentialPatterns | undefined,
   fields: Iterable<readonly [field: string, text: string]>,
+  held: readonly string[] = [],
 ): void {
   if (!patterns) throw new Error("no credential patterns were given: no text is sent to Cloud");
+  // A token shorter than the scan's shortest value would match ordinary words.
+  const tokens = held.filter((t) => t.length >= 8);
   for (const [field, text] of fields) {
+    if (tokens.some((t) => text.includes(t))) throw new CredentialRefused(field, "session");
     const kind = credentialKind(text, patterns);
     if (kind) throw new CredentialRefused(field, kind);
   }

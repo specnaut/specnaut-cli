@@ -25,3 +25,26 @@ export interface CredentialStore {
   /** Remove the credentials for a deployment (no-op if absent). */
   delete(apiUrl: string): Promise<void>;
 }
+
+/**
+ * `store`, recording every token it loads or saves, and `held`, those tokens: what
+ * a client must refuse to send as text. A refreshed login holds both pairs.
+ */
+export function watchedStore(
+  store: CredentialStore,
+): { store: CredentialStore; held: () => readonly string[] } {
+  const seen = new Set<string>();
+  const note = (c: CloudCredentials | null) => {
+    if (c) [c.accessToken, c.refreshToken].forEach((t) => seen.add(t));
+    return c;
+  };
+  return {
+    held: () => [...seen],
+    store: {
+      kind: store.kind,
+      load: async (apiUrl) => note(await store.load(apiUrl)),
+      save: (apiUrl, creds) => (note(creds), store.save(apiUrl, creds)),
+      delete: (apiUrl) => store.delete(apiUrl),
+    },
+  };
+}

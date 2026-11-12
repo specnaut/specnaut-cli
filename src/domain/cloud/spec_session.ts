@@ -18,7 +18,7 @@ import {
 } from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
-import type { CredentialStore } from "./credentials.ts";
+import { type CredentialStore, watchedStore } from "./credentials.ts";
 import type { CredentialPatterns } from "./credential_check.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
@@ -140,15 +140,16 @@ export function makeSpecSession(deps: {
   fetchFn?: FetchFn;
   now?: () => number;
 }): SpecSession | null {
-  const { config, store, env } = deps;
+  const { config, env } = deps;
+  const { store, held } = watchedStore(deps.store);
   const apiUrl = linkedApiUrl(config.apiUrl);
   if (!apiUrl || !config.projectKey) return null;
 
   const now = deps.now ?? (() => Date.now());
   const fetchFn = deps.fetchFn ?? fetch;
 
-  const cloudClient = new CloudClient(apiUrl, fetchFn, deps.patterns);
-  const specClient = new SpecClient(apiUrl, fetchFn, deps.patterns);
+  const cloudClient = new CloudClient(apiUrl, fetchFn, deps.patterns, held);
+  const specClient = new SpecClient(apiUrl, fetchFn, deps.patterns, held);
 
   // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
   const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });
