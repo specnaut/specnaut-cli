@@ -1,3 +1,5 @@
 # The macOS entitlements are pinned by sha256 (release.yml, sign-macos) and
 # signed as bytes: a CRLF checkout on Windows would change them. Never convert.
 packaging/macos/entitlements.plist -text
+# The bundler refuses a release history file holding a CR (cli#759): always check out LF.
+.specnaut/release/history/*.md text eol=lf
