@@ -46,18 +46,16 @@ gate_candidate_in_repo() {
 # returns 1.
 # shellcheck disable=SC2034  # EXPLICIT_REFUSAL is read by the script that calls this
 gate_candidate_head() {
-  local sha="" objects=""
+  local rc
   while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --head) sha="${2:-}" ;;
-      --objects) objects="${2:-}" ;;
+    rc=0 && explicit_head_option "$@" || rc=$?
+    case $rc in
+      0) shift 2 ;;
+      2) return 1 ;;
       *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not $1"; return 1 ;;
     esac
-    shift 2 2>/dev/null || { EXPLICIT_REFUSAL="usage: $1 takes a value"; return 1; }
   done
-  [ -n "$sha$objects" ] || return 0
-  [ -n "$sha" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 1; }
-  explicit_head_take "$sha" "$objects" gate_git || return 1
+  explicit_head_from_options gate_git || return 1
 }
 
 # gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the

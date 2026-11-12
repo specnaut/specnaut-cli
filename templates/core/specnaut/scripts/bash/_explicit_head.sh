@@ -18,15 +18,35 @@
 # become readable and nothing else of its repository is read, neither refs, config nor
 # hooks. Without it, the head must already be in the repository.
 #
+# explicit_head_option <option> [<value>...] - the one parse of `--head <sha>` and
+#   `--objects <dir>`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
+#   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
+#   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_from_options <git...> - takes the head those options named, if any: refuses
+#   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_names_head <rev> - true for a spelling of HEAD (`HEAD`, `@`, either
-#   followed by `~` or `^`), which a script given a head must not read.
+#   followed by `~` or `^`), in any case: where the file system folds case, git
+#   resolves `head` to HEAD. A script given a head must not read it.
 
 EXPLICIT_HEAD="" EXPLICIT_OBJECTS="" EXPLICIT_REFUSAL=""
+EXPLICIT_HEAD_OPTION="" EXPLICIT_OBJECTS_OPTION=""
+
+explicit_head_option() {
+  case "$1" in --head | --objects) ;; *) return 1 ;; esac
+  [ -n "${2:-}" ] || { EXPLICIT_REFUSAL="$1 takes a value"; return 2; }
+  if [ "$1" = --head ]; then EXPLICIT_HEAD_OPTION="$2"; else EXPLICIT_OBJECTS_OPTION="$2"; fi
+}
+
+explicit_head_from_options() {
+  [ -n "$EXPLICIT_HEAD_OPTION$EXPLICIT_OBJECTS_OPTION" ] || return 0
+  [ -n "$EXPLICIT_HEAD_OPTION" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 2; }
+  explicit_head_take "$EXPLICIT_HEAD_OPTION" "$EXPLICIT_OBJECTS_OPTION" "$@"
+}
 
 explicit_head_take() {
   local sha="$1" objects="$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?$'
@@ -52,6 +72,6 @@ explicit_head_env() {
 }
 
 explicit_head_names_head() {
-  local re='^(HEAD|@)([~^].*)?$'
+  local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?$'
   [[ $1 =~ $re ]]
 }

@@ -24,20 +24,13 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "$here/_git_untrusted.sh" || exit 70
 
-head="" objects=""
-while [ $# -ge 2 ]; do
-  case "$1" in
-    --head) head="$2" ;;
-    --objects) objects="$2" ;;
-    *) break ;;
-  esac
+while [ $# -gt 0 ]; do
+  case "$1" in --head | --objects) ;; *) break ;; esac
+  explicit_head_option "$@" || { echo "git-read: refused: $EXPLICIT_REFUSAL" >&2; exit 2; }
   shift 2
 done
-if [ -n "$head$objects" ]; then
-  [ -n "$head" ] || { echo "git-read: refused: --objects needs --head" >&2; exit 2; }
-  explicit_head_take "$head" "$objects" _gu_git ||
-    { echo "git-read: refused: --head: $EXPLICIT_REFUSAL" >&2; exit 2; }
-fi
+explicit_head_from_options _gu_git ||
+  { echo "git-read: refused: --head: $EXPLICIT_REFUSAL" >&2; exit 2; }
 
 form="${1:-}"
 [ $# -gt 0 ] && shift

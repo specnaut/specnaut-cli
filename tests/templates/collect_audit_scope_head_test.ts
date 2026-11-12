@@ -56,11 +56,13 @@ Deno.test("audit scope --head: a range naming HEAD is refused", async () => {
   assert(!r.stdout.includes("CODE-AUDIT SCOPE"), r.stdout);
 });
 
-Deno.test("audit scope --head: a head out of reach, or objects alone, is refused", async () => {
+Deno.test("audit scope --head: a head out of reach, objects alone, or an empty value is refused", async () => {
   const repo = await fixture();
   const cases: [string[], string][] = [
     [["--head", repo.head], `error: --head: no commit ${repo.head} in reach`],
     [["--objects", repo.objects], "error: --head: --objects needs --head"],
+    [["--head", ""], "error: --head takes a value"],
+    [["--head", repo.head, "--objects", ""], "error: --objects takes a value"],
   ];
   for (const [args, why] of cases) {
     const r = await scope(repo.root, args);

@@ -29,8 +29,6 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
-HEAD_ARG=""
-OBJECTS_ARG=""
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
@@ -82,8 +80,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --head | --objects)
-      [ -n "${2:-}" ] || { echo "error: $1 requires a value" >&2; usage; exit 2; }
-      if [ "$1" = --head ]; then HEAD_ARG="$2"; else OBJECTS_ARG="$2"; fi
+      explicit_head_option "$@" || { echo "error: $EXPLICIT_REFUSAL" >&2; usage; exit 2; }
       shift 2
       ;;
     *)
@@ -99,10 +96,7 @@ if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
-if [ -n "$HEAD_ARG$OBJECTS_ARG" ]; then
-  [ -n "$HEAD_ARG" ] && explicit_head_take "$HEAD_ARG" "$OBJECTS_ARG" _gu_git ||
-    { echo "error: --head: ${EXPLICIT_REFUSAL:---objects needs --head}" >&2; exit 2; }
-fi
+explicit_head_from_options _gu_git || { echo "error: --head: $EXPLICIT_REFUSAL" >&2; exit 2; }
 TIP="${EXPLICIT_HEAD:-HEAD}"
 
 SCOPE=""

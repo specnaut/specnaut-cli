@@ -54,19 +54,6 @@ set -uo pipefail
 
 usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
 
-SINCE="" REPORT=0 HEAD_SHA="" OBJECTS=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
-    --head) [ -n "${2:-}" ] || usage; HEAD_SHA="$2"; shift 2 ;;
-    --objects) [ -n "${2:-}" ] || usage; OBJECTS="$2"; shift 2 ;;
-    --report) REPORT=1; shift ;;
-    *) usage ;;
-  esac
-done
-# A head is judged against an explicit base, and objects belong to a head.
-if { [ -n "$HEAD_SHA" ] && [ -z "$SINCE" ]; } || { [ -n "$OBJECTS" ] && [ -z "$HEAD_SHA" ]; }; then usage; fi
-
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
@@ -75,15 +62,28 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   exit 3
 }
 
+SINCE="" REPORT=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
+    --head | --objects)
+      explicit_head_option "$@" || { echo "size-ratchet: $EXPLICIT_REFUSAL" >&2; usage; }
+      shift 2
+      ;;
+    --report) REPORT=1; shift ;;
+    *) usage ;;
+  esac
+done
+# A head is judged against an explicit base.
+if [ -n "$EXPLICIT_HEAD_OPTION" ] && [ -z "$SINCE" ]; then usage; fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
   exit 3
 }
 cd -- "$REPO_ROOT" || exit 3
-if [ -n "$HEAD_SHA" ]; then
-  explicit_head_take "$HEAD_SHA" "$OBJECTS" git || { echo "size-ratchet: --head: $EXPLICIT_REFUSAL" >&2; exit 3; }
-  explicit_head_env
-fi
+explicit_head_from_options git || { echo "size-ratchet: --head: $EXPLICIT_REFUSAL" >&2; exit 3; }
+explicit_head_env
 if [ -n "$SINCE" ] && ! git rev-parse --verify -q "$SINCE^{commit}" >/dev/null; then
   echo "size-ratchet: not a commit: $SINCE" >&2
   exit 3
@@ -109,8 +109,10 @@ done <<<"$limits"
 # Specnaut's own files: the lock's entries.
 managed="$(config_lock_entries "$LOCK")"
 
+# A name holding a newline is never exempt: grep reads such a pattern as several
+# lines, any of which could name a managed file.
 is_exempt() {
-  case "$1" in .specnaut/*) return 0 ;; esac
+  case "$1" in *$'\n'*) return 1 ;; .specnaut/*) return 0 ;; esac
   if [ -n "$managed" ] && printf '%s\n' "$managed" | grep -Fxq -- "$1"; then return 0; fi
   config_exempt "$1" ${exempt[@]+"${exempt[@]}"}
 }

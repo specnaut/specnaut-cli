@@ -65,14 +65,27 @@ Deno.test("size ratchet --head: only a full commit id is a head", async () => {
 
 Deno.test("size ratchet --head: needs --since, and --objects needs --head", async () => {
   const repo = await grown();
+  const cases: [string[], string][] = [
+    [["--head", repo.head, "--objects", repo.objects], "usage: size-ratchet.sh"],
+    [["--since", repo.base, "--objects", repo.objects], "--head: --objects needs --head"],
+  ];
+  for (const [args, why] of cases) {
+    const r = await ratchet(repo.root, args);
+    assertEquals(r.code, 3, args.join(" ") + r.stderr);
+    assertStringIncludes(r.stderr, why);
+  }
+});
+
+Deno.test("size ratchet --head: an empty --head or --objects is refused, never read as none", async () => {
+  const repo = await grown();
   for (
     const args of [
-      ["--head", repo.head, "--objects", repo.objects],
-      ["--since", repo.base, "--objects", repo.objects],
+      ["--since", repo.base, "--head", ""],
+      ["--since", repo.base, "--head", repo.head, "--objects", ""],
     ]
   ) {
     const r = await ratchet(repo.root, args);
-    assertEquals(r.code, 3, args.join(" ") + r.stderr);
-    assertStringIncludes(r.stderr, "usage: size-ratchet.sh");
+    assertEquals(r.code, 3, args.join(" ") + r.stdout + r.stderr);
+    assertStringIncludes(r.stderr, `size-ratchet: ${args.at(-2)} takes a value`);
   }
 });

@@ -39,15 +39,6 @@ fail() { echo "$NAME: $*" >&2; exit 2; }
 skip() { echo "$NAME: skipped — $*"; exit 4; }
 
 usage() { fail "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"; }
-HEAD_SHA="" OBJECTS=""
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --head) [ -n "${2:-}" ] || usage; HEAD_SHA="$2"; shift 2 ;;
-    --objects) [ -n "${2:-}" ] || usage; OBJECTS="$2"; shift 2 ;;
-    *) usage ;;
-  esac
-done
-[ -z "$OBJECTS" ] || [ -n "$HEAD_SHA" ] || usage
 
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,12 +46,19 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 { . "$here/_config.sh" && . "$here/_explicit_head.sh"; } ||
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 
+while [ "$#" -gt 0 ]; do
+  rc=0 && explicit_head_option "$@" || rc=$?
+  case $rc in
+    0) shift 2 ;;
+    2) fail "$EXPLICIT_REFUSAL" ;;
+    *) usage ;;
+  esac
+done
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "$REPO_ROOT" || fail "cannot enter $REPO_ROOT"
-if [ -n "$HEAD_SHA" ]; then
-  explicit_head_take "$HEAD_SHA" "$OBJECTS" git || fail "--head: $EXPLICIT_REFUSAL"
-  explicit_head_env
-fi
+explicit_head_from_options git || fail "--head: $EXPLICIT_REFUSAL"
+explicit_head_env
 
 config_present "$CONFIG_BOUNDARIES" || skip "no $CONFIG_BOUNDARIES"
 # Captured before it is split, so its exit 2 is seen.

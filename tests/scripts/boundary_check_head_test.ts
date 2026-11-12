@@ -55,9 +55,22 @@ Deno.test("boundary check --head: a head the repository cannot reach is refused,
 
 Deno.test("boundary check: --objects needs --head, and any other argument is refused", async () => {
   const repo = await split();
-  for (const args of [["--objects", repo.objects], ["--since", repo.base]]) {
+  const cases: [string[], string][] = [
+    [["--objects", repo.objects], "boundary-check: --head: --objects needs --head"],
+    [["--since", repo.base], "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"],
+  ];
+  for (const [args, why] of cases) {
     const r = await check(repo.root, args);
     assertEquals(r.code, 2, args.join(" ") + r.stderr);
-    assertStringIncludes(r.stderr, "usage: boundary-check.sh [--head <sha> [--objects <dir>]]");
+    assertStringIncludes(r.stderr, why);
+  }
+});
+
+Deno.test("boundary check: an empty --head or --objects is refused, never read as none", async () => {
+  const repo = await split();
+  for (const args of [["--head", ""], ["--head", repo.head, "--objects", ""]]) {
+    const r = await check(repo.root, args);
+    assertEquals(r.code, 2, args.join(" ") + r.stdout + r.stderr);
+    assertStringIncludes(r.stderr, `boundary-check: ${args.at(-2)} takes a value`);
   }
 });

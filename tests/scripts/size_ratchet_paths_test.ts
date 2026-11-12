@@ -10,6 +10,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { FILE, lines, ratchet, repo, run, stage } from "./size_ratchet_fixture.ts";
+import { run as child } from "../templates/child_fixture.ts";
 
 /** Commits `name` at `start` lines in a fresh repo held to target 300, ceiling 400. */
 async function committed(name: string, start: number): Promise<string> {
@@ -81,4 +82,31 @@ Deno.test({
   name: "a name that reads as an index stage is measured as itself",
   ignore: Deno.build.os === "windows", // `:` is not a legal file name character on Windows
   fn: () => assertGrowthRefused("1:x.ts"),
+});
+
+// grep reads a pattern holding a newline as one pattern per line, so a name
+// whose second line is a managed path was taken for that managed file and
+// passed at any size. The name is staged through the index alone: no file
+// system is asked to hold a newline in a name.
+Deno.test("a name holding a newline is never exempt, even when one line names a managed file", async () => {
+  const dir = await repo(10, FILE(300, 400));
+  await Deno.writeTextFile(
+    join(dir, ".specnaut/installed.lock"),
+    "version: 2\nentries:\n  managed.ts:\n    sha256: abc\ntemplates_version: 1\n",
+  );
+  await run("git", ["add", ".specnaut/installed.lock"], dir);
+  await run("git", ["commit", "-q", "-m", "lock"], dir);
+  const blob = await child("git", ["hash-object", "-w", "--stdin"], dir, {}, lines(900));
+  const name = "grown.ts\nmanaged.ts";
+  const staged = await child(
+    "git",
+    ["update-index", "-z", "--index-info"],
+    dir,
+    {},
+    `100644 ${blob.stdout.trim()}\t${name}\0`,
+  );
+  assertEquals(staged.code, 0, staged.stderr);
+  const r = await ratchet(dir);
+  assertEquals(r.code, 1, r.stdout + r.stderr);
+  assertStringIncludes(r.stderr, `${name}: 0 → 900 (target 300, ceiling 400) — over the ceiling`);
 });

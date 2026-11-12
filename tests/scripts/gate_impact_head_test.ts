@@ -73,6 +73,17 @@ Deno.test("gate impact --head: a head out of reach is refused, never looked for"
   ]]);
 });
 
+Deno.test("gate impact --head: an empty --head or --objects is refused, never read as none", async () => {
+  const { repo, head } = await withHead();
+  for (const extra of [["--head", ""], ["--head", head, "--objects", ""]]) {
+    const rows = await impact(repo, extra);
+    assertEquals(kinds(rows, "refused"), [[
+      "refused",
+      `head-refused: ${extra.at(-2)} takes a value`,
+    ]], extra.join(" "));
+  }
+});
+
 /** `gate_evidence_write` as run-gate.sh calls it, after the candidate took `head`. */
 async function evidence(repo: Repo, head: string, objects: string, folder: string) {
   const records = join(repo.outside, "ev-records");

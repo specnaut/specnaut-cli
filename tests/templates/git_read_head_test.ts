@@ -42,7 +42,15 @@ Deno.test("git-read --head: the head's objects are read by id in every form", as
 Deno.test("git-read --head: no revision may spell HEAD", async () => {
   const repo = await fixture();
   const head = ["--head", repo.head, "--objects", repo.objects];
-  for (const args of [["log", "HEAD"], ["names", "main", "HEAD~1"], ["log", "main..@"]]) {
+  const spellings = [
+    ["log", "HEAD"],
+    ["names", "main", "HEAD~1"],
+    ["log", "main..@"],
+    // Where the file system folds case, git resolves `head` to HEAD.
+    ["log", "head"],
+    ["names", "main", "Head^"],
+  ];
+  for (const args of spellings) {
     const r = await gitRead([...head, ...args], repo.root);
     assertEquals(r.code, 2, args.join(" ") + r.stdout);
     assertStringIncludes(r.stderr, "git-read: refused: ");
@@ -62,7 +70,10 @@ Deno.test("git-read --head: refuses a head it cannot reach, a short id, and obje
       ["--head", repo.head, "--objects", "relative/objects", "files"],
       "--head: not an absolute path",
     ],
-    [["--objects", repo.objects, "files"], "--objects needs --head"],
+    [["--objects", repo.objects, "files"], "--head: --objects needs --head"],
+    [["--head", "", "files"], "--head takes a value"],
+    [["--head", repo.head, "--objects", "", "files"], "--objects takes a value"],
+    [["--head"], "--head takes a value"],
   ];
   for (const [args, why] of cases) {
     const r = await gitRead(args, repo.root);

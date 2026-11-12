@@ -16531,8 +16531,6 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
-HEAD_ARG=""
-OBJECTS_ARG=""
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
@@ -16584,8 +16582,7 @@ while [ \$# -gt 0 ]; do
       shift 2
       ;;
     --head | --objects)
-      [ -n "\${2:-}" ] || { echo "error: \$1 requires a value" >&2; usage; exit 2; }
-      if [ "\$1" = --head ]; then HEAD_ARG="\$2"; else OBJECTS_ARG="\$2"; fi
+      explicit_head_option "\$@" || { echo "error: \$EXPLICIT_REFUSAL" >&2; usage; exit 2; }
       shift 2
       ;;
     *)
@@ -16601,10 +16598,7 @@ if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
-if [ -n "\$HEAD_ARG\$OBJECTS_ARG" ]; then
-  [ -n "\$HEAD_ARG" ] && explicit_head_take "\$HEAD_ARG" "\$OBJECTS_ARG" _gu_git ||
-    { echo "error: --head: \${EXPLICIT_REFUSAL:---objects needs --head}" >&2; exit 2; }
-fi
+explicit_head_from_options _gu_git || { echo "error: --head: \$EXPLICIT_REFUSAL" >&2; exit 2; }
 TIP="\${EXPLICIT_HEAD:-HEAD}"
 
 SCOPE=""
@@ -16945,15 +16939,35 @@ gu_manifests() {
 # become readable and nothing else of its repository is read, neither refs, config nor
 # hooks. Without it, the head must already be in the repository.
 #
+# explicit_head_option <option> [<value>...] - the one parse of \`--head <sha>\` and
+#   \`--objects <dir>\`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
+#   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
+#   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_from_options <git...> - takes the head those options named, if any: refuses
+#   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_names_head <rev> - true for a spelling of HEAD (\`HEAD\`, \`@\`, either
-#   followed by \`~\` or \`^\`), which a script given a head must not read.
+#   followed by \`~\` or \`^\`), in any case: where the file system folds case, git
+#   resolves \`head\` to HEAD. A script given a head must not read it.
 
 EXPLICIT_HEAD="" EXPLICIT_OBJECTS="" EXPLICIT_REFUSAL=""
+EXPLICIT_HEAD_OPTION="" EXPLICIT_OBJECTS_OPTION=""
+
+explicit_head_option() {
+  case "\$1" in --head | --objects) ;; *) return 1 ;; esac
+  [ -n "\${2:-}" ] || { EXPLICIT_REFUSAL="\$1 takes a value"; return 2; }
+  if [ "\$1" = --head ]; then EXPLICIT_HEAD_OPTION="\$2"; else EXPLICIT_OBJECTS_OPTION="\$2"; fi
+}
+
+explicit_head_from_options() {
+  [ -n "\$EXPLICIT_HEAD_OPTION\$EXPLICIT_OBJECTS_OPTION" ] || return 0
+  [ -n "\$EXPLICIT_HEAD_OPTION" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 2; }
+  explicit_head_take "\$EXPLICIT_HEAD_OPTION" "\$EXPLICIT_OBJECTS_OPTION" "\$@"
+}
 
 explicit_head_take() {
   local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
@@ -16979,7 +16993,7 @@ explicit_head_env() {
 }
 
 explicit_head_names_head() {
-  local re='^(HEAD|@)([~^].*)?\$'
+  local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?\$'
   [[ \$1 =~ \$re ]]
 }
 `,
@@ -29618,18 +29632,16 @@ gate_candidate_in_repo() {
 # returns 1.
 # shellcheck disable=SC2034  # EXPLICIT_REFUSAL is read by the script that calls this
 gate_candidate_head() {
-  local sha="" objects=""
+  local rc
   while [ "\$#" -gt 0 ]; do
-    case "\$1" in
-      --head) sha="\${2:-}" ;;
-      --objects) objects="\${2:-}" ;;
+    rc=0 && explicit_head_option "\$@" || rc=\$?
+    case \$rc in
+      0) shift 2 ;;
+      2) return 1 ;;
       *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not \$1"; return 1 ;;
     esac
-    shift 2 2>/dev/null || { EXPLICIT_REFUSAL="usage: \$1 takes a value"; return 1; }
   done
-  [ -n "\$sha\$objects" ] || return 0
-  [ -n "\$sha" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 1; }
-  explicit_head_take "\$sha" "\$objects" gate_git || return 1
+  explicit_head_from_options gate_git || return 1
 }
 
 # gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the
@@ -32199,19 +32211,6 @@ set -uo pipefail
 
 usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
 
-SINCE="" REPORT=0 HEAD_SHA="" OBJECTS=""
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
-    --head) [ -n "\${2:-}" ] || usage; HEAD_SHA="\$2"; shift 2 ;;
-    --objects) [ -n "\${2:-}" ] || usage; OBJECTS="\$2"; shift 2 ;;
-    --report) REPORT=1; shift ;;
-    *) usage ;;
-  esac
-done
-# A head is judged against an explicit base, and objects belong to a head.
-if { [ -n "\$HEAD_SHA" ] && [ -z "\$SINCE" ]; } || { [ -n "\$OBJECTS" ] && [ -z "\$HEAD_SHA" ]; }; then usage; fi
-
 # Sourced before the \`cd\` below: the script's own directory may be relative.
 here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
@@ -32220,15 +32219,28 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
   exit 3
 }
 
+SINCE="" REPORT=0
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
+    --head | --objects)
+      explicit_head_option "\$@" || { echo "size-ratchet: \$EXPLICIT_REFUSAL" >&2; usage; }
+      shift 2
+      ;;
+    --report) REPORT=1; shift ;;
+    *) usage ;;
+  esac
+done
+# A head is judged against an explicit base.
+if [ -n "\$EXPLICIT_HEAD_OPTION" ] && [ -z "\$SINCE" ]; then usage; fi
+
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
   exit 3
 }
 cd -- "\$REPO_ROOT" || exit 3
-if [ -n "\$HEAD_SHA" ]; then
-  explicit_head_take "\$HEAD_SHA" "\$OBJECTS" git || { echo "size-ratchet: --head: \$EXPLICIT_REFUSAL" >&2; exit 3; }
-  explicit_head_env
-fi
+explicit_head_from_options git || { echo "size-ratchet: --head: \$EXPLICIT_REFUSAL" >&2; exit 3; }
+explicit_head_env
 if [ -n "\$SINCE" ] && ! git rev-parse --verify -q "\$SINCE^{commit}" >/dev/null; then
   echo "size-ratchet: not a commit: \$SINCE" >&2
   exit 3
@@ -32254,8 +32266,10 @@ done <<<"\$limits"
 # Specnaut's own files: the lock's entries.
 managed="\$(config_lock_entries "\$LOCK")"
 
+# A name holding a newline is never exempt: grep reads such a pattern as several
+# lines, any of which could name a managed file.
 is_exempt() {
-  case "\$1" in .specnaut/*) return 0 ;; esac
+  case "\$1" in *\$'\\n'*) return 1 ;; .specnaut/*) return 0 ;; esac
   if [ -n "\$managed" ] && printf '%s\\n' "\$managed" | grep -Fxq -- "\$1"; then return 0; fi
   config_exempt "\$1" \${exempt[@]+"\${exempt[@]}"}
 }
@@ -32408,15 +32422,6 @@ fail() { echo "\$NAME: \$*" >&2; exit 2; }
 skip() { echo "\$NAME: skipped — \$*"; exit 4; }
 
 usage() { fail "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"; }
-HEAD_SHA="" OBJECTS=""
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    --head) [ -n "\${2:-}" ] || usage; HEAD_SHA="\$2"; shift 2 ;;
-    --objects) [ -n "\${2:-}" ] || usage; OBJECTS="\$2"; shift 2 ;;
-    *) usage ;;
-  esac
-done
-[ -z "\$OBJECTS" ] || [ -n "\$HEAD_SHA" ] || usage
 
 # Sourced before the \`cd\` below: the script's own directory may be relative.
 here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
@@ -32424,12 +32429,19 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 { . "\$here/_config.sh" && . "\$here/_explicit_head.sh"; } ||
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 
+while [ "\$#" -gt 0 ]; do
+  rc=0 && explicit_head_option "\$@" || rc=\$?
+  case \$rc in
+    0) shift 2 ;;
+    2) fail "\$EXPLICIT_REFUSAL" ;;
+    *) usage ;;
+  esac
+done
+
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "\$REPO_ROOT" || fail "cannot enter \$REPO_ROOT"
-if [ -n "\$HEAD_SHA" ]; then
-  explicit_head_take "\$HEAD_SHA" "\$OBJECTS" git || fail "--head: \$EXPLICIT_REFUSAL"
-  explicit_head_env
-fi
+explicit_head_from_options git || fail "--head: \$EXPLICIT_REFUSAL"
+explicit_head_env
 
 config_present "\$CONFIG_BOUNDARIES" || skip "no \$CONFIG_BOUNDARIES"
 # Captured before it is split, so its exit 2 is seen.
@@ -32770,15 +32782,35 @@ gu_manifests() {
 # become readable and nothing else of its repository is read, neither refs, config nor
 # hooks. Without it, the head must already be in the repository.
 #
+# explicit_head_option <option> [<value>...] - the one parse of \`--head <sha>\` and
+#   \`--objects <dir>\`: keeps the value in EXPLICIT_HEAD_OPTION or EXPLICIT_OBJECTS_OPTION and
+#   the caller shifts two. Returns 1 for any other option, and 2 with EXPLICIT_REFUSAL set for
+#   a value that is missing or empty: an empty head is a refusal, never "no head".
+# explicit_head_from_options <git...> - takes the head those options named, if any: refuses
+#   --objects without --head, then runs explicit_head_take.
 # explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_names_head <rev> - true for a spelling of HEAD (\`HEAD\`, \`@\`, either
-#   followed by \`~\` or \`^\`), which a script given a head must not read.
+#   followed by \`~\` or \`^\`), in any case: where the file system folds case, git
+#   resolves \`head\` to HEAD. A script given a head must not read it.
 
 EXPLICIT_HEAD="" EXPLICIT_OBJECTS="" EXPLICIT_REFUSAL=""
+EXPLICIT_HEAD_OPTION="" EXPLICIT_OBJECTS_OPTION=""
+
+explicit_head_option() {
+  case "\$1" in --head | --objects) ;; *) return 1 ;; esac
+  [ -n "\${2:-}" ] || { EXPLICIT_REFUSAL="\$1 takes a value"; return 2; }
+  if [ "\$1" = --head ]; then EXPLICIT_HEAD_OPTION="\$2"; else EXPLICIT_OBJECTS_OPTION="\$2"; fi
+}
+
+explicit_head_from_options() {
+  [ -n "\$EXPLICIT_HEAD_OPTION\$EXPLICIT_OBJECTS_OPTION" ] || return 0
+  [ -n "\$EXPLICIT_HEAD_OPTION" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 2; }
+  explicit_head_take "\$EXPLICIT_HEAD_OPTION" "\$EXPLICIT_OBJECTS_OPTION" "\$@"
+}
 
 explicit_head_take() {
   local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
@@ -32804,7 +32836,7 @@ explicit_head_env() {
 }
 
 explicit_head_names_head() {
-  local re='^(HEAD|@)([~^].*)?\$'
+  local re='^([Hh][Ee][Aa][Dd]|@)([~^].*)?\$'
   [[ \$1 =~ \$re ]]
 }
 `,
@@ -32900,20 +32932,13 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "\$here/_git_untrusted.sh" || exit 70
 
-head="" objects=""
-while [ \$# -ge 2 ]; do
-  case "\$1" in
-    --head) head="\$2" ;;
-    --objects) objects="\$2" ;;
-    *) break ;;
-  esac
+while [ \$# -gt 0 ]; do
+  case "\$1" in --head | --objects) ;; *) break ;; esac
+  explicit_head_option "\$@" || { echo "git-read: refused: \$EXPLICIT_REFUSAL" >&2; exit 2; }
   shift 2
 done
-if [ -n "\$head\$objects" ]; then
-  [ -n "\$head" ] || { echo "git-read: refused: --objects needs --head" >&2; exit 2; }
-  explicit_head_take "\$head" "\$objects" _gu_git ||
-    { echo "git-read: refused: --head: \$EXPLICIT_REFUSAL" >&2; exit 2; }
-fi
+explicit_head_from_options _gu_git ||
+  { echo "git-read: refused: --head: \$EXPLICIT_REFUSAL" >&2; exit 2; }
 
 form="\${1:-}"
 [ \$# -gt 0 ] && shift
