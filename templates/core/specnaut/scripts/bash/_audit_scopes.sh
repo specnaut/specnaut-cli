@@ -8,10 +8,12 @@
 
 # scope_read <form> <args...> - the form's output. A refusal by the library stops
 # the audit with its message: an argument it refuses is an error, not an empty
-# scope. Any other failure (an unknown revision) reads as empty, as before.
+# scope. Any other failure (an unknown revision) reads as empty, as before. With no
+# temporary file to hold the form's errors, a refusal could not be told from an
+# empty answer, so the audit stops too.
 scope_read() {
   local out rc=0 err
-  err="$(mktemp)"
+  err="$(mktemp)" && [ -n "$err" ] || { echo "error: cannot create a temporary file" >&2; exit 2; }
   out="$("$@" 2>"$err")" || rc=$?
   if [ "$rc" -eq 2 ] && grep -q '^git-read: refused' "$err"; then
     cat "$err" >&2
