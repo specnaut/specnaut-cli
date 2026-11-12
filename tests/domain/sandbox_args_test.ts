@@ -29,6 +29,8 @@ const TMPFS = `rw,nosuid,nodev,size=${LIMITS.scratchBytes},mode=1777`;
 const EXPECTED_CONTAINER_ARGS = [
   "run",
   "--rm",
+  "--pull",
+  "never",
   "--name",
   NAME,
   "--init",
@@ -181,6 +183,10 @@ Deno.test("generators refuse a policy holding a path they cannot pass safely", (
   assertThrows(() => bwrapArgs({ ...policyOf("bwrap"), writes: ["/a\nb"] }, COMMAND));
   assertThrows(() => containerArgs({ ...forged, reads: ["/a,ro=false"] }, RUN, COMMAND));
   assertThrows(() => containerArgs({ ...policyOf("container"), writes: ["/a:rw"] }, RUN, COMMAND));
+});
+
+Deno.test("containerArgs: the image is never pulled, so a run stays offline", () => {
+  assertEquals(after(container(), "--pull"), ["never"]);
 });
 
 Deno.test("containerArgs: a named run, an init reaping its children, and no engine-kept logs", () => {

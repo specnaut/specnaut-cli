@@ -21,10 +21,11 @@ export type ContainerRun = { readonly image: string; readonly name: string };
 const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
 /**
- * `run` arguments for podman or docker: a named run with an init process that reaps orphans and
- * forwards signals, no log the engine keeps after it, no network, a read-only root, no
- * capabilities, no privilege gain, the `nobody` user, the policy's caps (swap counted in the memory
- * cap), its scratch folders as tmpfs and the exported tree as the one bind mount, read-only.
+ * `run` arguments for podman or docker: a named run of an image already present (never pulled,
+ * so a run stays offline), with an init process that reaps orphans and forwards signals, no log
+ * the engine keeps after it, no network, a read-only root, no capabilities, no privilege gain, the
+ * `nobody` user, the policy's caps (swap counted in the memory cap), its scratch folders as tmpfs
+ * and the exported tree as the one bind mount, read-only.
  * `--env NAME=value` always carries its value: `--env NAME` alone would copy the host's.
  */
 export function containerArgs(
@@ -34,7 +35,7 @@ export function containerArgs(
 ): string[] {
   const { image, name } = checkedRun(run);
   return [
-    ...["run", "--rm", "--name", name, "--init", "--log-driver", "none"],
+    ...["run", "--rm", "--pull", "never", "--name", name, "--init", "--log-driver", "none"],
     ...containerNetwork(policy.network),
     ...["--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],

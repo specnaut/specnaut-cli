@@ -26,7 +26,12 @@ export class ContainerRunner implements SandboxRunner {
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const args = containerArgs(policy, { image: this.image, name }, command);
-    const remove = { cmd: this.engine, args: ["rm", "--force", name], env: "host" } as const;
+    const remove = {
+      cmd: this.engine,
+      args: ["rm", "--force", name],
+      env: "host",
+      stdout: "discarded",
+    } as const;
     // A container outlives its client: an interrupt removes it rather than leave it running.
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {

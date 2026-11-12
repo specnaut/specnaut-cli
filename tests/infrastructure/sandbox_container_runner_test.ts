@@ -1,8 +1,14 @@
 import { assert, assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
+import {
+  DenoProcessLauncher,
+  type ProcessLauncher,
+} from "../../src/infrastructure/sandbox_process.ts";
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
-import { COMMAND, fakeLauncher, IMAGE, withWallClock } from "./sandbox_runner_fixture.ts";
+import { capture } from "./sandbox_live_fixture.ts";
+import { COMMAND, fakeLauncher, IMAGE, POSIX, withWallClock } from "./sandbox_runner_fixture.ts";
 
 /**
  * The container runner: the engine launched with exactly the domain's `run` arguments under a
@@ -49,6 +55,39 @@ Deno.test("ContainerRunner: past the wall clock the container is removed by name
     cmd: "podman",
     args: ["rm", "--force", "specnaut-sandbox-x2"],
     env: "host",
+    stdout: "discarded",
   });
   assertEquals(launches[0].stopped, 1);
+});
+
+/** An engine that prints a line and hangs on `run`, and prints the name it removes on `rm`. */
+const FAKE_ENGINE = `#!/bin/sh
+case "$1" in
+  run) echo "from the command"; exec sleep 30.137 ;;
+  rm) echo "removed $3" ;;
+esac
+`;
+
+Deno.test({
+  name: "ContainerRunner: past the wall clock, stdout holds the command's output and nothing else",
+  ignore: !POSIX,
+  fn: async () => {
+    const dir = await Deno.makeTempDir({ prefix: "specnaut-engine-" });
+    try {
+      const engine = join(dir, "engine");
+      await Deno.writeTextFile(engine, FAKE_ENGINE, { mode: 0o755 });
+      const out = capture();
+      const real = new DenoProcessLauncher(out.stream, capture().stream);
+      const launcher: ProcessLauncher = {
+        start: (spec) => real.start({ ...spec, cmd: engine }),
+        runSync: (spec) => real.runSync({ ...spec, cmd: engine }),
+      };
+      const runner = new ContainerRunner("podman", IMAGE, launcher, () => "specnaut-sandbox-x3");
+      const outcome = await runner.run(withWallClock(policyOf("container"), 1), COMMAND);
+      assertEquals(outcome, { kind: "timed_out", seconds: 1 });
+      assertEquals(out.text(), "from the command\n");
+    } finally {
+      await Deno.remove(dir, { recursive: true });
+    }
+  },
 });

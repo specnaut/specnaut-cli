@@ -16,6 +16,8 @@ export type ProcessSpec = {
   readonly env: Readonly<Record<string, string>> | "host";
   readonly cwd?: string;
   readonly stdin?: Uint8Array;
+  /** `discarded` for a helper whose output must never pass for the command's own; `copied` else. */
+  readonly stdout?: "copied" | "discarded";
 };
 
 export type Started = {
@@ -45,8 +47,11 @@ export async function untilWallClock(
   try {
     const first = await Promise.race([started.exited, late]);
     if (first !== "late") return { kind: "exited", code: first };
-    await halt();
-    started.stop();
+    try {
+      await halt();
+    } finally {
+      started.stop();
+    }
     await started.exited;
     return { kind: "timed_out", seconds };
   } finally {
@@ -57,6 +62,8 @@ export async function untilWallClock(
 const GROUPS = Deno.build.os !== "windows";
 
 export class DenoProcessLauncher implements ProcessLauncher {
+  #sinks?: Sinks;
+
   constructor(
     readonly out: WritableStream<Uint8Array> = Deno.stdout.writable,
     readonly err: WritableStream<Uint8Array> = Deno.stderr.writable,
@@ -66,9 +73,10 @@ export class DenoProcessLauncher implements ProcessLauncher {
     const child = command(spec, spec.stdin ? "piped" : "null").spawn();
     const stop = () => killGroup(child);
     const disarm = armExitTrap(stop);
+    const sinks = this.#sinks ??= { out: this.out.getWriter(), err: this.err.getWriter() };
     const copied = Promise.all([
-      child.stdout.pipeTo(this.out, { preventClose: true }),
-      child.stderr.pipeTo(this.err, { preventClose: true }),
+      spec.stdout === "discarded" ? undefined : copy(child.stdout, sinks.out),
+      copy(child.stderr, sinks.err),
     ]);
     if (spec.stdin) feed(child.stdin, spec.stdin, spec.cmd);
     const exited = child.status.then(async ({ code }) => {
@@ -85,6 +93,23 @@ export class DenoProcessLauncher implements ProcessLauncher {
   }
 }
 
+/**
+ * One writer per output stream, held for the launcher's life: every process it starts writes
+ * through them, so two at once (a run and the removal of its container) never contend for a
+ * stream, as two `pipeTo`s would, the second finding it locked.
+ */
+type Sinks = {
+  readonly out: WritableStreamDefaultWriter<Uint8Array>;
+  readonly err: WritableStreamDefaultWriter<Uint8Array>;
+};
+
+async function copy(
+  from: ReadableStream<Uint8Array>,
+  to: WritableStreamDefaultWriter<Uint8Array>,
+): Promise<void> {
+  for await (const chunk of from) await to.write(chunk);
+}
+
 function command(spec: ProcessSpec, stdin: "piped" | "null"): Deno.Command {
   const host = spec.env === "host";
   return new Deno.Command(spec.cmd, {
@@ -93,7 +118,7 @@ function command(spec: ProcessSpec, stdin: "piped" | "null"): Deno.Command {
     env: host ? undefined : { ...spec.env as Record<string, string> },
     cwd: spec.cwd,
     stdin,
-    stdout: "piped",
+    stdout: spec.stdout === "discarded" ? "null" : "piped",
     stderr: "piped",
     detached: GROUPS,
   });
