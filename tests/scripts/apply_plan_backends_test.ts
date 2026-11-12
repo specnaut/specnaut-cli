@@ -125,7 +125,11 @@ Deno.test("cloud: a create travels in the JSON payload; what the contract lacks 
       jsonl({ op: "create", title: "A $(touch m) debt", body: "Why." }),
     );
     assertEquals(out.lines, ["APPLIED create 5", "RECEIPT: none"], out.stderr);
-    assertStringIncludes(out.calls, '"title": "A $(touch m) debt",   "body": "Why."');
+    // The payload is the request body, sent from a file, never an argument.
+    assertEquals(out.bodies.length, 1, out.calls);
+    const sent = JSON.parse(out.bodies[0]);
+    assertEquals([sent.title, sent.body], ["A $(touch m) debt", "Why."], out.bodies[0]);
+    assert(!out.calls.includes("touch m"), out.calls);
     const label = await readThenApply(
       p,
       ["tech-debt"],

@@ -8,6 +8,8 @@ import { gitProject } from "./read_items_fixture.ts";
  * terminal column is the last by order, whatever its name (`terminal_column`,
  * cloud/_config.sh): a plan never moves a task into it, and a close reaches it
  * only behind the cascade check — on the column the board itself names.
+ * The stand-in logs argv, then a request body read from `--data-binary @<file>`
+ * on a `BODY` line.
  */
 
 /** columns.json is the board (out of order, the terminal one Shipped); kids.json lists #1's children. */
@@ -15,6 +17,11 @@ const CURL = `#!/usr/bin/env bash
 printf curl >> "$FAKE_ROOT/calls.log"
 for a in "$@"; do printf '\\t%s' "\${a//$'\\n'/ }" >> "$FAKE_ROOT/calls.log"; done
 echo >> "$FAKE_ROOT/calls.log"
+prev=""
+for a in "$@"; do
+  [ "$prev" != --data-binary ] || printf 'BODY\\t%s\\n' "$(cat -- "\${a#@}")" >> "$FAKE_ROOT/calls.log"
+  prev=$a
+done
 cat >/dev/null
 case "$*" in
   *PATCH*) b='{"ok":true}' ;;
@@ -64,7 +71,7 @@ Deno.test("cloud: a move to the terminal column is refused, whatever it is calle
       jsonl({ op: "move", target: 1, status: "Ready" }),
     );
     assertEquals([open.code, open.lines], [0, ["APPLIED move 1", "RECEIPT: none"]], open.stderr);
-    assertStringIncludes(open.calls, '"status": "Ready"');
+    assertStringIncludes(open.calls, 'BODY\t{"projectKey":"K","number":1,"status":"Ready"}');
   } finally {
     await p.cleanup();
   }
@@ -80,8 +87,8 @@ Deno.test("cloud: a close passes the cascade check, then moves into the column t
     await p.write("fake/kids.json", NO_KIDS);
     const closed = await readThenApply(p, ["close", "--id", "1"], plan);
     assertEquals(closed.lines, ["APPLIED close 1", "RECEIPT: none"], closed.stderr);
-    assertStringIncludes(closed.calls, '"status": "Shipped"');
-    assert(!closed.calls.includes('"status": "Done"'), closed.calls);
+    assertStringIncludes(closed.calls, '"status":"Shipped"}');
+    assert(!closed.calls.includes('"status":"Done"'), closed.calls);
   } finally {
     await p.cleanup();
   }

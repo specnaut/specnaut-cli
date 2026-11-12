@@ -120,7 +120,8 @@ async function assertSentAsWritten(backend: Backend, w: Writer, viaFile: boolean
     const args = viaFile ? w.way.file!(join(p.dir, "text.md")) : w.way.argv!(text);
     const r = await p.run(w.name, args);
     assertEquals(r.code, 0, `${w.script} ${w.way.field}\n${r.stdout}${r.stderr}`);
-    const sent = backend === "local" ? await snapshot(p) : r.raw;
+    // A remote body travels off the command line (stdin or a body file): it counts as sent too.
+    const sent = backend === "local" ? await snapshot(p) : [r.raw, ...r.bodies].join("\0");
     assert(reached(sent, text), `${w.script} ${w.way.field}: not sent as written\n${r.raw}`);
   } finally {
     await p.cleanup();
@@ -180,7 +181,7 @@ for (const backend of ["github", "gitlab", "cloud", "local"] as const) {
   });
 }
 
-/** The text arrived intact: inside an argument or a body file, or as a string of a JSON payload. */
+/** The text arrived intact: inside an argument, a body file or a request body, or as a string of a JSON payload. */
 function reached(sent: string, text: string): boolean {
   if (sent.includes(text)) return true;
   return sent.split("\0").some((a) => {
