@@ -64,11 +64,19 @@ Deno.test("on Windows, reserved characters and device names are refused too", ()
     assertEquals(fault(name, true), "a character Windows reserves", name);
     assertEquals(fault(name, false), null, name);
   }
-  for (const name of ["CON", "nul.txt", "Aux.c", "com1", "LPT9.log", "prn "]) {
+  const devices = ["CON", "nul.txt", "Aux.c", "com1", "LPT9.log", "prn ", "CONIN$", "conout$.txt"];
+  for (const name of [...devices, "COM0", "lpt\u00b9", "com\u00b3.x", "nul .txt"]) {
     assertEquals(fault(name, true), "a Windows device name", name);
   }
   assertEquals(fault("console", true), null);
   assertEquals(fault("com10", true), null);
+});
+
+Deno.test("on Windows, a name ending in a dot or a space is refused: Windows would trim it", () => {
+  for (const name of ["a.", "a ", "notes. "]) {
+    assertEquals(fault(name, true), "a name Windows would trim", JSON.stringify(name));
+    assertEquals(fault(name, false), null, JSON.stringify(name));
+  }
 });
 
 Deno.test("names that one filesystem would merge fold to one key", () => {

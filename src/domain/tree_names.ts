@@ -14,8 +14,12 @@ const HFS_IGNORABLE = /[\u200c-\u200f\u202a-\u202e\u206a-\u206f\ufeff]/gu;
 /** Characters a Windows path cannot hold in a name; `:` would open an alternate data stream. */
 const WINDOWS_RESERVED = /[<>:"|?*]/;
 
-/** Names Windows opens as a device whatever the extension. */
-const WINDOWS_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/;
+/**
+ * Names Windows opens as a device whatever the extension: the console pair, and `COM`/`LPT` with
+ * any digit, the superscript ones included, which Windows also reads as a port number.
+ */
+const WINDOWS_DEVICE =
+  /^(?:con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/;
 
 const MAX_NAME_BYTES = 255;
 
@@ -34,8 +38,14 @@ export function nameFault(bytes: Uint8Array, windows: boolean): string | null {
   if (name === "." || name === "..") return "a '.' or '..' step";
   if (isDotGit(name)) return "a spelling of .git";
   if (windows && WINDOWS_RESERVED.test(name)) return "a character Windows reserves";
-  if (windows && WINDOWS_DEVICE.test(foldKey(name).split(".")[0])) return "a Windows device name";
+  if (windows && isDevice(name)) return "a Windows device name";
+  if (windows && /[. ]$/.test(name)) return "a name Windows would trim";
   return null;
+}
+
+/** A device name before any extension, spaces before the dot ignored as Windows ignores them. */
+function isDevice(name: string): boolean {
+  return WINDOWS_DEVICE.test(foldKey(name).split(".")[0].replace(/ +$/, ""));
 }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
