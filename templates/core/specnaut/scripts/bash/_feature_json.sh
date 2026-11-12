@@ -8,37 +8,51 @@
 _FEATURE_JSON_UNPARSEABLE=65
 
 # The "feature_directory" of the feature.json at $1, by jq, else python3, else a
-# single-line grep (which misses a pretty-printed file). Nothing, status 0, when
-# it names none: no key, a null, or not an object, as Get-FeatureJsonDirectory
-# reads it.
+# single-line grep (which misses a value on a line apart from its key). Nothing,
+# status 0, when it names none: no key, a null, or not an object, as
+# Get-FeatureJsonDirectory reads it.
 #
 # A feature.json that exists is a pointer `plan` wrote, so one that cannot be
 # read or parsed is refused (cli#778), status 1, never swapped for a guess from
 # the branch: the act `_feature_json_contradicts_branch` refuses. The line is
 # Get-FeatureJsonDirectory's, with the .NET type its reader throws for the same
-# failure, so both twins print one text; a reader's own message names the file.
-# One that is not a regular file is refused before any reader runs (cli#780),
-# with the type Get-Content throws on a directory. The grep reader cannot tell
-# an unparseable file from one without the key, and falls back to the branch on
-# both; it also answers when python3 fails to start, as the Windows Store alias
-# does, since only the python3 program's own status says the file is at fault.
+# failure, so both twins print one text; a reader's own message is discarded,
+# so no path reaches stderr. One that is not a regular file is refused before
+# any reader runs (cli#780), with the type Get-Content throws on a directory.
 _feature_json_dir() {
-    local _fj_type=ArgumentException _fj_out _fj_status=0
+    local _fj_type=ArgumentException
     if [ ! -f "$1" ]; then
         _fj_type=InvalidOperationException
     elif [ ! -r "$1" ]; then
         _fj_type=UnauthorizedAccessException
-    elif command -v jq >/dev/null 2>&1; then
-        jq_lf -r 'if type == "object" then .feature_directory // empty else empty end' "$1" 2>/dev/null && return 0
     else
-        if command -v python3 >/dev/null 2>&1; then
-            _fj_out=$(_feature_json_python "$1") || _fj_status=$?
-            [ "$_fj_status" -ne 0 ] || { printf '%s' "$_fj_out"; return 0; }
-        fi
-        [ "$_fj_status" -eq "$_FEATURE_JSON_UNPARSEABLE" ] || { _feature_json_grep "$1"; return 0; }
+        _feature_json_read "$1" && return 0
     fi
     echo "ERROR: Failed to parse .specnaut/feature.json ($_fj_type)" >&2
     return 1
+}
+
+# What `_feature_json_dir` reads from $1, by the first reader that starts;
+# status 1 when one that ran says the file does not parse. A reader that fails
+# to start (a broken jq, the Windows Store alias for python3) is not the file's
+# fault, and the next one answers. python3 says so by a status of its own; jq's
+# status for a parse failure differs by version, so a jq that fails and then
+# runs an empty program has started, and it is the file that failed. The grep
+# reader cannot tell an unparseable file from one without the key, and falls
+# back to the branch on both.
+_feature_json_read() {
+    local _fj_out _fj_status=0
+    if command -v jq >/dev/null 2>&1; then
+        _fj_out=$(jq_lf -r 'if type == "object" then .feature_directory // empty else empty end' "$1" 2>/dev/null) &&
+            { printf '%s' "$_fj_out"; return 0; }
+        jq_lf -n empty >/dev/null 2>&1 && return 1
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        _fj_out=$(_feature_json_python "$1") || _fj_status=$?
+        [ "$_fj_status" -ne 0 ] || { printf '%s' "$_fj_out"; return 0; }
+        [ "$_fj_status" -ne "$_FEATURE_JSON_UNPARSEABLE" ] || return 1
+    fi
+    _feature_json_grep "$1"
 }
 
 # What `_feature_json_dir` reads with python3; -I keeps a module planted in the

@@ -1,6 +1,7 @@
-// The project, the PATH and the assertion that feature_json_read_test.ts's
-// rows share (cli#763, cli#778, cli#780): a repository on `001-demo` holding
-// that feature, and one directory of tool wrappers standing in for PATH.
+// The cases, the project, the PATH and the assertion that
+// feature_json_read_test.ts and feature_json_readers_test.ts share (cli#763,
+// cli#778, cli#780): a repository on `001-demo` holding that feature, and one
+// directory of tool wrappers standing in for PATH.
 
 import { assert, assertEquals } from "@std/assert";
 import { copy } from "@std/fs";
@@ -36,6 +37,46 @@ export type Case = {
   directory?: boolean;
   expect: string;
 };
+
+export const NO_KEY: Case = {
+  label: "a feature.json with no feature_directory",
+  content: `{"other":1}`,
+  expect: BRANCH,
+};
+
+/** What each twin, and each bash reader, owes a feature.json. */
+export const CASES: Case[] = [
+  {
+    label: "an unparseable feature.json",
+    content: "{not json",
+    unparseable: true,
+    expect: REFUSAL("ArgumentException"),
+  },
+  {
+    // What it would say if read names the branch's own feature, so a read shows.
+    label: "a feature.json that cannot be read (POSIX)",
+    content: `{"feature_directory":".specnaut/specs/001-demo"}`,
+    unreadable: true,
+    expect: REFUSAL("UnauthorizedAccessException"),
+  },
+  NO_KEY,
+  { label: "a feature.json that is not an object", content: "[]", expect: BRANCH },
+  { label: "an empty feature.json", content: "", expect: BRANCH },
+  { label: "a null feature_directory", content: `{"feature_directory":null}`, expect: BRANCH },
+  { label: "no feature.json", content: null, expect: BRANCH },
+  {
+    // A reader that returns nothing falls back to the branch: this tells them apart.
+    label: "a feature.json naming the feature under another parent",
+    content: `{"feature_directory":"${ELSEWHERE}"}`,
+    expect: ELSEWHERE,
+  },
+  {
+    label: "a feature.json that is a directory",
+    content: null,
+    directory: true,
+    expect: REFUSAL("InvalidOperationException"),
+  },
+];
 
 /**
  * A repository on `001-demo` holding that feature and ELSEWHERE, the scripts,
