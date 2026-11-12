@@ -1,9 +1,9 @@
 import { assertEquals } from "@std/assert";
+import type { LinkEnd } from "../../src/domain/checkout_link.ts";
 import {
   CHECKOUT_REASON,
   type CheckoutEntry,
   judgeCheckout,
-  type LinkEnd,
 } from "../../src/domain/checkout_trust.ts";
 import { type BaseEntry, REASON } from "../../src/domain/script_trust.ts";
 

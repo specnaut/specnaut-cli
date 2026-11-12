@@ -8,7 +8,8 @@ import {
   type Untrusted,
 } from "./script_trust.ts";
 import { sameBytes } from "./bytes.ts";
-import { inCheckoutScope, inDeepRoot } from "./checkout_scope.ts";
+import { inCheckoutScope } from "./checkout_scope.ts";
+import { LINK_REASON, type LinkEnd, linkReason } from "./checkout_link.ts";
 
 /**
  * Whether the checkout a session runs in may steer the review of a branch it does not trust. The
@@ -23,20 +24,10 @@ import { inCheckoutScope, inDeepRoot } from "./checkout_scope.ts";
  *    bundle is their second copy);
  * 3. every file in `CHECKOUT_SCOPE` (`checkout_scope.ts`) equals its blob at the base's tip, byte
  *    for byte, and the tip has every one the tree has: no extra file, untracked or ignored ones
- *    included. A link holds only as the tip's own, by where it leads on disk (`linkReason`).
+ *    included. A link holds only as the tip's own, by where it leads on disk (`checkout_link.ts`).
  *
  * Anything else stops the review, which never falls back to reading the checkout as it is.
  */
-
-/**
- * Where a link leads, as the walk resolved it on disk: a path relative to the project's real root
- * with the file's identity (`dev:ino`, `null` where the platform has none), or why it leads nowhere
- * the check can follow.
- */
-export type LinkEnd =
-  | { readonly kind: "inside"; readonly path: string; readonly id: string | null }
-  | { readonly kind: "outside" }
-  | { readonly kind: "unresolved"; readonly why: string };
 
 /** A tree entry as the checkout walk reads it: a file with its identity, a link with its end. */
 export type CheckoutEntry = TreeEntry & { readonly id?: string | null; readonly end?: LinkEnd };
@@ -64,9 +55,7 @@ export const CHECKOUT_REASON = {
   headHolds: "HEAD holds this commit of the branch under review",
   headAhead: "HEAD holds this commit the base's tip lacks",
   scripts: "the helper scripts are untrusted",
-  linkLeaves: "a link out of the checked files",
-  linkForm: "a link target with a backslash or a drive",
-  linkUnresolved: "a link that leads nowhere",
+  ...LINK_REASON,
 } as const;
 
 /**
@@ -148,26 +137,4 @@ function entryReason(
     if (sameBytes(entry.bytes, new TextEncoder().encode(base.target))) return null;
   }
   return REASON.differs;
-}
-
-/**
- * A link holds only as the tip's own link, written with forward slashes and no drive, and only when
- * it leads, on disk, to a file this check compared (the same `dev:ino`) or into a root it walks
- * whole. A link into the project's other files, a subfolder no root walks, or out of the project
- * leads where the check cannot vouch for.
- */
-function linkReason(
-  entry: CheckoutEntry & { kind: "link" },
-  base: BaseEntry,
-  ids: ReadonlySet<string>,
-): string | null {
-  if (base.kind !== "link" || entry.target === undefined || entry.target !== base.target) {
-    return REASON.differs;
-  }
-  if (/\\|^[A-Za-z]:/.test(entry.target)) return CHECKOUT_REASON.linkForm;
-  const end = entry.end;
-  if (end === undefined || end.kind === "outside") return CHECKOUT_REASON.linkLeaves;
-  if (end.kind === "unresolved") return `${CHECKOUT_REASON.linkUnresolved}: ${end.why}`;
-  if (end.id !== null && ids.has(end.id)) return null;
-  return inDeepRoot(end.path) ? null : CHECKOUT_REASON.linkLeaves;
 }

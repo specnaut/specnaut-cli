@@ -1,7 +1,8 @@
 import { isAbsolute, join, relative, SEPARATOR } from "@std/path";
 import { type CheckoutTreeWalker, MAX_SCRIPT_BYTES } from "../application/script_trust_ports.ts";
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
-import type { CheckoutEntry, CheckoutWalk, LinkEnd } from "../domain/checkout_trust.ts";
+import type { LinkEnd } from "../domain/checkout_link.ts";
+import type { CheckoutEntry, CheckoutWalk } from "../domain/checkout_trust.ts";
 import { REASON } from "../domain/script_trust.ts";
 
 /**
