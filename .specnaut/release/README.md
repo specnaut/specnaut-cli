@@ -68,6 +68,8 @@ control, format, line or paragraph separator, default-ignorable — or a name th
 `v<MAJOR.MINOR.PATCH[-PRERELEASE]>.md`. A prerelease is recorded under its own name, and
 `specnaut upgrade` shows it only to a project upgrading to a prerelease. The files are records of
 what each release published: `deno fmt` skips them, and nothing edits one after its release.
+`scripts/check-release-history.ts`, run by CI, holds that: each record whose tag exists must equal
+`HIGHLIGHTS.md` as that tag published it (whitespace-insensitive, a missing file read as empty).
 
 ## Prerequisites — repo secrets
 

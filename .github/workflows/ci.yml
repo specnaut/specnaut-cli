@@ -42,6 +42,13 @@ jobs:
           echo "Bundle is in sync with templates/."
       - name: Type check
         run: deno task check
+      - name: History records are what their release published
+        # Each .specnaut/release/history/v<X>.md is compared with HIGHLIGHTS.md at tag v<X>
+        # (cli#775). The checkout is shallow and fetches no tag, so the tags come first, each at
+        # depth 1: only the tagged tree is read.
+        run: |
+          git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+          deno run --allow-read --allow-run scripts/check-release-history.ts
       - name: Test
         run: deno task test
 

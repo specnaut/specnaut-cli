@@ -39,7 +39,7 @@ const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
  * Highlights compared whitespace-insensitively: reflowing is exactly the edit
  * that must NOT count as rewriting, and `deno fmt` performs it unasked.
  */
-const flat = (t: string) => t.replace(/\s+/g, " ").trim();
+export const flat = (t: string) => t.replace(/\s+/g, " ").trim();
 
 async function git(...args: string[]): Promise<string> {
   const out = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
