@@ -6,11 +6,14 @@
  * the line grants, so every renderer enforces the same reading:
  *
  * - **Claude Code** enforces the list itself: a tool not named is not there.
- * - **OpenCode** gets an explicit `deny` for every capability not granted,
- *   rather than silence, which would leave OpenCode's own default in force. A
- *   read-only grant (`isReadOnlyGrant`) is deny-by-default: `"*": deny`, then
- *   `bash`, `edit`, `write`, the web tools it lacks, `task` and `skill` denied by
- *   name, then its read tools: MCP tools and patching fall under the wildcard.
+ * - **OpenCode** gets an explicit `deny` for every capability not granted but
+ *   `read`, which is never denied, rather than silence, which would leave
+ *   OpenCode's own default in force; a tool outside `CAPABILITIES` (`task`,
+ *   `skill`, MCP tools) keeps that default. A read-only grant
+ *   (`isReadOnlyGrant`) is deny-by-default instead: `"*": deny`; then `bash`,
+ *   `edit`, `write`, the web tools it lacks, `task` and `skill` denied by name;
+ *   then its own tools allowed back, the web ones at `ask`. MCP tools and
+ *   patching fall under the wildcard.
  * - **Codex** offers no enforced seat isolation. A seat inherits the parent
  *   session's sandbox, and its agent file can switch the shell tool off but
  *   cannot remove exec, inherited MCP servers or agent spawning. A grant naming
