@@ -34,7 +34,7 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
     ...(policy.services.length > 0
       ? [`(allow mach-lookup ${policy.services.map(service).join(" ")})`]
       : []),
-    "(deny network*)",
+    networkRule(policy.network),
     "(deny job-creation)",
     `(deny mach-lookup ${forbidden.map(service).join(" ")})`,
     "",
@@ -47,4 +47,12 @@ function rules(kind: "subpath" | "literal", paths: readonly string[]): string {
 
 function service(name: string): string {
   return `(global-name "${name}")`;
+}
+
+/** `none` shuts the host's whole network stack, loopback and unix sockets included. */
+function networkRule(network: SandboxPolicy["network"]): string {
+  switch (network) {
+    case "none":
+      return "(deny network*)";
+  }
 }

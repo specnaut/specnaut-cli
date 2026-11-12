@@ -1,6 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { LIMITS, type SandboxPaths, sandboxPolicy } from "../../src/domain/sandbox.ts";
 import { ALLOWED_SERVICES, FORBIDDEN_SERVICES } from "../../src/domain/sandbox_hosts.ts";
+import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
+import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
@@ -97,9 +99,15 @@ Deno.test("sandboxPolicy: a path the backends cannot quote or that is not plain 
 });
 
 Deno.test("sandboxPolicy: no network, loopback included, on every backend", () => {
-  for (const backend of ["container", "bwrap", "seatbelt"] as const) {
-    assertEquals(policyOf(backend).network, "none");
-  }
+  const image = `ghcr.io/acme/dev@sha256:${"c".repeat(64)}`;
+  const ctr = containerArgs(policyOf("container"), image, ["true"]);
+  assertEquals(ctr.flatMap((a, i) => (a === "--network" ? [ctr[i + 1]] : [])), ["none"]);
+  const bwrap = bwrapArgs(policyOf("bwrap"), ["true"]);
+  assert(bwrap.includes("--unshare-all"));
+  assertEquals(bwrap.filter((a) => a.startsWith("--share")), []);
+  const rules = seatbeltProfile(policyOf("seatbelt")).split("\n");
+  const lastAllow = rules.findLastIndex((l) => l.startsWith("(allow"));
+  assert(rules.indexOf("(deny network*)") > lastAllow);
 });
 
 Deno.test("sandboxPolicy: processes, memory, CPU, wall-clock and scratch are capped", () => {

@@ -26,7 +26,8 @@ export function containerArgs(
   return [
     "run",
     "--rm",
-    ...["--network", "none", "--read-only", "--cap-drop", "ALL"],
+    ...containerNetwork(policy.network),
+    ...["--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
     ...["--pids-limit", String(limits.processes), "--memory", String(limits.memoryBytes)],
     ...["--memory-swap", String(limits.memoryBytes), "--cpus", String(limits.cpus)],
@@ -52,6 +53,7 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
   const size = String(policy.limits.scratchBytes);
   return [
     ...["--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--cap-drop", "ALL"],
+    ...bwrapNetwork(policy.network),
     ...policy.system.flatMap((p) => ["--ro-bind-try", safePath(p), p]),
     ...policy.reads.flatMap((p) => ["--ro-bind", safePath(p), p]),
     ...["--proc", "/proc", "--dev", "/dev"],
@@ -61,4 +63,23 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
     "--",
     ...command,
   ];
+}
+
+/** The container's network: with `none` it has its own loopback only, never the host's. */
+function containerNetwork(network: SandboxPolicy["network"]): string[] {
+  switch (network) {
+    case "none":
+      return ["--network", "none"];
+  }
+}
+
+/**
+ * Bubblewrap's network: `--unshare-all` already gave the sandbox a network namespace of its own,
+ * so `none` adds nothing; any other value would be the `--share-net` it must never carry.
+ */
+function bwrapNetwork(network: SandboxPolicy["network"]): string[] {
+  switch (network) {
+    case "none":
+      return [];
+  }
 }
