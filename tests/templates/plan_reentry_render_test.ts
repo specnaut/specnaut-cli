@@ -24,7 +24,7 @@ Deno.test("every harness and option set ships the same plan row, gate and Re-ent
   const para = [
     "`plan <id>` classifies the item once, before `phases/plan.md` step 2",
     "bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>",
-    "Every `plan`, with an id or not, passes its intake gate before step 2.",
+    "Every `plan`, with an id or not, passes the intake gate (`phases/auto-chain.md`) before step 2.",
     "Only the user's own arguments in this turn amend it",
   ];
   for (const h of HARNESSES) {

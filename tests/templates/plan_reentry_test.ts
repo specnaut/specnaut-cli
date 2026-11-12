@@ -54,7 +54,10 @@ Deno.test("plan.md loads plan-reentry.md, which re-enters on the item's own bran
   for (
     const [doc, s] of [
       [plan, "first runs `phases/plan-reentry.md`"],
-      [plan, "Every `plan`, with an id or not, passes its intake gate before step 2."],
+      [
+        plan,
+        "Every `plan`, with an id or not, passes the intake gate (`phases/auto-chain.md`) before step 2.",
+      ],
       [plan, "git add .specnaut/specs/<feature-dir>/ .specnaut/feature.json"],
       [plan, "A non-zero exit is a stop: never retried with `--allow-existing-branch`"],
       [re, "`plan <id>` classifies the item once, before `phases/plan.md` step 2"],

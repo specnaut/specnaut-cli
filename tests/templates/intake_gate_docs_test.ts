@@ -33,19 +33,15 @@ Deno.test("auto-chain.md is the one home of the proceed rule, the call and the f
   assertStringIncludes(chain, "`--fence-ack <n>` added, for that run only");
 });
 
-Deno.test("each caller names the intake gate once and restates none of its rule", () => {
+Deno.test("each caller names the intake gate once, routes it to auto-chain.md, restates none of it", () => {
   for (const p of CALLERS) {
     const src = flat(read(p));
-    assertEquals(
-      count(src, "intake gate"),
-      1,
-      `${p} names the gate ${count(src, "intake gate")} times`,
-    );
-    for (
-      const rule of ["gate clear", "gate blocked", "--fence-ack", "exit 4", "--own", "--since"]
-    ) {
-      assert(!src.includes(rule), `${p} restates the gate's rule: ${rule}`);
-    }
+    const n = count(src, "intake gate"),
+      near = src.slice(src.indexOf("intake gate")).slice(0, 48);
+    assertEquals(n, 1, `${p} names the gate ${n} times`);
+    assert(near.includes("`phases/auto-chain.md`"), `${p} names the gate, not where it lives`);
+    const rules = ["gate clear", "gate blocked", "--fence-ack", "exit 4", "--own", "--since"];
+    for (const rule of rules) assert(!src.includes(rule), `${p} restates the gate's rule: ${rule}`);
   }
   // Only resume reads the gate's lines, and it reads them as row evidence.
   for (const p of ["phases/plan.md", "phases/implement.md"]) {

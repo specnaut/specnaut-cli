@@ -129,8 +129,8 @@ step 4b, without being asked.
 ## Steps
 
 **Re-entry.** \`plan <id>\` on an item already on the board first runs \`phases/plan-reentry.md\`,
-which classifies it and says where this phase picks up. Every \`plan\`, with an id or not, passes its
-intake gate before step 2.
+which classifies it and says where this phase picks up. Every \`plan\`, with an id or not, passes the
+intake gate (\`phases/auto-chain.md\`) before step 2.
 
 ### 1. If the idea is still fuzzy, find out what it is — then keep going
 
@@ -335,7 +335,7 @@ whether the chain goes on.
 An epic is one plan: for a child, \`<task>\` below is its parent epic, and the epic's class picks the
 branch. Only one thing is the child's own: open chains, closed runs alone (\`phases/auto-chain.md\`).
 Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`; the
-intake gate \`phases/plan.md\` runs stops an \`UNPUSHED\` one. So an \`IDLE\` child of an \`ACTIVE\` epic
+intake gate (\`phases/auto-chain.md\`) stops an \`UNPUSHED\` one. So an \`IDLE\` child of an \`ACTIVE\` epic
 continues on the epic's branch. Run \`specnaut spec pull <task>\` first. A plan exists when it materialises
 \`.specnaut/specs/.cache/<task>/1-plan.md\`; \`no spec for task\`, or no such file, means none does.
 Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused — since an

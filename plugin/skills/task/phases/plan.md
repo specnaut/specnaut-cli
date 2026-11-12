@@ -18,8 +18,8 @@ step 4b, without being asked.
 ## Steps
 
 **Re-entry.** `plan <id>` on an item already on the board first runs `phases/plan-reentry.md`,
-which classifies it and says where this phase picks up. Every `plan`, with an id or not, passes its
-intake gate before step 2.
+which classifies it and says where this phase picks up. Every `plan`, with an id or not, passes the
+intake gate (`phases/auto-chain.md`) before step 2.
 
 ### 1. If the idea is still fuzzy, find out what it is — then keep going
 
