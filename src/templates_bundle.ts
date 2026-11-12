@@ -16528,8 +16528,9 @@ done
 # COMMITS are <base>..<head>, and FILES are the union of the diffs from each merge base
 # of the two to the head, so a file only the base changed since the branch forked is not
 # in scope, and in a criss-cross history no base hides a file another one shows.
-# HEAD is never read: the checkout may be the base's tip or behind it. It takes no
-# --path, --range or --last.
+# HEAD is never read: the checkout may be the base's tip or behind it. The base must be
+# in the repository's own objects; one only the --objects folder holds is refused. It
+# takes no --path, --range or --last.
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
@@ -17158,7 +17159,8 @@ scope_read() {
 # another only: FILES are the union of the diffs from every one.
 scope_base() {
   local forks fork files=""
-  [ "\$(_gu_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)" = "\$BASE_ARG" ] ||
+  # The base is proved by the repository's own objects, never through the head's folder.
+  [ "\$(EXPLICIT_OBJECTS="" _gu_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)" = "\$BASE_ARG" ] ||
     { echo "error: --base: no commit \$BASE_ARG in reach" >&2; exit 2; }
   forks="\$(scope_read _gu_git merge-base --all --end-of-options "\$EXPLICIT_HEAD" "\$BASE_ARG")"
   [ -n "\$forks" ] || { echo "error: --base: \$BASE_ARG and the head share no history" >&2; exit 2; }

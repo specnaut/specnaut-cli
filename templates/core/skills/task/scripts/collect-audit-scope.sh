@@ -24,8 +24,9 @@
 # COMMITS are <base>..<head>, and FILES are the union of the diffs from each merge base
 # of the two to the head, so a file only the base changed since the branch forked is not
 # in scope, and in a criss-cross history no base hides a file another one shows.
-# HEAD is never read: the checkout may be the base's tip or behind it. It takes no
-# --path, --range or --last.
+# HEAD is never read: the checkout may be the base's tip or behind it. The base must be
+# in the repository's own objects; one only the --objects folder holds is refused. It
+# takes no --path, --range or --last.
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail

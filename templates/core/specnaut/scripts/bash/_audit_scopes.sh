@@ -29,7 +29,8 @@ scope_read() {
 # another only: FILES are the union of the diffs from every one.
 scope_base() {
   local forks fork files=""
-  [ "$(_gu_git rev-parse --verify --quiet --end-of-options "$BASE_ARG^{commit}" 2>/dev/null)" = "$BASE_ARG" ] ||
+  # The base is proved by the repository's own objects, never through the head's folder.
+  [ "$(EXPLICIT_OBJECTS="" _gu_git rev-parse --verify --quiet --end-of-options "$BASE_ARG^{commit}" 2>/dev/null)" = "$BASE_ARG" ] ||
     { echo "error: --base: no commit $BASE_ARG in reach" >&2; exit 2; }
   forks="$(scope_read _gu_git merge-base --all --end-of-options "$EXPLICIT_HEAD" "$BASE_ARG")"
   [ -n "$forks" ] || { echo "error: --base: $BASE_ARG and the head share no history" >&2; exit 2; }

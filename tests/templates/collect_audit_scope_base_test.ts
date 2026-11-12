@@ -77,3 +77,35 @@ Deno.test("audit scope --base: needs a head, mixes with no other scope, and take
     assert(!r.stdout.includes("CODE-AUDIT SCOPE"), r.stdout);
   }
 });
+
+// The base is the side the review trusts: its id is proved against the repository's own objects,
+// never through the objects folder the head came in.
+
+Deno.test("audit scope --base: a base present only in the objects folder is refused", async () => {
+  const repo = await forked();
+  const exported = repo.objects.replace(/[\\/]objects$/, "");
+  const tree = await git(repo.root, "rev-parse", "main^{tree}");
+  const only = await git(
+    repo.root,
+    "--git-dir",
+    exported,
+    "commit-tree",
+    "-p",
+    repo.head,
+    "-m",
+    "x",
+    tree,
+  );
+  const head = ["--head", repo.head, "--objects", repo.objects];
+  const r = await scope(repo.root, ["--base", only, ...head]);
+  assertEquals(r.code, 2, r.stdout);
+  assertStringIncludes(r.stderr, `error: --base: no commit ${only} in reach`);
+});
+
+Deno.test("audit scope --base: with an empty objects folder, a base in the repository resolves", async () => {
+  const repo = await forked();
+  const empty = (await Deno.makeTempDir({ prefix: "audit-empty-objects-" })).replaceAll("\\", "/");
+  const r = await scope(repo.root, ["--base", repo.base, "--head", repo.tip, "--objects", empty]);
+  assertEquals(r.code, 0, r.stderr);
+  assertEquals(section(r.stdout, "FILES", "TOTAL_FILES"), ["src/shared.ts"]);
+});
