@@ -5751,8 +5751,8 @@ Spawned by \`/task audit\`, over the scope it resolved — the whole project by 
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-\`review-findings-contract\` § Read-only contract binds this seat. Dependencies come from the
-manifests and lockfiles you read.
+Read-only: no mutating tool, no shell — \`review-findings-contract\` § Read-only contract binds this
+seat. Dependencies come from the manifests and lockfiles you read.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
@@ -5887,8 +5887,9 @@ FE-surface gate. Walk only the surfaces the project has.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-\`review-findings-contract\` § Read-only contract binds this seat. Live browser testing and
-mobile-native semantics are out of scope — name them as runtime coverage to add, not as findings.
+Read-only: no mutating tool, no shell — \`review-findings-contract\` § Read-only contract binds this
+seat. Live browser testing and mobile-native semantics are out of scope — name them as runtime
+coverage to add, not as findings.
 
 ## Output — every mode
 
@@ -5969,8 +5970,9 @@ Spawned by \`/task audit\`, over the scope it resolved — the whole project by 
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-\`review-findings-contract\` § Read-only contract binds this seat. A cycle is traced through the
-imports you read; a module graph you cannot read whole is a suspicion, not a finding.
+Read-only: no mutating tool, no shell — \`review-findings-contract\` § Read-only contract binds this
+seat. A cycle is traced through the imports you read; a module graph you cannot read whole is a
+suspicion, not a finding.
 
 ### Axes, in order
 
@@ -6110,9 +6112,10 @@ Spawned by \`/task audit\`, over the scope it resolved — the whole project by 
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-\`review-findings-contract\` § Read-only contract binds this seat. Versions, licenses and the
-dependency tree come from the manifests and lockfiles you read. **Never a live advisory or CVE
-lookup**: name an advisory scanner for the ecosystem as recommended follow-up tooling instead.
+Read-only: no mutating tool, no shell — \`review-findings-contract\` § Read-only contract binds this
+seat. Versions, licenses and the dependency tree come from the manifests and lockfiles you read.
+**Never a live advisory or CVE lookup**: name an advisory scanner for the ecosystem as recommended
+follow-up tooling instead.
 
 ### Manifest auto-detection
 

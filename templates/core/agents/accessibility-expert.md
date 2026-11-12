@@ -94,8 +94,9 @@ FE-surface gate. Walk only the surfaces the project has.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-`review-findings-contract` § Read-only contract binds this seat. Live browser testing and
-mobile-native semantics are out of scope — name them as runtime coverage to add, not as findings.
+Read-only: no mutating tool, no shell — `review-findings-contract` § Read-only contract binds this
+seat. Live browser testing and mobile-native semantics are out of scope — name them as runtime
+coverage to add, not as findings.
 
 ## Output — every mode
 

@@ -61,8 +61,9 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-`review-findings-contract` § Read-only contract binds this seat. A cycle is traced through the
-imports you read; a module graph you cannot read whole is a suspicion, not a finding.
+Read-only: no mutating tool, no shell — `review-findings-contract` § Read-only contract binds this
+seat. A cycle is traced through the imports you read; a module graph you cannot read whole is a
+suspicion, not a finding.
 
 ### Axes, in order
 

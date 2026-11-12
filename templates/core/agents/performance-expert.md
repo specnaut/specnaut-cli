@@ -70,8 +70,8 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-`review-findings-contract` § Read-only contract binds this seat. Dependencies come from the
-manifests and lockfiles you read.
+Read-only: no mutating tool, no shell — `review-findings-contract` § Read-only contract binds this
+seat. Dependencies come from the manifests and lockfiles you read.
 
 ## Mode 3 — Plan expertise (before any code exists)
 

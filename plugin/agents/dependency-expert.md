@@ -72,9 +72,10 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-`review-findings-contract` § Read-only contract binds this seat. Versions, licenses and the
-dependency tree come from the manifests and lockfiles you read. **Never a live advisory or CVE
-lookup**: name an advisory scanner for the ecosystem as recommended follow-up tooling instead.
+Read-only: no mutating tool, no shell — `review-findings-contract` § Read-only contract binds this
+seat. Versions, licenses and the dependency tree come from the manifests and lockfiles you read.
+**Never a live advisory or CVE lookup**: name an advisory scanner for the ecosystem as recommended
+follow-up tooling instead.
 
 ### Manifest auto-detection
 

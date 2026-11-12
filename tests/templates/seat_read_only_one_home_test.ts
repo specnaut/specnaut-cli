@@ -4,8 +4,8 @@ import { fromFileUrl, join } from "@std/path";
 /**
  * #758: the read-only paragraph four review seats share is written once, in
  * `review-findings-contract`, which every one of them already preloads. Each
- * seat keeps its `Read-only contract` heading, a pointer at the skill, and the
- * one sentence that is its own. A second copy of the shared rule would drift
+ * seat keeps its `Read-only contract` heading, one inline clause with a pointer
+ * at the skill, and the one sentence that is its own. A second copy of the shared rule would drift
  * from the first at the next edit, and the seats would follow different rules.
  */
 
@@ -21,7 +21,12 @@ const SHARED =
   "hold, downgrade to `Suspicion —` and name what would settle it.";
 /** Fragments of the shared rule: any one of them in an agent file is a second copy. */
 const SHARED_FRAGMENTS = ["NotebookEdit or any mutating tool", "name what would settle it"];
-const POINTER = "`review-findings-contract` § Read-only contract binds this seat.";
+/**
+ * The one clause each seat keeps inline: the Codex renderer drops `skills:`, so a
+ * seat there reads this line even when it never opens the skill.
+ */
+const POINTER = "Read-only: no mutating tool, no shell — " +
+  "`review-findings-contract` § Read-only contract binds this seat.";
 
 /** seat -> the sentence that stays in its own file. */
 const OWN_SENTENCE = new Map<string, string>([
