@@ -2,7 +2,14 @@ import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
-import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
+import {
+  after,
+  PATHS,
+  policyOf,
+  PROXY_NAMES,
+  SCRATCH_HOME,
+  SCRATCH_TMP,
+} from "./sandbox_fixture.ts";
 
 /**
  * The arguments each launcher is given carry the policy and nothing else: every isolation flag is
@@ -12,7 +19,9 @@ import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fix
 const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
 const NAME = "specnaut-gate-3f9c2a71";
-const RUN = { image: IMAGE, name: NAME };
+const RUN = { image: IMAGE, name: NAME, engine: "docker" } as const;
+
+const BLANKED = PROXY_NAMES.map((name) => `${name}=`);
 
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 
@@ -54,6 +63,7 @@ const EXPECTED_CONTAINER_ARGS = [
   `type=bind,src=${PATHS.tree},dst=${PATHS.tree},readonly=true`,
   "--workdir",
   PATHS.tree,
+  ...BLANKED.flatMap((blank) => ["--env", blank]),
   "--env",
   `HOME=${SCRATCH_HOME}`,
   "--env",
@@ -87,8 +97,18 @@ Deno.test("containerArgs: only the exported tree is mounted, read-only; writes g
 
 Deno.test("containerArgs: every variable carries its value; none is inherited from the host", () => {
   const args = container();
-  assertEquals(after(args, "--env"), [`HOME=${SCRATCH_HOME}`, `TMPDIR=${SCRATCH_TMP}`]);
+  assertEquals(after(args, "--env"), [...BLANKED, `HOME=${SCRATCH_HOME}`, `TMPDIR=${SCRATCH_TMP}`]);
   assertEquals(args.filter((a) => a === "-e" || a.startsWith("--env-file")), []);
+});
+
+Deno.test("containerArgs: on either engine, every proxy variable is set empty; podman copies none", () => {
+  for (const engine of ["docker", "podman"] as const) {
+    const args = containerArgs(policyOf("container"), { ...RUN, engine }, COMMAND);
+    const proxies = after(args, "--env").filter((e) => PROXY_NAMES.includes(e.split("=")[0]));
+    assertEquals(proxies, BLANKED, engine);
+    const copy = args.filter((a) => a.startsWith("--http-proxy"));
+    assertEquals(copy, engine === "podman" ? ["--http-proxy=false"] : [], engine);
+  }
 });
 
 Deno.test("containerArgs: the process, memory and CPU caps are set, swap included", () => {

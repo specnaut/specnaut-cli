@@ -1,12 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import type { RunOutcome } from "../../src/application/sandbox_ports.ts";
 import { runSandbox } from "../../src/cli/handlers/sandbox_handler.ts";
-import {
-  assessBackends,
-  type OfferedBackend,
-  type SandboxPolicy,
-} from "../../src/domain/sandbox.ts";
-import { userBus } from "../../src/domain/sandbox_args.ts";
+import type { OfferedBackend, SandboxPolicy } from "../../src/domain/sandbox.ts";
 import { CAP_NAMES, capsWithout, type SandboxLimits } from "../../src/domain/sandbox_limits.ts";
 import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
@@ -15,9 +10,11 @@ import {
   killNamed,
   live,
   LIVE_IMAGE,
-  NO_CONTAINER,
   probed,
   runIn,
+  RUNNER_HOST,
+  skipOf,
+  STATUSES,
   withLayout,
 } from "./sandbox_live_fixture.ts";
 
@@ -81,21 +78,6 @@ const BOMBS: Readonly<Record<Cap, Bomb>> = {
   },
 };
 
-/** Every backend in selection order, with what this host offers: a container uses LIVE_IMAGE. */
-const STATUSES = assessBackends({ ...probed, image: { kind: "pinned", ref: LIVE_IMAGE } });
-
-const host = {
-  arch: Deno.build.arch,
-  path: Deno.env.get("PATH") ?? "",
-  bus: userBus(Deno.env.get),
-};
-
-/** Why `status` cannot be checked here, or `null` with what it offers. */
-function skipOf(status: (typeof STATUSES)[number]): string | null {
-  if (!("offered" in status)) return `${status.kind}: ${status.why}`;
-  return status.kind === "container" ? NO_CONTAINER : null;
-}
-
 /** The probe line and the exec notice for `offered`, through the handler, as a user sees them. */
 async function reported(offered: OfferedBackend, outcome: RunOutcome): Promise<string[]> {
   const ran = {
@@ -132,7 +114,7 @@ for (const status of STATUSES) {
           const started = Date.now();
           try {
             const { outcome, out } = await runIn(
-              (l) => runnerFor(offered!, l, host),
+              (l) => runnerFor(offered!, l, RUNNER_HOST),
               capped,
               ["/bin/sh", "-c", `echo start; ${bomb.command}`],
             );

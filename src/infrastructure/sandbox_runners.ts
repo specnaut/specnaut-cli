@@ -34,7 +34,7 @@ export class ContainerRunner implements SandboxRunner {
    */
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
-    const args = containerArgs(policy, { image: this.image, name }, command);
+    const args = containerArgs(policy, { image: this.image, name, engine: this.engine }, command);
     const remove = removalOf(this.engine, name);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {

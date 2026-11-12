@@ -108,7 +108,9 @@ Deno.test("sandboxPolicy: a path the backends cannot quote or that is not plain 
 
 Deno.test("sandboxPolicy: no network, loopback included, on every backend", () => {
   const image = `ghcr.io/acme/dev@sha256:${"c".repeat(64)}`;
-  const ctr = containerArgs(policyOf("container"), { image, name: "gate" }, ["true"]);
+  const ctr = containerArgs(policyOf("container"), { image, name: "gate", engine: "docker" }, [
+    "true",
+  ]);
   assertEquals(ctr.flatMap((a, i) => (a === "--network" ? [ctr[i + 1]] : [])), ["none"]);
   const bwrap = bwrapArgs(policyOf("bwrap"), ["true"]);
   assert(bwrap.includes("--unshare-all"));

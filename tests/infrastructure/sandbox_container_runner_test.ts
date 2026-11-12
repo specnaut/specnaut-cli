@@ -32,7 +32,11 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
   assertEquals(await runner.run(policy, COMMAND), { kind: "exited", code: 3 });
   assertEquals(launches[0].spec, {
     cmd: "podman",
-    args: containerArgs(policy, { image: IMAGE, name: "specnaut-sandbox-x1" }, COMMAND),
+    args: containerArgs(
+      policy,
+      { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman" },
+      COMMAND,
+    ),
     env: "host",
   });
 });

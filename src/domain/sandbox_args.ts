@@ -1,21 +1,25 @@
 /**
  * The arguments that launch a command under a {@link SandboxPolicy}: for `podman run` /
  * `docker run`, and for `bwrap`. They translate the policy and add nothing to it: every folder
- * mounted is one it names, every variable set is one of its own with its value, and every
- * isolation flag is always present. Pure — the caller runs the launcher.
+ * mounted is one it names, every variable set is one of its own with its value (or a proxy one an
+ * engine would add, set empty), and every isolation flag is always present. Pure — the caller runs the launcher.
  */
 
-import type { SandboxPolicy } from "./sandbox.ts";
+import type { Engine, SandboxPolicy } from "./sandbox.ts";
 import type { SandboxLimits } from "./sandbox_limits.ts";
 import { isPinned } from "./sandbox_image.ts";
 import { safePath } from "./sandbox_paths.ts";
 import { SECCOMP_FD } from "./sandbox_seccomp.ts";
 
 /**
- * One container run: its pinned image, and a name the caller makes unique, so that the launcher
- * can stop and remove exactly that container when the wall clock runs out.
+ * One container run: its pinned image, a name the caller makes unique, so that the launcher can
+ * stop and remove exactly that container when the wall clock runs out, and the engine running it.
  */
-export type ContainerRun = { readonly image: string; readonly name: string };
+export type ContainerRun = {
+  readonly image: string;
+  readonly name: string;
+  readonly engine: Engine;
+};
 
 /** A name the engines accept that can never be read as a flag. */
 const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
@@ -25,8 +29,7 @@ const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
  * so a run stays offline), with an init process that reaps orphans and forwards signals, no log
  * the engine keeps after it, no network, a read-only root, no capabilities, no privilege gain, the
  * `nobody` user, the policy's caps (swap counted in the memory cap), its scratch folders as tmpfs
- * and the exported tree as the one bind mount, read-only.
- * `--env NAME=value` always carries its value: `--env NAME` alone would copy the host's.
+ * and the exported tree as the one bind mount, read-only, and the policy's variables only.
  */
 export function containerArgs(
   policy: SandboxPolicy,
@@ -41,9 +44,33 @@ export function containerArgs(
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
     ...containerCaps(policy.limits),
     ...containerFolders(policy),
-    ...Object.entries(policy.env).flatMap(([k, v]) => ["--env", `${k}=${v}`]),
+    ...containerEnv(policy, run.engine),
     image,
     ...command,
+  ];
+}
+
+/**
+ * The proxy variables an engine adds to a container on its own: podman copies the host's unless
+ * told `--http-proxy=false`, and docker's client copies those of its configuration file unless the
+ * run sets them.
+ */
+const PROXIES = ["HTTP_PROXY", "HTTPS_PROXY", "FTP_PROXY", "NO_PROXY", "ALL_PROXY"]
+  .flatMap((name) => [name, name.toLowerCase()]);
+
+/**
+ * The container's variables: the proxy ones set empty first, so that it gets only the policy's
+ * (the run has no network for a proxy to serve), then the policy's. `--env NAME=value` always
+ * carries its value: `--env NAME` alone would copy the host's.
+ */
+function containerEnv(policy: SandboxPolicy, engine: Engine): string[] {
+  const set = [
+    ...PROXIES.map((name) => `${name}=`),
+    ...Object.entries(policy.env).map(([k, v]) => `${k}=${v}`),
+  ];
+  return [
+    ...(engine === "podman" ? ["--http-proxy=false"] : []),
+    ...set.flatMap((e) => ["--env", e]),
   ];
 }
 

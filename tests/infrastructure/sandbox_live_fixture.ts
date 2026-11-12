@@ -1,11 +1,14 @@
 import { join } from "@std/path";
 import type { SandboxRunner } from "../../src/application/sandbox_ports.ts";
 import {
+  assessBackends,
+  type BackendStatus,
   type Engine,
   type SandboxedBackend,
   type SandboxPolicy,
   sandboxPolicy,
 } from "../../src/domain/sandbox.ts";
+import { userBus } from "../../src/domain/sandbox_args.ts";
 import { isPinned } from "../../src/domain/sandbox_image.ts";
 import { DenoSubprocessRunner } from "../../src/infrastructure/deno_subprocess.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
@@ -44,6 +47,22 @@ export const NO_CONTAINER = ENGINE === null
   : isPinned(LIVE_IMAGE)
   ? null
   : "a digest-pinned image with /bin/sh, named in SPECNAUT_LIVE_IMAGE";
+
+/** Every backend in selection order, with what this host offers: a container uses LIVE_IMAGE. */
+export const STATUSES = assessBackends({ ...probed, image: { kind: "pinned", ref: LIVE_IMAGE } });
+
+/** Why the backend of `status` cannot run a live test here, or `null` when it can. */
+export function skipOf(status: BackendStatus): string | null {
+  if (!("offered" in status)) return `${status.kind}: ${status.why}`;
+  return status.kind === "container" ? NO_CONTAINER : null;
+}
+
+/** The host facts a live runner is built with, read from this process. */
+export const RUNNER_HOST = {
+  arch: Deno.build.arch,
+  path: Deno.env.get("PATH") ?? "",
+  bus: userBus(Deno.env.get),
+};
 
 /** A live test's name: what it shows, then why it is skipped when `missing` names what is absent. */
 export function live(title: string, missing: string | null): string {

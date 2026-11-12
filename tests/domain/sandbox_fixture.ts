@@ -25,3 +25,7 @@ export function policyOf(backend: SandboxedBackend, paths: SandboxPaths = PATHS)
 export function after(args: readonly string[], flag: string): string[] {
   return args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
 }
+
+/** Every proxy variable an engine would copy into a container from the host, by name. */
+export const PROXY_NAMES = ["HTTP", "HTTPS", "FTP", "NO", "ALL"]
+  .flatMap((p) => [`${p}_PROXY`, `${p.toLowerCase()}_proxy`]);

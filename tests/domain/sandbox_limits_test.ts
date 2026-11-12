@@ -15,7 +15,11 @@ import { after, policyOf } from "./sandbox_fixture.ts";
  */
 
 const COMMAND = ["deno", "task", "test"];
-const RUN = { image: `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`, name: "specnaut-gate-3f9c2a71" };
+const RUN = {
+  image: `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`,
+  name: "specnaut-gate-3f9c2a71",
+  engine: "docker",
+} as const;
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
 const scope = () => after(scopeArgs(policyOf("bwrap")), "-p");
