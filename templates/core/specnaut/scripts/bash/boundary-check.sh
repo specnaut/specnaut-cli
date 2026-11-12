@@ -95,7 +95,8 @@ trap 'rm -f -- "$listing" "$blob"' EXIT
 
 list_domain() {
   if [ -n "$EXPLICIT_HEAD" ]; then
-    git -c core.quotePath=false ls-tree -r -z --end-of-options "$EXPLICIT_HEAD" -- "$1"
+    # No `--`: after --end-of-options, ls-tree takes it for one more path.
+    git -c core.quotePath=false ls-tree -r -z --end-of-options "$EXPLICIT_HEAD" "$1"
   else
     git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "$1"
   fi

@@ -19,6 +19,13 @@ Deno.test("git-read --head: files lists the head's tree, not the index", async (
   assertEquals(r.stdout.trim().split("\n"), ["src/a.ts", "src/head_only.ts"]);
 });
 
+Deno.test("git-read --head: files with no path lists the head's whole tree", async () => {
+  const repo = await fixture();
+  const r = await gitRead(["--head", repo.head, "--objects", repo.objects, "files"], repo.root);
+  assertEquals(r.code, 0, r.stderr);
+  assertEquals(r.stdout.trim().split("\n"), ["README.md", "src/a.ts", "src/head_only.ts"]);
+});
+
 Deno.test("git-read --head: base starts from the head, not from HEAD", async () => {
   const repo = await fixture();
   const r = await gitRead(

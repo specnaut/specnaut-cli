@@ -16870,7 +16870,8 @@ gu_files() {
   [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "\$@" || return 2
   [ -n "\$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "\$@"; return; }
-  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" -- "\$@"
+  # No \`--\`: after --end-of-options, ls-tree takes it for a path, and lists nothing.
+  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" "\$@"
 }
 
 gu_grep() {
@@ -32478,7 +32479,8 @@ trap 'rm -f -- "\$listing" "\$blob"' EXIT
 
 list_domain() {
   if [ -n "\$EXPLICIT_HEAD" ]; then
-    git -c core.quotePath=false ls-tree -r -z --end-of-options "\$EXPLICIT_HEAD" -- "\$1"
+    # No \`--\`: after --end-of-options, ls-tree takes it for one more path.
+    git -c core.quotePath=false ls-tree -r -z --end-of-options "\$EXPLICIT_HEAD" "\$1"
   else
     git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "\$1"
   fi
@@ -32713,7 +32715,8 @@ gu_files() {
   [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "\$@" || return 2
   [ -n "\$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "\$@"; return; }
-  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" -- "\$@"
+  # No \`--\`: after --end-of-options, ls-tree takes it for a path, and lists nothing.
+  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" "\$@"
 }
 
 gu_grep() {

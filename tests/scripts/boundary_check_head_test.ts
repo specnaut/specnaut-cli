@@ -5,7 +5,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { BOUNDARIES_CONFIG_PATH } from "../../src/domain/constitution_paths.ts";
-import { bashScript, headRepo } from "./explicit_head_fixture.ts";
+import { bashScript, exportHead, headRepo } from "./explicit_head_fixture.ts";
 
 const SCRIPT = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/boundary-check.sh", import.meta.url),
@@ -44,6 +44,20 @@ Deno.test("boundary check --head: a clean head passes whatever the work tree hol
   const r = await check(repo.root, ["--head", repo.head, "--objects", repo.objects]);
   assertEquals(r.code, 0, r.stdout + r.stderr);
   assertStringIncludes(r.stdout, "boundary-check: 2 file(s) under domain: clean of 1 pattern(s)");
+});
+
+// After --end-of-options, a `--` is one more path to ls-tree: a file of that name, outside
+// every domain, was checked as if it were inside one.
+Deno.test("boundary check --head: only the domain's files are listed, not one named --", async () => {
+  const repo = await split(CLEAN);
+  const outside = await exportHead(repo.root, {
+    "--": VIOLATION,
+    "src/domain/a.ts": CLEAN,
+    "src/domain/b.ts": CLEAN,
+  });
+  const r = await check(repo.root, ["--head", outside.head, "--objects", outside.objects]);
+  assertEquals(r.code, 0, r.stdout + r.stderr);
+  assertStringIncludes(r.stdout, "boundary-check: 2 file(s) under domain: clean");
 });
 
 Deno.test("boundary check --head: a head the repository cannot reach is refused, never discovered", async () => {

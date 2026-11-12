@@ -158,7 +158,8 @@ gu_files() {
   [ $# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "$@" || return 2
   [ -n "$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "$@"; return; }
-  _gu_git ls-tree -r --name-only --end-of-options "$EXPLICIT_HEAD" -- "$@"
+  # No `--`: after --end-of-options, ls-tree takes it for a path, and lists nothing.
+  _gu_git ls-tree -r --name-only --end-of-options "$EXPLICIT_HEAD" "$@"
 }
 
 gu_grep() {
