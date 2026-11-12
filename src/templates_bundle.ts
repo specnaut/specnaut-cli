@@ -16525,8 +16525,9 @@ done
 #
 # --base <sha> --head <sha> [--objects <dir>] scopes a branch against the tip of the
 # branch it targets, both full commit ids (SCOPE: range, SCOPE_LABEL <base>..<head>):
-# COMMITS are <base>..<head>, and FILES are the diff from the merge base of the two to
-# the head, so a file only the base changed since the branch forked is not in scope.
+# COMMITS are <base>..<head>, and FILES are the union of the diffs from each merge base
+# of the two to the head, so a file only the base changed since the branch forked is not
+# in scope, and in a criss-cross history no base hides a file another one shows.
 # HEAD is never read: the checkout may be the base's tip or behind it. It takes no
 # --path, --range or --last.
 #
@@ -17151,18 +17152,23 @@ scope_read() {
 }
 
 # scope_base - the head's scope against the base's tip, never HEAD: its commits since the
-# base, and its files since the merge base of the two, so the base's own later changes,
-# which a two-point diff would list reverted, stay out.
+# base, and its files since the merge bases of the two, so the base's own later changes,
+# which a two-point diff would list reverted, stay out. A criss-cross history has several
+# merge bases, and a file the head's merge took back to one base's content differs from
+# another only: FILES are the union of the diffs from every one.
 scope_base() {
-  local fork
+  local forks fork files=""
   [ "\$(_gu_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)" = "\$BASE_ARG" ] ||
     { echo "error: --base: no commit \$BASE_ARG in reach" >&2; exit 2; }
-  fork="\$(scope_read gu_base "\$BASE_ARG")"
-  [ -n "\$fork" ] || { echo "error: --base: \$BASE_ARG and the head share no history" >&2; exit 2; }
+  forks="\$(scope_read _gu_git merge-base --all --end-of-options "\$EXPLICIT_HEAD" "\$BASE_ARG")"
+  [ -n "\$forks" ] || { echo "error: --base: \$BASE_ARG and the head share no history" >&2; exit 2; }
   SCOPE="range"
   SCOPE_LABEL="\$BASE_ARG..\$EXPLICIT_HEAD"
   COMMITS="\$(scope_read gu_log "\$BASE_ARG..\$EXPLICIT_HEAD")"
-  FILES="\$(scope_read gu_names "\$fork" "\$EXPLICIT_HEAD")"
+  for fork in \$forks; do
+    files+="\$(scope_read gu_names "\$fork" "\$EXPLICIT_HEAD")"\$'\\n'
+  done
+  FILES="\$(printf '%s' "\$files" | LC_ALL=C sort -u)"
 }
 
 # scope_path - the tracked files under the subtree; no commit list for a path scope.

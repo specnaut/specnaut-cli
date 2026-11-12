@@ -4,16 +4,10 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { headRepo } from "../scripts/explicit_head_fixture.ts";
-import { scope } from "./collect_audit_scope_fixture.ts";
+import { scope, section } from "./collect_audit_scope_fixture.ts";
 
 const fixture = () =>
   headRepo({ "src/a.ts": "a\n" }, { "src/Head.tsx": "h\n" }, { "src/main_only.ts": "m\n" });
-
-/** The lines of the block between `<from>:` and the next label. */
-function section(block: string, from: string, to: string): string[] {
-  const body = block.split(`${from}:\n`)[1]?.split(`${to}`)[0] ?? "";
-  return body.split("\n").filter(Boolean);
-}
 
 Deno.test("audit scope --head: the last-N window ends at the head, not at HEAD", async () => {
   const repo = await fixture();

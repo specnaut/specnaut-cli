@@ -82,3 +82,9 @@ export function count(block: string, key: string): number {
   assert(m, `expected a "${key}: <int>" line in:\n${block}`);
   return Number(m[1]);
 }
+
+/** The lines of the block between `<from>:` and the next label `<to>`. */
+export function section(block: string, from: string, to: string): string[] {
+  const body = block.split(`${from}:\n`)[1]?.split(`${to}`)[0] ?? "";
+  return body.split("\n").filter(Boolean);
+}

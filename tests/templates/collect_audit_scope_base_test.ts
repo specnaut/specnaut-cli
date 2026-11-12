@@ -6,7 +6,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { git, headRepo } from "../scripts/explicit_head_fixture.ts";
-import { scope } from "./collect_audit_scope_fixture.ts";
+import { scope, section } from "./collect_audit_scope_fixture.ts";
 
 /** `shared.ts` at the fork; the head adds `feature.ts`; the base then edits `shared.ts`. */
 async function forked() {
@@ -18,12 +18,6 @@ async function forked() {
   const tip = await git(repo.root, "rev-parse", "main");
   await git(repo.root, "checkout", "-q", "--detach", repo.base);
   return { ...repo, tip };
-}
-
-/** The lines of the block between `<from>:` and the next label. */
-function section(block: string, from: string, to: string): string[] {
-  const body = block.split(`${from}:\n`)[1]?.split(`${to}`)[0] ?? "";
-  return body.split("\n").filter(Boolean);
 }
 
 const subjects = (block: string) =>

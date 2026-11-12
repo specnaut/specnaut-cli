@@ -21,8 +21,9 @@
 #
 # --base <sha> --head <sha> [--objects <dir>] scopes a branch against the tip of the
 # branch it targets, both full commit ids (SCOPE: range, SCOPE_LABEL <base>..<head>):
-# COMMITS are <base>..<head>, and FILES are the diff from the merge base of the two to
-# the head, so a file only the base changed since the branch forked is not in scope.
+# COMMITS are <base>..<head>, and FILES are the union of the diffs from each merge base
+# of the two to the head, so a file only the base changed since the branch forked is not
+# in scope, and in a criss-cross history no base hides a file another one shows.
 # HEAD is never read: the checkout may be the base's tip or behind it. It takes no
 # --path, --range or --last.
 #
