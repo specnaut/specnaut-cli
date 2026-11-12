@@ -23,6 +23,11 @@ export type BackendProbe = {
   readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
   /** What `bwrap --version` printed, or `null` when it printed nothing. */
   readonly bwrapVersion: string | null;
+  /**
+   * A systemd user scope can be made, with the pids, memory and cpu controllers delegated to it
+   * (cgroup v2): bubblewrap then runs in one, which caps what it alone cannot.
+   */
+  readonly bwrapScope: boolean;
   readonly sandboxExec: boolean;
 };
 

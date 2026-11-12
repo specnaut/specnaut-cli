@@ -1,5 +1,5 @@
 import { chooseBackend, type SandboxedBackend, sandboxPolicy } from "../domain/sandbox.ts";
-import { type SandboxLimits, unenforcedCaps } from "../domain/sandbox_limits.ts";
+import { capsWithout, type SandboxLimits } from "../domain/sandbox_limits.ts";
 import type { SandboxPaths } from "../domain/sandbox_paths.ts";
 import type {
   BackendProber,
@@ -36,7 +36,7 @@ export type ExecOutcome =
     readonly kind: "ran";
     readonly backend: SandboxedBackend;
     readonly outcome: RunOutcome;
-    /** The caps the run went without (`unenforcedCaps`): reported, never a reason not to run. */
+    /** The caps the run went without (`capsWithout`): reported, never a reason not to run. */
     readonly unenforced: readonly (keyof SandboxLimits)[];
   }
   | { readonly kind: "not_run"; readonly why: string };
@@ -67,5 +67,5 @@ async function runUnder(
   const result = sandboxPolicy(backend.kind, paths);
   if (!result.ok) return { kind: "not_run", why: result.why };
   const outcome = await deps.runnerFor(backend).run(result.policy, command);
-  return { kind: "ran", backend: backend.kind, outcome, unenforced: unenforcedCaps(backend.kind) };
+  return { kind: "ran", backend: backend.kind, outcome, unenforced: capsWithout(backend) };
 }

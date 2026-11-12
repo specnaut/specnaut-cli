@@ -61,3 +61,22 @@ Deno.test({
       assertEquals(out.trim().split("\n"), ["opened", "1"]);
     }),
 });
+
+const NO_SCOPE = MISSING ??
+  (probed.bwrapScope ? null : "a systemd user scope with cgroups delegated");
+
+Deno.test({
+  name: live("bwrap live: in a user scope, the memory cap stops a run that exceeds it", NO_SCOPE),
+  ignore: NO_SCOPE !== null,
+  fn: () =>
+    withLayout("bwrap", async ({ policy }) => {
+      const small = { ...policy, limits: { ...policy.limits, memoryBytes: 64 * 1024 ** 2 } };
+      const scoped = (l: DenoProcessLauncher) =>
+        new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!, true);
+      // 256 MiB held in one shell variable: four times the cap.
+      const script = "x=$(head -c 268435456 /dev/zero | tr '\\0' a); echo survived";
+      const { outcome, out } = await runIn(scoped, small, ["/bin/sh", "-c", script]);
+      assertEquals(outcome.kind === "exited" && outcome.code !== 0, true, JSON.stringify(outcome));
+      assertEquals(out.includes("survived"), false);
+    }),
+});

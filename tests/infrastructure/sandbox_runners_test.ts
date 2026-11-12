@@ -165,6 +165,6 @@ Deno.test("runnerFor: one runner per backend", () => {
   );
   assert(container instanceof ContainerRunner);
   assertEquals(container.engine, "docker");
-  assert(runnerFor({ kind: "bwrap" }, launcher, host) instanceof BwrapRunner);
+  assert(runnerFor({ kind: "bwrap", scope: false }, launcher, host) instanceof BwrapRunner);
   assert(runnerFor({ kind: "seatbelt" }, launcher, host) instanceof SeatbeltRunner);
 });

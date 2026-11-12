@@ -47,6 +47,7 @@ Deno.test("probe: nothing installed on Linux reads as nothing offered", async ()
     docker: false,
     bwrap: "absent",
     bwrapVersion: null,
+    bwrapScope: false,
     sandboxExec: false,
   });
 });
@@ -152,4 +153,30 @@ Deno.test("probe: on Windows nothing is run at all", async () => {
   const probed = await p.probe();
   assertEquals(calls, []);
   assertEquals([probed.docker, probed.podman, probed.bwrap], [false, "absent", "absent"]);
+});
+
+const USABLE_BWRAP = { "bwrap --version": ok("bubblewrap 0.9.0\n"), "bwrap --unshare-all": ok() };
+
+Deno.test("probe: a user scope with pids, memory and cpu delegated is bubblewrap's scope", async () => {
+  const delegated = prober("linux", {
+    ...USABLE_BWRAP,
+    "systemd-run --user": ok("cpuset cpu io memory pids\n"),
+  });
+  assertEquals((await delegated.prober.probe()).bwrapScope, true);
+  const trial = delegated.calls.find((c) => c.cmd === "systemd-run");
+  assertEquals(trial?.args.slice(0, 5), ["--user", "--scope", "--quiet", "--collect", "/bin/sh"]);
+  const partial = prober("linux", { ...USABLE_BWRAP, "systemd-run --user": ok("cpu memory\n") });
+  assertEquals((await partial.prober.probe()).bwrapScope, false);
+  const refused = { code: 1, stdout: "", stderr: "Failed to connect to bus" };
+  const none = prober("linux", { ...USABLE_BWRAP, "systemd-run --user": refused });
+  assertEquals((await none.prober.probe()).bwrapScope, false);
+});
+
+Deno.test("probe: no user scope is asked for without a usable bubblewrap", async () => {
+  const { prober: p, calls } = prober("linux", { "systemd-run --user": ok("cpu memory pids\n") });
+  assertEquals((await p.probe()).bwrapScope, false);
+  assertEquals(calls.filter((c) => c.cmd === "systemd-run"), []);
+  const mac = prober("darwin", { "systemd-run --user": ok("cpu memory pids\n") });
+  assertEquals((await mac.prober.probe()).bwrapScope, false);
+  assertEquals(mac.calls.filter((c) => c.cmd === "systemd-run"), []);
 });

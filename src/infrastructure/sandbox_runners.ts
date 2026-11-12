@@ -124,7 +124,7 @@ export function runnerFor(
     case "container":
       return new ContainerRunner(backend.engine, backend.image, launcher);
     case "bwrap":
-      return new BwrapRunner(host.arch, launcher, host.path);
+      return new BwrapRunner(host.arch, launcher, host.path, backend.scope);
     case "seatbelt":
       return new SeatbeltRunner(launcher);
   }

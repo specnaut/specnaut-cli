@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { bwrapArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs } from "../../src/domain/sandbox_args.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
@@ -67,4 +67,22 @@ Deno.test("bwrapArgs: the environment is exactly the policy's, and the command f
   assertEquals(after(args, "--chdir"), [PATHS.tree]);
   assertEquals(args.slice(-1 - COMMAND.length), ["--", ...COMMAND]);
   assertEquals(args.filter((a) => a === "--"), ["--"]);
+});
+
+Deno.test("scopeArgs: a systemd user scope carrying the policy's memory, process and CPU caps", () => {
+  assertEquals(scopeArgs(policyOf("bwrap")), [
+    "systemd-run",
+    "--user",
+    "--scope",
+    "--quiet",
+    "--collect",
+    "-p",
+    `MemoryMax=${LIMITS.memoryBytes}`,
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    `TasksMax=${LIMITS.processes}`,
+    "-p",
+    `CPUQuota=${LIMITS.cpus * 100}%`,
+  ]);
 });

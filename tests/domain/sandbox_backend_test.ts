@@ -23,6 +23,7 @@ const NOTHING: BackendProbe = {
   docker: false,
   bwrap: "absent",
   bwrapVersion: "bubblewrap 0.8.0",
+  bwrapScope: false,
   sandboxExec: false,
 };
 
@@ -42,7 +43,7 @@ Deno.test("chooseBackend: rootless podman without delegated cgroups cannot cap a
   const uncapped = probe({ podman: "rootless", docker: true });
   assertEquals(chooseBackend(uncapped), { kind: "container", engine: "docker", image: IMAGE.ref });
   const alone = chooseBackend(probe({ podman: "rootless", bwrap: "usable" }));
-  assertEquals(alone, { kind: "bwrap" });
+  assertEquals(alone, { kind: "bwrap", scope: false });
   const nothing = chooseBackend(probe({ podman: "rootless" }));
   assertEquals(nothing.kind === "static" && nothing.why[0], CGROUPS_WHY);
 });
@@ -60,7 +61,7 @@ Deno.test("chooseBackend: no digest-pinned image means no container, whatever en
     docker: true,
     bwrap: "usable",
   });
-  assertEquals(chooseBackend(engines), { kind: "bwrap" });
+  assertEquals(chooseBackend(engines), { kind: "bwrap", scope: false });
 });
 
 Deno.test("chooseBackend: bubblewrap blocked by the user-namespace restriction is passed over", () => {
@@ -76,7 +77,10 @@ Deno.test("chooseBackend: bubblewrap older than 0.8 cannot forbid nested user na
     assertEquals(old.kind === "static" && old.why.at(-1), OLD_BWRAP_WHY, String(bwrapVersion));
   }
   for (const bwrapVersion of ["bubblewrap 0.8.0", "0.11.0", "1.0.0"]) {
-    assertEquals(chooseBackend(probe({ bwrap: "usable", bwrapVersion })), { kind: "bwrap" });
+    assertEquals(chooseBackend(probe({ bwrap: "usable", bwrapVersion })), {
+      kind: "bwrap",
+      scope: false,
+    });
   }
 });
 
@@ -123,7 +127,10 @@ Deno.test("chooseBackend: bubblewrap whose trial run failed is passed over, with
 });
 
 Deno.test("chooseBackend: bubblewrap needs a syscall filter for the host's architecture", () => {
-  assertEquals(chooseBackend(probe({ bwrap: "usable", arch: "aarch64" })), { kind: "bwrap" });
+  assertEquals(chooseBackend(probe({ bwrap: "usable", arch: "aarch64" })), {
+    kind: "bwrap",
+    scope: false,
+  });
   assertEquals(chooseBackend(probe({ bwrap: "usable", arch: "riscv64" })), {
     kind: "static",
     why: [NO_ENGINE_WHY, "bubblewrap: no syscall filter for riscv64"],
@@ -140,7 +147,7 @@ Deno.test("assessBackends: each backend in selection order, offered or with its 
   const linux = probe({ docker: true, bwrap: "usable" });
   assertEquals(assessBackends(linux), [
     { kind: "container", offered: { kind: "container", engine: "docker", image: IMAGE.ref } },
-    { kind: "bwrap", offered: { kind: "bwrap" } },
+    { kind: "bwrap", offered: { kind: "bwrap", scope: false } },
     { kind: "seatbelt", why: "sandbox-exec: macOS only", onThisOs: false },
   ]);
 });
@@ -168,4 +175,12 @@ Deno.test("chooseBackend: the first backend assessBackends offers, whatever the 
       }
     }
   }
+});
+
+Deno.test("chooseBackend: bubblewrap runs in a user scope exactly when the probe found one", () => {
+  assertEquals(chooseBackend(probe({ bwrap: "usable", bwrapScope: true })), {
+    kind: "bwrap",
+    scope: true,
+  });
+  assertEquals(chooseBackend(probe({ bwrap: "usable" })), { kind: "bwrap", scope: false });
 });

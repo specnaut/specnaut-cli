@@ -30,16 +30,20 @@ export type Engine = "podman" | "docker";
 
 export type Backend =
   | { readonly kind: "container"; readonly engine: Engine; readonly image: string }
-  | { readonly kind: "bwrap" }
+  /** `scope`: run inside a systemd user scope that caps memory, processes and CPU. */
+  | { readonly kind: "bwrap"; readonly scope: boolean }
   | { readonly kind: "seatbelt" }
   | { readonly kind: "static"; readonly why: readonly string[] };
 
 /** A backend that runs something: every one but static only. */
 export type SandboxedBackend = Exclude<Backend["kind"], "static">;
 
+/** A backend that runs something, as chosen: its kind with what it runs with. */
+export type OfferedBackend = Exclude<Backend, { readonly kind: "static" }>;
+
 /** One backend as a probe finds it: what it offers here, or why not, and if it is this OS's. */
 export type BackendStatus =
-  | { readonly kind: SandboxedBackend; readonly offered: Backend }
+  | { readonly kind: SandboxedBackend; readonly offered: OfferedBackend }
   | { readonly kind: SandboxedBackend; readonly why: string; readonly onThisOs: boolean };
 
 const UNCAPPED_PODMAN =
@@ -66,7 +70,9 @@ export function assessBackends(probe: BackendProbe): BackendStatus[] {
   const seatbelt = os === "darwin" && probe.sandboxExec ? null : mac;
   return [
     containerStatus(probe),
-    bwrap === null ? OFFERED.bwrap : { kind: "bwrap", why: bwrap, onThisOs: os === "linux" },
+    bwrap === null
+      ? { kind: "bwrap", offered: { kind: "bwrap", scope: probe.bwrapScope } }
+      : { kind: "bwrap", why: bwrap, onThisOs: os === "linux" },
     seatbelt === null
       ? OFFERED.seatbelt
       : { kind: "seatbelt", why: seatbelt, onThisOs: os === "darwin" },
@@ -74,10 +80,7 @@ export function assessBackends(probe: BackendProbe): BackendStatus[] {
 }
 
 const KINDS: readonly SandboxedBackend[] = ["container", "bwrap", "seatbelt"];
-const OFFERED = {
-  bwrap: { kind: "bwrap", offered: { kind: "bwrap" } },
-  seatbelt: { kind: "seatbelt", offered: { kind: "seatbelt" } },
-} as const;
+const OFFERED = { seatbelt: { kind: "seatbelt", offered: { kind: "seatbelt" } } } as const;
 
 /** The container backend `probe` offers, or why there is none. */
 function containerStatus(probe: BackendProbe): BackendStatus {

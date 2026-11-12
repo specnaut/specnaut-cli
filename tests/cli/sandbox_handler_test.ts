@@ -26,6 +26,7 @@ const MAC: BackendProbe = {
   docker: false,
   bwrap: "absent",
   bwrapVersion: null,
+  bwrapScope: false,
   sandboxExec: true,
 };
 
@@ -114,15 +115,19 @@ Deno.test("sandbox exec: a refusal or a launcher that cannot start is 125, never
   }
 });
 
-/** The caps the table says `backend` runs without, by their names, read from the table itself. */
-function capsWithout(backend: SandboxedBackend): (keyof SandboxLimits)[] {
-  return (Object.keys(CAP_ENFORCEMENT[backend]) as (keyof SandboxLimits)[])
-    .filter((cap) => CAP_ENFORCEMENT[backend][cap] === "unenforced");
+/**
+ * The caps the table says `backend` runs without, read from the table itself: those it enforces
+ * nowhere, and those only a user scope enforces when it runs without one.
+ */
+function capsWithout(backend: SandboxedBackend, scope = false): (keyof SandboxLimits)[] {
+  const by = CAP_ENFORCEMENT[backend];
+  return (Object.keys(by) as (keyof SandboxLimits)[])
+    .filter((cap) => by[cap] === "unenforced" || (by[cap] === "scope" && !scope));
 }
 
 /** The UNCAPPED line the table calls for, if any. */
-function uncapped(backend: SandboxedBackend): string[] {
-  const caps = capsWithout(backend);
+function uncapped(backend: SandboxedBackend, scope = false): string[] {
+  const caps = capsWithout(backend, scope);
   return caps.length === 0
     ? []
     : [`UNCAPPED ${backend} ${caps.map((c) => CAP_NAMES[c]).join(",")}`];
@@ -162,6 +167,7 @@ Deno.test("sandbox probe: an UNCAPPED line per available backend the table leave
     sandboxExec: false,
     bwrap: "usable",
     bwrapVersion: "bubblewrap 0.9.0",
+    bwrapScope: false,
     docker: true,
     image: { kind: "pinned", ref: `acme/dev@sha256:${"e".repeat(64)}` },
   };
@@ -176,4 +182,24 @@ Deno.test("sandbox exec: a run on a backend without caps is still a run, with it
   const { d, err } = deps(MAC, () => Promise.resolve(late));
   assertEquals(await runSandbox(EXEC, d), 3);
   assertEquals(err.some((l) => l.includes("not run")), false);
+});
+
+Deno.test("sandbox probe: bubblewrap in a user scope lacks only what the table says a scope cannot give", async () => {
+  const scoped: BackendProbe = {
+    ...MAC,
+    os: "linux",
+    arch: "x86_64",
+    sandboxExec: false,
+    bwrap: "usable",
+    bwrapVersion: "bubblewrap 0.9.0",
+    bwrapScope: true,
+  };
+  const { d, out } = deps(scoped, () => Promise.reject(new Error("unused")));
+  await runSandbox(PROBE, d);
+  const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
+  assertEquals(lines, uncapped("bwrap", true));
+  const bare = deps({ ...scoped, bwrapScope: false }, () => Promise.reject(new Error("unused")));
+  await runSandbox(PROBE, bare.d);
+  const bareLines = bare.out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
+  assertEquals(bareLines, uncapped("bwrap"));
 });

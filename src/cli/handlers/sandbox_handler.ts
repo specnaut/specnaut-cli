@@ -13,9 +13,9 @@ import {
 } from "../../domain/sandbox.ts";
 import {
   CAP_NAMES,
+  capsWithout,
   type SandboxLimits,
   STOP_LIMIT,
-  unenforcedCaps,
 } from "../../domain/sandbox_limits.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
@@ -70,7 +70,7 @@ async function probe(deps: SandboxDeps): Promise<number> {
   const found = await deps.probe();
   const lines = assessBackends(found).flatMap((s) =>
     "offered" in s
-      ? [`AVAILABLE ${s.kind}`, ...gaps(s.kind, unenforcedCaps(s.kind))]
+      ? [`AVAILABLE ${s.kind}`, ...gaps(s.kind, capsWithout(s.offered))]
       : [`UNAVAILABLE ${s.kind} ${terminalText(s.why)}`]
   );
   const chosen = chooseBackend(found).kind;

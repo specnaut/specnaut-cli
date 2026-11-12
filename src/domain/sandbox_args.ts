@@ -113,6 +113,20 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
   ];
 }
 
+/**
+ * The prefix that runs bubblewrap in a transient systemd user scope carrying the policy's memory
+ * (no swap on top), process and CPU caps: a cgroup holds the whole run, which per-process limits
+ * could not. `--scope` runs the command in place, so its input and output pass straight through.
+ */
+export function scopeArgs(policy: SandboxPolicy): string[] {
+  const { memoryBytes, processes, cpus } = policy.limits;
+  return [
+    ...["systemd-run", "--user", "--scope", "--quiet", "--collect"],
+    ...["-p", `MemoryMax=${memoryBytes}`, "-p", "MemorySwapMax=0"],
+    ...["-p", `TasksMax=${processes}`, "-p", `CPUQuota=${cpus * 100}%`],
+  ];
+}
+
 /** The container's network: with `none` it has its own loopback only, never the host's. */
 function containerNetwork(network: SandboxPolicy["network"]): string[] {
   switch (network) {

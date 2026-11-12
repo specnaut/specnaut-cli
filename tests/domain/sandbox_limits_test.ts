@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, containerArgs, scopeArgs } from "../../src/domain/sandbox_args.ts";
 import {
   CAP_ENFORCEMENT,
   CAP_NAMES,
@@ -9,12 +9,22 @@ import {
 } from "../../src/domain/sandbox_limits.ts";
 import { after, policyOf } from "./sandbox_fixture.ts";
 
-/** Where each resource cap is applied: a cap the data puts in a backend's arguments is in them. */
+/**
+ * Where each resource cap is applied: a cap the data puts in a backend's arguments is in them,
+ * and one it puts in bubblewrap's user scope is in the scope's.
+ */
 
 const COMMAND = ["deno", "task", "test"];
 const RUN = { image: `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`, name: "specnaut-gate-3f9c2a71" };
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
+const scope = () => after(scopeArgs(policyOf("bwrap")), "-p");
+
+/** What the table must say of `cap`, given where the arguments were found to carry it. */
+function enforcer(cap: string, by: boolean | string): string {
+  if (by === "scope") return "scope";
+  return by ? "arguments" : cap === "wallClockSeconds" ? "launcher" : "unenforced";
+}
 
 Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and no other", () => {
   const ctr = container();
@@ -28,9 +38,9 @@ Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and
       scratchBytes: after(ctr, "--tmpfs").every((t) => t.includes(`size=${LIMITS.scratchBytes}`)),
     },
     bwrap: {
-      processes: false,
-      memoryBytes: false,
-      cpus: false,
+      processes: scope().includes(`TasksMax=${LIMITS.processes}`) && "scope",
+      memoryBytes: scope().includes(`MemoryMax=${LIMITS.memoryBytes}`) && "scope",
+      cpus: scope().includes(`CPUQuota=${LIMITS.cpus * 100}%`) && "scope",
       wallClockSeconds: wall(bwrap()),
       scratchBytes: after(bwrap(), "--size").length === after(bwrap(), "--tmpfs").length,
     },
@@ -44,9 +54,7 @@ Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and
   };
   for (const [backend, caps] of Object.entries(carried)) {
     const expected = Object.fromEntries(
-      Object.entries(caps).map((
-        [cap, inArgs],
-      ) => [cap, inArgs ? "arguments" : cap === "wallClockSeconds" ? "launcher" : "unenforced"]),
+      Object.entries(caps).map(([cap, by]) => [cap, enforcer(cap, by)]),
     );
     assertEquals(CAP_ENFORCEMENT[backend as keyof typeof CAP_ENFORCEMENT], expected, backend);
   }
@@ -56,6 +64,12 @@ Deno.test("unenforcedCaps: the container runs with every cap; the others name wh
   assertEquals(unenforcedCaps("container"), []);
   assertEquals(unenforcedCaps("bwrap"), ["processes", "memoryBytes", "cpus"]);
   assertEquals(unenforcedCaps("seatbelt"), ["processes", "memoryBytes", "cpus", "scratchBytes"]);
+});
+
+Deno.test("unenforcedCaps: bubblewrap in a user scope lacks none; a scope means nothing elsewhere", () => {
+  assertEquals(unenforcedCaps("bwrap", true), []);
+  assertEquals(unenforcedCaps("seatbelt", true), unenforcedCaps("seatbelt"));
+  assertEquals(unenforcedCaps("container", true), []);
 });
 
 Deno.test("STOP_LIMIT: only sandbox-exec's stop misses a process that left the run's group", () => {

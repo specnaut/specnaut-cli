@@ -188,5 +188,6 @@ const LINUX_BWRAP = {
   docker: false,
   bwrap: "usable",
   bwrapVersion: "bubblewrap 0.9.0",
+  bwrapScope: false,
   sandboxExec: false,
 } as const;

@@ -22,9 +22,18 @@ const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
 type Podman = Pick<BackendProbe, "podman" | "podmanCgroups">;
-type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion">;
+type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
 const NO_PODMAN: Podman = { podman: "absent", podmanCgroups: false };
-const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null };
+const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null, bwrapScope: false };
+
+/**
+ * A trial user scope: the shell inside it prints the controllers its own cgroup (cgroup v2, the
+ * one `0::` line) can use, which are the ones a scope's limits act through.
+ */
+const SCOPE_TRIAL = [
+  ...["--user", "--scope", "--quiet", "--collect", "/bin/sh", "-c"],
+  'read -r line < /proc/self/cgroup; cat "/sys/fs/cgroup${line#0::}/cgroup.controllers"',
+];
 
 export class HostBackendProber implements BackendProber {
   constructor(
@@ -78,9 +87,17 @@ export class HostBackendProber implements BackendProber {
     if (version.code !== 0) return NO_BWRAP;
     const bwrapVersion = version.stdout.trim() || null;
     const trial = await this.runner.run("bwrap", BWRAP_TRIAL);
-    if (trial.code === 0) return { bwrap: "usable", bwrapVersion };
+    if (trial.code === 0) return { bwrap: "usable", bwrapVersion, bwrapScope: await this.#scope() };
     const restricted = USERNS_REFUSED.test(trial.stderr);
-    return { bwrap: restricted ? "userns_restricted" : "trial_failed", bwrapVersion };
+    const bwrap = restricted ? "userns_restricted" : "trial_failed";
+    return { bwrap, bwrapVersion, bwrapScope: false };
+  }
+
+  /** Whether a systemd user scope can be made with pids, memory and cpu delegated to it. */
+  async #scope(): Promise<boolean> {
+    const { code, stdout } = await this.runner.run("systemd-run", SCOPE_TRIAL);
+    const controllers = stdout.trim().split(/\s+/);
+    return code === 0 && NEEDED_CONTROLLERS.every((c) => controllers.includes(c));
   }
 
   async #sandboxExec(): Promise<boolean> {

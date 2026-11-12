@@ -1,8 +1,13 @@
-import type { RunOutcome, SandboxRunner } from "../application/sandbox_ports.ts";
+import { join } from "@std/path";
+import {
+  type RunOutcome,
+  SandboxRefused,
+  type SandboxRunner,
+} from "../application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../domain/sandbox.ts";
-import { bwrapArgs } from "../domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs } from "../domain/sandbox_args.ts";
 import { isFilterArch, SECCOMP_FD, seccompFilter } from "../domain/sandbox_seccomp.ts";
-import type { ProcessLauncher } from "./sandbox_process.ts";
+import type { ProcessLauncher, Started } from "./sandbox_process.ts";
 import { untilWallClock } from "./sandbox_wall_clock.ts";
 
 /**
@@ -12,22 +17,72 @@ import { untilWallClock } from "./sandbox_wall_clock.ts";
  */
 const MOVE_FILTER = `exec ${SECCOMP_FD}<&0 </dev/null; exec "$@"`;
 
+/**
+ * In a systemd user scope, the shell line first creates the marker it is given: it runs only once
+ * the scope is up, so a marker missing after the run means the scope never started.
+ */
+const SCOPED_MOVE_FILTER = `: > "$1" || exit 125; shift; ${MOVE_FILTER}`;
+
 export class BwrapRunner implements SandboxRunner {
   readonly #filter: Uint8Array;
 
-  /** `path` finds `bwrap` as the probe found it; the sandbox's own PATH is the policy's. */
-  constructor(arch: string, readonly launcher: ProcessLauncher, readonly path: string) {
+  /**
+   * `path` finds `bwrap` and `systemd-run` as the probe found them; the sandbox's own PATH is the
+   * policy's. `scope`: run in a systemd user scope, which caps memory, processes and CPU.
+   */
+  constructor(
+    arch: string,
+    readonly launcher: ProcessLauncher,
+    readonly path: string,
+    readonly scope = false,
+  ) {
     if (!isFilterArch(arch)) throw new Error(`no syscall filter for ${arch}`);
     this.#filter = seccompFilter(arch);
   }
 
   run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
-    const started = this.launcher.start({
-      cmd: "/bin/sh",
-      args: ["-c", MOVE_FILTER, "sh", "bwrap", ...bwrapArgs(policy, command)],
-      env: { PATH: this.path },
-      stdin: this.#filter,
-    });
-    return untilWallClock(started, policy.limits.wallClockSeconds);
+    const bwrap = ["bwrap", ...bwrapArgs(policy, command)];
+    if (this.scope) return this.#scoped(policy, bwrap);
+    return untilWallClock(
+      this.#start("/bin/sh", ["-c", MOVE_FILTER, "sh", ...bwrap]),
+      wall(policy),
+    );
+  }
+
+  /**
+   * The run inside a user scope. A scope that did not start ran nothing: it is refused with its
+   * cause, never turned into a run without the caps it was chosen for.
+   */
+  async #scoped(policy: SandboxPolicy, bwrap: readonly string[]): Promise<RunOutcome> {
+    const folder = await Deno.makeTempDir({ prefix: "specnaut-scope-" });
+    try {
+      const marker = join(folder, "started");
+      const [cmd, ...prefix] = scopeArgs(policy);
+      const line = ["/bin/sh", "-c", SCOPED_MOVE_FILTER, "sh", marker, ...bwrap];
+      const outcome = await untilWallClock(this.#start(cmd, [...prefix, ...line]), wall(policy));
+      if (outcome.kind === "exited" && !(await present(marker))) {
+        throw new SandboxRefused(`the systemd user scope did not start (exit ${outcome.code})`);
+      }
+      return outcome;
+    } finally {
+      await Deno.remove(folder, { recursive: true });
+    }
+  }
+
+  #start(cmd: string, args: readonly string[]): Started {
+    return this.launcher.start({ cmd, args, env: { PATH: this.path }, stdin: this.#filter });
+  }
+}
+
+const wall = (policy: SandboxPolicy) => policy.limits.wallClockSeconds;
+
+/** Whether `path` exists. */
+async function present(path: string): Promise<boolean> {
+  try {
+    await Deno.lstat(path);
+    return true;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
   }
 }

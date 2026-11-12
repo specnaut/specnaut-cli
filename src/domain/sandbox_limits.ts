@@ -3,7 +3,7 @@
  * a hang ends at a known bound. `sandboxPolicy` in `sandbox.ts` decides that a policy carries them.
  */
 
-import type { SandboxedBackend } from "./sandbox.ts";
+import type { OfferedBackend, SandboxedBackend } from "./sandbox.ts";
 
 export type SandboxLimits = {
   readonly processes: number;
@@ -26,10 +26,11 @@ export const LIMITS: SandboxLimits = {
 };
 
 /**
- * Who applies a cap: the backend's own arguments, the launcher around it, or nobody. A cap a
- * backend cannot enforce is named as such here, never claimed: the run goes ahead without it.
+ * Who applies a cap: the backend's own arguments, the launcher around it, a systemd user scope
+ * around it when the host offers one (and nobody when it does not), or nobody. A cap a backend
+ * cannot enforce is named as such here, never claimed: the run goes ahead without it.
  */
-export type CapEnforcer = "arguments" | "launcher" | "unenforced";
+export type CapEnforcer = "arguments" | "launcher" | "scope" | "unenforced";
 
 /** What a backend with no resource options gets: the launcher's wall clock, and nothing else. */
 const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
@@ -43,7 +44,8 @@ const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
 /**
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
  * option ends a run on time. Neither bubblewrap nor `sandbox-exec` can cap processes, memory or
- * CPU, and nothing around them does either; bubblewrap caps its scratch tmpfs by size.
+ * CPU; bubblewrap caps its scratch tmpfs by size, and gets the other three from a systemd user
+ * scope where cgroups are delegated (`scopeArgs`). Nothing does so around `sandbox-exec`.
  */
 export const CAP_ENFORCEMENT: Readonly<
   Record<SandboxedBackend, Readonly<Record<keyof SandboxLimits, CapEnforcer>>>
@@ -55,7 +57,13 @@ export const CAP_ENFORCEMENT: Readonly<
     wallClockSeconds: "launcher",
     scratchBytes: "arguments",
   },
-  bwrap: { ...WALL_CLOCK_ONLY, scratchBytes: "arguments" },
+  bwrap: {
+    processes: "scope",
+    memoryBytes: "scope",
+    cpus: "scope",
+    wallClockSeconds: "launcher",
+    scratchBytes: "arguments",
+  },
   seatbelt: WALL_CLOCK_ONLY,
 };
 
@@ -68,10 +76,15 @@ export const CAP_NAMES: Readonly<Record<keyof SandboxLimits, string>> = {
   scratchBytes: "scratch",
 };
 
-/** The caps `backend` runs without. */
-export function unenforcedCaps(backend: SandboxedBackend): (keyof SandboxLimits)[] {
+/** The caps `backend` runs without; `scope`: it runs in a systemd user scope. */
+export function unenforcedCaps(backend: SandboxedBackend, scope = false): (keyof SandboxLimits)[] {
   return (Object.entries(CAP_ENFORCEMENT[backend]) as [keyof SandboxLimits, CapEnforcer][])
-    .filter(([, by]) => by === "unenforced").map(([cap]) => cap);
+    .filter(([, by]) => by === "unenforced" || (by === "scope" && !scope)).map(([cap]) => cap);
+}
+
+/** The caps a chosen backend runs without: bubblewrap in a user scope lacks none of the three. */
+export function capsWithout(backend: OfferedBackend): (keyof SandboxLimits)[] {
+  return unenforcedCaps(backend.kind, backend.kind === "bwrap" && backend.scope);
 }
 
 /**

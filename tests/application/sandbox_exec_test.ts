@@ -34,6 +34,7 @@ const LINUX_BWRAP: BackendProbe = {
   docker: false,
   bwrap: "usable",
   bwrapVersion: "bubblewrap 0.9.0",
+  bwrapScope: false,
   sandboxExec: false,
 };
 
@@ -95,7 +96,7 @@ Deno.test("execInSandbox: the chosen backend's runner runs the command under its
     path: ["/opt/deno/bin"],
   });
   assertEquals(expected.ok && seen.runs[0].policy, expected.ok && expected.policy);
-  assertEquals(seen.runs[0].backend, { kind: "bwrap" });
+  assertEquals(seen.runs[0].backend, { kind: "bwrap", scope: false });
   assertEquals(seen.runs[0].command, ["deno", "test"]);
   assertEquals(seen.removed, 1);
 });
@@ -175,4 +176,11 @@ Deno.test("execInSandbox: a run carries the caps its backend ran without, from t
   assertEquals(ran.kind === "ran" && ran.unenforced, unenforcedCaps("container"));
   const bwrap = await execInSandbox(world(LINUX_BWRAP).deps, REQUEST);
   assertEquals(bwrap.kind === "ran" && bwrap.unenforced, unenforcedCaps("bwrap"));
+});
+
+Deno.test("execInSandbox: bubblewrap in a user scope is handed the scope, and lacks none of its caps", async () => {
+  const { deps, seen } = world({ ...LINUX_BWRAP, bwrapScope: true });
+  const ran = await execInSandbox(deps, REQUEST);
+  assertEquals(seen.runs[0].backend, { kind: "bwrap", scope: true });
+  assertEquals(ran.kind === "ran" && ran.unenforced, unenforcedCaps("bwrap", true));
 });
