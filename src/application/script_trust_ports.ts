@@ -1,8 +1,9 @@
+import type { ScopeRoot } from "../domain/checkout_trust.ts";
 import type { BaseEntry, TreeWalk } from "../domain/script_trust.ts";
 
 /**
- * The ports `specnaut verify-scripts` reads through. Their own module: `ports.ts` is the
- * project-file ports, and these read a repository's commits and one folder of its work tree.
+ * The ports the script and checkout checks read through. Their own module: `ports.ts` is the
+ * project-file ports, and these read a repository's commits and folders of its work tree.
  */
 
 /**
@@ -34,8 +35,12 @@ export interface GitObjectReader {
   mergeBase(a: string, b: string): Promise<string | null>;
   /** How many commits `to` has that `from` lacks. */
   aheadCount(from: string, to: string): Promise<number>;
+  /** The commits `to` has that `from` lacks, as full shas. */
+  commitsAhead(from: string, to: string): Promise<string[]>;
   /** Every entry under `dir` at `commit`, recursively; a blob over the cap is a throw. */
   listTree(commit: string, dir: string): Promise<BaseEntry[]>;
+  /** The entries of `root` at `commit`, a link with its target; a blob over the cap is a throw. */
+  listRoot(commit: string, root: ScopeRoot): Promise<BaseEntry[]>;
   /** One path at `commit`; a blob over the cap is a throw. */
   readFile(commit: string, path: string): Promise<BaseFile>;
   /** The paths changed between two commits, from the repository's top. */
@@ -45,4 +50,9 @@ export interface GitObjectReader {
 /** Walks the scripts folder of the work tree, following no link. */
 export interface ScriptTreeWalker {
   walk(): Promise<TreeWalk>;
+}
+
+/** Walks one root of the checked files in the work tree, following no link. */
+export interface CheckoutTreeWalker {
+  walk(root: ScopeRoot): Promise<TreeWalk>;
 }

@@ -29,7 +29,7 @@ export type TreeEntry =
     readonly bytes: Uint8Array;
     readonly links: number;
   }
-  | { readonly kind: "link"; readonly path: string }
+  | { readonly kind: "link"; readonly path: string; readonly target?: string }
   | { readonly kind: "other"; readonly path: string }
   | { readonly kind: "unreadable"; readonly path: string; readonly why: string };
 
@@ -41,7 +41,7 @@ export type TreeWalk =
 /** One entry of a commit's tree under {@link SCRIPTS_DIR}, as `git ls-tree -r` lists it. */
 export type BaseEntry =
   | { readonly kind: "blob"; readonly path: string; readonly bytes: Uint8Array }
-  | { readonly kind: "link"; readonly path: string }
+  | { readonly kind: "link"; readonly path: string; readonly target?: string }
   | { readonly kind: "submodule"; readonly path: string };
 
 /**
@@ -185,7 +185,7 @@ function byPath(entries: readonly BaseEntry[]): ReadonlyMap<string, BaseEntry> {
 }
 
 /** Another path in `entries` that is `path` but for letter case: one file on a case-blind disk. */
-function hasCaseTwin(path: string, entries: ReadonlyMap<string, BaseEntry>): boolean {
+export function hasCaseTwin(path: string, entries: ReadonlyMap<string, BaseEntry>): boolean {
   const folded = path.toLowerCase();
   return [...entries.keys()].some((other) => other !== path && other.toLowerCase() === folded);
 }

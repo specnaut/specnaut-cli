@@ -1,21 +1,27 @@
 import { join } from "@std/path";
-import { MAX_SCRIPT_BYTES, type ScriptTreeWalker } from "../application/script_trust_ports.ts";
+import {
+  type CheckoutTreeWalker,
+  MAX_SCRIPT_BYTES,
+  type ScriptTreeWalker,
+} from "../application/script_trust_ports.ts";
+import { inScopeRoot, type ScopeRoot } from "../domain/checkout_trust.ts";
 import { REASON, SCRIPTS_DIR, type TreeEntry, type TreeWalk } from "../domain/script_trust.ts";
 
 /**
- * Walks `.specnaut/scripts/` as the disk holds it: every folder from the project's root down is
- * `lstat`ed, so a link on the way stops the walk; a link inside is recorded, never followed; dot
- * files are walked like any other. A file's bytes are read from the descriptor it was checked on.
+ * Walks a folder as the disk holds it: every folder from the project's root down is `lstat`ed, so
+ * a link on the way stops the walk; a link inside is recorded with its target, never followed; dot
+ * files are walked like any other. A file's bytes are read from the descriptor it was checked on,
+ * and only for a file the root takes: a shallow root lists its folder and reads nothing else.
  *
  * Its limit on Windows: Deno reports no `ino` and no `nlink` there, so a hard link reads as linked
  * once (`links` is 1, and the trust rule's hard-link check never fires) and the descriptor check
  * compares the device alone. Both checks hold on POSIX only.
  */
-export class FsScriptTreeWalker implements ScriptTreeWalker {
+export class FsTreeWalker implements CheckoutTreeWalker {
   constructor(private readonly root: string) {}
 
-  async walk(): Promise<TreeWalk> {
-    const parts = SCRIPTS_DIR.split("/");
+  async walk(scope: ScopeRoot): Promise<TreeWalk> {
+    const parts = scope.dir === "." ? [] : scope.dir.split("/");
     for (let i = 1; i <= parts.length; i++) {
       const path = parts.slice(0, i).join("/");
       const info = await lstatOrNull(join(this.root, path));
@@ -24,24 +30,44 @@ export class FsScriptTreeWalker implements ScriptTreeWalker {
       if (!info.isDirectory) return { kind: "blocked", path, why: "not a folder" };
     }
     const entries: TreeEntry[] = [];
-    await this.#walkDir(SCRIPTS_DIR, entries);
+    await this.#walkDir(parts.join("/"), scope, entries);
     return { kind: "walked", entries: entries.sort((a, b) => a.path < b.path ? -1 : 1) };
   }
 
-  async #walkDir(dir: string, into: TreeEntry[]): Promise<void> {
-    for await (const item of Deno.readDir(join(this.root, dir))) {
-      const path = `${dir}/${item.name}`;
+  async #walkDir(dir: string, scope: ScopeRoot, into: TreeEntry[]): Promise<void> {
+    for await (const item of Deno.readDir(join(this.root, dir || "."))) {
+      const path = dir === "" ? item.name : `${dir}/${item.name}`;
       try {
         const info = await Deno.lstat(join(this.root, path));
-        if (info.isSymlink) into.push({ kind: "link", path });
-        else if (info.isDirectory) await this.#walkDir(path, into);
-        else if (info.isFile) into.push(await readChecked(join(this.root, path), path, info));
+        if (info.isDirectory) {
+          if (!scope.deep) continue;
+          // A nested repository (a worktree, a clone) is one foreign entry: its files are not read.
+          if (await lstatOrNull(join(this.root, path, ".git")) !== null) {
+            into.push({ kind: "other", path });
+          } else await this.#walkDir(path, scope, into);
+        } else if (!inScopeRoot(scope, path)) continue;
+        else if (info.isSymlink) {
+          into.push({ kind: "link", path, target: await Deno.readLink(join(this.root, path)) });
+        } else if (info.isFile) into.push(await readChecked(join(this.root, path), path, info));
         else into.push({ kind: "other", path });
       } catch (err) {
         if (err instanceof Deno.errors.NotCapable || !(err instanceof Error)) throw err;
         into.push({ kind: "unreadable", path, why: err.message });
       }
     }
+  }
+}
+
+/** `.specnaut/scripts/`, every entry below it: what `specnaut verify-scripts` judges. */
+export class FsScriptTreeWalker implements ScriptTreeWalker {
+  readonly #walker: FsTreeWalker;
+
+  constructor(root: string) {
+    this.#walker = new FsTreeWalker(root);
+  }
+
+  walk(): Promise<TreeWalk> {
+    return this.#walker.walk({ dir: SCRIPTS_DIR, deep: true });
   }
 }
 

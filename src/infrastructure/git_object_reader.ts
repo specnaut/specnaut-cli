@@ -3,6 +3,7 @@ import {
   type GitObjectReader,
   MAX_SCRIPT_BYTES,
 } from "../application/script_trust_ports.ts";
+import { inScopeRoot, type ScopeRoot } from "../domain/checkout_trust.ts";
 import type { BaseEntry } from "../domain/script_trust.ts";
 import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 
@@ -61,12 +62,38 @@ export class GitObjects implements GitObjectReader {
     return Number(firstLine(await this.#git.run("rev-list", ["--count", `${from}..${to}`])));
   }
 
+  async commitsAhead(from: string, to: string): Promise<string[]> {
+    const out = decode(await this.#git.run("rev-list", [`${from}..${to}`]));
+    return out.split("\n").filter((sha) => SHA.test(sha));
+  }
+
   async listTree(commit: string, dir: string): Promise<BaseEntry[]> {
     const records = await this.#lsTree(commit, ["-r", "--", `${this.projectPrefix}${dir}`]);
-    const bytes = await this.#catFiles(commit, records.filter((r) => r.kind === "blob"));
-    return records.map((r): BaseEntry =>
-      r.kind === "blob" ? { kind: "blob", path: r.path, bytes: bytes.get(r.sha)! } : r
-    );
+    return await this.#withBytes(commit, records);
+  }
+
+  /**
+   * A deep root is listed as `listTree` lists it, the root's own entry included (a link or a
+   * submodule there); a shallow one without `-r`. Filtered before any blob is read.
+   */
+  async listRoot(commit: string, root: ScopeRoot): Promise<BaseEntry[]> {
+    const dir = root.dir === "." ? "" : root.deep ? root.dir : `${root.dir}/`;
+    const path = `${this.projectPrefix}${dir}`;
+    const args = [...(root.deep ? ["-r"] : []), ...(path === "" ? [] : ["--", path])];
+    const records = await this.#lsTree(commit, args);
+    return await this.#withBytes(commit, records.filter((r) => inScopeRoot(root, r.path)));
+  }
+
+  /** Each record with its blob's bytes, a link with its target. */
+  async #withBytes(commit: string, records: TreeRecord[]): Promise<BaseEntry[]> {
+    const bytes = await this.#catFiles(commit, records.filter((r) => r.kind !== "submodule"));
+    return records.map((r): BaseEntry => {
+      if (r.kind === "submodule") return r;
+      if (r.kind === "link") {
+        return { kind: "link", path: r.path, target: decode(bytes.get(r.sha)!) };
+      }
+      return { kind: "blob", path: r.path, bytes: bytes.get(r.sha)! };
+    });
   }
 
   async readFile(commit: string, path: string): Promise<BaseFile> {
@@ -90,15 +117,18 @@ export class GitObjects implements GitObjectReader {
       if (m === null || !m[5].startsWith(this.projectPrefix)) continue;
       const path = m[5].slice(this.projectPrefix.length);
       if (m[1] === "160000") records.push({ kind: "submodule", path });
-      else if (m[1] === "120000") records.push({ kind: "link", path });
-      else if (m[2] === "blob") records.push({ kind: "blob", path, sha: m[3], size: Number(m[4]) });
+      else if (m[1] === "120000") {
+        records.push({ kind: "link", path, sha: m[3], size: Number(m[4]) });
+      } else if (m[2] === "blob") {
+        records.push({ kind: "blob", path, sha: m[3], size: Number(m[4]) });
+      }
     }
     return records;
   }
 
   /**
-   * Each blob's raw bytes, through one `cat-file --batch`. The sizes `ls-tree` listed are checked
-   * first: a blob over the cap is refused by its path, before any of it is read.
+   * Each blob's raw bytes, a link's included, through one `cat-file --batch`. The sizes `ls-tree`
+   * listed are checked first: a blob over the cap is refused by its path, before any of it is read.
    */
   async #catFiles(commit: string, blobs: BlobRecord[]): Promise<Map<string, Uint8Array>> {
     const found = new Map<string, Uint8Array>();
@@ -122,8 +152,6 @@ export class GitObjects implements GitObjectReader {
   }
 }
 
-type BlobRecord = { kind: "blob"; path: string; sha: string; size: number };
-type TreeRecord =
-  | BlobRecord
-  | { kind: "link"; path: string }
-  | { kind: "submodule"; path: string };
+/** A blob `ls-tree -l` listed: a file's, or a link's, whose bytes are its target. */
+type BlobRecord = { kind: "blob" | "link"; path: string; sha: string; size: number };
+type TreeRecord = BlobRecord | { kind: "submodule"; path: string };
