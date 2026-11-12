@@ -17,21 +17,7 @@
 gate_evidence_write() {
   local path dir tmp
   command -v jq >/dev/null 2>&1 || { echo "unwritten (jq-absent)"; return 0; }
-  if [ -n "${7:-}" ]; then
-    case "$7" in /* | [A-Za-z]:[/\\]*) ;; *) echo "unwritten (evidence-folder-relative)"; return 0 ;; esac
-    if [ -n "$EXPLICIT_HEAD" ]; then
-      [ -d "$7" ] || { echo "unwritten (evidence-folder-missing)"; return 0; }
-      gate_evidence_apart "$7" || { echo "unwritten (evidence-beside-the-head)"; return 0; }
-    fi
-    path="$7/specnaut/gate-evidence/$1-$2.json"
-  elif [ -n "$EXPLICIT_HEAD" ]; then
-    echo "unwritten (no-evidence-folder)"
-    return 0
-  else
-    path="$(gate_git rev-parse --git-path "specnaut/gate-evidence/$1-$2.json" 2>/dev/null)" ||
-      { echo "unwritten (no-git-path)"; return 0; }
-    case "$path" in /*|[A-Za-z]:*) ;; *) path="$REPO_ROOT/$path" ;; esac
-  fi
+  path="$(gate_evidence_path "$1" "$2" "${7:-}")" || { echo "$path"; return 0; }
   dir="$(dirname -- "$path")"
   mkdir -p -- "$dir" 2>/dev/null || { echo "unwritten (cannot-create-directory)"; return 0; }
   tmp="$(mktemp "$dir/.evidence.XXXXXX" 2>/dev/null)" || { echo "unwritten (cannot-create-file)"; return 0; }
@@ -45,14 +31,41 @@ gate_evidence_write() {
   echo "$path"
 }
 
+# gate_evidence_path <tier> <tree> <folder or ""> - prints where the file goes, or prints
+# `unwritten (<cause>)` and returns 1.
+gate_evidence_path() {
+  local path name="specnaut/gate-evidence/$1-$2.json"
+  if [ -n "$3" ]; then
+    case "$3" in /* | [A-Za-z]:[/\\]*) ;; *) echo "unwritten (evidence-folder-relative)"; return 1 ;; esac
+    if [ -n "$EXPLICIT_HEAD" ]; then
+      [ -d "$3" ] || { echo "unwritten (evidence-folder-missing)"; return 1; }
+      gate_evidence_apart "$3" || { echo "unwritten (evidence-beside-the-head)"; return 1; }
+    fi
+    echo "$3/$name"
+  elif [ -n "$EXPLICIT_HEAD" ]; then
+    echo "unwritten (no-evidence-folder)"
+    return 1
+  else
+    path="$(gate_git rev-parse --git-path "$name" 2>/dev/null)" || { echo "unwritten (no-git-path)"; return 1; }
+    case "$path" in /*|[A-Za-z]:*) ;; *) path="$REPO_ROOT/$path" ;; esac
+    echo "$path"
+  fi
+}
+
 # gate_evidence_apart <dir> - false when <dir> lies inside the folder holding the head's
-# repository (two levels above its objects folder), compared once links are resolved.
+# repository (two levels above its objects folder). <dir> and each folder above it are
+# compared with that folder by identity (`-ef`), never by spelling: a file system that
+# folds case, or a short 8.3 name, gives one folder several spellings.
 gate_evidence_apart() {
-  local mine theirs
+  local dir theirs
   [ -n "$EXPLICIT_OBJECTS" ] || return 0
-  mine="$(cd -P -- "$1" && pwd)/" || return 1
-  theirs="$(cd -P -- "$EXPLICIT_OBJECTS/../.." && pwd)/" || return 1
-  case "$mine" in "$theirs"*) return 1 ;; esac
+  theirs="$EXPLICIT_OBJECTS/../.."
+  [ -d "$theirs" ] && dir="$(cd -P -- "$1" && pwd)" || return 1
+  while ! [ "$dir" -ef "$theirs" ]; do
+    [ "$dir" != "$(dirname -- "$dir")" ] || return 0
+    dir="$(dirname -- "$dir")"
+  done
+  return 1
 }
 
 gate_evidence_json() {

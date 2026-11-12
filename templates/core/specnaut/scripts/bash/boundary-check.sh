@@ -110,9 +110,9 @@ for i in "${!domains[@]}"; do
   err="$(list_domain "$domain" 2>&1 >"$listing")" ||
     fail "$CONFIG_BOUNDARIES: line ${domain_lines[$i]}: domain: '$domain' cannot be listed — ${err%%$'\n'*}"
   found=0 prev=""
-  # Each record: `<mode> <object> <stage>\t<path>`, or `<mode> blob <object>\t<path>`
-  # from a head's tree, whose last field is the object. A conflicted path comes once
-  # per stage, adjacent; it is checked once.
+  # Each record: `<mode> <object> <stage>\t<path>` from the index, or `<mode> blob
+  # <object>\t<path>` from a head's tree. A conflicted path comes once per stage,
+  # adjacent; it is checked once.
   while IFS= read -r -d '' rec; do
     path="${rec#*$'\t'}"
     [ "$path" != "$prev" ] || continue
@@ -120,8 +120,9 @@ for i in "${!domains[@]}"; do
     case "${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=$((tracked + 1))
     if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
-    meta="${rec%%$'\t'*}"
-    is_exempt "$path" || { files+=("$path") && objects+=("${meta##* }"); }
+    meta="${rec%%$'\t'*}" && meta="${meta#* }"
+    case "$meta" in blob\ *) object="${meta#blob }" ;; *) object="${meta%% *}" ;; esac
+    is_exempt "$path" || { files+=("$path") && objects+=("$object"); }
   done <"$listing"
   [ "$found" = 1 ] || echo "  note: domain: '$domain' (line ${domain_lines[$i]}) names no tracked file"
 done

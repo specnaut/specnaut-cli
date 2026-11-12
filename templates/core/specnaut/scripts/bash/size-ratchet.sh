@@ -61,17 +61,13 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
   exit 3
 }
-# Every git call below, given an objects folder, reads it under explicit_head_git's settings.
-git() { explicit_head_git "$@"; }
+git() { explicit_head_git "$@"; } # every git call below: an --objects folder, read safely
 
 SINCE="" REPORT=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
-    --head | --objects)
-      explicit_head_option "$@" || { echo "size-ratchet: $EXPLICIT_REFUSAL" >&2; usage; }
-      shift 2
-      ;;
+    --head | --objects) explicit_head_option "$@" || { echo "size-ratchet: $EXPLICIT_REFUSAL" >&2; usage; }; shift 2 ;;
     --report) REPORT=1; shift ;;
     *) usage ;;
   esac

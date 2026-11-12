@@ -5,7 +5,9 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { BOUNDARIES_CONFIG_PATH } from "../../src/domain/constitution_paths.ts";
-import { bashScript, exportHead, headRepo } from "./explicit_head_fixture.ts";
+import { bashScript, exportHead, git, headRepo } from "./explicit_head_fixture.ts";
+import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { IDENTITY, run } from "../templates/child_fixture.ts";
 
 const SCRIPT = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/boundary-check.sh", import.meta.url),
@@ -87,4 +89,15 @@ Deno.test("boundary check: an empty --head or --objects is refused, never read a
     assertEquals(r.code, 2, args.join(" ") + r.stdout + r.stderr);
     assertStringIncludes(r.stderr, `boundary-check: ${args.at(-2)} takes a value`);
   }
+});
+
+// Without a head the files are read in the work tree, and the object each entry carries is
+// the index's: never the stage number that ends an index record. The trace shows each value.
+Deno.test("boundary check: without a head, each file's object is its blob id", async () => {
+  const repo = await split();
+  const blob = await git(repo.root, "rev-parse", ":src/domain/a.ts");
+  const r = await run("bash", ["-x", bashPath(SCRIPT)], repo.root, IDENTITY);
+  assertEquals(r.code, 1, r.stdout + r.stderr);
+  const traced = r.stderr.split("\n").filter((l) => /^\++ object=/.test(l));
+  assertEquals(traced.map((l) => l.replace(/^\++ /, "")), [`object=${blob}`]);
 });

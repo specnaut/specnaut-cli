@@ -29710,12 +29710,7 @@ gate_candidate_head() {
 # the commit is asked instead: an id names one tree, whatever the disk holds.
 gate_candidate_check() {
   local status head
-  if [ -n "\$EXPLICIT_HEAD" ]; then
-    head="\$(gate_git rev-parse --verify --quiet "\$EXPLICIT_HEAD^{tree}" 2>/dev/null)" ||
-      { echo "no-commit"; return 1; }
-    [ "\$head" = "\$1" ] || { echo "tree-moved: \$EXPLICIT_HEAD holds \$head"; return 1; }
-    return 0
-  fi
+  [ -z "\$EXPLICIT_HEAD" ] || { gate_candidate_check_head "\$1"; return; }
   status="\$(gate_git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" ||
     { echo "status-failed"; return 1; }
   if [ -n "\$status" ]; then
@@ -29729,6 +29724,15 @@ gate_candidate_check() {
     return 1
   fi
   return 0
+}
+
+# gate_candidate_check_head <tree> - does the head hold <tree>? Prints the refusal and
+# returns 1 when it does not.
+gate_candidate_check_head() {
+  local head
+  head="\$(gate_git rev-parse --verify --quiet "\$EXPLICIT_HEAD^{tree}" 2>/dev/null)" ||
+    { echo "no-commit"; return 1; }
+  [ "\$head" = "\$1" ] || { echo "tree-moved: \$EXPLICIT_HEAD holds \$head"; return 1; }
 }
 
 # gate_candidate_merge_base <name> - the merge-base of HEAD, or the head, and the default branch <name>,
@@ -30073,21 +30077,7 @@ gate_graph_affected() {
 gate_evidence_write() {
   local path dir tmp
   command -v jq >/dev/null 2>&1 || { echo "unwritten (jq-absent)"; return 0; }
-  if [ -n "\${7:-}" ]; then
-    case "\$7" in /* | [A-Za-z]:[/\\\\]*) ;; *) echo "unwritten (evidence-folder-relative)"; return 0 ;; esac
-    if [ -n "\$EXPLICIT_HEAD" ]; then
-      [ -d "\$7" ] || { echo "unwritten (evidence-folder-missing)"; return 0; }
-      gate_evidence_apart "\$7" || { echo "unwritten (evidence-beside-the-head)"; return 0; }
-    fi
-    path="\$7/specnaut/gate-evidence/\$1-\$2.json"
-  elif [ -n "\$EXPLICIT_HEAD" ]; then
-    echo "unwritten (no-evidence-folder)"
-    return 0
-  else
-    path="\$(gate_git rev-parse --git-path "specnaut/gate-evidence/\$1-\$2.json" 2>/dev/null)" ||
-      { echo "unwritten (no-git-path)"; return 0; }
-    case "\$path" in /*|[A-Za-z]:*) ;; *) path="\$REPO_ROOT/\$path" ;; esac
-  fi
+  path="\$(gate_evidence_path "\$1" "\$2" "\${7:-}")" || { echo "\$path"; return 0; }
   dir="\$(dirname -- "\$path")"
   mkdir -p -- "\$dir" 2>/dev/null || { echo "unwritten (cannot-create-directory)"; return 0; }
   tmp="\$(mktemp "\$dir/.evidence.XXXXXX" 2>/dev/null)" || { echo "unwritten (cannot-create-file)"; return 0; }
@@ -30101,14 +30091,41 @@ gate_evidence_write() {
   echo "\$path"
 }
 
+# gate_evidence_path <tier> <tree> <folder or ""> - prints where the file goes, or prints
+# \`unwritten (<cause>)\` and returns 1.
+gate_evidence_path() {
+  local path name="specnaut/gate-evidence/\$1-\$2.json"
+  if [ -n "\$3" ]; then
+    case "\$3" in /* | [A-Za-z]:[/\\\\]*) ;; *) echo "unwritten (evidence-folder-relative)"; return 1 ;; esac
+    if [ -n "\$EXPLICIT_HEAD" ]; then
+      [ -d "\$3" ] || { echo "unwritten (evidence-folder-missing)"; return 1; }
+      gate_evidence_apart "\$3" || { echo "unwritten (evidence-beside-the-head)"; return 1; }
+    fi
+    echo "\$3/\$name"
+  elif [ -n "\$EXPLICIT_HEAD" ]; then
+    echo "unwritten (no-evidence-folder)"
+    return 1
+  else
+    path="\$(gate_git rev-parse --git-path "\$name" 2>/dev/null)" || { echo "unwritten (no-git-path)"; return 1; }
+    case "\$path" in /*|[A-Za-z]:*) ;; *) path="\$REPO_ROOT/\$path" ;; esac
+    echo "\$path"
+  fi
+}
+
 # gate_evidence_apart <dir> - false when <dir> lies inside the folder holding the head's
-# repository (two levels above its objects folder), compared once links are resolved.
+# repository (two levels above its objects folder). <dir> and each folder above it are
+# compared with that folder by identity (\`-ef\`), never by spelling: a file system that
+# folds case, or a short 8.3 name, gives one folder several spellings.
 gate_evidence_apart() {
-  local mine theirs
+  local dir theirs
   [ -n "\$EXPLICIT_OBJECTS" ] || return 0
-  mine="\$(cd -P -- "\$1" && pwd)/" || return 1
-  theirs="\$(cd -P -- "\$EXPLICIT_OBJECTS/../.." && pwd)/" || return 1
-  case "\$mine" in "\$theirs"*) return 1 ;; esac
+  theirs="\$EXPLICIT_OBJECTS/../.."
+  [ -d "\$theirs" ] && dir="\$(cd -P -- "\$1" && pwd)" || return 1
+  while ! [ "\$dir" -ef "\$theirs" ]; do
+    [ "\$dir" != "\$(dirname -- "\$dir")" ] || return 0
+    dir="\$(dirname -- "\$dir")"
+  done
+  return 1
 }
 
 gate_evidence_json() {
@@ -32278,17 +32295,13 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
   echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
   exit 3
 }
-# Every git call below, given an objects folder, reads it under explicit_head_git's settings.
-git() { explicit_head_git "\$@"; }
+git() { explicit_head_git "\$@"; } # every git call below: an --objects folder, read safely
 
 SINCE="" REPORT=0
 while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
-    --head | --objects)
-      explicit_head_option "\$@" || { echo "size-ratchet: \$EXPLICIT_REFUSAL" >&2; usage; }
-      shift 2
-      ;;
+    --head | --objects) explicit_head_option "\$@" || { echo "size-ratchet: \$EXPLICIT_REFUSAL" >&2; usage; }; shift 2 ;;
     --report) REPORT=1; shift ;;
     *) usage ;;
   esac
@@ -32555,9 +32568,9 @@ for i in "\${!domains[@]}"; do
   err="\$(list_domain "\$domain" 2>&1 >"\$listing")" ||
     fail "\$CONFIG_BOUNDARIES: line \${domain_lines[\$i]}: domain: '\$domain' cannot be listed — \${err%%\$'\\n'*}"
   found=0 prev=""
-  # Each record: \`<mode> <object> <stage>\\t<path>\`, or \`<mode> blob <object>\\t<path>\`
-  # from a head's tree, whose last field is the object. A conflicted path comes once
-  # per stage, adjacent; it is checked once.
+  # Each record: \`<mode> <object> <stage>\\t<path>\` from the index, or \`<mode> blob
+  # <object>\\t<path>\` from a head's tree. A conflicted path comes once per stage,
+  # adjacent; it is checked once.
   while IFS= read -r -d '' rec; do
     path="\${rec#*\$'\\t'}"
     [ "\$path" != "\$prev" ] || continue
@@ -32565,8 +32578,9 @@ for i in "\${!domains[@]}"; do
     case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=\$((tracked + 1))
     if [ -z "\$EXPLICIT_HEAD" ] && [ -L "\$path" ]; then continue; fi
-    meta="\${rec%%\$'\\t'*}"
-    is_exempt "\$path" || { files+=("\$path") && objects+=("\${meta##* }"); }
+    meta="\${rec%%\$'\\t'*}" && meta="\${meta#* }"
+    case "\$meta" in blob\\ *) object="\${meta#blob }" ;; *) object="\${meta%% *}" ;; esac
+    is_exempt "\$path" || { files+=("\$path") && objects+=("\$object"); }
   done <"\$listing"
   [ "\$found" = 1 ] || echo "  note: domain: '\$domain' (line \${domain_lines[\$i]}) names no tracked file"
 done

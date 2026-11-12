@@ -64,12 +64,7 @@ gate_candidate_head() {
 # the commit is asked instead: an id names one tree, whatever the disk holds.
 gate_candidate_check() {
   local status head
-  if [ -n "$EXPLICIT_HEAD" ]; then
-    head="$(gate_git rev-parse --verify --quiet "$EXPLICIT_HEAD^{tree}" 2>/dev/null)" ||
-      { echo "no-commit"; return 1; }
-    [ "$head" = "$1" ] || { echo "tree-moved: $EXPLICIT_HEAD holds $head"; return 1; }
-    return 0
-  fi
+  [ -z "$EXPLICIT_HEAD" ] || { gate_candidate_check_head "$1"; return; }
   status="$(gate_git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" ||
     { echo "status-failed"; return 1; }
   if [ -n "$status" ]; then
@@ -83,6 +78,15 @@ gate_candidate_check() {
     return 1
   fi
   return 0
+}
+
+# gate_candidate_check_head <tree> - does the head hold <tree>? Prints the refusal and
+# returns 1 when it does not.
+gate_candidate_check_head() {
+  local head
+  head="$(gate_git rev-parse --verify --quiet "$EXPLICIT_HEAD^{tree}" 2>/dev/null)" ||
+    { echo "no-commit"; return 1; }
+  [ "$head" = "$1" ] || { echo "tree-moved: $EXPLICIT_HEAD holds $head"; return 1; }
 }
 
 # gate_candidate_merge_base <name> - the merge-base of HEAD, or the head, and the default branch <name>,

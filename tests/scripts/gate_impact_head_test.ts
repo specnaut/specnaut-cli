@@ -4,7 +4,7 @@
 // is left dirty, so a candidate taken from HEAD or the disk would be refused or misnamed.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { basename, dirname, join } from "@std/path";
 import {
   assertNoGraphs,
   exportHead,
@@ -105,7 +105,10 @@ Deno.test("gate impact --head: an empty --head or --objects is refused, never re
   }
 });
 
-/** `gate_evidence_write` as run-gate.sh calls it, after the candidate took `head`. */
+/**
+ * `_gate_evidence.sh`'s `gate_evidence_write`, sourced and called with a folder after
+ * `gate_candidate_head` took `head`. No script passes it a folder yet, so this is its caller.
+ */
 async function evidence(repo: Repo, head: string, objects: string, folder: string) {
   const records = join(repo.outside, "ev-records");
   const ran = join(repo.outside, "ev-ran");
@@ -150,7 +153,14 @@ Deno.test("gate evidence --head: written to the folder given, never inside the r
 Deno.test("gate evidence --head: no folder, a relative or absent one, or one beside the head", async () => {
   const { repo, head, objects, side } = await withHead();
   await Deno.mkdir(join(side, "review"));
+  // Another spelling of the same folder, where the file system folds case; elsewhere, none.
+  const cased = join(dirname(side), basename(side).toUpperCase(), "review");
+  const folds = await Deno.stat(cased).then(() => true, ifAbsent(false));
   const cases: [string, string][] = [
+    [
+      bashPath(cased),
+      folds ? "unwritten (evidence-beside-the-head)" : "unwritten (evidence-folder-missing)",
+    ],
     ["", "unwritten (no-evidence-folder)"],
     ["review/evidence", "unwritten (evidence-folder-relative)"],
     [bashPath(join(repo.outside, "absent")), "unwritten (evidence-folder-missing)"],
