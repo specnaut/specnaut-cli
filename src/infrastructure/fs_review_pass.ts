@@ -1,5 +1,6 @@
 import { dirname, join } from "@std/path";
 import type { GrantedPass, ReviewPass } from "../application/review_ports.ts";
+import type { CheckoutState } from "../domain/review_gate.ts";
 import { firstLine } from "./git_text.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 
@@ -19,11 +20,11 @@ export class FsReviewPass implements ReviewPass {
     return new FsReviewPass(join(firstLine(out.stdout), "specnaut", "review-pass.json"), now);
   }
 
-  async grant(baseTip: string): Promise<void> {
+  async grant(baseTip: string, checkout: CheckoutState): Promise<void> {
     const dir = dirname(this.path);
     await realFolder(dir);
     const temp = join(dir, `.review-pass.${crypto.randomUUID()}.tmp`);
-    const text = `${JSON.stringify({ granted: this.now(), baseTip })}\n`;
+    const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout })}\n`;
     await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
     try {
       await Deno.rename(temp, this.path);
@@ -54,19 +55,32 @@ export class FsReviewPass implements ReviewPass {
   }
 }
 
-/** The pass the file holds; `NaN` and `""` for what it does not say: a pass that never holds. */
+/**
+ * The pass the file holds; `NaN`, `""` and `null` for what it does not say: a pass that never
+ * holds.
+ */
 function passOf(text: string): GrantedPass {
   try {
-    const { granted, baseTip } = JSON.parse(text) as { granted?: unknown; baseTip?: unknown };
+    const { granted, baseTip, checkout } = JSON.parse(text) as Record<string, unknown>;
     return {
       granted: typeof granted === "number" ? granted : NaN,
       baseTip: typeof baseTip === "string" ? baseTip : "",
+      checkout: checkoutOf(checkout),
     };
   } catch (err) {
     // Not swallowed: a pass that is not JSON is one that never holds.
     if (!(err instanceof SyntaxError)) throw err;
-    return { granted: NaN, baseTip: "" };
+    return { granted: NaN, baseTip: "", checkout: null };
   }
+}
+
+/** The checkout a pass names, or `null` when any of its fields is neither a string nor `null`. */
+function checkoutOf(v: unknown): CheckoutState | null {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+  const { head, ref, reflog } = v as Record<string, unknown>;
+  const said = (f: unknown) => typeof f === "string" || f === null;
+  if (!said(head) || !said(ref) || !said(reflog)) return null;
+  return { head, ref, reflog } as CheckoutState;
 }
 
 /** `dir` made where missing; one existing as anything but a folder, a link included, is refused. */

@@ -15,6 +15,7 @@
  *
  * Known limit: while a pass exists, this pattern is load-bearing. A line that starts a review
  * under a spelling it does not match, run right after a line it did match, would take that pass.
+ * The gate stops a mistaken start; a session that writes the pass file itself is out of reach.
  */
 export function startsReview(command: string): boolean {
   return /(^|[^\w-])review\s+start($|[^\w-])/.test(command);
@@ -29,6 +30,25 @@ export const PASS_TTL_MS = 15 * 60 * 1000;
 /** Whether a pass granted at `grantedAt` still starts a review at `now`; a clock that ran back never does. */
 export function passHolds(grantedAt: number, now: number): boolean {
   return Number.isFinite(grantedAt) && grantedAt <= now && now - grantedAt <= PASS_TTL_MS;
+}
+
+/**
+ * The checkout a verdict was taken on, as the start reads it again: HEAD's commit, the branch HEAD
+ * names (`null` when detached), and the SHA-256 of HEAD's reflog, which grows each time HEAD moves,
+ * so a branch checked out and left again between the two still reads as changed. A line that
+ * checks out another branch before it starts a review, past the gate that ran before the line,
+ * starts nothing. Each field is `null` where git does not say. A file edited in the folder while
+ * HEAD stays put does not change it.
+ */
+export type CheckoutState = {
+  readonly head: string | null;
+  readonly ref: string | null;
+  readonly reflog: string | null;
+};
+
+/** Whether the start reads the checkout as the verdict did. */
+export function sameCheckout(judged: CheckoutState, now: CheckoutState): boolean {
+  return judged.head === now.head && judged.ref === now.ref && judged.reflog === now.reflog;
 }
 
 /** What the gate says when the check itself could not finish: a refusal, never a pass. */

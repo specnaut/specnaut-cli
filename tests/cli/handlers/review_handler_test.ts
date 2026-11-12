@@ -40,6 +40,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
         },
         now: Date.now,
         baseTip: () => Promise.resolve(null),
+        checkout: () => Promise.reject(new Error("read")),
         exportBranch: () => Promise.reject(new Error("fetched")),
       }),
   };

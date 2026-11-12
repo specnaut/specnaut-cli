@@ -4,6 +4,7 @@ import { baseTipOf } from "../../application/verify_scripts.ts";
 import { type BranchExport, exportBranchTree } from "../../application/untrusted_review.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
+import { checkoutState } from "../../infrastructure/git_checkout_state.ts";
 import {
   exportCacheRoot,
   FsExportStore,
@@ -96,7 +97,8 @@ function defaultDeps(): ReviewDeps {
       };
       const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
       const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
-      return { pass, now: Date.now, baseTip, exportBranch };
+      const checkout = () => checkoutState(cwd);
+      return { pass, now: Date.now, baseTip, checkout, exportBranch };
     },
   };
 }

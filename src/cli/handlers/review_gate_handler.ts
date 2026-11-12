@@ -8,6 +8,7 @@ import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
 import { FsSessionRecords } from "../../infrastructure/fs_session_records.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
+import { checkoutState } from "../../infrastructure/git_checkout_state.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { findHarness } from "../harnesses.ts";
@@ -71,8 +72,10 @@ export function openGate(cwd: string): GateDeps {
   return {
     verify: async (sessionId) =>
       await verifyCheckout(await checkDeps(cwd, (await opened()).records, sessionId), null),
+    // The repository first, so a folder in none is refused as such.
+    checkout: async () => await opened().then(() => checkoutState(cwd)),
     pass: {
-      grant: async (tip) => await (await opened()).pass.grant(tip),
+      grant: async (tip, checkout) => await (await opened()).pass.grant(tip, checkout),
       // Not the repository's records: removing a pass needs the pass alone, and
       // outside a repository there is none to remove.
       revoke: async () => await (await FsReviewPass.open(cwd))?.revoke(),
