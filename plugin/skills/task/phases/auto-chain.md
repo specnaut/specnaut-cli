@@ -110,12 +110,16 @@ quoting the gate's lines.** Where each stop points:
 | `PARTIAL closeout <n> …` | `/task plan <n>`: the delivery continues |
 | `PENDING push <sha>` | `/task resume <id>` for the item that landed: its push row is the refused-push recovery |
 | `FENCED closeout <n> …` | the question below, for the run's own `<n>`; another item's, `/task resume <n>` |
-| `INVALID closeout …` | by hand: remove `.specnaut/feature.json` in its own commit, and push |
+| `INVALID closeout …` | by hand: remove `.specnaut/feature.json` in its own commit, and push; a line ending `fenced` asks the question below first |
 
 **`FENCED`, for the run's own `<n>`.** Ask once, as `phases/merge.md` step 0 asks: *"The landing
 changed `.specnaut/backlog-config.yml`. Yes runs against the board it now names."* A yes reruns the
 gate with `--fence-ack <n>` added, for that run only, and goes on from the line it prints. Anything
 else runs no backlog script and stops.
+
+**An `INVALID` line ending `fenced`** gets the same question before its hand fix, whose run it is
+or not: that landing moved the config too, and the fix clears the gate for the board it names. A
+yes is the hand fix, and its removal commit is the next anchor; anything else leaves the marker.
 
 ## Failure
 

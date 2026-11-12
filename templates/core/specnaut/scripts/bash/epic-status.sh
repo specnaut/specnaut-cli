@@ -13,7 +13,8 @@
 # named by sha and ordinal on stderr, never by echoing commit text.
 #
 # The base is read as `refs/heads/<base>` (else `refs/remotes/origin/<base>`),
-# so a tag named like it cannot shadow it.
+# so a tag named like it cannot shadow it. Its refs resolve in _base_refs.sh,
+# beside this script; one that cannot be read is 15, never taken for absent.
 #
 # Exit — the full table; phases/merge.md maps each one:
 #   0  consistent
@@ -43,6 +44,13 @@
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_base_refs.sh
+. "$here/_base_refs.sh"
+# unread <what> - a git read failed: 15, never a conclusion drawn from no output.
+unread() {
+  echo "epic-status: could not read $1 - git log failed; nothing concluded" >&2
+  exit 15
+}
 
 landed=""
 if [ $# -eq 2 ] && [ "$1" = --landed ] && [[ $2 =~ ^[1-9][0-9]{0,9}(@[0-9]{1,12})?$ ]]; then
@@ -51,23 +59,17 @@ elif [ $# -ne 0 ]; then
   echo "usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]" >&2
   exit 2
 fi
-# The base has one home, base-branch.sh — never an argument.
-base=$(bash "$here/base-branch.sh") || exit 3
-if ! git --no-pager rev-parse --verify --quiet "refs/heads/$base^{commit}" >/dev/null &&
-  ! git --no-pager rev-parse --verify --quiet "refs/remotes/origin/$base^{commit}" >/dev/null; then
-  echo "epic-status: the base '$base' does not resolve to a commit" >&2
-  exit 3
-fi
+# The base has one home, base-branch.sh - never an argument.
+resolve_base_refs
 # A child's subject, `<type>(T<NN>): <subject> (#<child>)`, read the same by both modes.
 CHILD_RE='^[a-z]+\(T([0-9]{1,4})\): .+ \(#([1-9][0-9]{0,9})\)$'
 if [ -n "$landed" ]; then
   epic=${landed%%@*} since=0
   [ "$landed" = "$epic" ] || since=$((10#${landed#*@}))
-  ref="refs/remotes/origin/$base"
-  git --no-pager rev-parse --verify --quiet "$ref^{commit}" >/dev/null || ref="refs/heads/$base"
+  ref=$published
   # Anchored per line by git itself: #50 never matches a trailer of #501.
   log=$(git --no-pager log --reverse --format='%H%x1f%ct%x1f%s' -E --grep="^Epic: #$epic\$" "$ref" --) ||
-    { echo "epic-status: could not read $ref - git log failed; nothing concluded" >&2; exit 15; }
+    unread "$ref"
   while IFS=$'\x1f' read -r sha ct subject; do
     [ -n "$sha" ] && [ "$ct" -ge "$since" ] && [[ $subject =~ $CHILD_RE ]] || continue
     printf 'CHILD T%02d #%s %s\n' "$((10#${BASH_REMATCH[1]}))" "${BASH_REMATCH[2]}" "$sha"
@@ -75,14 +77,8 @@ if [ -n "$landed" ]; then
   exit 0
 fi
 # Fully qualified: a tag named like the base would otherwise shadow it.
-range="refs/heads/$base..HEAD"
-git --no-pager rev-parse --verify --quiet "refs/heads/$base" >/dev/null || range="refs/remotes/origin/$base..HEAD"
+range="${local:-$remote}..HEAD"
 
-# unread <what> — a git read failed: 15, never a conclusion drawn from no output.
-unread() {
-  echo "epic-status: could not read $1 — git log failed; nothing concluded" >&2
-  exit 15
-}
 # Read whole before the loop: a process substitution's exit is never checked.
 log=$(git --no-pager log --reverse --format='%H%x1f%s' "$range") || unread "$range"
 

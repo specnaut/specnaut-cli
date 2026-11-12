@@ -130,3 +130,17 @@ Deno.test("a log that fails is exit 15, nothing printed", async () => {
     await sb.cleanup();
   }
 });
+
+Deno.test("a base ref that cannot be read is exit 15, never taken for an absent one", async () => {
+  if (Deno.build.os === "windows") return; // the shim is a bash script
+  const sb = await sandbox();
+  try {
+    await child(sb, "a", 1_700_000_000, "feat(T01): one (#51)");
+    await git(sb.work, "push", "--quiet", "origin", "main");
+    const shim = '[ "$2" = show-ref ] && exit 128; exec "$REAL_GIT" "$@"';
+    const r = await sb.scriptWithGit(shim, "epic-status.sh", "--landed", "50");
+    assertEquals([r.code, r.stdout], [15, ""], r.stderr);
+  } finally {
+    await sb.cleanup();
+  }
+});

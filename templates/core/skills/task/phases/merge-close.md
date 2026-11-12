@@ -42,7 +42,8 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
    and the close is the move: step 3 runs here, for that one item, before the next item's check —
    so an epic's check sees the children this closeout closed — and not again after the loop. A
    **20** from it stops before the next item's check; step 4 runs only when every one of these
-   per-item runs exited 0 or 21.
+   per-item runs exited 0 or 21. Each run reconciles the whole board, so on cloud an epic of N
+   children costs N+1 reconciles: the price of its check seeing what this closeout closed.
 3. **Settle the board** — the items that answered 0 or 12:
 
    ```

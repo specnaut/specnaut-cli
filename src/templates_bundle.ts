@@ -894,7 +894,8 @@ the board fence of \`phases/merge.md\` step 5. Re-entry differs only where it sa
    and the close is the move: step 3 runs here, for that one item, before the next item's check —
    so an epic's check sees the children this closeout closed — and not again after the loop. A
    **20** from it stops before the next item's check; step 4 runs only when every one of these
-   per-item runs exited 0 or 21.
+   per-item runs exited 0 or 21. Each run reconciles the whole board, so on cloud an epic of N
+   children costs N+1 reconciles: the price of its check seeing what this closeout closed.
 3. **Settle the board** — the items that answered 0 or 12:
 
    \`\`\`
@@ -2935,7 +2936,9 @@ normal routing, addendum included.
    lines are the evidence for the rows that name them.
 4. **For \`ACTIVE\`, the candidate branch:**
    \`git for-each-ref --points-at <sha> --format='%(refname)' refs/heads\`.
-5. **The working tree:** its \`.specnaut/feature.json\`, and \`git status --porcelain\`.
+5. **The working tree:** \`git status --porcelain\`; and, for the \`IDLE\` rows only, the item its
+   \`.specnaut/feature.json\` links, never the file whole:
+   \`sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json\`.
 
 ## 2. Re-enter from this table — the first row that matches decides
 
@@ -2946,7 +2949,7 @@ normal routing, addendum included.
 | \`OWN closeout <id> <dir> <sha>\` (or \`PENDING closeout <id> …\`) | \`phases/merge-close.md\` § Re-entry, from that line |
 | \`FENCED closeout <id> …\` | the question \`phases/auto-chain.md\` asks; a yes, the row its rerun's line matches |
 | \`OWN partial <id> …\` (or \`PARTIAL closeout <id> …\`), the item closed | \`phases/merge-close.md\` § Re-entry, its partial line: the marker goes, nothing closes |
-| \`INVALID closeout …\` | nothing: name its fix in \`phases/auto-chain.md\`, and stop |
+| \`INVALID closeout …\` | nothing: name its fix in \`phases/auto-chain.md\`, with the question it asks first when the line ends \`fenced\`, and stop |
 | a gate line other than its last, the verdict | nothing: quote it and point where \`phases/auto-chain.md\` points, then stop |
 | the item is closed | nothing: name the line \`wip-audit.sh\` printed, with its sha (or "closed without a landing commit"), and stop |
 | \`LANDED\`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is \`/task close <id>\` or the next branch's \`merge\` |
@@ -3560,12 +3563,16 @@ quoting the gate's lines.** Where each stop points:
 | \`PARTIAL closeout <n> …\` | \`/task plan <n>\`: the delivery continues |
 | \`PENDING push <sha>\` | \`/task resume <id>\` for the item that landed: its push row is the refused-push recovery |
 | \`FENCED closeout <n> …\` | the question below, for the run's own \`<n>\`; another item's, \`/task resume <n>\` |
-| \`INVALID closeout …\` | by hand: remove \`.specnaut/feature.json\` in its own commit, and push |
+| \`INVALID closeout …\` | by hand: remove \`.specnaut/feature.json\` in its own commit, and push; a line ending \`fenced\` asks the question below first |
 
 **\`FENCED\`, for the run's own \`<n>\`.** Ask once, as \`phases/merge.md\` step 0 asks: *"The landing
 changed \`.specnaut/backlog-config.yml\`. Yes runs against the board it now names."* A yes reruns the
 gate with \`--fence-ack <n>\` added, for that run only, and goes on from the line it prints. Anything
 else runs no backlog script and stops.
+
+**An \`INVALID\` line ending \`fenced\`** gets the same question before its hand fix, whose run it is
+or not: that landing moved the config too, and the fix clears the gate for the board it names. A
+yes is the hand fix, and its removal commit is the next anchor; anything else leaves the marker.
 
 ## Failure
 
@@ -29835,7 +29842,8 @@ exit 0
 # named by sha and ordinal on stderr, never by echoing commit text.
 #
 # The base is read as \`refs/heads/<base>\` (else \`refs/remotes/origin/<base>\`),
-# so a tag named like it cannot shadow it.
+# so a tag named like it cannot shadow it. Its refs resolve in _base_refs.sh,
+# beside this script; one that cannot be read is 15, never taken for absent.
 #
 # Exit — the full table; phases/merge.md maps each one:
 #   0  consistent
@@ -29865,6 +29873,13 @@ exit 0
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_base_refs.sh
+. "\$here/_base_refs.sh"
+# unread <what> - a git read failed: 15, never a conclusion drawn from no output.
+unread() {
+  echo "epic-status: could not read \$1 - git log failed; nothing concluded" >&2
+  exit 15
+}
 
 landed=""
 if [ \$# -eq 2 ] && [ "\$1" = --landed ] && [[ \$2 =~ ^[1-9][0-9]{0,9}(@[0-9]{1,12})?\$ ]]; then
@@ -29873,23 +29888,17 @@ elif [ \$# -ne 0 ]; then
   echo "usage: epic-status.sh | epic-status.sh --landed <E>[@<epoch>]" >&2
   exit 2
 fi
-# The base has one home, base-branch.sh — never an argument.
-base=\$(bash "\$here/base-branch.sh") || exit 3
-if ! git --no-pager rev-parse --verify --quiet "refs/heads/\$base^{commit}" >/dev/null &&
-  ! git --no-pager rev-parse --verify --quiet "refs/remotes/origin/\$base^{commit}" >/dev/null; then
-  echo "epic-status: the base '\$base' does not resolve to a commit" >&2
-  exit 3
-fi
+# The base has one home, base-branch.sh - never an argument.
+resolve_base_refs
 # A child's subject, \`<type>(T<NN>): <subject> (#<child>)\`, read the same by both modes.
 CHILD_RE='^[a-z]+\\(T([0-9]{1,4})\\): .+ \\(#([1-9][0-9]{0,9})\\)\$'
 if [ -n "\$landed" ]; then
   epic=\${landed%%@*} since=0
   [ "\$landed" = "\$epic" ] || since=\$((10#\${landed#*@}))
-  ref="refs/remotes/origin/\$base"
-  git --no-pager rev-parse --verify --quiet "\$ref^{commit}" >/dev/null || ref="refs/heads/\$base"
+  ref=\$published
   # Anchored per line by git itself: #50 never matches a trailer of #501.
   log=\$(git --no-pager log --reverse --format='%H%x1f%ct%x1f%s' -E --grep="^Epic: #\$epic\\\$" "\$ref" --) ||
-    { echo "epic-status: could not read \$ref - git log failed; nothing concluded" >&2; exit 15; }
+    unread "\$ref"
   while IFS=\$'\\x1f' read -r sha ct subject; do
     [ -n "\$sha" ] && [ "\$ct" -ge "\$since" ] && [[ \$subject =~ \$CHILD_RE ]] || continue
     printf 'CHILD T%02d #%s %s\\n' "\$((10#\${BASH_REMATCH[1]}))" "\${BASH_REMATCH[2]}" "\$sha"
@@ -29897,14 +29906,8 @@ if [ -n "\$landed" ]; then
   exit 0
 fi
 # Fully qualified: a tag named like the base would otherwise shadow it.
-range="refs/heads/\$base..HEAD"
-git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range="refs/remotes/origin/\$base..HEAD"
+range="\${local:-\$remote}..HEAD"
 
-# unread <what> — a git read failed: 15, never a conclusion drawn from no output.
-unread() {
-  echo "epic-status: could not read \$1 — git log failed; nothing concluded" >&2
-  exit 15
-}
 # Read whole before the loop: a process substitution's exit is never checked.
 log=\$(git --no-pager log --reverse --format='%H%x1f%s' "\$range") || unread "\$range"
 
@@ -29981,10 +29984,12 @@ exit 0
     name: "specify",
     suffix: "scripts/bash/_base_refs.sh",
     content: `# shellcheck shell=bash disable=SC2154 # here: set by the sourcing script
-# The base and its refs, resolved once for wip-audit.sh and its intake gate
-# (cli#760) — the one home of \`unread\`, \`present\` and the published ref.
-# Sourced, never run, by wip-audit.sh, which sets \`here\` (this directory) and
-# \`set -euo pipefail\`. base-branch.sh beside it names the base.
+# The base and its refs, resolved once for wip-audit.sh, its intake gate
+# (cli#760) and epic-status.sh - the one home of \`unread\`, \`present\` and the
+# published ref. Sourced, never run, by a script that sets \`here\` (this
+# directory) and \`set -euo pipefail\`. base-branch.sh beside it names the base.
+# A script whose exit table gives a failed read another code redefines
+# \`unread\` after sourcing this file (epic-status.sh: 15).
 #
 # resolve_base_refs sets four names, every ref fully qualified so a tag named
 # like the base cannot shadow it:
@@ -29992,6 +29997,8 @@ exit 0
 #   remote     refs/remotes/origin/<base>, or "" when it does not exist
 #   local      refs/heads/<base>, or "" when it does not exist
 #   published  remote, else local; neither resolving is exit 3
+# and moves to the repository's top, so every pathspec after it is the
+# repository's, whatever directory the caller ran in (cli#774).
 #
 # A read that fails is never taken for one that found nothing: git's own
 # errors are discarded (they can carry ref text) and the script stops, 3.
@@ -30011,7 +30018,9 @@ resolve_base_refs() {
   present "\$remote" || remote=""
   present "\$local" || local=""
   published=\${remote:-\$local}
-  [ -n "\$published" ] || { echo "wip-audit: the base '\$base' does not resolve to a commit" >&2; exit 3; }
+  [ -n "\$published" ] || { echo "\${0##*/}: the base '\$base' does not resolve to a commit" >&2; exit 3; }
+  top=\$(git --no-pager rev-parse --show-toplevel 2>/dev/null) || unread "the repository's top"
+  cd "\$top" || unread "the repository's top"
 }
 `,
     executable: false,
@@ -30036,123 +30045,149 @@ resolve_base_refs() {
 #       backend (phases/merge-close.md step 4), so while it is there the
 #       closeout has not finished. A linked_issue of null never blocks.
 #
-# Output — fixed tokens, digits, 40-hex shas and one validated path, never
+# Output - fixed tokens, digits, 40-hex shas and one validated path, never
 # text read from a commit or from the file. First every commit of (P), oldest
 # first, then for the marker the first of these that matches:
 #   PENDING push <sha>
-#   INVALID closeout <n or ->       linked_issue neither digits nor null; a
-#                                   feature_directory that is not one tracked
-#                                   directory, not a link, directly under
-#                                   .specnaut/specs/; no landed commit for <n>;
-#                                   or, under --since <n>@<epoch>, the
-#                                   directory's first commit is older than it
+#   INVALID closeout <n|-> <fence>  linked_issue neither digits nor null; a
+#                                   feature_directory not one tracked directory,
+#                                   not a link, directly under .specnaut/specs/;
+#                                   no landed commit for <n>; or, under --since
+#                                   <n>@<epoch>, a directory older than it.
+#                                   <fence>: \`fenced\` or \`unfenced\`, the FENCED
+#                                   test below, --fence-ack aside
 #   FENCED closeout <n> <dir> <sha> .specnaut/backlog-config.yml differs
 #                                   between the anchor (below) and the tip
 #   PARTIAL closeout <n> <dir> <sha> "delivery": "partial", a --no-close slice
 #   PENDING closeout <n> <dir> <sha> the closeout has not finished
 #   gate clear | gate blocked       always the last line
 # <dir> is \`-\` when the file names no feature_directory. <sha> is the newest
-# commit on the published history whose subject names #<n> (first_naming);
-# when none does, the first CHILD line of \`epic-status.sh --landed\`, because an
-# epic's subjects never name the epic (phases/epic-commits.md).
+# published commit that landed <n>: for an epic, whose subjects never name it
+# (phases/epic-commits.md), the last CHILD of \`epic-status.sh --landed\`, asked
+# first; otherwise the newest whose subject names #<n> (first_naming).
 #
-# --own <n> prints PENDING as \`OWN closeout …\` and PARTIAL as \`OWN partial …\`,
+# --own <n> prints PENDING as \`OWN closeout ...\` and PARTIAL as \`OWN partial ...\`,
 # so a reader still tells a partial delivery from a pending closeout.
 # --fence-ack <n>, given for one run after the user's yes, reads a FENCED <n>
 # as unfenced. PENDING push and INVALID are never OWN. The anchor is the
 # newest --first-parent commit that deleted .specnaut/feature.json and did
 # nothing but delete paths under .specnaut/ (what remove-spec.sh commits),
 # else the parent of the oldest one that added it; no anchor, or a parent a
-# shallow clone lacks, reads FENCED — the user's yes is the way out, never 3.
+# shallow clone lacks, reads FENCED - the user's yes is the way out, never 3.
 #
-# Exit: 0 every line printed is OWN (\`gate clear\`) · 4 any other line
-# (\`gate blocked\`) · 2 usage · 3 the base or a read could not be resolved,
-# origin/<base> missing while origin exists included — nothing printed then.
+# Exit: 0 every line printed is OWN (\`gate clear\`) - 4 any other line
+# (\`gate blocked\`) - 2 usage - 3 the base or a read could not be resolved,
+# origin/<base> missing while origin exists included - nothing printed then.
 
-gate_usage() {
-  echo "usage: wip-audit.sh --gate [--own <n>]... [--since <n>@<epoch>] [--fence-ack <n>]" >&2
-  exit 2
-}
+gate_usage() { echo "usage: wip-audit.sh --gate [--own <n>]... [--since <n>@<epoch>] [--fence-ack <n>]" >&2; exit 2; }
 GATE_FJ=.specnaut/feature.json GATE_CFG=.specnaut/backlog-config.yml
 GATE_DIR_RE='^\\.specnaut/specs/[A-Za-z0-9][A-Za-z0-9._-]*\$'
 
-# gate_anchor_fenced — 0 when the config moved since the last settled
-# closeout, or there is no anchor to compare against; 1 when it did not.
-gate_anchor_fenced() {
-  local c dels adds names p anchor="" s=0
+# gate_removal_anchor - ANCHOR, the newest --first-parent commit that deleted
+# the marker and did nothing but delete paths under .specnaut/, or "".
+gate_removal_anchor() {
+  local c dels names p
+  ANCHOR=""
   dels=\$(git --no-pager log --first-parent --no-renames --diff-filter=D --format=%H "\$published" -- "\$GATE_FJ" 2>/dev/null) ||
     unread "the history of \$GATE_FJ"
   while IFS= read -r c; do
     [[ \$c =~ ^[0-9a-f]{40}\$ ]] || continue
     # A parent a shallow clone lacks is no anchor; the next one may be.
     names=\$(git --no-pager diff --no-renames --name-status "\$c^" "\$c" -- 2>/dev/null) || continue
-    anchor=\$c
+    ANCHOR=\$c
     # Deletions only, all under .specnaut/: a commit that also edits the config
     # would hide that edit. A quoted name (core.quotePath) fails the prefix too.
-    while IFS= read -r p; do [[ \$p == D\$'\\t'.specnaut/* ]] || anchor=""; done <<<"\$names"
-    [ -z "\$anchor" ] || break
+    while IFS= read -r p; do [[ \$p == D\$'\\t'.specnaut/* ]] || ANCHOR=""; done <<<"\$names"
+    [ -z "\$ANCHOR" ] || return 0
   done <<<"\$dels"
-  if [ -z "\$anchor" ]; then
+}
+
+# gate_anchor_fenced - 0 when the config moved since the last settled
+# closeout, or there is no anchor to compare against; 1 when it did not.
+gate_anchor_fenced() {
+  local adds c s=0
+  gate_removal_anchor
+  if [ -z "\$ANCHOR" ]; then
     adds=\$(git --no-pager log --first-parent --no-renames --diff-filter=A --format=%H "\$published" -- "\$GATE_FJ" 2>/dev/null) ||
       unread "the history of \$GATE_FJ"
     c=\$(printf '%s\\n' "\$adds" | sed -n '\$p')
     [[ \$c =~ ^[0-9a-f]{40}\$ ]] || return 0
-    anchor=\$(git --no-pager rev-parse --verify --quiet "\$c^1^{commit}" 2>/dev/null) || return 0
+    ANCHOR=\$(git --no-pager rev-parse --verify --quiet "\$c^1^{commit}" 2>/dev/null) || return 0
   fi
-  git --no-pager diff --quiet --no-ext-diff "\$anchor" "\$published" -- "\$GATE_CFG" 2>/dev/null || s=\$?
+  git --no-pager diff --quiet --no-ext-diff "\$ANCHOR" "\$published" -- "\$GATE_CFG" 2>/dev/null || s=\$?
   [ "\$s" -le 1 ] || unread "\$GATE_CFG"
   [ "\$s" -eq 1 ]
 }
 
-# gate_marker — sets MARKER to the line for the published marker, or "".
-gate_marker() {
-  local entry json n dir="-" since=0 sha="" first rec
-  MARKER=""
+# gate_invalid <n|-> - MARKER, the INVALID line; its fence asks before a hand fix.
+gate_invalid() { MARKER="INVALID closeout \$1 unfenced"; ! gate_anchor_fenced || MARKER="INVALID closeout \$1 fenced"; }
+
+# gate_read_marker - GATE_JSON, GATE_N and GATE_FROM (its --since epoch) from the
+# published marker; 1 when there is none, its link is null, or MARKER is INVALID.
+gate_read_marker() {
+  local entry
   entry=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager ls-tree "\$published" -- "\$GATE_FJ" 2>/dev/null) || unread "\$GATE_FJ"
-  [ -n "\$entry" ] || return 0
-  [[ \$entry =~ ^100(644|755)\\ blob\\ ([0-9a-f]{40}) ]] || { MARKER="INVALID closeout -"; return 0; }
-  json=\$(git --no-pager cat-file blob "\${BASH_REMATCH[2]}" 2>/dev/null) || unread "\$GATE_FJ"
-  n=\$(printf '%s\\n' "\$json" |
+  [ -n "\$entry" ] || return 1
+  [[ \$entry =~ ^100(644|755)\\ blob\\ ([0-9a-f]{40}) ]] || { gate_invalid -; return 1; }
+  GATE_JSON=\$(git --no-pager cat-file blob "\${BASH_REMATCH[2]}" 2>/dev/null) || unread "\$GATE_FJ"
+  GATE_N=\$(printf '%s\\n' "\$GATE_JSON" |
     sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([^,}[:space:]]*\\).*/\\1/p' | sed -n 1p)
-  [ "\$n" != null ] || return 0
-  [[ \$n =~ \$NUM ]] || { MARKER="INVALID closeout -"; return 0; }
-  if [[ \$GATE_SINCE == *" \$n@"* ]]; then
-    since=\${GATE_SINCE##*" \$n@"}
-    since=\${since%% *}
+  [ "\$GATE_N" != null ] || return 1
+  [[ \$GATE_N =~ \$NUM ]] || { gate_invalid -; return 1; }
+  [[ \$GATE_SINCE == *" \$GATE_N@"* ]] || return 0
+  GATE_FROM=\${GATE_SINCE##*" \$GATE_N@"} && GATE_FROM=\${GATE_FROM%% *}
+}
+
+# gate_check_dir - GATE_DIR, the marker's feature_directory when it names one;
+# 1, MARKER INVALID, when it is not one per the header, or is older than --since.
+gate_check_dir() {
+  local entry first
+  [[ \$GATE_JSON == *'"feature_directory"'* ]] || return 0
+  GATE_DIR=\$(printf '%s\\n' "\$GATE_JSON" |
+    sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' | sed -n 1p)
+  GATE_DIR=\${GATE_DIR%/}
+  [[ \$GATE_DIR =~ \$GATE_DIR_RE ]] || { gate_invalid "\$GATE_N"; return 1; }
+  entry=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager ls-tree "\$published" -- "\$GATE_DIR" 2>/dev/null) || unread "\$GATE_DIR"
+  [ "\$entry" = "040000 tree \${entry:12:40}"\$'\\t'"\$GATE_DIR" ] && [[ \${entry:12:40} =~ ^[0-9a-f]{40}\$ ]] ||
+    { gate_invalid "\$GATE_N"; return 1; }
+  [ "\$GATE_FROM" != 0 ] || return 0
+  first=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager log --reverse --format=%ct "\$published" -- "\$GATE_DIR" 2>/dev/null) ||
+    unread "\$GATE_DIR"
+  first=\$(printf '%s\\n' "\$first" | sed -n 1p)
+  [[ \$first =~ ^[0-9]+\$ ]] && [ "\$first" -ge "\$GATE_FROM" ] || { gate_invalid "\$GATE_N"; return 1; }
+}
+
+# gate_landed_sha - GATE_SHA, the header's <sha>; 1, MARKER INVALID, when none. Its
+# grep runs in git, so an epic never pays first_naming's walk of the whole history.
+gate_landed_sha() {
+  local rec
+  rec=\$(bash "\$here/epic-status.sh" --landed "\$GATE_N@\$GATE_FROM" 2>/dev/null) || unread "the epic's landed children"
+  GATE_SHA=\$(printf '%s\\n' "\$rec" | sed -n '\$s/^CHILD T[0-9][0-9]* #[1-9][0-9]* \\([0-9a-f]\\{40\\}\\)\$/\\1/p')
+  if [ -z "\$GATE_SHA" ]; then
+    rec=\$(git --no-pager log --format='%H%x1f%ct%x1f%s' "\$published" -- 2>/dev/null) || unread "\$published"
+    GATE_SHA=\$(first_naming "\$GATE_N" "\$GATE_FROM" "\$rec") || GATE_SHA=""
   fi
-  if [[ \$json == *'"feature_directory"'* ]]; then
-    dir=\$(printf '%s\\n' "\$json" |
-      sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' | sed -n 1p)
-    dir=\${dir%/}
-    [[ \$dir =~ \$GATE_DIR_RE ]] || { MARKER="INVALID closeout \$n"; return 0; }
-    entry=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager ls-tree "\$published" -- "\$dir" 2>/dev/null) || unread "\$dir"
-    [ "\$entry" = "040000 tree \${entry:12:40}"\$'\\t'"\$dir" ] && [[ \${entry:12:40} =~ ^[0-9a-f]{40}\$ ]] ||
-      { MARKER="INVALID closeout \$n"; return 0; }
-    if [ "\$since" != 0 ]; then
-      first=\$(GIT_LITERAL_PATHSPECS=1 git --no-pager log --reverse --format=%ct "\$published" -- "\$dir" 2>/dev/null) ||
-        unread "\$dir"
-      first=\$(printf '%s\\n' "\$first" | sed -n 1p)
-      [[ \$first =~ ^[0-9]+\$ ]] && [ "\$first" -ge "\$since" ] || { MARKER="INVALID closeout \$n"; return 0; }
-    fi
-  fi
-  rec=\$(git --no-pager log --format='%H%x1f%ct%x1f%s' "\$published" -- 2>/dev/null) || unread "\$published"
-  if ! sha=\$(first_naming "\$n" "\$since" "\$rec"); then
-    rec=\$(bash "\$here/epic-status.sh" --landed "\$n@\$since" 2>/dev/null) || unread "the epic's landed children"
-    sha=\$(printf '%s\\n' "\$rec" | sed -n '1s/^CHILD T[0-9][0-9]* #[1-9][0-9]* \\([0-9a-f]\\{40\\}\\)\$/\\1/p')
-  fi
-  [[ \$sha =~ ^[0-9a-f]{40}\$ ]] || { MARKER="INVALID closeout \$n"; return 0; }
-  if [[ \$GATE_ACK != *" \$n "* ]] && gate_anchor_fenced; then
-    MARKER="FENCED closeout \$n \$dir \$sha"
-  elif [[ \$json =~ \\"delivery\\"[[:space:]]*:[[:space:]]*\\"partial\\" ]]; then
-    MARKER="PARTIAL closeout \$n \$dir \$sha"
-    [[ \$GATE_OWN != *" \$n "* ]] || MARKER="OWN partial \$n \$dir \$sha"
+  [[ \$GATE_SHA =~ ^[0-9a-f]{40}\$ ]] || { gate_invalid "\$GATE_N"; return 1; }
+}
+
+# gate_marker - MARKER, the line for the published marker, or "".
+gate_marker() {
+  MARKER="" GATE_DIR="-" GATE_FROM=0
+  gate_read_marker && gate_check_dir && gate_landed_sha || return 0
+  local tail="\$GATE_N \$GATE_DIR \$GATE_SHA"
+  if [[ \$GATE_ACK != *" \$GATE_N "* ]] && gate_anchor_fenced; then
+    MARKER="FENCED closeout \$tail"
+  elif [[ \$GATE_JSON =~ \\"delivery\\"[[:space:]]*:[[:space:]]*\\"partial\\" ]]; then
+    MARKER="PARTIAL closeout \$tail"
+    [[ \$GATE_OWN != *" \$GATE_N "* ]] || MARKER="OWN partial \$tail"
   else
-    MARKER="PENDING closeout \$n \$dir \$sha"
-    [[ \$GATE_OWN != *" \$n "* ]] || MARKER="OWN closeout \$n \$dir \$sha"
+    MARKER="PENDING closeout \$tail"
+    [[ \$GATE_OWN != *" \$GATE_N "* ]] || MARKER="OWN closeout \$tail"
   fi
 }
 
-intake_gate() {
+# gate_args - the gate's flags into GATE_OWN, GATE_SINCE and GATE_ACK, else usage.
+gate_args() {
   GATE_OWN=" " GATE_SINCE=" " GATE_ACK=" "
   while [ \$# -gt 0 ]; do
     [ \$# -ge 2 ] || gate_usage
@@ -30164,27 +30199,32 @@ intake_gate() {
     esac
     shift 2
   done
-  resolve_base_refs
-  local s=0 pushes="" c out=() blocked=0 top
-  # Every path below is the repository's, whatever directory the caller is in.
-  top=\$(git --no-pager rev-parse --show-toplevel 2>/dev/null) || unread "the repository's top"
-  cd "\$top" || unread "the repository's top"
+}
+
+# gate_pushes - GATE_OUT gains a PENDING push line per commit of (P), oldest first.
+gate_pushes() {
+  local s=0 pushes="" c
   if [ -z "\$remote" ]; then
     git --no-pager config --get remote.origin.url >/dev/null 2>&1 || s=\$?
     [ "\$s" -le 1 ] || unread "the origin remote"
-    if [ "\$s" -eq 0 ]; then
-      echo "wip-audit: origin has no \$base branch - publish it first: git push -u origin \$base" >&2
-      exit 3
-    fi
+    [ "\$s" -ne 0 ] || { echo "wip-audit: origin has no \$base branch - publish it first: git push -u origin \$base" >&2; exit 3; }
   elif [ -n "\$local" ]; then
     pushes=\$(git --no-pager rev-list --reverse "\$local" --not "\$remote" -- 2>/dev/null) || unread "\$local"
   fi
   while IFS= read -r c; do
-    [ -z "\$c" ] || { [[ \$c =~ ^[0-9a-f]{40}\$ ]] || unread "\$local"; out+=("PENDING push \$c"); }
+    [ -z "\$c" ] || { [[ \$c =~ ^[0-9a-f]{40}\$ ]] || unread "\$local"; GATE_OUT+=("PENDING push \$c"); }
   done <<<"\$pushes"
+}
+
+intake_gate() {
+  local c blocked=0
+  gate_args "\$@"
+  resolve_base_refs
+  GATE_OUT=()
+  gate_pushes
   gate_marker
-  [ -z "\$MARKER" ] || out+=("\$MARKER")
-  for c in \${out[@]+"\${out[@]}"}; do
+  [ -z "\$MARKER" ] || GATE_OUT+=("\$MARKER")
+  for c in \${GATE_OUT[@]+"\${GATE_OUT[@]}"}; do
     printf '%s\\n' "\$c"
     [[ \$c == "OWN "* ]] || blocked=1
   done
@@ -30644,13 +30684,13 @@ fi
 # landed and the backlog item closed. Two forms:
 #
 #   remove-spec.sh <landed-branch>    the directory and .specnaut/feature.json
-#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone, when it
-#                                     names no directory (cli#760): its
-#                                     linked_issue must be <n>, else 22
+#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone (cli#760):
+#                                     its linked_issue must be <n>, else 22
 #
 # The directory form, below. The marker form checks the same HEAD, index,
-# tracking and staged-path rules over that one path, and never names a
-# directory.
+# tracking and staged-path rules over that one path, and never touches a
+# directory: one the file names is left in place, tracked. merge-close.md
+# runs it for a marker that names none; the directory form takes both.
 #
 # Five conditions, all required, else nothing is touched: HEAD is the base;
 # \`.specnaut/feature.json\` names a \`feature_directory\`; it exists; it is in

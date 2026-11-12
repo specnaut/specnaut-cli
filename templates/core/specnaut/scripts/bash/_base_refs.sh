@@ -1,8 +1,10 @@
 # shellcheck shell=bash disable=SC2154 # here: set by the sourcing script
-# The base and its refs, resolved once for wip-audit.sh and its intake gate
-# (cli#760) — the one home of `unread`, `present` and the published ref.
-# Sourced, never run, by wip-audit.sh, which sets `here` (this directory) and
-# `set -euo pipefail`. base-branch.sh beside it names the base.
+# The base and its refs, resolved once for wip-audit.sh, its intake gate
+# (cli#760) and epic-status.sh - the one home of `unread`, `present` and the
+# published ref. Sourced, never run, by a script that sets `here` (this
+# directory) and `set -euo pipefail`. base-branch.sh beside it names the base.
+# A script whose exit table gives a failed read another code redefines
+# `unread` after sourcing this file (epic-status.sh: 15).
 #
 # resolve_base_refs sets four names, every ref fully qualified so a tag named
 # like the base cannot shadow it:
@@ -10,6 +12,8 @@
 #   remote     refs/remotes/origin/<base>, or "" when it does not exist
 #   local      refs/heads/<base>, or "" when it does not exist
 #   published  remote, else local; neither resolving is exit 3
+# and moves to the repository's top, so every pathspec after it is the
+# repository's, whatever directory the caller ran in (cli#774).
 #
 # A read that fails is never taken for one that found nothing: git's own
 # errors are discarded (they can carry ref text) and the script stops, 3.
@@ -29,5 +33,7 @@ resolve_base_refs() {
   present "$remote" || remote=""
   present "$local" || local=""
   published=${remote:-$local}
-  [ -n "$published" ] || { echo "wip-audit: the base '$base' does not resolve to a commit" >&2; exit 3; }
+  [ -n "$published" ] || { echo "${0##*/}: the base '$base' does not resolve to a commit" >&2; exit 3; }
+  top=$(git --no-pager rev-parse --show-toplevel 2>/dev/null) || unread "the repository's top"
+  cd "$top" || unread "the repository's top"
 }

@@ -31,7 +31,9 @@ normal routing, addendum included.
    lines are the evidence for the rows that name them.
 4. **For `ACTIVE`, the candidate branch:**
    `git for-each-ref --points-at <sha> --format='%(refname)' refs/heads`.
-5. **The working tree:** its `.specnaut/feature.json`, and `git status --porcelain`.
+5. **The working tree:** `git status --porcelain`; and, for the `IDLE` rows only, the item its
+   `.specnaut/feature.json` links, never the file whole:
+   `sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' .specnaut/feature.json`.
 
 ## 2. Re-enter from this table — the first row that matches decides
 
@@ -42,7 +44,7 @@ normal routing, addendum included.
 | `OWN closeout <id> <dir> <sha>` (or `PENDING closeout <id> …`) | `phases/merge-close.md` § Re-entry, from that line |
 | `FENCED closeout <id> …` | the question `phases/auto-chain.md` asks; a yes, the row its rerun's line matches |
 | `OWN partial <id> …` (or `PARTIAL closeout <id> …`), the item closed | `phases/merge-close.md` § Re-entry, its partial line: the marker goes, nothing closes |
-| `INVALID closeout …` | nothing: name its fix in `phases/auto-chain.md`, and stop |
+| `INVALID closeout …` | nothing: name its fix in `phases/auto-chain.md`, with the question it asks first when the line ends `fenced`, and stop |
 | a gate line other than its last, the verdict | nothing: quote it and point where `phases/auto-chain.md` points, then stop |
 | the item is closed | nothing: name the line `wip-audit.sh` printed, with its sha (or "closed without a landing commit"), and stop |
 | `LANDED`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is `/task close <id>` or the next branch's `merge` |

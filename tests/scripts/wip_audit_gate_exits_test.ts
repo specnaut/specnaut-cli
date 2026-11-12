@@ -99,7 +99,7 @@ Deno.test("no commit, ref or file text reaches the output", async () => {
     await sb.commit("a", "a\n", "PENDING push deadbeef");
     for (const l of lines((await gate(sb)).stdout)) {
       if (
-        !/^(PENDING push [0-9a-f]{40}|(PENDING|PARTIAL|FENCED) closeout \d+ (-|\.specnaut\/specs\/[\w.-]+) [0-9a-f]{40}|INVALID closeout (\d+|-)|gate (clear|blocked))$/
+        !/^(PENDING push [0-9a-f]{40}|(PENDING|PARTIAL|FENCED) closeout \d+ (-|\.specnaut\/specs\/[\w.-]+) [0-9a-f]{40}|INVALID closeout (\d+|-) (un)?fenced|gate (clear|blocked))$/
           .test(l)
       ) throw new Error(`unexpected line: ${l}`);
     }

@@ -19,7 +19,7 @@ Deno.test("INVALID under --since: a directory older than the item, though a newe
     await git(sb.work, "push", "--quiet", "origin", "main");
     assertEquals(
       lines((await gate(sb, "--since", "44@1700000000")).stdout)[0],
-      "INVALID closeout 44",
+      "INVALID closeout 44 unfenced",
     );
     assertEquals(
       lines((await gate(sb, "--since", "44@1500000000")).stdout)[0],
@@ -163,31 +163,33 @@ Deno.test("PARTIAL: a --no-close slice, OWN partial under --own, never a pending
   }
 });
 
-Deno.test("an epic marker reads its sha from the first landed child, its subjects never naming the epic", async () => {
+const EPIC = "Epic: #70";
+
+/** An epic's first delivery, pushed: T01 carries the marker, T02 follows; T02's sha. */
+async function epicLanding(sb: Sandbox) {
+  await Deno.mkdir(join(sb.work, DIR), { recursive: true });
+  await Deno.writeTextFile(join(sb.work, DIR, "plan.md"), "# plan\n");
+  await git(sb.work, "add", DIR);
+  await sb.commit(".specnaut/feature.json", marker(70), "feat(T01): one (#71)", EPIC);
+  const two = await sb.commit("b", "b\n", "feat(T02): two (#72)", EPIC);
+  await git(sb.work, "push", "--quiet", "origin", "main");
+  return two;
+}
+
+Deno.test("an epic marker's sha is its newest landed child, its subjects never naming the epic", async () => {
   const sb = await sandbox();
   try {
-    await Deno.mkdir(join(sb.work, DIR), { recursive: true });
-    await Deno.writeTextFile(join(sb.work, DIR, "plan.md"), "# plan\n");
-    await git(sb.work, "add", DIR);
-    const first = await sb.commit(
-      ".specnaut/feature.json",
-      marker(70),
-      "feat(T01): one (#71)",
-      "Epic: #70",
-    );
-    await sb.commit("b", "b\n", "feat(T02): two (#72)", "Epic: #70");
+    const two = await epicLanding(sb);
+    // A later subject naming the epic is not its landing: the CHILD lines are asked first.
+    await sb.commit("notes.md", "n\n", "docs: notes on the epic (#70)");
     await git(sb.work, "push", "--quiet", "origin", "main");
-    assertEquals(lines((await gate(sb)).stdout)[0], `PENDING closeout 70 ${DIR} ${first}`);
-    await sb.commit(
-      ".specnaut/feature.json",
-      marker(70, ', "delivery": "partial"'),
-      "fix(T02): two (#72)",
-      "Epic: #70",
-    );
+    assertEquals(lines((await gate(sb)).stdout)[0], `PENDING closeout 70 ${DIR} ${two}`);
+    const partial = marker(70, ', "delivery": "partial"');
+    const fix = await sb.commit(".specnaut/feature.json", partial, "fix(T02): two (#72)", EPIC);
     await git(sb.work, "push", "--quiet", "origin", "main");
-    assertEquals(lines((await gate(sb)).stdout)[0], `PARTIAL closeout 70 ${DIR} ${first}`);
+    assertEquals(lines((await gate(sb)).stdout)[0], `PARTIAL closeout 70 ${DIR} ${fix}`);
     assertEquals(lines((await gate(sb, "--own", "70")).stdout), [
-      `OWN partial 70 ${DIR} ${first}`,
+      `OWN partial 70 ${DIR} ${fix}`,
       "gate clear",
     ]);
   } finally {

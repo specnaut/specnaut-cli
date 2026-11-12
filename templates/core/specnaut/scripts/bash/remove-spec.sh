@@ -4,13 +4,13 @@
 # landed and the backlog item closed. Two forms:
 #
 #   remove-spec.sh <landed-branch>    the directory and .specnaut/feature.json
-#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone, when it
-#                                     names no directory (cli#760): its
-#                                     linked_issue must be <n>, else 22
+#   remove-spec.sh --marker-only <n>  .specnaut/feature.json alone (cli#760):
+#                                     its linked_issue must be <n>, else 22
 #
 # The directory form, below. The marker form checks the same HEAD, index,
-# tracking and staged-path rules over that one path, and never names a
-# directory.
+# tracking and staged-path rules over that one path, and never touches a
+# directory: one the file names is left in place, tracked. merge-close.md
+# runs it for a marker that names none; the directory form takes both.
 #
 # Five conditions, all required, else nothing is touched: HEAD is the base;
 # `.specnaut/feature.json` names a `feature_directory`; it exists; it is in

@@ -83,44 +83,20 @@ Deno.test("a cloud marker, with no feature_directory, prints - for the directory
   }
 });
 
-/** [label, feature.json, subject, the line] — each published as `merge` lands it. */
-const INVALID_CASES: [string, string, string, string][] = [
-  [
-    "a quoted number",
-    `{ "feature_directory": "${DIR}", "linked_issue": "41" }\n`,
-    "feat(41): x",
-    "INVALID closeout -",
-  ],
-  ["no link at all", `{ "feature_directory": "${DIR}" }\n`, "feat(41): x", "INVALID closeout -"],
-  [
-    "a parent path",
-    marker(41).replace(DIR, ".specnaut/specs/../x"),
-    "feat(41): x",
-    "INVALID closeout 41",
-  ],
-  [
-    "a nested path",
-    marker(41).replace(DIR, `${DIR}/deeper`),
-    "feat(41): x",
-    "INVALID closeout 41",
-  ],
-  [
-    "outside specs",
-    marker(41).replace(DIR, ".specnaut/001-x"),
-    "feat(41): x",
-    "INVALID closeout 41",
-  ],
-  [
-    "a null directory",
-    '{ "feature_directory": null, "linked_issue": 41 }\n',
-    "feat(41): x",
-    "INVALID closeout 41",
-  ],
-  ["no commit names it", marker(41), "feat: unnamed", "INVALID closeout 41"],
+/** [label, feature.json, the line's <n>, subject] — each published as `merge` lands it. */
+const INVALID_CASES: [string, string, string, string?][] = [
+  ["a quoted number", `{ "feature_directory": "${DIR}", "linked_issue": "41" }\n`, "-"],
+  ["no link at all", `{ "feature_directory": "${DIR}" }\n`, "-"],
+  ["a parent path", marker(41).replace(DIR, ".specnaut/specs/../x"), "41"],
+  ["a nested path", marker(41).replace(DIR, `${DIR}/deeper`), "41"],
+  ["outside specs", marker(41).replace(DIR, ".specnaut/001-x"), "41"],
+  ["a null directory", '{ "feature_directory": null, "linked_issue": 41 }\n', "41"],
+  ["no commit names it", marker(41), "41", "feat: unnamed"],
 ];
 
 Deno.test("INVALID: a malformed link, a directory outside the rule, a link, a missing one, no landed commit", async () => {
-  for (const [label, json, subject, line] of INVALID_CASES) {
+  for (const [label, json, n, subject = "feat(41): x"] of INVALID_CASES) {
+    const line = `INVALID closeout ${n} unfenced`;
     const sb = await sandbox();
     try {
       await land(sb, json, subject);
@@ -141,18 +117,18 @@ Deno.test("INVALID: a directory that is a link, or not in the tree", async () =>
     await git(sb.work, "add", DIR);
     await sb.commit(".specnaut/feature.json", marker(42), "feat(42): linked dir");
     await git(sb.work, "push", "--quiet", "origin", "main");
-    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout 42");
+    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout 42 unfenced");
     await git(sb.work, "rm", "--quiet", DIR);
     await git(sb.work, "commit", "--quiet", "-m", "chore: drop the link");
     await git(sb.work, "push", "--quiet", "origin", "main");
-    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout 42");
+    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout 42 unfenced");
     await Deno.remove(join(sb.work, ".specnaut/feature.json"));
     // A link's blob is its target text: one shaped like a marker must still read INVALID.
     await Deno.symlink('{ "linked_issue": 42 }', join(sb.work, ".specnaut/feature.json"));
     await git(sb.work, "add", ".specnaut/feature.json");
     await git(sb.work, "commit", "--quiet", "-m", "feat(42): a linked marker");
     await git(sb.work, "push", "--quiet", "origin", "main");
-    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout -");
+    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout - unfenced");
   } finally {
     await sb.cleanup();
   }
@@ -165,7 +141,7 @@ Deno.test("INVALID under --since: the directory is older than the item, or no na
     const future = "4102444800"; // 2100-01-01: after any commit this test makes
     assertEquals(
       lines((await gate(sb, "--since", `43@${future}`)).stdout)[0],
-      "INVALID closeout 43",
+      "INVALID closeout 43 unfenced",
     );
     // Another item's --since does not reach this one.
     assertEquals(
@@ -176,6 +152,21 @@ Deno.test("INVALID under --since: the directory is older than the item, or no na
       lines((await gate(sb, "--since", "43@0")).stdout)[0],
       `PENDING closeout 43 ${DIR} ${sha}`,
     );
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("INVALID carries the fence: a landing that moved the config says so, the fix waits on it", async () => {
+  const sb = await sandbox();
+  try {
+    await sb.commit(".specnaut/backlog-config.yml", "repo: acme/first\n", "chore: a board");
+    await land(sb, `{ "feature_directory": "${DIR}", "linked_issue": "45" }\n`, "feat(45): x");
+    assertEquals(lines((await gate(sb)).stdout)[0], "INVALID closeout - unfenced");
+    await sb.commit(".specnaut/backlog-config.yml", "repo: acme/second\n", "chore: another board");
+    await git(sb.work, "push", "--quiet", "origin", "main");
+    const r = await gate(sb, "--own", "45", "--fence-ack", "45");
+    assertEquals([r.code, lines(r.stdout)], [4, ["INVALID closeout - fenced", "gate blocked"]]);
   } finally {
     await sb.cleanup();
   }
