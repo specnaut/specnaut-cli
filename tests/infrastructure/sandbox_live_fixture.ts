@@ -39,6 +39,27 @@ export function exists(path: string): boolean {
   }
 }
 
+/** Perl makes the `setsid` call macOS has no command for. */
+export const NO_PERL = exists("/usr/bin/perl") ? null : "perl at /usr/bin/perl";
+
+/**
+ * A shell line that prints `before`, then leaves behind `sleep <seconds>` in a session of its own,
+ * out of the process group, holding the output open; the shell itself ends at once with 0.
+ */
+export function detaching(seconds: string): string {
+  const perl = `use POSIX; exit if fork; setsid(); exec "sleep", "${seconds}"`;
+  return `echo before; /usr/bin/perl -e '${perl}'`;
+}
+
+/** Kills every process whose command line starts with `marker`: what a test left behind. */
+export function killNamed(marker: string): void {
+  const ps = new Deno.Command("/bin/ps", { args: ["-axo", "pid=,command="] }).outputSync();
+  for (const line of new TextDecoder().decode(ps.stdout).split("\n")) {
+    const [, pid, cmd] = line.match(/^\s*(\d+)\s+(.*)$/) ?? [];
+    if (cmd?.startsWith(marker)) Deno.kill(Number(pid), "SIGKILL");
+  }
+}
+
 /** Output captured from the launcher's pipes. */
 export function capture() {
   const chunks: Uint8Array[] = [];

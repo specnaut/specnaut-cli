@@ -1,35 +1,19 @@
-import { assertEquals, assertRejects } from "@std/assert";
-import { DenoProcessLauncher, type Started } from "../../src/infrastructure/sandbox_process.ts";
-import { untilWallClock } from "../../src/infrastructure/sandbox_wall_clock.ts";
-import { capture } from "./sandbox_live_fixture.ts";
+import { assertEquals } from "@std/assert";
+import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
+import { capture, detaching, killNamed, live, NO_PERL } from "./sandbox_live_fixture.ts";
 
 /**
- * How a sandbox's launcher process is waited on and stopped: the wall clock, the halt that stops
- * what the launcher alone cannot, and which of its output reaches ours.
+ * How a sandbox's launcher process is started and stopped: which of its output reaches ours, and
+ * how an output still held open by a process that left its group is let go.
  */
 
 const POSIX = Deno.build.os !== "windows";
+const MARKER = "30.271";
 
-/** A process that never ends on its own; `stop` ends it with 137. */
-function endless() {
-  let stops = 0;
-  let exit: (code: number) => void = () => {};
-  const started: Started = {
-    exited: new Promise<number>((ok) => (exit = ok)),
-    stop: () => {
-      stops++;
-      exit(137);
-    },
-  };
-  return { started, stops: () => stops };
+/** `value`, after `ms` milliseconds. */
+function later<T>(ms: number, value: T): Promise<T> {
+  return new Promise((ok) => setTimeout(() => ok(value), ms));
 }
-
-Deno.test("untilWallClock: a halt that fails still stops the process, and the failure is raised", async () => {
-  const { started, stops } = endless();
-  const halt = () => Promise.reject(new Error("the engine is gone"));
-  await assertRejects(() => untilWallClock(started, 0.01, halt), Error, "the engine is gone");
-  assertEquals(stops(), 1);
-});
 
 Deno.test({
   name: "DenoProcessLauncher: a process whose output is discarded writes nothing to ours",
@@ -44,5 +28,41 @@ Deno.test({
     assertEquals([out.text(), err.text()], ["", "to-stderr\n"]);
     assertEquals(await launcher.start(spec).exited, 0);
     assertEquals(out.text(), "to-stdout\n");
+  },
+});
+
+Deno.test({
+  name: live(
+    "DenoProcessLauncher: output held by a process that left the group is let go",
+    NO_PERL,
+  ),
+  ignore: NO_PERL !== null,
+  fn: async () => {
+    const out = capture();
+    const launcher = new DenoProcessLauncher(out.stream, capture().stream);
+    const started = launcher.start({ cmd: "/bin/sh", args: ["-c", detaching(MARKER)], env: {} });
+    try {
+      assertEquals(await started.ended, 0);
+      const waiting = await Promise.race([started.exited, later(500, "still copying")]);
+      assertEquals(waiting, "still copying");
+      started.release();
+      assertEquals(await Promise.race([started.exited, later(2000, "never let go")]), 0);
+      assertEquals(out.text(), "before\n");
+    } finally {
+      killNamed(`sleep ${MARKER}`);
+    }
+  },
+});
+
+Deno.test({
+  name: "DenoProcessLauncher: stopping a process that has ended but is not yet reaped is no error",
+  ignore: !POSIX,
+  fn: async () => {
+    const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
+    const started = launcher.start({ cmd: "/bin/sh", args: ["-c", "exit 0"], env: {} });
+    // Blocking the event loop keeps the ended process from being reaped while it is stopped.
+    for (const until = Date.now() + 300; Date.now() < until;) { /* wait */ }
+    started.stop();
+    assertEquals(await started.exited, 0);
   },
 });

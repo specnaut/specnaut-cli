@@ -1,7 +1,18 @@
 import { assert, assertEquals } from "@std/assert";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
-import { live, probed, processesNamed, runIn, withLayout } from "./sandbox_live_fixture.ts";
+import { fromFileUrl } from "@std/path";
+import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
+import {
+  detaching,
+  killNamed,
+  live,
+  NO_PERL,
+  probed,
+  processesNamed,
+  runIn,
+  withLayout,
+} from "./sandbox_live_fixture.ts";
 
 /** `sandbox-exec` on a real macOS host, through the real launcher; skipped elsewhere, saying so. */
 
@@ -80,4 +91,70 @@ Deno.test({
       assertEquals(outcome, { kind: "timed_out", seconds: 0.5 });
       assertEquals(processesNamed(marker), []);
     }),
+});
+
+/** `value`, after `ms` milliseconds. */
+function later<T>(ms: number, value: T): Promise<T> {
+  return new Promise((ok) => setTimeout(() => ok(value), ms));
+}
+
+const DETACHED = MISSING ?? NO_PERL;
+
+Deno.test({
+  name: live(
+    "seatbelt live: a process that left the group delays the run by the grace only",
+    DETACHED,
+  ),
+  ignore: DETACHED !== null,
+  fn: () =>
+    withLayout("seatbelt", async ({ policy }) => {
+      const marker = "34.219";
+      const timed = { ...policy, limits: { ...policy.limits, wallClockSeconds: 2 } };
+      const started = Date.now();
+      try {
+        const { outcome, out } = await runIn(mac, timed, ["/bin/sh", "-c", detaching(marker)]);
+        const took = Date.now() - started;
+        assertEquals(outcome, { kind: "exited", code: 0 });
+        assertEquals(out, "before\n");
+        assert(took < (2 + DRAIN_GRACE_SECONDS + 1) * 1000, `the run took ${took} ms`);
+        // Let go, not stopped: what STOP_LIMIT says of this backend.
+        assertEquals(processesNamed(`sleep ${marker}`).length, 1);
+      } finally {
+        killNamed(`sleep ${marker}`);
+      }
+    }),
+});
+
+Deno.test({
+  name: live(
+    "seatbelt live: a run whose launcher is killed with SIGKILL still ends on time",
+    MISSING,
+  ),
+  ignore: MISSING !== null,
+  fn: async () => {
+    const marker = "/bin/sleep 35.137";
+    const base = await Deno.realPath(await Deno.makeTempDir({ prefix: "specnaut-killed-" }));
+    const child = fromFileUrl(new URL("./sandbox_killed_runner.ts", import.meta.url));
+    const flags = ["--allow-read", "--allow-write", "--allow-run", "--allow-env"];
+    const cli = new Deno.Command(Deno.execPath(), {
+      args: ["run", ...flags, child, base, marker.split(" ")[1]],
+      stdin: "null",
+      stdout: "null",
+      stderr: "null",
+    }).spawn();
+    try {
+      for (let i = 0; i < 100 && processesNamed(marker).length === 0; i++) await later(100, 0);
+      const seen = Date.now();
+      assertEquals(processesNamed(marker).length, 1, "the sandboxed command never started");
+      cli.kill("SIGKILL");
+      await cli.status;
+      const limit = seen + (1 + DRAIN_GRACE_SECONDS + 2) * 1000;
+      while (processesNamed(marker).length > 0 && Date.now() < limit) await later(200, 0);
+      assertEquals(processesNamed(marker), [], "the sandboxed command outlived its wall clock");
+    } finally {
+      killNamed(marker);
+      killNamed("/bin/sh -c exec </dev/null");
+      await Deno.remove(base, { recursive: true });
+    }
+  },
 });

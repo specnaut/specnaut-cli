@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { bwrapArgs } from "../../src/domain/sandbox_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
@@ -9,6 +9,8 @@ import {
   runnerFor,
   SeatbeltRunner,
 } from "../../src/infrastructure/sandbox_runners.ts";
+import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
+import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 import {
   COMMAND,
@@ -69,12 +71,16 @@ Deno.test({
         kind: "exited",
         code: 9,
       });
-      assertEquals(launches.map((l) => l.spec), [{
+      assertEquals(launches[0].spec, {
         cmd: "/usr/bin/sandbox-exec",
         args: ["-p", seatbeltProfile(policy), "--", ...COMMAND],
         env: policy.env,
         cwd: policy.workdir,
-      }]);
+      });
+      // Its watchdog kills the group past the clock and the grace, and is stopped after the run.
+      const wall = policy.limits.wallClockSeconds;
+      assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, wall + DRAIN_GRACE_SECONDS));
+      assertEquals([launches.length, launches[1].stopped], [2, 1]);
     } finally {
       await Deno.remove(scratch, { recursive: true });
     }
@@ -99,7 +105,7 @@ Deno.test({
       const policy = seatbeltPolicy(scratch);
       const policyWrites = policy.writes;
       await new SeatbeltRunner(recording).run(policy, COMMAND);
-      assertEquals(seen, [policy.writes as string[]]);
+      assertEquals(seen[0], policy.writes as string[]);
     } finally {
       await Deno.remove(scratch, { recursive: true });
     }
@@ -118,6 +124,30 @@ Deno.test({
         kind: "timed_out",
         seconds: 0.01,
       });
+      assertEquals(launches[0].stopped, 1);
+    } finally {
+      await Deno.remove(scratch, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "SeatbeltRunner: a watchdog that cannot start stops the run, which never goes unwatched",
+  ignore: !POSIX,
+  fn: async () => {
+    const scratch = await Deno.makeTempDir({ prefix: "specnaut-runner-" });
+    try {
+      const { launcher, launches } = fakeLauncher(null);
+      const failing: ProcessLauncher = {
+        ...launcher,
+        start: (spec) => {
+          if (launches.length > 0) throw new Error("no /bin/sh");
+          return launcher.start(spec);
+        },
+      };
+      const policy = withWallClock(seatbeltPolicy(scratch), 0.05);
+      const run = () => new SeatbeltRunner(failing).run(policy, COMMAND);
+      await assertRejects(run, Error, "no /bin/sh");
       assertEquals(launches[0].stopped, 1);
     } finally {
       await Deno.remove(scratch, { recursive: true });

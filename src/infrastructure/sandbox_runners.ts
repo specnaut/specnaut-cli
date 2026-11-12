@@ -5,14 +5,17 @@ import { bwrapArgs, containerArgs } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { isFilterArch, SECCOMP_FD, seccompFilter } from "../domain/sandbox_seccomp.ts";
 import { armExitTrap } from "./exit_trap.ts";
-import type { ProcessLauncher } from "./sandbox_process.ts";
-import { untilWallClock } from "./sandbox_wall_clock.ts";
+import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
+import { DRAIN_GRACE_SECONDS, untilWallClock } from "./sandbox_wall_clock.ts";
+import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
  * One runner per backend. Each launches exactly what the domain generated for the policy, adds
  * nothing to it, and applies the wall clock, which no backend's own options can. The other caps
  * are applied where `CAP_ENFORCEMENT` puts them in the arguments, and nowhere else: what a
- * backend runs without is `unenforcedCaps`.
+ * backend runs without is `unenforcedCaps`. A run that would outlive us were we killed (a
+ * container, `sandbox-exec`) has a watchdog beside it that ends it at the wall clock plus the
+ * drain grace.
  */
 
 /** The run's container, named so it can be removed when the wall clock runs out or we are stopped. */
@@ -27,23 +30,25 @@ export class ContainerRunner implements SandboxRunner {
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const args = containerArgs(policy, { image: this.image, name }, command);
-    const remove = {
-      cmd: this.engine,
-      args: ["rm", "--force", name],
-      env: "host",
-      stdout: "discarded",
-    } as const;
+    const remove = removalOf(this.engine, name);
     // A container outlives its client: an interrupt removes it rather than leave it running.
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
       const started = this.launcher.start({ cmd: this.engine, args, env: "host" });
-      return await untilWallClock(started, policy.limits.wallClockSeconds, async () => {
+      const removal = [remove.cmd, ...remove.args];
+      const halt = async () => {
         await this.launcher.start(remove).exited;
-      });
+      };
+      return await watched(this.launcher, started, policy.limits.wallClockSeconds, removal, halt);
     } finally {
       disarm();
     }
   }
+}
+
+/** Removes the named container; what the engine prints (the name) never passes for the run's. */
+function removalOf(engine: Engine, name: string): ProcessSpec {
+  return { cmd: engine, args: ["rm", "--force", name], env: "host", stdout: "discarded" };
 }
 
 function containerName(): string {
@@ -92,7 +97,45 @@ export class SeatbeltRunner implements SandboxRunner {
       env: policy.env,
       cwd: policy.workdir,
     });
-    return await untilWallClock(started, policy.limits.wallClockSeconds);
+    return await watched(this.launcher, started, policy.limits.wallClockSeconds, []);
+  }
+}
+
+/**
+ * `started` run to its end under the wall clock, beside its watchdog, which is stopped once the
+ * run has ended. A watchdog that cannot start stops the run: it never goes unwatched.
+ */
+async function watched(
+  launcher: ProcessLauncher,
+  started: Started,
+  seconds: number,
+  removal: readonly string[],
+  halt?: () => Promise<void>,
+): Promise<RunOutcome> {
+  const watchdog = startWatchdog(launcher, started, seconds, removal);
+  try {
+    return await untilWallClock(started, seconds, halt);
+  } finally {
+    watchdog.stop();
+    await watchdog.exited;
+  }
+}
+
+/**
+ * The watchdog of `started`, past the wall clock and the drain grace; if it cannot start, the run
+ * is stopped and the failure raised.
+ */
+function startWatchdog(
+  launcher: ProcessLauncher,
+  started: Started,
+  seconds: number,
+  removal: readonly string[],
+): Started {
+  try {
+    return launcher.start(watchdogSpec(started.pid, seconds + DRAIN_GRACE_SECONDS, removal));
+  } catch (err) {
+    started.stop();
+    throw err;
   }
 }
 
