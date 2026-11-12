@@ -16,8 +16,8 @@
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
-# is the drift the sweep exists to report — then move it to Done. Then
-# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# is the drift the sweep exists to report — then move it to done_status's
+# column. Then reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
 # REOPENED lines and the sweep's own summary line verbatim.
 #
 # Exit — the full table; phases/merge-close.md maps each one:

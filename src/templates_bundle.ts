@@ -7697,8 +7697,8 @@ reconcile() { :; }
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
-# is the drift the sweep exists to report — then move it to Done. Then
-# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# is the drift the sweep exists to report — then move it to done_status's
+# column. Then reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
 # REOPENED lines and the sweep's own summary line verbatim.
 #
 # Exit — the full table; phases/merge-close.md maps each one:
@@ -10819,8 +10819,8 @@ exit 0
     name: "close-shipped",
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
-# After a merge: settle the board for the items the product-owner just closed
-# (phases/merge-close.md, spec 042) — the github half. The loop, the lines and
+# After a merge: settle the board for the items phases/merge-close.md step 2
+# just closed (spec 042) — the github half. The loop, the lines and
 # the exit table are the shared body, _close_shipped.sh, beside this file; what
 # is here is how github confirms a close and reconciles the board.
 #
@@ -10880,8 +10880,8 @@ reconcile() {
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
-# is the drift the sweep exists to report — then move it to Done. Then
-# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# is the drift the sweep exists to report — then move it to done_status's
+# column. Then reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
 # REOPENED lines and the sweep's own summary line verbatim.
 #
 # Exit — the full table; phases/merge-close.md maps each one:
@@ -13208,8 +13208,8 @@ exit 0
     name: "close-shipped",
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
-# After a merge: settle the board for the items the product-owner just closed
-# (phases/merge-close.md, spec 042) — the gitlab half. The loop, the lines and
+# After a merge: settle the board for the items phases/merge-close.md step 2
+# just closed (spec 042) — the gitlab half. The loop, the lines and
 # the exit table are the shared body, _close_shipped.sh, beside this file; what
 # is here is how gitlab confirms a close and reconciles the board.
 #
@@ -13272,8 +13272,8 @@ reconcile() {
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
-# is the drift the sweep exists to report — then move it to Done. Then
-# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# is the drift the sweep exists to report — then move it to done_status's
+# column. Then reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
 # REOPENED lines and the sweep's own summary line verbatim.
 #
 # Exit — the full table; phases/merge-close.md maps each one:
@@ -15165,8 +15165,8 @@ done_status() { bash "\$here/columns.sh" --terminal 2>/dev/null; }
 #
 # Per issue, in the order given: confirm it closed — an open issue's card is
 # left alone, because the close comes first and a Done card over an open issue
-# is the drift the sweep exists to report — then move it to Done. Then
-# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# is the drift the sweep exists to report — then move it to done_status's
+# column. Then reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
 # REOPENED lines and the sweep's own summary line verbatim.
 #
 # Exit — the full table; phases/merge-close.md maps each one:

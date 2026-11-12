@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# After a merge: settle the board for the items the product-owner just closed
-# (phases/merge-close.md, spec 042) — the gitlab half. The loop, the lines and
+# After a merge: settle the board for the items phases/merge-close.md step 2
+# just closed (spec 042) — the gitlab half. The loop, the lines and
 # the exit table are the shared body, _close_shipped.sh, beside this file; what
 # is here is how gitlab confirms a close and reconciles the board.
 #
