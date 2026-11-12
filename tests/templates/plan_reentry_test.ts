@@ -4,8 +4,9 @@ import { fromFileUrl, join } from "@std/path";
 /**
  * spec 055 (cli#729) — a direct `/task plan <id>` chains on the item's
  * classification, not on whether a commit follows plan.md. The rule has one
- * home, auto-chain.md's re-entry table; plan.md holds how a re-entered plan
- * adopts its branch, resume.md § 3 whose branch it may be.
+ * home, auto-chain.md's re-entry table; plan-reentry.md (cli#774), which plan.md
+ * loads before step 2, holds how a re-entered plan adopts its branch, and
+ * resume.md § 3 whose branch it may be.
  */
 
 const T = fromFileUrl(new URL("../../templates/core/", import.meta.url));
