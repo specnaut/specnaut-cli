@@ -153,6 +153,31 @@ Deno.test({
   },
 });
 
+Deno.test("a project git cannot read is refused in the export's own terms", async () => {
+  const dir = await tempDir("fetch-");
+  try {
+    const source = { kind: "ref", remote: "origin", branch: "topic" } as const;
+    const fetcher = local(dir);
+    await assertRejects(() => fetcher.fetch(source, join(dir, "out.git")), ExportRefused, "failed");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("a fetch that finds no git program is refused, not a crash", async () => {
+  const w = await world();
+  try {
+    const empty = join(w.out, "..", "empty");
+    await Deno.mkdir(empty);
+    const env = (name: string) => name === "PATH" ? empty : Deno.env.get(name);
+    const fetcher = new GitBranchFetcher(w.project, { protocols: ["file"], env });
+    const source = { kind: "ref", remote: "origin", branch: "topic" } as const;
+    await assertRejects(() => fetcher.fetch(source, w.out), ExportRefused, "not on the PATH");
+  } finally {
+    await w.cleanup();
+  }
+});
+
 Deno.test("credentials in a URL git echoes are redacted", () => {
   assertEquals(
     redacted("fatal: unable to access 'https://bob:s3cret@example.com/x.git/'"),

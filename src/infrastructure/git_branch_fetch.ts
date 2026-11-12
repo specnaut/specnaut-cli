@@ -58,9 +58,9 @@ export class GitBranchFetcher implements BranchFetcher {
 
   async remotes(): Promise<string[]> {
     const args = ["--name-only", "--get-regexp", "^remote\\..*\\.url$"];
-    const out = await this.#project.call("config", args);
+    const out = await this.#project.call("config", args).catch(asRefusal);
     if (out.code === 1) return [];
-    if (out.code !== 0) throw new GitRefused(`git config failed: ${out.why}`);
+    if (out.code !== 0) throw new ExportRefused(`git config failed: ${out.why}`);
     // A key is `remote.<name>.url`, and `<name>` may itself hold dots, spaces or slashes.
     return decode(out.stdout).split("\n").filter(Boolean)
       .map((key) => key.slice("remote.".length, -".url".length));
@@ -75,32 +75,49 @@ export class GitBranchFetcher implements BranchFetcher {
     await Deno.writeTextFile(alternates, `${join(common, "objects")}\n`);
     await this.#git("fetch", gitDir, fetchArgs(url, refspecOf(source), this.#protocols));
     const head = await new UntrustedGit(gitDir)
-      .run("rev-parse", ["--verify", "--quiet", "--end-of-options", `${FETCHED_REF}^{commit}`]);
+      .run("rev-parse", ["--verify", "--quiet", "--end-of-options", `${FETCHED_REF}^{commit}`])
+      .catch(asRefusal);
     return firstLine(head);
   }
 
   async #read(sub: "config" | "rev-parse", args: string[]): Promise<string> {
-    return firstLine(await this.#project.run(sub, args));
+    return firstLine(await this.#project.run(sub, args).catch(asRefusal));
   }
 
   /** git with the fetch's environment and timeout; a failure is refused with git's cause. */
   async #git(what: string, cwd: string, args: string[]): Promise<void> {
     const signal = AbortSignal.timeout(this.#timeoutMs);
-    const out = await new Deno.Command("git", {
-      args,
-      cwd,
-      clearEnv: true,
-      env: fetchEnv(this.#env),
-      stdin: "null",
-      stdout: "null",
-      stderr: "piped",
-      signal,
-    }).output();
+    const out = await spawn(cwd, args, fetchEnv(this.#env), signal);
     if (signal.aborted) {
       throw new ExportRefused(`the fetch did not finish within ${this.#timeoutMs / 1000} s`);
     }
     if (out.code !== 0) throw new ExportRefused(`git ${what} failed: ${causeOf(out.stderr)}`);
   }
+}
+
+/** No input, and only stderr kept: it carries git's cause when the step fails. */
+const QUIET = { stdin: "null", stdout: "null", stderr: "piped" } as const;
+
+/** One git process; a spawn that finds no git program is a refusal the user can act on. */
+async function spawn(
+  cwd: string,
+  args: string[],
+  env: Record<string, string>,
+  signal: AbortSignal,
+): Promise<Deno.CommandOutput> {
+  const command = new Deno.Command("git", { ...QUIET, args, cwd, clearEnv: true, env, signal });
+  try {
+    return await command.output();
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    throw new ExportRefused("git is not on the PATH", { cause: err });
+  }
+}
+
+/** git's refusal, said in the export's own terms; anything else is not a refusal and goes on. */
+function asRefusal(err: unknown): never {
+  if (err instanceof GitRefused) throw new ExportRefused(err.message, { cause: err });
+  throw err;
 }
 
 /** A bare repository with no template, so no hook, in the object format of the user's own. */
