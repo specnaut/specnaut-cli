@@ -14982,7 +14982,7 @@ set -euo pipefail
 
 if [ "\$#" -lt 2 ]; then
   echo 'usage: move.sh <number> <Status>' >&2
-  echo '  Status one of: Backlog, Ready, "In Progress", "In Review", Done' >&2
+  echo '  Status: one of the board'"'"'s own column names, as columns.sh lists them' >&2
   exit 2
 fi
 NUM=\$(require_issue_number "\$1") || exit 2
