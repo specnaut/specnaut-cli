@@ -19,9 +19,8 @@
 # Usage: reconcile.sh [--reset] [--seek-end] [--limit N]
 set -euo pipefail
 
-# shellcheck source=./_config.sh
-. "$(dirname "$0")/_config.sh"
-
+# Every argument is judged before _config.sh asks for a token. The limit is a
+# page size, and it reaches the query string: digits only.
 LIMIT=100
 RESET=0
 SEEK_END=0
@@ -29,12 +28,14 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --reset) RESET=1; shift ;;
     --seek-end) SEEK_END=1; shift ;;
-    --limit) LIMIT="${2:?--limit needs a value}"; shift 2 ;;
+    --limit) LIMIT=${2-}; [ "$#" -lt 2 ] || shift; shift ;;
     *) echo "usage: reconcile.sh [--reset] [--seek-end] [--limit N]" >&2; exit 2 ;;
   esac
 done
-# The limit is a page size, and it reaches the query string: digits only.
 [[ $LIMIT =~ ^[1-9][0-9]{0,2}$ ]] || { echo "reconcile.sh: --limit is a page size, 1 to 999" >&2; exit 2; }
+
+# shellcheck source=./_config.sh
+. "$(dirname "$0")/_config.sh"
 
 STATE="$ROOT/.specnaut/.cloud-cursor-$PROJECT_KEY"
 [ "$RESET" = "1" ] && rm -f "$STATE"
