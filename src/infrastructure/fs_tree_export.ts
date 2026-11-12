@@ -10,6 +10,7 @@ import { formatOf, gitBlobId } from "../domain/git_object_id.ts";
 import type { ExportPlan, PlannedFile } from "../domain/tree_plan.ts";
 import { isInside } from "../domain/template.ts";
 import { armExitTrap } from "./exit_trap.ts";
+import { securePrivateFolder } from "./private_folder.ts";
 
 /**
  * The export's folders: `<cache>/specnaut/untrusted/<sha>/` holding `git/` (the borrowed
@@ -39,6 +40,7 @@ const windows = Deno.build.os === "windows";
 
 export class FsExportStore implements ExportStore {
   readonly #made: string[] = [];
+  #root: string | undefined;
   #home: ExportHome | undefined;
   #disarm: (() => void) | undefined;
 
@@ -51,6 +53,8 @@ export class FsExportStore implements ExportStore {
     if (isInside(project, root)) {
       throw new ExportRefused(`the cache folder ${root} is inside the project; set XDG_CACHE_HOME`);
     }
+    await securePrivateFolder(root);
+    this.#root = root;
     this.#disarm ??= armExitTrap(() => this.#removeSync());
     const staging = await Deno.makeTempDir({ dir: root, prefix: ".fetch-" });
     this.#made.push(staging);
@@ -61,7 +65,8 @@ export class FsExportStore implements ExportStore {
     if (!isCommitSha(sha)) throw new ExportRefused("not a full commit id");
     const staging = dirname(staged);
     if (!this.#made.includes(staging)) throw new Error("claim takes the path stage handed out");
-    const root = join(await Deno.realPath(this.cacheRoot), sha);
+    // The staging check above proves `stage` ran, so the root it resolved is set.
+    const root = join(this.#root!, sha);
     // A folder left by an export that could not clean up is not trusted to be what it was.
     await Deno.remove(root, { recursive: true }).catch(ignoreNotFound);
     await Deno.mkdir(root, { mode: 0o700 });
