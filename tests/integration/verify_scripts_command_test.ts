@@ -1,5 +1,6 @@
 import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
 import { join } from "@std/path";
+import { runSpecnaut } from "../helpers/run_specnaut.ts";
 import {
   advanceBase,
   bundled,
@@ -127,6 +128,13 @@ Deno.test("no base it can name: exit 3, and the last line is still untrusted", a
   const v = await verify(dir);
   assertEquals([v.code, v.lines], [3, ["VERDICT scripts untrusted"]], v.stderr);
   assertMatch(v.stderr, /the base is unknown: no origin\/HEAD and no global init\.defaultBranch/);
+});
+
+Deno.test("an argument: the parser's exit 2, help on stderr and no VERDICT line", async () => {
+  const { root } = await fixture();
+  const r = await runSpecnaut(["verify-scripts", "extra"], { cwd: root });
+  assertEquals([r.code, r.stdout.includes("VERDICT")], [2, false]);
+  assertMatch(r.stderr, /verify-scripts takes no argument/);
 });
 
 Deno.test("run outside a project: exit 2", async () => {

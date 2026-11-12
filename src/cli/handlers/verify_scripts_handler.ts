@@ -14,18 +14,20 @@ import { findHarness } from "../harnesses.ts";
  *
  *   0  trusted: every file under `.specnaut/scripts/` matches a copy the branch does not carry
  *   1  untrusted: one `UNTRUSTED <path> <reason>` line per cause
- *   2  usage: an argument (the parser's), or no `.specnaut/` in the folder it runs in
- *   3  the base is unknown, or the check could not run
+ *   2  usage: no `.specnaut/` in the folder it runs in. An argument is exit 2 too, but the parser's
+ *      (`main.ts`): it refuses before this handler runs, help on stderr and no `VERDICT` line
+ *   3  the base is unknown, or the check could not run. The Go port exits 3 with no `VERDICT`
+ *      line: it parses the command but does not run it (`internal/cli/notported.go`)
  *
  * Exits 0 and 1 print, in order, `BASE <merge-base sha>`, `BASE_TIP <sha>`, `BASE_BRANCH <name>`,
  * `NAMES_FILE <path>` (the paths changed since BASE, one per line, in a new temp file outside the
- * repository), `NAMES_RELATIVE_TO <folder>` (those paths are relative to the project's folder,
- * named from the repository's top, `.` at the top), `SCRIPTS_DIGEST <sha256>` (the folder's bytes
- * as walked: what a user's approval covers), the `UNTRUSTED` lines, and last
- * `VERDICT scripts trusted|untrusted`. Every other exit, a crash included, ends with
- * `VERDICT scripts untrusted` too. A caller trusts the scripts only on exit 0 with
- * that final `trusted` line and a full `BASE` sha; anything else, the binary missing included, is
- * untrusted. `scripts` names the class checked, so others can be added without breaking a caller.
+ * repository, which the caller removes once read), `NAMES_RELATIVE_TO <folder>` (those paths are
+ * relative to the project's folder, named from the repository's top, `.` at the top),
+ * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers), the
+ * `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. Every other exit of this
+ * handler, a crash included, ends with `VERDICT scripts untrusted` too. A caller trusts the scripts
+ * only on exit 0 with that final `trusted` line and a full `BASE` sha; anything else, the binary
+ * missing included, is untrusted. `scripts` names the class checked, so others can be added without breaking a caller.
  */
 const EXIT = { trusted: 0, untrusted: 1, usage: 2, couldNotRun: 3 } as const;
 const UNTRUSTED = "VERDICT scripts untrusted";
