@@ -16518,6 +16518,9 @@ done
 #   5. last-N               → HEAD~<N>..HEAD, N default 20, --last <n> overrides
 #                             (SCOPE: last-N)
 #
+# --head <sha> [--objects <dir>] puts that commit in HEAD's place, read from git's
+# objects only (_explicit_head.sh): --path lists its tree, and no range may name HEAD.
+#
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
@@ -16528,9 +16531,11 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
+HEAD_ARG=""
+OBJECTS_ARG=""
 
 usage() {
-  echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]" >&2
+  echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
   # Known limitation: the --range allowlist excludes '{' '}', so no stash@{N}.
   echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
@@ -16578,6 +16583,11 @@ while [ \$# -gt 0 ]; do
       fi
       shift 2
       ;;
+    --head | --objects)
+      [ -n "\${2:-}" ] || { echo "error: \$1 requires a value" >&2; usage; exit 2; }
+      if [ "\$1" = --head ]; then HEAD_ARG="\$2"; else OBJECTS_ARG="\$2"; fi
+      shift 2
+      ;;
     *)
       echo "error: unknown argument: \$1" >&2
       usage
@@ -16591,6 +16601,11 @@ if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
+if [ -n "\$HEAD_ARG\$OBJECTS_ARG" ]; then
+  [ -n "\$HEAD_ARG" ] && explicit_head_take "\$HEAD_ARG" "\$OBJECTS_ARG" _gu_git ||
+    { echo "error: --head: \${EXPLICIT_REFUSAL:---objects needs --head}" >&2; exit 2; }
+fi
+TIP="\${EXPLICIT_HEAD:-HEAD}"
 
 SCOPE=""
 SCOPE_LABEL=""
@@ -16629,22 +16644,22 @@ elif [ -n "\$RANGE_ARG" ]; then
   FILES="\$(scope_read gu_names "\${RANGE_ARG%%..*}" "\${RANGE_ARG#*..}")"
   COMMITS="\$(scope_read gu_log "\$RANGE_ARG")"
 elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  local_count="\$(_gu_git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
+  local_count="\$(_gu_git rev-list --count "origin/main..\$TIP" 2>/dev/null || echo 0)" &&
   [ "\$local_count" -gt 0 ]; then
   # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
-  SCOPE_LABEL="origin/main..HEAD (\${local_count} commits)"
-  FILES="\$(scope_read gu_names origin/main HEAD)"
-  COMMITS="\$(scope_read gu_log origin/main..HEAD)"
-elif TAG="\$(_gu_git describe --tags --abbrev=0 2>/dev/null)" && [ -n "\$TAG" ]; then
+  SCOPE_LABEL="origin/main..\$TIP (\${local_count} commits)"
+  FILES="\$(scope_read gu_names origin/main "\$TIP")"
+  COMMITS="\$(scope_read gu_log "origin/main..\$TIP")"
+elif TAG="\$(_gu_git describe --tags --abbrev=0 "\$TIP" 2>/dev/null)" && [ -n "\$TAG" ]; then
   SCOPE="since-tag"
-  SCOPE_LABEL="\${TAG}..HEAD"
-  FILES="\$(scope_read gu_names "\$TAG" HEAD)"
-  COMMITS="\$(scope_read gu_log "\${TAG}..HEAD")"
+  SCOPE_LABEL="\${TAG}..\$TIP"
+  FILES="\$(scope_read gu_names "\$TAG" "\$TIP")"
+  COMMITS="\$(scope_read gu_log "\${TAG}..\$TIP")"
 else
   SCOPE="last-N"
   # Clamp N to the available history so HEAD~N never points before the root.
-  AVAIL="\$(_gu_git rev-list --count HEAD 2>/dev/null || echo 1)"
+  AVAIL="\$(_gu_git rev-list --count "\$TIP" 2>/dev/null || echo 1)"
   N="\$LAST_N"
   if [ "\$N" -gt "\$AVAIL" ]; then
     N="\$AVAIL"
@@ -16654,11 +16669,11 @@ else
     # The window covers all of history; HEAD~N would precede the root, so diff
     # against the empty tree to surface every file the history touched.
     EMPTY_TREE="\$(_gu_git hash-object -t tree /dev/null)"
-    FILES="\$(scope_read gu_names "\$EMPTY_TREE" HEAD)"
+    FILES="\$(scope_read gu_names "\$EMPTY_TREE" "\$TIP")"
   else
-    FILES="\$(scope_read gu_names "HEAD~\${N}" HEAD)"
+    FILES="\$(scope_read gu_names "\$TIP~\${N}" "\$TIP")"
   fi
-  COMMITS="\$(scope_read gu_log HEAD "\$N")"
+  COMMITS="\$(scope_read gu_log "\$TIP" "\$N")"
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.
@@ -16734,18 +16749,17 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 # that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$_gu_here/_scope_globs.sh" ] ||
-  { echo "git-read: \$_gu_here/_scope_globs.sh is missing" >&2 && return 70; }
-# shellcheck source=SCRIPTDIR/_scope_globs.sh
-. "\$_gu_here/_scope_globs.sh"
+[ -f "\$_gu_here/_scope_globs.sh" ] && [ -f "\$_gu_here/_explicit_head.sh" ] ||
+  { echo "git-read: _scope_globs.sh or _explicit_head.sh is missing from \$_gu_here" >&2 && return 70; }
+# shellcheck source=SCRIPTDIR/_scope_globs.sh disable=SC1091
+. "\$_gu_here/_scope_globs.sh" && . "\$_gu_here/_explicit_head.sh"
 
 # A revision: ref-name characters only, the whole string, never an option or a
 # range. \`+\` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
 _gu_rev() {
   local re='^[A-Za-z0-9._/@^~+-]+\$'
-  case "\$1" in
-    -* | *..*) return 1 ;;
-  esac
+  case "\$1" in -* | *..*) return 1 ;; esac
+  [ -z "\$EXPLICIT_HEAD" ] || ! explicit_head_names_head "\$1" || return 1
   [[ "\$1" =~ \$re ]]
 }
 
@@ -16769,7 +16783,7 @@ _gu_path() {
 _gu_count() { local re='^[1-9][0-9]*\$' && [[ "\$1" =~ \$re ]]; }
 
 _gu_refuse() { echo "git-read: refused: \$1" >&2 && return 2; }
-_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
+_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision\${EXPLICIT_HEAD:+ (HEAD is not read given a head)}: \$1"; }
 
 _gu_need_paths() {
   local p
@@ -16798,7 +16812,7 @@ _gu_env_run() (
   for name in \$(compgen -e); do
     case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
   done
-  export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   command git "\$@"
 )
@@ -16861,7 +16875,8 @@ gu_show() {
 gu_files() {
   [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "\$@" || return 2
-  _gu_git ls-files -- "\$@"
+  [ -n "\$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "\$@"; return; }
+  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" -- "\$@"
 }
 
 gu_grep() {
@@ -16876,7 +16891,7 @@ gu_grep() {
 gu_base() {
   [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "\$1" || return 2
-  _gu_git merge-base --end-of-options HEAD "\$1"
+  _gu_git merge-base --end-of-options "\${EXPLICIT_HEAD:-HEAD}" "\$1"
 }
 
 # The patch of every changed file _scope_globs.sh counts as a manifest, in a new
@@ -16900,6 +16915,71 @@ gu_manifests() {
   fi
   [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
   printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/audit/_explicit_head.sh",
+    content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: EXPLICIT_* are read by the sourcing script.)
+# _explicit_head.sh - the one home of an explicit head: the commit a script is told to
+# judge, by its full id, in place of HEAD. Sourced, never run, by size-ratchet.sh,
+# boundary-check.sh and _git_untrusted.sh (git-read.sh, collect-audit-scope.sh).
+#
+#   --head <sha>      a full commit id: 40 or 64 lowercase hex digits, the object
+#                     format's own length, so no ref name, revision expression or
+#                     option can be spelled with it
+#   --objects <dir>   an absolute git objects folder holding that commit, such as the
+#                     one of a repository a single branch was fetched into
+#
+# Given a head, a script reads the branch only from git's objects, by that id: never
+# HEAD, the index or a work tree, so no file on disk stands in for the commit and no
+# folder is searched for a repository. The objects folder is added to the repository's
+# own as an alternate (GIT_ALTERNATE_OBJECT_DIRECTORIES) for each git call: its objects
+# become readable and nothing else of its repository is read, neither refs, config nor
+# hooks. Without it, the head must already be in the repository.
+#
+# explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
+#   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
+#   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
+# explicit_head_env - exports the objects folder for git. Call it in the subshell that
+#   runs git, after any inherited GIT_* variable was dropped.
+# explicit_head_names_head <rev> - true for a spelling of HEAD (\`HEAD\`, \`@\`, either
+#   followed by \`~\` or \`^\`), which a script given a head must not read.
+
+EXPLICIT_HEAD="" EXPLICIT_OBJECTS="" EXPLICIT_REFUSAL=""
+
+explicit_head_take() {
+  local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  shift 2
+  EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
+  [[ \$sha =~ \$re ]] || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
+  if [ -n "\$objects" ]; then
+    case "\$objects" in
+      /* | [A-Za-z]:[/\\\\]*) ;;
+      *) EXPLICIT_REFUSAL="not an absolute path: \$objects"; return 2 ;;
+    esac
+    [ -d "\$objects" ] || { EXPLICIT_REFUSAL="not a folder: \$objects"; return 2; }
+  fi
+  # A 40-digit id in a SHA-256 repository is a prefix: only an exact answer passes.
+  full="\$(EXPLICIT_OBJECTS="\$objects" && explicit_head_env &&
+    "\$@" rev-parse --verify --quiet --end-of-options "\$sha^{commit}" 2>/dev/null)"
+  [ "\$full" = "\$sha" ] || { EXPLICIT_REFUSAL="no commit \$sha in reach"; return 2; }
+  EXPLICIT_HEAD="\$sha" EXPLICIT_OBJECTS="\$objects" EXPLICIT_REFUSAL=""
+}
+
+explicit_head_env() {
+  [ -z "\$EXPLICIT_OBJECTS" ] || export GIT_ALTERNATE_OBJECT_DIRECTORIES="\$EXPLICIT_OBJECTS"
+}
+
+explicit_head_names_head() {
+  local re='^(HEAD|@)([~^].*)?\$'
+  [[ \$1 =~ \$re ]]
 }
 `,
     executable: true,
@@ -31974,6 +32054,9 @@ load_report() {
 #
 #   size-ratchet.sh [--report]                  staged changes (pre-commit)
 #   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
+#   size-ratchet.sh --since <ref> --head <sha> [--objects <dir>] [--report]
+#                                               <ref> → <sha>, read from objects
+#                                               only (_explicit_head.sh)
 #
 # Reads the \`file\` and \`constitution\` units and the \`exempt:\` globs of
 # \`.specnaut/size-limits.yml\` through \`_config.sh\` beside it. A unit the file
@@ -32020,21 +32103,26 @@ load_report() {
 #       usage error
 set -uo pipefail
 
-usage() { echo "usage: size-ratchet.sh [--since <ref>] [--report]" >&2; exit 3; }
+usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
 
-SINCE="" REPORT=0
+SINCE="" REPORT=0 HEAD_SHA="" OBJECTS=""
 while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
+    --head) [ -n "\${2:-}" ] || usage; HEAD_SHA="\$2"; shift 2 ;;
+    --objects) [ -n "\${2:-}" ] || usage; OBJECTS="\$2"; shift 2 ;;
     --report) REPORT=1; shift ;;
     *) usage ;;
   esac
 done
+# A head is judged against an explicit base, and objects belong to a head.
+if { [ -n "\$HEAD_SHA" ] && [ -z "\$SINCE" ]; } || { [ -n "\$OBJECTS" ] && [ -z "\$HEAD_SHA" ]; }; then usage; fi
 
 # Sourced before the \`cd\` below: the script's own directory may be relative.
-# shellcheck source=SCRIPTDIR/_config.sh
-. "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_config.sh" || {
-  echo "size-ratchet: _config.sh is missing beside the script" >&2
+here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
+{ . "\$here/_config.sh" && . "\$here/_explicit_head.sh"; } || {
+  echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
   exit 3
 }
 
@@ -32043,6 +32131,10 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
   exit 3
 }
 cd -- "\$REPO_ROOT" || exit 3
+if [ -n "\$HEAD_SHA" ]; then
+  explicit_head_take "\$HEAD_SHA" "\$OBJECTS" git || { echo "size-ratchet: --head: \$EXPLICIT_REFUSAL" >&2; exit 3; }
+  explicit_head_env
+fi
 if [ -n "\$SINCE" ] && ! git rev-parse --verify -q "\$SINCE^{commit}" >/dev/null; then
   echo "size-ratchet: not a commit: \$SINCE" >&2
   exit 3
@@ -32091,7 +32183,9 @@ default_branch_base() {
 # --- walk the changed files ---------------------------------------------------
 # \`:0:\` is the index entry; a bare \`:\` would read a name like \`1:x\` as stage 1.
 if [ -n "\$SINCE" ]; then
-  base="\$SINCE" head_prefix="HEAD:" diff_args=("\$SINCE" HEAD) scope="changed since \$SINCE"
+  tip="\${EXPLICIT_HEAD:-HEAD}"
+  base="\$SINCE" head_prefix="\$tip:" diff_args=("\$SINCE" "\$tip")
+  scope="changed since \$SINCE\${EXPLICIT_HEAD:+ up to \$EXPLICIT_HEAD}"
 elif git rev-parse --verify -q HEAD >/dev/null; then
   base="\$(default_branch_base || git rev-parse HEAD)"
   head_prefix=":0:" diff_args=(--cached "\$base") scope="staged"
@@ -32182,7 +32276,9 @@ exit 0
     content: `#!/usr/bin/env bash
 # Hold the project's domain paths free of the imports it forbids.
 #
-#   boundary-check.sh
+#   boundary-check.sh                                  the index and the work tree
+#   boundary-check.sh --head <sha> [--objects <dir>]   that commit, from git's
+#                                                      objects only (_explicit_head.sh)
 #
 # Reads three flat lists from \`.specnaut/boundaries.yml\`, through \`_config.sh\`
 # beside it (the grammar is stated there):
@@ -32200,6 +32296,7 @@ exit 0
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
 # the work tree, could point anywhere on the disk. Binary files are skipped.
+# Given a head, its tree is listed and each blob read by id: no work tree file is.
 #
 # Exit codes — a skip is never a pass, and neither is a check that broke:
 #   0   every tracked file under \`domain:\` was checked and none matches
@@ -32207,7 +32304,7 @@ exit 0
 #   2   the check could not run: the config is unreadable or holds a pattern
 #       that does not compile, a \`domain:\` path git cannot list (outside the
 #       repo), a file grep cannot read, not a git work tree, \`_config.sh\`
-#       missing, or an argument (the script takes none)
+#       missing, an unknown argument, or a --head git cannot read as a commit
 #   4   skipped, with the reason on stdout: no config, no \`forbid:\` patterns,
 #       no \`domain:\` paths, or no file left to check under them
 set -uo pipefail
@@ -32216,15 +32313,29 @@ NAME=boundary-check
 fail() { echo "\$NAME: \$*" >&2; exit 2; }
 skip() { echo "\$NAME: skipped — \$*"; exit 4; }
 
-[ "\$#" -eq 0 ] || fail "usage: boundary-check.sh (it takes no arguments)"
+usage() { fail "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"; }
+HEAD_SHA="" OBJECTS=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --head) [ -n "\${2:-}" ] || usage; HEAD_SHA="\$2"; shift 2 ;;
+    --objects) [ -n "\${2:-}" ] || usage; OBJECTS="\$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -z "\$OBJECTS" ] || [ -n "\$HEAD_SHA" ] || usage
 
 # Sourced before the \`cd\` below: the script's own directory may be relative.
-# shellcheck source=SCRIPTDIR/_config.sh
-. "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_config.sh" ||
-  fail "_config.sh is missing beside the script"
+here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
+{ . "\$here/_config.sh" && . "\$here/_explicit_head.sh"; } ||
+  fail "_config.sh or _explicit_head.sh is missing beside the script"
 
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "\$REPO_ROOT" || fail "cannot enter \$REPO_ROOT"
+if [ -n "\$HEAD_SHA" ]; then
+  explicit_head_take "\$HEAD_SHA" "\$OBJECTS" git || fail "--head: \$EXPLICIT_REFUSAL"
+  explicit_head_env
+fi
 
 config_present "\$CONFIG_BOUNDARIES" || skip "no \$CONFIG_BOUNDARIES"
 # Captured before it is split, so its exit 2 is seen.
@@ -32256,24 +32367,35 @@ is_exempt() { config_exempt "\$1" \${exempt[@]+"\${exempt[@]}"}; }
 # \`ls-files -z\` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.
 listing="\$(mktemp "\${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary file"
-trap 'rm -f -- "\$listing"' EXIT
+blob="\$listing.blob"
+trap 'rm -f -- "\$listing" "\$blob"' EXIT
 
-files=() tracked=0
+list_domain() {
+  if [ -n "\$EXPLICIT_HEAD" ]; then
+    git -c core.quotePath=false ls-tree -r -z --end-of-options "\$EXPLICIT_HEAD" -- "\$1"
+  else
+    git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "\$1"
+  fi
+}
+
+files=() objects=() tracked=0
 for i in "\${!domains[@]}"; do
   domain="\${domains[\$i]}"
-  err="\$(git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "\$domain" 2>&1 >"\$listing")" ||
+  err="\$(list_domain "\$domain" 2>&1 >"\$listing")" ||
     fail "\$CONFIG_BOUNDARIES: line \${domain_lines[\$i]}: domain: '\$domain' cannot be listed — \${err%%\$'\\n'*}"
   found=0 prev=""
-  # Each record: \`<mode> <object> <stage>\\t<path>\`. A conflicted path comes
-  # once per stage, adjacent; it is checked once.
+  # Each record: \`<mode> <object> <stage>\\t<path>\`, or \`<mode> blob <object>\\t<path>\`
+  # from a head's tree, whose last field is the object. A conflicted path comes once
+  # per stage, adjacent; it is checked once.
   while IFS= read -r -d '' rec; do
     path="\${rec#*\$'\\t'}"
     [ "\$path" != "\$prev" ] || continue
     prev="\$path"
     case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=\$((tracked + 1))
-    [ -L "\$path" ] && continue
-    is_exempt "\$path" || files+=("\$path")
+    if [ -z "\$EXPLICIT_HEAD" ] && [ -L "\$path" ]; then continue; fi
+    meta="\${rec%%\$'\\t'*}"
+    is_exempt "\$path" || { files+=("\$path") && objects+=("\${meta##* }"); }
   done <"\$listing"
   [ "\$found" = 1 ] || echo "  note: domain: '\$domain' (line \${domain_lines[\$i]}) names no tracked file"
 done
@@ -32284,16 +32406,22 @@ done
 grep_args=()
 for pat in "\${patterns[@]}"; do grep_args+=(-e "\$pat"); done
 
+# A head's file is its blob, written out by id; the work tree's is read in place.
 violations=()
-for file in "\${files[@]}"; do
+for i in "\${!files[@]}"; do
+  file="\${files[\$i]}" src="\${files[\$i]}"
+  if [ -n "\$EXPLICIT_HEAD" ]; then
+    git cat-file blob "\${objects[\$i]}" >"\$blob" || fail "\$file: git could not read its blob"
+    src="\$blob"
+  fi
   # One pass with every pattern; only a file that matches is read again, per
   # pattern, to say which one.
-  grep -E -I -q "\${grep_args[@]}" -- "\$file"
+  grep -E -I -q "\${grep_args[@]}" -- "\$src"
   status=\$?
   [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
   [ "\$status" = 0 ] || continue
   for pat in "\${patterns[@]}"; do
-    hits="\$(grep -E -I -n -e "\$pat" -- "\$file")"
+    hits="\$(grep -E -I -n -e "\$pat" -- "\$src")"
     status=\$?
     [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
     while IFS= read -r hit; do
@@ -32352,18 +32480,17 @@ exit 0
 # that source this file, never for an argv someone else composed.
 
 _gu_here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$_gu_here/_scope_globs.sh" ] ||
-  { echo "git-read: \$_gu_here/_scope_globs.sh is missing" >&2 && return 70; }
-# shellcheck source=SCRIPTDIR/_scope_globs.sh
-. "\$_gu_here/_scope_globs.sh"
+[ -f "\$_gu_here/_scope_globs.sh" ] && [ -f "\$_gu_here/_explicit_head.sh" ] ||
+  { echo "git-read: _scope_globs.sh or _explicit_head.sh is missing from \$_gu_here" >&2 && return 70; }
+# shellcheck source=SCRIPTDIR/_scope_globs.sh disable=SC1091
+. "\$_gu_here/_scope_globs.sh" && . "\$_gu_here/_explicit_head.sh"
 
 # A revision: ref-name characters only, the whole string, never an option or a
 # range. \`+\` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
 _gu_rev() {
   local re='^[A-Za-z0-9._/@^~+-]+\$'
-  case "\$1" in
-    -* | *..*) return 1 ;;
-  esac
+  case "\$1" in -* | *..*) return 1 ;; esac
+  [ -z "\$EXPLICIT_HEAD" ] || ! explicit_head_names_head "\$1" || return 1
   [[ "\$1" =~ \$re ]]
 }
 
@@ -32387,7 +32514,7 @@ _gu_path() {
 _gu_count() { local re='^[1-9][0-9]*\$' && [[ "\$1" =~ \$re ]]; }
 
 _gu_refuse() { echo "git-read: refused: \$1" >&2 && return 2; }
-_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision: \$1"; }
+_gu_need_rev() { _gu_rev "\$1" || _gu_refuse "not a revision\${EXPLICIT_HEAD:+ (HEAD is not read given a head)}: \$1"; }
 
 _gu_need_paths() {
   local p
@@ -32416,7 +32543,7 @@ _gu_env_run() (
   for name in \$(compgen -e); do
     case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
   done
-  export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   command git "\$@"
 )
@@ -32479,7 +32606,8 @@ gu_show() {
 gu_files() {
   [ \$# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "\$@" || return 2
-  _gu_git ls-files -- "\$@"
+  [ -n "\$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "\$@"; return; }
+  _gu_git ls-tree -r --name-only --end-of-options "\$EXPLICIT_HEAD" -- "\$@"
 }
 
 gu_grep() {
@@ -32494,7 +32622,7 @@ gu_grep() {
 gu_base() {
   [ \$# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "\$1" || return 2
-  _gu_git merge-base --end-of-options HEAD "\$1"
+  _gu_git merge-base --end-of-options "\${EXPLICIT_HEAD:-HEAD}" "\$1"
 }
 
 # The patch of every changed file _scope_globs.sh counts as a manifest, in a new
@@ -32518,6 +32646,71 @@ gu_manifests() {
   fi
   [ "\$rc" -eq 0 ] || { rm -f "\$out" && return "\$rc"; }
   printf 'MANIFESTS_FILE: %s\\nMANIFESTS: %s\\n' "\$out" "\${#picked[@]}"
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_explicit_head.sh",
+    content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: EXPLICIT_* are read by the sourcing script.)
+# _explicit_head.sh - the one home of an explicit head: the commit a script is told to
+# judge, by its full id, in place of HEAD. Sourced, never run, by size-ratchet.sh,
+# boundary-check.sh and _git_untrusted.sh (git-read.sh, collect-audit-scope.sh).
+#
+#   --head <sha>      a full commit id: 40 or 64 lowercase hex digits, the object
+#                     format's own length, so no ref name, revision expression or
+#                     option can be spelled with it
+#   --objects <dir>   an absolute git objects folder holding that commit, such as the
+#                     one of a repository a single branch was fetched into
+#
+# Given a head, a script reads the branch only from git's objects, by that id: never
+# HEAD, the index or a work tree, so no file on disk stands in for the commit and no
+# folder is searched for a repository. The objects folder is added to the repository's
+# own as an alternate (GIT_ALTERNATE_OBJECT_DIRECTORIES) for each git call: its objects
+# become readable and nothing else of its repository is read, neither refs, config nor
+# hooks. Without it, the head must already be in the repository.
+#
+# explicit_head_take <sha> <objects or ""> <git...> - checks both, then that <git...>
+#   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
+#   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
+# explicit_head_env - exports the objects folder for git. Call it in the subshell that
+#   runs git, after any inherited GIT_* variable was dropped.
+# explicit_head_names_head <rev> - true for a spelling of HEAD (\`HEAD\`, \`@\`, either
+#   followed by \`~\` or \`^\`), which a script given a head must not read.
+
+EXPLICIT_HEAD="" EXPLICIT_OBJECTS="" EXPLICIT_REFUSAL=""
+
+explicit_head_take() {
+  local sha="\$1" objects="\$2" full re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  shift 2
+  EXPLICIT_HEAD="" EXPLICIT_OBJECTS=""
+  [[ \$sha =~ \$re ]] || { EXPLICIT_REFUSAL="not a full commit id: \$sha"; return 2; }
+  if [ -n "\$objects" ]; then
+    case "\$objects" in
+      /* | [A-Za-z]:[/\\\\]*) ;;
+      *) EXPLICIT_REFUSAL="not an absolute path: \$objects"; return 2 ;;
+    esac
+    [ -d "\$objects" ] || { EXPLICIT_REFUSAL="not a folder: \$objects"; return 2; }
+  fi
+  # A 40-digit id in a SHA-256 repository is a prefix: only an exact answer passes.
+  full="\$(EXPLICIT_OBJECTS="\$objects" && explicit_head_env &&
+    "\$@" rev-parse --verify --quiet --end-of-options "\$sha^{commit}" 2>/dev/null)"
+  [ "\$full" = "\$sha" ] || { EXPLICIT_REFUSAL="no commit \$sha in reach"; return 2; }
+  EXPLICIT_HEAD="\$sha" EXPLICIT_OBJECTS="\$objects" EXPLICIT_REFUSAL=""
+}
+
+explicit_head_env() {
+  [ -z "\$EXPLICIT_OBJECTS" ] || export GIT_ALTERNATE_OBJECT_DIRECTORIES="\$EXPLICIT_OBJECTS"
+}
+
+explicit_head_names_head() {
+  local re='^(HEAD|@)([~^].*)?\$'
+  [[ \$1 =~ \$re ]]
 }
 `,
     executable: true,
@@ -32587,7 +32780,8 @@ EOF
     name: "specify",
     suffix: "scripts/bash/git-read.sh",
     content: `#!/usr/bin/env bash
-# git-read.sh <form> <args...> - read a repository through the git library with
+# git-read.sh [--head <sha> [--objects <dir>]] <form> <args...> - read a repository
+# through the git library with
 # hardened defaults (_git_untrusted.sh, beside this file). The phases run their
 # git reads here, so no program the repository's configuration names runs.
 #
@@ -32595,6 +32789,9 @@ EOF
 #   names <a> <b>  |  patch <a> <b> [<path>...]  |  log <a>..<b> | <rev> [<n>]
 #   show <rev> --stat|--no-patch  |  files [<path>]  |  grep <pattern> <rev> [<path>...]
 #   base <rev>  |  manifests <a> <b>
+#
+# Given --head, every form reads that commit from git's objects (_explicit_head.sh):
+# \`files\` lists its tree, \`base\` starts from it, and no revision may spell HEAD.
 #
 # Exit: git's own status for a form that ran; 2 for a refused form or argument;
 # 70 when the library is missing.
@@ -32608,6 +32805,21 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "\$here/_git_untrusted.sh" || exit 70
 
+head="" objects=""
+while [ \$# -ge 2 ]; do
+  case "\$1" in
+    --head) head="\$2" ;;
+    --objects) objects="\$2" ;;
+    *) break ;;
+  esac
+  shift 2
+done
+if [ -n "\$head\$objects" ]; then
+  [ -n "\$head" ] || { echo "git-read: refused: --objects needs --head" >&2; exit 2; }
+  explicit_head_take "\$head" "\$objects" _gu_git ||
+    { echo "git-read: refused: --head: \$EXPLICIT_REFUSAL" >&2; exit 2; }
+fi
+
 form="\${1:-}"
 [ \$# -gt 0 ] && shift
 case "\$form" in
@@ -32620,7 +32832,7 @@ case "\$form" in
   base) gu_base "\$@" ;;
   manifests) gu_manifests "\$@" ;;
   *)
-    echo "usage: git-read.sh names|patch|log|show|files|grep|base|manifests <args...>" >&2
+    echo "usage: git-read.sh [--head <sha> [--objects <dir>]] names|patch|log|show|files|grep|base|manifests <args...>" >&2
     exit 2
     ;;
 esac

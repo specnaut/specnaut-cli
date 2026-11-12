@@ -1162,6 +1162,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/audit/_explicit_head.sh",
+      "source": "core/specnaut/scripts/bash/_explicit_head.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/audit/_scope_globs.sh",
       "source": "core/specnaut/scripts/bash/_scope_globs.sh",
       "executable": true
@@ -2320,6 +2327,13 @@
       "name": "specify",
       "suffix": "scripts/bash/_git_untrusted.sh",
       "source": "core/specnaut/scripts/bash/_git_untrusted.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_explicit_head.sh",
+      "source": "core/specnaut/scripts/bash/_explicit_head.sh",
       "executable": true
     },
     {

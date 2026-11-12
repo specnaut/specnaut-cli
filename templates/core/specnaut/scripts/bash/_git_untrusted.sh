@@ -31,18 +31,17 @@
 # that source this file, never for an argv someone else composed.
 
 _gu_here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-[ -f "$_gu_here/_scope_globs.sh" ] ||
-  { echo "git-read: $_gu_here/_scope_globs.sh is missing" >&2 && return 70; }
-# shellcheck source=SCRIPTDIR/_scope_globs.sh
-. "$_gu_here/_scope_globs.sh"
+[ -f "$_gu_here/_scope_globs.sh" ] && [ -f "$_gu_here/_explicit_head.sh" ] ||
+  { echo "git-read: _scope_globs.sh or _explicit_head.sh is missing from $_gu_here" >&2 && return 70; }
+# shellcheck source=SCRIPTDIR/_scope_globs.sh disable=SC1091
+. "$_gu_here/_scope_globs.sh" && . "$_gu_here/_explicit_head.sh"
 
 # A revision: ref-name characters only, the whole string, never an option or a
 # range. `+` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
 _gu_rev() {
   local re='^[A-Za-z0-9._/@^~+-]+$'
-  case "$1" in
-    -* | *..*) return 1 ;;
-  esac
+  case "$1" in -* | *..*) return 1 ;; esac
+  [ -z "$EXPLICIT_HEAD" ] || ! explicit_head_names_head "$1" || return 1
   [[ "$1" =~ $re ]]
 }
 
@@ -66,7 +65,7 @@ _gu_path() {
 _gu_count() { local re='^[1-9][0-9]*$' && [[ "$1" =~ $re ]]; }
 
 _gu_refuse() { echo "git-read: refused: $1" >&2 && return 2; }
-_gu_need_rev() { _gu_rev "$1" || _gu_refuse "not a revision: $1"; }
+_gu_need_rev() { _gu_rev "$1" || _gu_refuse "not a revision${EXPLICIT_HEAD:+ (HEAD is not read given a head)}: $1"; }
 
 _gu_need_paths() {
   local p
@@ -95,7 +94,7 @@ _gu_env_run() (
   for name in $(compgen -e); do
     case "$name" in GIT_*) unset "$name" 2>/dev/null || true ;; esac
   done
-  export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   command git "$@"
 )
@@ -158,7 +157,8 @@ gu_show() {
 gu_files() {
   [ $# -le 1 ] || { _gu_refuse "files takes [<path>]"; return 2; }
   _gu_need_paths "$@" || return 2
-  _gu_git ls-files -- "$@"
+  [ -n "$EXPLICIT_HEAD" ] || { _gu_git ls-files -- "$@"; return; }
+  _gu_git ls-tree -r --name-only --end-of-options "$EXPLICIT_HEAD" -- "$@"
 }
 
 gu_grep() {
@@ -173,7 +173,7 @@ gu_grep() {
 gu_base() {
   [ $# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "$1" || return 2
-  _gu_git merge-base --end-of-options HEAD "$1"
+  _gu_git merge-base --end-of-options "${EXPLICIT_HEAD:-HEAD}" "$1"
 }
 
 # The patch of every changed file _scope_globs.sh counts as a manifest, in a new

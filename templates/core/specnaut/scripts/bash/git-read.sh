@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# git-read.sh <form> <args...> - read a repository through the git library with
+# git-read.sh [--head <sha> [--objects <dir>]] <form> <args...> - read a repository
+# through the git library with
 # hardened defaults (_git_untrusted.sh, beside this file). The phases run their
 # git reads here, so no program the repository's configuration names runs.
 #
@@ -7,6 +8,9 @@
 #   names <a> <b>  |  patch <a> <b> [<path>...]  |  log <a>..<b> | <rev> [<n>]
 #   show <rev> --stat|--no-patch  |  files [<path>]  |  grep <pattern> <rev> [<path>...]
 #   base <rev>  |  manifests <a> <b>
+#
+# Given --head, every form reads that commit from git's objects (_explicit_head.sh):
+# `files` lists its tree, `base` starts from it, and no revision may spell HEAD.
 #
 # Exit: git's own status for a form that ran; 2 for a refused form or argument;
 # 70 when the library is missing.
@@ -20,6 +24,21 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "$here/_git_untrusted.sh" || exit 70
 
+head="" objects=""
+while [ $# -ge 2 ]; do
+  case "$1" in
+    --head) head="$2" ;;
+    --objects) objects="$2" ;;
+    *) break ;;
+  esac
+  shift 2
+done
+if [ -n "$head$objects" ]; then
+  [ -n "$head" ] || { echo "git-read: refused: --objects needs --head" >&2; exit 2; }
+  explicit_head_take "$head" "$objects" _gu_git ||
+    { echo "git-read: refused: --head: $EXPLICIT_REFUSAL" >&2; exit 2; }
+fi
+
 form="${1:-}"
 [ $# -gt 0 ] && shift
 case "$form" in
@@ -32,7 +51,7 @@ case "$form" in
   base) gu_base "$@" ;;
   manifests) gu_manifests "$@" ;;
   *)
-    echo "usage: git-read.sh names|patch|log|show|files|grep|base|manifests <args...>" >&2
+    echo "usage: git-read.sh [--head <sha> [--objects <dir>]] names|patch|log|show|files|grep|base|manifests <args...>" >&2
     exit 2
     ;;
 esac

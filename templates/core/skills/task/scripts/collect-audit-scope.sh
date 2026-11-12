@@ -16,6 +16,9 @@
 #   5. last-N               → HEAD~<N>..HEAD, N default 20, --last <n> overrides
 #                             (SCOPE: last-N)
 #
+# --head <sha> [--objects <dir>] puts that commit in HEAD's place, read from git's
+# objects only (_explicit_head.sh): --path lists its tree, and no range may name HEAD.
+#
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -26,9 +29,11 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PATH_ARG=""
 RANGE_ARG=""
 LAST_N=20
+HEAD_ARG=""
+OBJECTS_ARG=""
 
 usage() {
-  echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]" >&2
+  echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>] [--head <sha> [--objects <dir>]]" >&2
   # Known limitation: the --range allowlist excludes '{' '}', so no stash@{N}.
   echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
@@ -76,6 +81,11 @@ while [ $# -gt 0 ]; do
       fi
       shift 2
       ;;
+    --head | --objects)
+      [ -n "${2:-}" ] || { echo "error: $1 requires a value" >&2; usage; exit 2; }
+      if [ "$1" = --head ]; then HEAD_ARG="$2"; else OBJECTS_ARG="$2"; fi
+      shift 2
+      ;;
     *)
       echo "error: unknown argument: $1" >&2
       usage
@@ -89,6 +99,11 @@ if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
+if [ -n "$HEAD_ARG$OBJECTS_ARG" ]; then
+  [ -n "$HEAD_ARG" ] && explicit_head_take "$HEAD_ARG" "$OBJECTS_ARG" _gu_git ||
+    { echo "error: --head: ${EXPLICIT_REFUSAL:---objects needs --head}" >&2; exit 2; }
+fi
+TIP="${EXPLICIT_HEAD:-HEAD}"
 
 SCOPE=""
 SCOPE_LABEL=""
@@ -127,22 +142,22 @@ elif [ -n "$RANGE_ARG" ]; then
   FILES="$(scope_read gu_names "${RANGE_ARG%%..*}" "${RANGE_ARG#*..}")"
   COMMITS="$(scope_read gu_log "$RANGE_ARG")"
 elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  local_count="$(_gu_git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
+  local_count="$(_gu_git rev-list --count "origin/main..$TIP" 2>/dev/null || echo 0)" &&
   [ "$local_count" -gt 0 ]; then
   # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
-  SCOPE_LABEL="origin/main..HEAD (${local_count} commits)"
-  FILES="$(scope_read gu_names origin/main HEAD)"
-  COMMITS="$(scope_read gu_log origin/main..HEAD)"
-elif TAG="$(_gu_git describe --tags --abbrev=0 2>/dev/null)" && [ -n "$TAG" ]; then
+  SCOPE_LABEL="origin/main..$TIP (${local_count} commits)"
+  FILES="$(scope_read gu_names origin/main "$TIP")"
+  COMMITS="$(scope_read gu_log "origin/main..$TIP")"
+elif TAG="$(_gu_git describe --tags --abbrev=0 "$TIP" 2>/dev/null)" && [ -n "$TAG" ]; then
   SCOPE="since-tag"
-  SCOPE_LABEL="${TAG}..HEAD"
-  FILES="$(scope_read gu_names "$TAG" HEAD)"
-  COMMITS="$(scope_read gu_log "${TAG}..HEAD")"
+  SCOPE_LABEL="${TAG}..$TIP"
+  FILES="$(scope_read gu_names "$TAG" "$TIP")"
+  COMMITS="$(scope_read gu_log "${TAG}..$TIP")"
 else
   SCOPE="last-N"
   # Clamp N to the available history so HEAD~N never points before the root.
-  AVAIL="$(_gu_git rev-list --count HEAD 2>/dev/null || echo 1)"
+  AVAIL="$(_gu_git rev-list --count "$TIP" 2>/dev/null || echo 1)"
   N="$LAST_N"
   if [ "$N" -gt "$AVAIL" ]; then
     N="$AVAIL"
@@ -152,11 +167,11 @@ else
     # The window covers all of history; HEAD~N would precede the root, so diff
     # against the empty tree to surface every file the history touched.
     EMPTY_TREE="$(_gu_git hash-object -t tree /dev/null)"
-    FILES="$(scope_read gu_names "$EMPTY_TREE" HEAD)"
+    FILES="$(scope_read gu_names "$EMPTY_TREE" "$TIP")"
   else
-    FILES="$(scope_read gu_names "HEAD~${N}" HEAD)"
+    FILES="$(scope_read gu_names "$TIP~${N}" "$TIP")"
   fi
-  COMMITS="$(scope_read gu_log HEAD "$N")"
+  COMMITS="$(scope_read gu_log "$TIP" "$N")"
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.

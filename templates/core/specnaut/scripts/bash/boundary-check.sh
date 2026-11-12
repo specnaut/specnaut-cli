@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Hold the project's domain paths free of the imports it forbids.
 #
-#   boundary-check.sh
+#   boundary-check.sh                                  the index and the work tree
+#   boundary-check.sh --head <sha> [--objects <dir>]   that commit, from git's
+#                                                      objects only (_explicit_head.sh)
 #
 # Reads three flat lists from `.specnaut/boundaries.yml`, through `_config.sh`
 # beside it (the grammar is stated there):
@@ -19,6 +21,7 @@
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
 # the work tree, could point anywhere on the disk. Binary files are skipped.
+# Given a head, its tree is listed and each blob read by id: no work tree file is.
 #
 # Exit codes — a skip is never a pass, and neither is a check that broke:
 #   0   every tracked file under `domain:` was checked and none matches
@@ -26,7 +29,7 @@
 #   2   the check could not run: the config is unreadable or holds a pattern
 #       that does not compile, a `domain:` path git cannot list (outside the
 #       repo), a file grep cannot read, not a git work tree, `_config.sh`
-#       missing, or an argument (the script takes none)
+#       missing, an unknown argument, or a --head git cannot read as a commit
 #   4   skipped, with the reason on stdout: no config, no `forbid:` patterns,
 #       no `domain:` paths, or no file left to check under them
 set -uo pipefail
@@ -35,15 +38,29 @@ NAME=boundary-check
 fail() { echo "$NAME: $*" >&2; exit 2; }
 skip() { echo "$NAME: skipped — $*"; exit 4; }
 
-[ "$#" -eq 0 ] || fail "usage: boundary-check.sh (it takes no arguments)"
+usage() { fail "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"; }
+HEAD_SHA="" OBJECTS=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --head) [ -n "${2:-}" ] || usage; HEAD_SHA="$2"; shift 2 ;;
+    --objects) [ -n "${2:-}" ] || usage; OBJECTS="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -z "$OBJECTS" ] || [ -n "$HEAD_SHA" ] || usage
 
 # Sourced before the `cd` below: the script's own directory may be relative.
-# shellcheck source=SCRIPTDIR/_config.sh
-. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_config.sh" ||
-  fail "_config.sh is missing beside the script"
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
+{ . "$here/_config.sh" && . "$here/_explicit_head.sh"; } ||
+  fail "_config.sh or _explicit_head.sh is missing beside the script"
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
 cd -- "$REPO_ROOT" || fail "cannot enter $REPO_ROOT"
+if [ -n "$HEAD_SHA" ]; then
+  explicit_head_take "$HEAD_SHA" "$OBJECTS" git || fail "--head: $EXPLICIT_REFUSAL"
+  explicit_head_env
+fi
 
 config_present "$CONFIG_BOUNDARIES" || skip "no $CONFIG_BOUNDARIES"
 # Captured before it is split, so its exit 2 is seen.
@@ -75,24 +92,35 @@ is_exempt() { config_exempt "$1" ${exempt[@]+"${exempt[@]}"}; }
 # `ls-files -z` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.
 listing="$(mktemp "${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary file"
-trap 'rm -f -- "$listing"' EXIT
+blob="$listing.blob"
+trap 'rm -f -- "$listing" "$blob"' EXIT
 
-files=() tracked=0
+list_domain() {
+  if [ -n "$EXPLICIT_HEAD" ]; then
+    git -c core.quotePath=false ls-tree -r -z --end-of-options "$EXPLICIT_HEAD" -- "$1"
+  else
+    git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "$1"
+  fi
+}
+
+files=() objects=() tracked=0
 for i in "${!domains[@]}"; do
   domain="${domains[$i]}"
-  err="$(git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "$domain" 2>&1 >"$listing")" ||
+  err="$(list_domain "$domain" 2>&1 >"$listing")" ||
     fail "$CONFIG_BOUNDARIES: line ${domain_lines[$i]}: domain: '$domain' cannot be listed — ${err%%$'\n'*}"
   found=0 prev=""
-  # Each record: `<mode> <object> <stage>\t<path>`. A conflicted path comes
-  # once per stage, adjacent; it is checked once.
+  # Each record: `<mode> <object> <stage>\t<path>`, or `<mode> blob <object>\t<path>`
+  # from a head's tree, whose last field is the object. A conflicted path comes once
+  # per stage, adjacent; it is checked once.
   while IFS= read -r -d '' rec; do
     path="${rec#*$'\t'}"
     [ "$path" != "$prev" ] || continue
     prev="$path"
     case "${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=$((tracked + 1))
-    [ -L "$path" ] && continue
-    is_exempt "$path" || files+=("$path")
+    if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
+    meta="${rec%%$'\t'*}"
+    is_exempt "$path" || { files+=("$path") && objects+=("${meta##* }"); }
   done <"$listing"
   [ "$found" = 1 ] || echo "  note: domain: '$domain' (line ${domain_lines[$i]}) names no tracked file"
 done
@@ -103,16 +131,22 @@ done
 grep_args=()
 for pat in "${patterns[@]}"; do grep_args+=(-e "$pat"); done
 
+# A head's file is its blob, written out by id; the work tree's is read in place.
 violations=()
-for file in "${files[@]}"; do
+for i in "${!files[@]}"; do
+  file="${files[$i]}" src="${files[$i]}"
+  if [ -n "$EXPLICIT_HEAD" ]; then
+    git cat-file blob "${objects[$i]}" >"$blob" || fail "$file: git could not read its blob"
+    src="$blob"
+  fi
   # One pass with every pattern; only a file that matches is read again, per
   # pattern, to say which one.
-  grep -E -I -q "${grep_args[@]}" -- "$file"
+  grep -E -I -q "${grep_args[@]}" -- "$src"
   status=$?
   [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
   [ "$status" = 0 ] || continue
   for pat in "${patterns[@]}"; do
-    hits="$(grep -E -I -n -e "$pat" -- "$file")"
+    hits="$(grep -E -I -n -e "$pat" -- "$src")"
     status=$?
     [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
     while IFS= read -r hit; do

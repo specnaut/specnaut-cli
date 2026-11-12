@@ -3,6 +3,9 @@
 #
 #   size-ratchet.sh [--report]                  staged changes (pre-commit)
 #   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
+#   size-ratchet.sh --since <ref> --head <sha> [--objects <dir>] [--report]
+#                                               <ref> → <sha>, read from objects
+#                                               only (_explicit_head.sh)
 #
 # Reads the `file` and `constitution` units and the `exempt:` globs of
 # `.specnaut/size-limits.yml` through `_config.sh` beside it. A unit the file
@@ -49,21 +52,26 @@
 #       usage error
 set -uo pipefail
 
-usage() { echo "usage: size-ratchet.sh [--since <ref>] [--report]" >&2; exit 3; }
+usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
 
-SINCE="" REPORT=0
+SINCE="" REPORT=0 HEAD_SHA="" OBJECTS=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
+    --head) [ -n "${2:-}" ] || usage; HEAD_SHA="$2"; shift 2 ;;
+    --objects) [ -n "${2:-}" ] || usage; OBJECTS="$2"; shift 2 ;;
     --report) REPORT=1; shift ;;
     *) usage ;;
   esac
 done
+# A head is judged against an explicit base, and objects belong to a head.
+if { [ -n "$HEAD_SHA" ] && [ -z "$SINCE" ]; } || { [ -n "$OBJECTS" ] && [ -z "$HEAD_SHA" ]; }; then usage; fi
 
 # Sourced before the `cd` below: the script's own directory may be relative.
-# shellcheck source=SCRIPTDIR/_config.sh
-. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_config.sh" || {
-  echo "size-ratchet: _config.sh is missing beside the script" >&2
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
+{ . "$here/_config.sh" && . "$here/_explicit_head.sh"; } || {
+  echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
   exit 3
 }
 
@@ -72,6 +80,10 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   exit 3
 }
 cd -- "$REPO_ROOT" || exit 3
+if [ -n "$HEAD_SHA" ]; then
+  explicit_head_take "$HEAD_SHA" "$OBJECTS" git || { echo "size-ratchet: --head: $EXPLICIT_REFUSAL" >&2; exit 3; }
+  explicit_head_env
+fi
 if [ -n "$SINCE" ] && ! git rev-parse --verify -q "$SINCE^{commit}" >/dev/null; then
   echo "size-ratchet: not a commit: $SINCE" >&2
   exit 3
@@ -120,7 +132,9 @@ default_branch_base() {
 # --- walk the changed files ---------------------------------------------------
 # `:0:` is the index entry; a bare `:` would read a name like `1:x` as stage 1.
 if [ -n "$SINCE" ]; then
-  base="$SINCE" head_prefix="HEAD:" diff_args=("$SINCE" HEAD) scope="changed since $SINCE"
+  tip="${EXPLICIT_HEAD:-HEAD}"
+  base="$SINCE" head_prefix="$tip:" diff_args=("$SINCE" "$tip")
+  scope="changed since $SINCE${EXPLICIT_HEAD:+ up to $EXPLICIT_HEAD}"
 elif git rev-parse --verify -q HEAD >/dev/null; then
   base="$(default_branch_base || git rev-parse HEAD)"
   head_prefix=":0:" diff_args=(--cached "$base") scope="staged"
