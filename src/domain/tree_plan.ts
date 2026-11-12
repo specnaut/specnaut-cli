@@ -77,6 +77,9 @@ export class TreePlanner {
 
   /** Counts object bytes about to be read against the byte cap. */
   charge(bytes: number): void {
+    if (!Number.isFinite(bytes) || bytes < 0) {
+      throw new TreeRefused([`an object size that is not a byte count: ${bytes}`]);
+    }
     this.#bytes += bytes;
     if (this.#bytes > this.caps.bytes) {
       throw new TreeRefused([`the tree holds more than ${this.caps.bytes} bytes`]);

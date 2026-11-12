@@ -143,6 +143,14 @@ Deno.test("the byte cap counts every charge and refuses past it", () => {
   assertEquals(refusal(() => p.charge(1)), ["the tree holds more than 10 bytes"]);
 });
 
+Deno.test("a size that is not a byte count is refused, not added", () => {
+  for (const bad of [NaN, -1, Infinity]) {
+    assertEquals(refusal(() => planner().charge(bad)), [
+      `an object size that is not a byte count: ${bad}`,
+    ]);
+  }
+});
+
 Deno.test("the defaults are bounded", () => {
   const caps = DEFAULT_TREE_CAPS;
   assertEquals(caps.entries <= 100_000 && caps.depth <= 32 && caps.pathBytes <= 1024, true);

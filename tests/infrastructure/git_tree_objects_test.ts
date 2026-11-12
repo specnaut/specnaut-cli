@@ -39,3 +39,17 @@ Deno.test("an object of the wrong type or a missing one is refused", async () =>
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("an id git answers under another spelling is refused, never left unread", async () => {
+  const dir = await tempDir("objects-");
+  try {
+    const repo = await initRepo(dir);
+    const id = await blob(repo, "x");
+    const objects = new GitTreeObjects(join(repo, ".git"));
+    const short = id.slice(0, 12);
+    await assertRejects(() => objects.sizes([short], "blob"), ExportRefused, "not read back");
+    await assertRejects(() => objects.readBlobs([short]), ExportRefused, "not read back");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

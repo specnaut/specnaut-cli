@@ -37,7 +37,7 @@ export class GitTreeObjects implements TreeObjects {
       }
       sizes.set(id, Number(size));
     }
-    return sizes;
+    return allRead(ids, sizes);
   }
 
   async readTrees(ids: readonly string[]): Promise<Map<string, TreeEntry[]>> {
@@ -68,8 +68,18 @@ export class GitTreeObjects implements TreeObjects {
       found.set(id, out.slice(start, start + Number(size)));
       at = start + Number(size) + 1;
     }
-    return found;
+    return allRead(ids, found);
   }
+}
+
+/**
+ * The answers, once each id asked for is among them: git names an object by its full id, so an id
+ * it resolved to another spelling, or one it never answered, is refused rather than left undefined.
+ */
+function allRead<T>(ids: readonly string[], found: Map<string, T>): Map<string, T> {
+  const missing = ids.find((id) => !found.has(id));
+  if (missing !== undefined) throw new ExportRefused(`${missing} was not read back by git`);
+  return found;
 }
 
 /**
