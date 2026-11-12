@@ -35,6 +35,14 @@ export function isSessionId(id: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id);
 }
 
+/**
+ * How long another session's record is kept: a write removes the folder's records older than this,
+ * so no stale record is left for a later session to be pointed at. Thirty days is Claude Code's
+ * default `cleanupPeriodDays`, past which a session's transcript, and with it any resume, is gone.
+ * A session resumed past it finds no record and takes a new one of the checkout as it is then.
+ */
+export const RECORD_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 /** The variable that names the record to the session's later commands, set through `CLAUDE_ENV_FILE`. */
 export const SESSION_RECORD_VAR = "SPECNAUT_SESSION_RECORD";
 
