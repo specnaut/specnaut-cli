@@ -94,30 +94,13 @@ while read -r unit rest; do
   esac
 done <<<"$limits"
 
-# Specnaut's own files: the lock's entries, two-space indented keys under `entries:`.
-managed=""
-if [ -f "$LOCK" ]; then
-  managed="$(awk '
-    /^entries:/ { inside = 1; next }
-    inside && /^[^ ]/ { exit }
-    inside && /^  [^ ]/ {
-      sub(/^  /, ""); sub(/:[[:space:]]*$/, "")
-      gsub(/^["\047]|["\047]$/, "")
-      print
-    }
-  ' "$LOCK")"
-fi
+# Specnaut's own files: the lock's entries.
+managed="$(config_lock_entries "$LOCK")"
 
 is_exempt() {
-  local path="$1" glob
-  case "$path" in .specnaut/*) return 0 ;; esac
-  if [ -n "$managed" ] && printf '%s\n' "$managed" | grep -Fxq -- "$path"; then return 0; fi
-  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
-  for glob in ${exempt[@]+"${exempt[@]}"}; do
-    case "$path" in $glob) return 0 ;; esac
-    case "/$path" in $glob) return 0 ;; esac
-  done
-  return 1
+  case "$1" in .specnaut/*) return 0 ;; esac
+  if [ -n "$managed" ] && printf '%s\n' "$managed" | grep -Fxq -- "$1"; then return 0; fi
+  config_exempt "$1" ${exempt[@]+"${exempt[@]}"}
 }
 
 count_at() { # <rev-spec> → line count, 0 when the blob does not exist

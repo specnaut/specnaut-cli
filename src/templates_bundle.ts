@@ -31103,7 +31103,8 @@ fi
 # (SC2034: the CONFIG_* paths and defaults are read by the sourcing script.)
 #
 # Sourced by the gate scripts beside it (size-ratchet.sh, boundary-check.sh):
-# the one bash reader of the project-owned configs (spec 038). Its TypeScript
+# the one bash reader of the project-owned configs (spec 038), and of the
+# entries of \`.specnaut/installed.lock\` those gates leave out. Its TypeScript
 # twin is \`readSizeLimits\` in the CLI; both are held to one fixture corpus, so
 # the two cannot read one file two ways.
 #
@@ -31141,6 +31142,8 @@ fi
 #                                 exempt <glob>
 #                               for file, function, class, constitution in that order;
 #                               2 unreadable
+#   config_exempt <path> <glob...>  0 when a glob matches \`path\` or \`/path\` (\`case\`)
+#   config_lock_entries <lock>  the keys under \`entries:\`, one per line; none if absent
 
 # The project-owned paths the gates read. The TypeScript twin is
 # src/domain/constitution_paths.ts; paths_parity_test.ts holds them equal.
@@ -31271,6 +31274,30 @@ config_size_limits() {
   while IFS=\$'\\t' read -r kind n key child; do
     [ "\$kind" != L ] || printf 'exempt %s\\n' "\$child"
   done <<<"\$records"
+}
+
+config_exempt() {
+  local path="\$1" glob
+  shift
+  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
+  for glob in "\$@"; do
+    case "\$path" in \$glob) return 0 ;; esac
+    case "/\$path" in \$glob) return 0 ;; esac
+  done
+  return 1
+}
+
+config_lock_entries() {
+  [ -f "\$1" ] || return 0
+  awk '
+    /^entries:/ { inside = 1; next }
+    inside && /^[^ ]/ { exit }
+    inside && /^  [^ ]/ {
+      sub(/^  /, ""); sub(/:[[:space:]]*\$/, "")
+      gsub(/^["\\047]|["\\047]\$/, "")
+      print
+    }
+  ' "\$1"
 }
 `,
     executable: false,
@@ -32048,30 +32075,13 @@ while read -r unit rest; do
   esac
 done <<<"\$limits"
 
-# Specnaut's own files: the lock's entries, two-space indented keys under \`entries:\`.
-managed=""
-if [ -f "\$LOCK" ]; then
-  managed="\$(awk '
-    /^entries:/ { inside = 1; next }
-    inside && /^[^ ]/ { exit }
-    inside && /^  [^ ]/ {
-      sub(/^  /, ""); sub(/:[[:space:]]*\$/, "")
-      gsub(/^["\\047]|["\\047]\$/, "")
-      print
-    }
-  ' "\$LOCK")"
-fi
+# Specnaut's own files: the lock's entries.
+managed="\$(config_lock_entries "\$LOCK")"
 
 is_exempt() {
-  local path="\$1" glob
-  case "\$path" in .specnaut/*) return 0 ;; esac
-  if [ -n "\$managed" ] && printf '%s\\n' "\$managed" | grep -Fxq -- "\$path"; then return 0; fi
-  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
-  for glob in \${exempt[@]+"\${exempt[@]}"}; do
-    case "\$path" in \$glob) return 0 ;; esac
-    case "/\$path" in \$glob) return 0 ;; esac
-  done
-  return 1
+  case "\$1" in .specnaut/*) return 0 ;; esac
+  if [ -n "\$managed" ] && printf '%s\\n' "\$managed" | grep -Fxq -- "\$1"; then return 0; fi
+  config_exempt "\$1" \${exempt[@]+"\${exempt[@]}"}
 }
 
 count_at() { # <rev-spec> → line count, 0 when the blob does not exist
@@ -32251,15 +32261,7 @@ done <<<"\$records"
 [ "\${#patterns[@]}" -gt 0 ] || skip "no forbid: patterns in \$CONFIG_BOUNDARIES"
 [ "\${#domains[@]}" -gt 0 ] || skip "no domain: paths in \$CONFIG_BOUNDARIES"
 
-is_exempt() {
-  local glob
-  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
-  for glob in \${exempt[@]+"\${exempt[@]}"}; do
-    case "\$1" in \$glob) return 0 ;; esac
-    case "/\$1" in \$glob) return 0 ;; esac
-  done
-  return 1
-}
+is_exempt() { config_exempt "\$1" \${exempt[@]+"\${exempt[@]}"}; }
 
 # \`ls-files -z\` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.

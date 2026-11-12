@@ -70,15 +70,7 @@ done <<<"$records"
 [ "${#patterns[@]}" -gt 0 ] || skip "no forbid: patterns in $CONFIG_BOUNDARIES"
 [ "${#domains[@]}" -gt 0 ] || skip "no domain: paths in $CONFIG_BOUNDARIES"
 
-is_exempt() {
-  local glob
-  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
-  for glob in ${exempt[@]+"${exempt[@]}"}; do
-    case "$1" in $glob) return 0 ;; esac
-    case "/$1" in $glob) return 0 ;; esac
-  done
-  return 1
-}
+is_exempt() { config_exempt "$1" ${exempt[@]+"${exempt[@]}"}; }
 
 # `ls-files -z` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.

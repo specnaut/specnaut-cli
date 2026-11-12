@@ -2,7 +2,8 @@
 # (SC2034: the CONFIG_* paths and defaults are read by the sourcing script.)
 #
 # Sourced by the gate scripts beside it (size-ratchet.sh, boundary-check.sh):
-# the one bash reader of the project-owned configs (spec 038). Its TypeScript
+# the one bash reader of the project-owned configs (spec 038), and of the
+# entries of `.specnaut/installed.lock` those gates leave out. Its TypeScript
 # twin is `readSizeLimits` in the CLI; both are held to one fixture corpus, so
 # the two cannot read one file two ways.
 #
@@ -40,6 +41,8 @@
 #                                 exempt <glob>
 #                               for file, function, class, constitution in that order;
 #                               2 unreadable
+#   config_exempt <path> <glob...>  0 when a glob matches `path` or `/path` (`case`)
+#   config_lock_entries <lock>  the keys under `entries:`, one per line; none if absent
 
 # The project-owned paths the gates read. The TypeScript twin is
 # src/domain/constitution_paths.ts; paths_parity_test.ts holds them equal.
@@ -170,4 +173,28 @@ config_size_limits() {
   while IFS=$'\t' read -r kind n key child; do
     [ "$kind" != L ] || printf 'exempt %s\n' "$child"
   done <<<"$records"
+}
+
+config_exempt() {
+  local path="$1" glob
+  shift
+  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
+  for glob in "$@"; do
+    case "$path" in $glob) return 0 ;; esac
+    case "/$path" in $glob) return 0 ;; esac
+  done
+  return 1
+}
+
+config_lock_entries() {
+  [ -f "$1" ] || return 0
+  awk '
+    /^entries:/ { inside = 1; next }
+    inside && /^[^ ]/ { exit }
+    inside && /^  [^ ]/ {
+      sub(/^  /, ""); sub(/:[[:space:]]*$/, "")
+      gsub(/^["\047]|["\047]$/, "")
+      print
+    }
+  ' "$1"
 }
