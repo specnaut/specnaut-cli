@@ -26,11 +26,20 @@ export function parseSandbox(
     return { kind: "sandbox", sub: "probe" };
   }
   if (sub !== "exec") return { kind: "unknown", received: `sandbox ${sub ?? ""}`.trim() };
+  return parseExec(parsed.toolchain, before, command);
+}
+
+/** `exec`'s words: one full commit id before `--`, a command after it, and `--toolchain`. */
+function parseExec(
+  rawToolchain: unknown,
+  before: readonly string[],
+  command: string[] | null,
+): Intent {
   if (before.length !== 1 || !isFullSha(before[0])) {
     return refused("exec takes one full commit id before --");
   }
   if (command === null || command.length === 0) return refused("exec needs a command after --");
-  const toolchain = toolchainOf(parsed.toolchain);
+  const toolchain = toolchainOf(rawToolchain);
   if (toolchain === null) return refused("exec --toolchain takes absolute folders separated by :");
   return { kind: "sandbox", sub: "exec", sha: before[0], toolchain, command };
 }

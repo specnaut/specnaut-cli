@@ -1,5 +1,6 @@
 import { red } from "@std/fmt/colors";
 import {
+  type ExecDeps,
   execInSandbox,
   type ExecOutcome,
   type ExecRequest,
@@ -74,26 +75,28 @@ function notRun(deps: SandboxDeps, why: string): number {
 }
 
 function defaultDeps(): SandboxDeps {
-  const { os, arch } = Deno.build;
   const subprocess = new DenoSubprocessRunner();
   const checkout = () => checkoutRoot(subprocess);
-  const prober = new HostBackendProber(
-    subprocess,
-    { os, arch },
-    async () => readDevcontainerImage(await checkout()),
-  );
-  const env = (name: string) => Deno.env.get(name);
-  const path = env("PATH") ?? "/usr/bin:/bin";
+  const { os, arch } = Deno.build;
+  const image = async () => readDevcontainerImage(await checkout());
+  const prober = new HostBackendProber(subprocess, { os, arch }, image);
   return {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     probe: () => prober.probe(),
-    exec: (request) =>
-      execInSandbox({
-        prober,
-        host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
-        runnerFor: (backend) => runnerFor(backend, new DenoProcessLauncher(), { arch, path }),
-      }, request),
+    exec: (request) => execInSandbox(execDeps(prober, checkout), request),
+  };
+}
+
+/** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
+function execDeps(prober: HostBackendProber, checkout: () => Promise<string>): ExecDeps {
+  const { os, arch } = Deno.build;
+  const env = (name: string) => Deno.env.get(name);
+  const path = env("PATH") ?? "/usr/bin:/bin";
+  return {
+    prober,
+    host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
+    runnerFor: (backend) => runnerFor(backend, new DenoProcessLauncher(), { arch, path }),
   };
 }
 

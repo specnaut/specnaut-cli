@@ -24,14 +24,24 @@ func parseSandbox(a Args, rest []string) Intent {
 	before := words[:len(words)-after]
 	switch sub {
 	case "probe":
-		if len(before) > 0 || a.AfterDash != nil {
-			return sandboxRefused("probe takes no argument")
-		}
-		return Intent{Kind: "sandbox"}
+		return parseSandboxProbe(a, before)
 	case "exec":
-	default:
-		return unknown(strings.TrimSpace("sandbox " + sub))
+		return parseSandboxExec(a, before, after)
 	}
+	return unknown(strings.TrimSpace("sandbox " + sub))
+}
+
+// parseSandboxProbe: probe takes no word, before -- or after it.
+func parseSandboxProbe(a Args, before []string) Intent {
+	if len(before) > 0 || a.AfterDash != nil {
+		return sandboxRefused("probe takes no argument")
+	}
+	return Intent{Kind: "sandbox"}
+}
+
+// parseSandboxExec is sandbox_parser.ts's parseExec: one full commit id before --, a command
+// after it, and --toolchain.
+func parseSandboxExec(a Args, before []string, after int) Intent {
 	if len(before) != 1 || !fullSha.MatchString(before[0]) {
 		return sandboxRefused("exec takes one full commit id before --")
 	}
