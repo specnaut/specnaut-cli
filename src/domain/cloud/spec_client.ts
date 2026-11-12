@@ -86,6 +86,15 @@ export class SpecClient {
   }
 
   /**
+   * Throws CredentialRefused when a field would carry a credential, or a token the
+   * session holds, `token` included. Nothing is sent: a caller about to make several
+   * requests runs it first over everything they will send.
+   */
+  refuse(token: string, fields: Iterable<readonly [field: string, text: string]>): void {
+    refuseCredentials(this.patterns, fields, [token, ...this.held()]);
+  }
+
+  /**
    * POST /api/v1/specs — ensure a spec exists for a task and attach it,
    * idempotently. Returns the (possibly newly-created) spec.
    */
@@ -95,9 +104,7 @@ export class SpecClient {
     taskNumber: number,
     title?: string,
   ): Promise<SpecWire> {
-    if (title !== undefined) {
-      refuseCredentials(this.patterns, [["spec title", title]], [token, ...this.held()]);
-    }
+    if (title !== undefined) this.refuse(token, [["spec title", title]]);
     const { status, json } = await this.send("POST", "/specs", token, {
       projectKey,
       taskNumber,
@@ -133,15 +140,7 @@ export class SpecClient {
     taskNumber: number,
     steps: readonly SpecStep[],
   ): Promise<void> {
-    refuseCredentials(
-      this.patterns,
-      steps.flatMap((s, i): [string, string][] => [
-        [`step ${i + 1} key`, s.key],
-        [`step ${i + 1} name`, s.name],
-        [`step ${i + 1} body`, s.body],
-      ]),
-      [token, ...this.held()],
-    );
+    this.refuse(token, stepFields(steps));
     const { status } = await this.send("PUT", "/specs/steps", token, {
       projectKey,
       taskNumber,
@@ -149,6 +148,15 @@ export class SpecClient {
     });
     if (status !== 200 && status !== 201) throw new SpecApiError(status, reasonForStatus(status));
   }
+}
+
+/** What a step push sends that someone wrote, named by the step's place, never its key. */
+export function stepFields(steps: readonly SpecStep[]): [string, string][] {
+  return steps.flatMap((s, i): [string, string][] => [
+    [`step ${i + 1} key`, s.key],
+    [`step ${i + 1} name`, s.name],
+    [`step ${i + 1} body`, s.body],
+  ]);
 }
 
 /**

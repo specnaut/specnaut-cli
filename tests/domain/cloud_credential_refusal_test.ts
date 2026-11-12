@@ -4,6 +4,7 @@ import { CloudClient, type FetchFn } from "../../src/domain/cloud/cloud_client.t
 import { SpecClient } from "../../src/domain/cloud/spec_client.ts";
 import { GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { CredentialRefused } from "../../src/domain/cloud/credential_check.ts";
+import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 
 /**
  * Every call that sends text someone wrote to Specnaut Cloud checks it first: a
@@ -122,4 +123,49 @@ Deno.test("a key and value a payload spreads over two strings is still one assig
     CredentialRefused,
   );
   assertEquals([e.field, e.kind, calls()], ["gate payload", "assignment", 0]);
+});
+
+/** A spec session over a login still valid for an hour: signing in makes no request. */
+function authoring(f: FetchFn) {
+  return makeSpecSession({
+    config: { apiUrl: API, projectKey: "ACME" },
+    store: {
+      kind: "file",
+      load: () =>
+        Promise.resolve({
+          accessToken: "a",
+          refreshToken: "r",
+          accessExpiresAt: Date.now() + 3_600_000,
+        }),
+      save: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    },
+    patterns: PATTERNS,
+    fetchFn: f,
+    env: () => undefined,
+  })!;
+}
+
+Deno.test("authoring checks every step before its first request: no task is left behind", async () => {
+  const { fetchFn, calls } = counting();
+  const steps = [step(), step({ body: `Use ${SAMPLES[0].value}.` })];
+  const e = await assertRejects(
+    () => authoring(fetchFn).author(null, "Export", steps),
+    CredentialRefused,
+  );
+  assertEquals([e.field, e.kind, calls()], ["step 2 body", "token", 0]);
+});
+
+Deno.test("authoring checks the title before its first request", async () => {
+  const { fetchFn, calls } = counting();
+  const e = await assertRejects(
+    () => authoring(fetchFn).author(null, `Rotate ${SAMPLES[0].value}`, [step()]),
+    CredentialRefused,
+  );
+  assertEquals([e.field, calls()], ["task title", 0]);
+  const linked = await assertRejects(
+    () => authoring(fetchFn).author(7, `Rotate ${SAMPLES[0].value}`, [step()]),
+    CredentialRefused,
+  );
+  assertEquals([linked.field, calls()], ["spec title", 0]);
 });

@@ -8,7 +8,7 @@
 // projectKey / taskNumber cross the wire. Errors are CLI-owned SpecApiErrors
 // keyed off HTTP status — never a Cloud-internal identifier or backend string.
 
-import { SpecApiError, SpecClient } from "./spec_client.ts";
+import { SpecApiError, SpecClient, stepFields } from "./spec_client.ts";
 import {
   CloudApiError,
   CloudClient,
@@ -106,6 +106,10 @@ export class SpecSession {
     title: string,
     steps: readonly SpecStep[],
   ): Promise<AuthorResult> {
+    // Everything this sends is checked before its first request: a refusal at the push
+    // would leave a task created and a spec attached that nobody asked for.
+    const what = taskNumber === null ? "task title" : "spec title";
+    this.deps.client.refuse(await this.requireToken(), [[what, title], ...stepFields(steps)]);
     let created = false;
     let resolved = taskNumber;
     if (resolved === null) {

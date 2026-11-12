@@ -84,7 +84,8 @@ Deno.test("every CloudClient request refuses a redirect, as a redirect and not a
 Deno.test("every SpecClient request refuses a redirect, and reads it as redirected", async () => {
   const { fn, modes } = redirecting();
   const c = new SpecClient(API, fn, PATTERNS);
-  const calls = covering(SpecClient, ["send"], {
+  // `refuse` makes no request: it is the check a write runs before its first one.
+  const calls = covering(SpecClient, ["send", "refuse"], {
     get: () => c.get("t", "K", 1),
     ensure: () => c.ensure("t", "K", 1),
     putSteps: () => c.putSteps("t", "K", 1, []),
