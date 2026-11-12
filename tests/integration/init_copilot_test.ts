@@ -101,7 +101,9 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     // cli#679 moved the integrations reference into `specnaut-facts`. 48 since
     // cli#727 gave `task` its resume document. 49 since cli#726 gave `specnaut`
     // its issue phase. 50 since cli#774 gave `task` its plan-reentry document.
-    assertEquals(instructionsCount, 50);
+    // 53 since `task` gained its script-gate, review-gates and review-untrusted
+    // documents.
+    assertEquals(instructionsCount, 53);
     const instr = (n: string) => join(root, `.github/instructions/${n}.instructions.md`);
     assertEquals(await exists(instr("specnaut-design")), true);
     assertEquals(await exists(instr("specnaut-agent-ui-ux-designer")), false);
