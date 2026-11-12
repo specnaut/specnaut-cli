@@ -39,6 +39,8 @@ export type BackendProbe = {
   readonly image: ImageSource;
   /** Podman running as the user, as root (passed over), or not installed. */
   readonly podman: "rootless" | "root" | "absent";
+  /** Rootless podman can cap a run: cgroup v2, with pids, memory and cpu delegated to the user. */
+  readonly podmanCgroups: boolean;
   /** A docker daemon answers. */
   readonly docker: boolean;
   /** Bubblewrap ran a trial command, or was stopped by the user-namespace restriction. */
@@ -46,14 +48,20 @@ export type BackendProbe = {
   readonly sandboxExec: boolean;
 };
 
+const UNCAPPED_PODMAN =
+  "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
+
 /** The best backend `probe` offers; static only on Windows, where no backend is supported. */
 export function chooseBackend(probe: BackendProbe): Backend {
   if (probe.os === "windows") return { kind: "static", why: ["no sandbox on Windows"] };
   const why: string[] = [];
-  const engine = probe.podman === "rootless" ? "podman" : probe.docker ? "docker" : null;
+  const podman = probe.podman === "rootless" && probe.podmanCgroups;
+  const engine = podman ? "podman" : probe.docker ? "docker" : null;
   if (probe.image.kind === "none") why.push(`no container image: ${probe.image.why}`);
   else if (engine) return { kind: "container", engine, image: probe.image.ref };
-  else why.push("container: no rootless podman and no docker");
+  else {why.push(
+      probe.podman === "rootless" ? UNCAPPED_PODMAN : "container: no rootless podman and no docker",
+    );}
   if (probe.os === "linux") {
     if (probe.bwrap === "usable") return { kind: "bwrap" };
     why.push(

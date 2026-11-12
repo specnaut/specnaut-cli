@@ -10,6 +10,8 @@ import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts
 
 const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
+const NAME = "specnaut-gate-3f9c2a71";
+const RUN = { image: IMAGE, name: NAME };
 
 /** Each value that follows `flag`, in order. */
 function after(args: readonly string[], flag: string): string[] {
@@ -21,7 +23,7 @@ function pairsAfter(args: readonly string[], flag: string): string[][] {
   return args.flatMap((a, i) => (a === flag ? [[args[i + 1], args[i + 2]]] : []));
 }
 
-const container = () => containerArgs(policyOf("container"), IMAGE, COMMAND);
+const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
 
 Deno.test("containerArgs: the whole argument list, in order", () => {
@@ -29,6 +31,11 @@ Deno.test("containerArgs: the whole argument list, in order", () => {
   assertEquals(container(), [
     "run",
     "--rm",
+    "--name",
+    NAME,
+    "--init",
+    "--log-driver",
+    "none",
     "--network",
     "none",
     "--read-only",
@@ -99,9 +106,15 @@ Deno.test("containerArgs: the process, memory and CPU caps are set, swap include
 Deno.test("containerArgs: the image is pinned by digest and the command follows it", () => {
   const args = container();
   assertEquals(args.slice(-1 - COMMAND.length), [IMAGE, ...COMMAND]);
-  assertThrows(() => containerArgs(policyOf("container"), "ghcr.io/acme/dev:latest", COMMAND));
   assertThrows(() =>
-    containerArgs(policyOf("container"), `--privileged@sha256:${"b".repeat(64)}`, COMMAND)
+    containerArgs(policyOf("container"), { ...RUN, image: "ghcr.io/acme/dev:latest" }, COMMAND)
+  );
+  assertThrows(() =>
+    containerArgs(
+      policyOf("container"),
+      { ...RUN, image: `--privileged@sha256:${"b".repeat(64)}` },
+      COMMAND,
+    )
   );
 });
 
@@ -161,8 +174,21 @@ Deno.test("generators refuse a policy holding a path they cannot pass safely", (
   assertThrows(() => bwrapArgs(forged, COMMAND));
   assertThrows(() => bwrapArgs({ ...policyOf("bwrap"), system: ["/a,b"] }, COMMAND));
   assertThrows(() => bwrapArgs({ ...policyOf("bwrap"), writes: ["/a\nb"] }, COMMAND));
-  assertThrows(() => containerArgs({ ...forged, reads: ["/a,ro=false"] }, IMAGE, COMMAND));
-  assertThrows(() =>
-    containerArgs({ ...policyOf("container"), writes: ["/a:rw"] }, IMAGE, COMMAND)
-  );
+  assertThrows(() => containerArgs({ ...forged, reads: ["/a,ro=false"] }, RUN, COMMAND));
+  assertThrows(() => containerArgs({ ...policyOf("container"), writes: ["/a:rw"] }, RUN, COMMAND));
+});
+
+Deno.test("containerArgs: a named run, an init reaping its children, and no engine-kept logs", () => {
+  const args = container();
+  assertEquals(after(args, "--name"), [NAME]);
+  assert(args.includes("--init"));
+  assertEquals(after(args, "--log-driver"), ["none"]);
+  for (const name of ["", "-x", "a b", "a/b", "a,b", "x".repeat(65)]) {
+    assertThrows(
+      () => containerArgs(policyOf("container"), { ...RUN, name }, COMMAND),
+      Error,
+      "",
+      name,
+    );
+  }
 });

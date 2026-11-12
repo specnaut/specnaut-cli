@@ -10,22 +10,36 @@ import { isPinned } from "./sandbox_image.ts";
 import { safePath } from "./sandbox_paths.ts";
 
 /**
- * `run` arguments for podman or docker: no network, a read-only root, no capabilities, no
- * privilege gain, the `nobody` user, the policy's caps (swap counted in the memory cap), its
- * scratch folders as tmpfs and the exported tree as the one bind mount, read-only.
+ * One container run: its pinned image, and a name the caller makes unique, so that the launcher
+ * can stop and remove exactly that container when the wall clock runs out.
+ */
+export type ContainerRun = { readonly image: string; readonly name: string };
+
+/** A name the engines accept that can never be read as a flag. */
+const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
+
+/**
+ * `run` arguments for podman or docker: a named run with an init process that reaps orphans and
+ * forwards signals, no log the engine keeps after it, no network, a read-only root, no
+ * capabilities, no privilege gain, the `nobody` user, the policy's caps (swap counted in the memory
+ * cap), its scratch folders as tmpfs and the exported tree as the one bind mount, read-only.
  * `--env NAME=value` always carries its value: `--env NAME` alone would copy the host's.
  */
 export function containerArgs(
   policy: SandboxPolicy,
-  image: string,
+  { image, name }: ContainerRun,
   command: readonly string[],
 ): string[] {
   if (!isPinned(image)) throw new Error(`container image ${image} is not pinned by digest`);
+  if (!CONTAINER_NAME.test(name)) {
+    throw new Error(`container name ${JSON.stringify(name)} is not plain`);
+  }
   const { limits } = policy;
   const tmpfs = `rw,nosuid,nodev,size=${limits.scratchBytes},mode=1777`;
   return [
     "run",
     "--rm",
+    ...["--name", name, "--init", "--log-driver", "none"],
     ...containerNetwork(policy.network),
     ...["--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
