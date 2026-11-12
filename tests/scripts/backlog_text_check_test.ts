@@ -13,7 +13,7 @@ import {
 
 /**
  * A backlog write never sends text the secret scan refuses. The rule is
- * `text_refusal` in `_backlog_plan.sh`, run here from a real install; every
+ * `text_refusal` in `_clean_text.sh`, run here from a real install; every
  * script that sends a title, body, comment or label to a tracker asks it before
  * its first tracker call or file write, and is driven here through its own
  * entry point with the tracker CLIs replaced by stand-ins.

@@ -5,7 +5,8 @@
 # import-boundary gate reads .specnaut/boundaries.yml. Each gate is run, not
 # grepped: a skip, a violation and a clean pass each have their own exit code,
 # and each is asserted. Split out of smoke-features.sh, which was over its size
-# ceiling when spec 038 had to add to it.
+# ceiling when spec 038 had to add to it. The impact-aware gates (#725) are
+# smoke-impact-gates.sh's.
 #
 # Usage: smoke-gates.sh <name>
 set -euo pipefail
@@ -93,111 +94,6 @@ out=$(bash "$BOUNDARY" 2>&1; echo "ec=$?")
   || fail "boundary-check.sh refused a clean domain" "$out"
 
 echo
-echo "═══ #725  impact-aware gates: run-gate.sh behind a flag, on a real scaffold ═══"
-GATE=.specnaut/scripts/bash/run-gate.sh
-for script in gate-impact.sh _gate_candidate.sh _gate_impact_read.sh _gate_impact_adapter.sh _gate_impact_graph.sh _gate_evidence.sh; do
-  check "$script scaffolded + executable" "[ -x .specnaut/scripts/bash/$script ]"
-done
-for script in gate-impact.ps1 base-branch.ps1 _gate_candidate.ps1 _gate_impact_read.ps1 _gate_impact_adapter.ps1 _gate_impact_graph.ps1 _gate_evidence.ps1; do
-  check "$script twin scaffolded" "[ -f .specnaut/scripts/powershell/$script ]"
-done
-check "the declaration is the project's: init writes no .specnaut/impact.json" '[ ! -e .specnaut/impact.json ]'
-check "quality-gates.md documents the declaration and its exits" \
-  'grep -qF ".specnaut/impact.json" .claude/skills/task/phases/quality-gates.md &&
-   grep -qF "SPECNAUT_AFFECTED_OWNERS" .claude/skills/task/phases/quality-gates.md'
-# Instruction only: what the merge passes is what the agent runs; no script reads merge.md.
-check "merge.md passes the merge-base, and says what 3 and 4 mean there" \
-  'grep -qF "run-gate.sh full --base \"\$(git merge-base HEAD <base>)\"" .claude/skills/task/phases/merge.md &&
-   grep -qF "say which commands left it" .claude/skills/task/phases/merge.md &&
-   grep -qF "With \`removed: none\`, everything was omitted: run it bare" .claude/skills/task/phases/merge.md &&
-   grep -qF "neither is ever reported as the full gate" .claude/skills/task/phases/merge.md'
-# Instruction only (cli#769): the epic exit runs the same full tier as the standalone
-# one, and that tier's first step is the gates.yml check with its one-time ask.
-M=$(tr '\n' ' ' <.claude/skills/task/phases/merge.md | tr -s ' ')
-has() { case $M in *"$1"*) ;; *) return 1 ;; esac; }
-# shellcheck disable=SC2034 # read by the check below, through eval
-TIER='run the full tier (**The full tier**, below)' EPIC='**Exit 0 — an epic**: do **not** squash: ' \
-  FULL='**The full tier** — exits 0 and 14 only, before the landing. Run the full gate tier once, but first: if '
-check "merge.md takes the epic path, like the standalone one, through the gates.yml ask" \
-  'has "$EPIC$TIER" && has "**Exit 14 — standalone**: $TIER" &&
-   has "$FULL\`git diff --quiet \"\$(git merge-base HEAD <base>)\" HEAD -- .specnaut/gates.yml\`" &&
-   has "ask once: *\"This branch changes \`.specnaut/gates.yml\`."'
-out=$(bash "$GATE" fast --base "$BASE" 2>&1; echo "ec=$?")
-bare=$(bash "$GATE" fast 2>&1; echo "ec=$?")
-[ "$out" = "$bare" ] && pass "with no declaration the flag is the bare run, to the byte" \
-  || fail "a flag with no declaration changed the run" "$out"
-
-# An invented adapter: two owners, read from a file in the tree it describes.
-mkdir -p apps/one apps/two tools
-echo one >apps/one/a.txt
-echo two >apps/two/a.txt
-cat >tools/graph.sh <<'ADAPTER'
-#!/usr/bin/env bash
-printf '{"schema":1,"commit":"%s","complete":true,"owners":[{"id":"one","roots":["apps/one/"],"depends_on":[]},{"id":"two","roots":["apps/two/"],"depends_on":["one"]}]}\n' "$SPECNAUT_IMPACT_COMMIT" >"$SPECNAUT_IMPACT_OUT"
-ADAPTER
-cat >.specnaut/impact.json <<'DECLARATION'
-{ "schema": 1, "adapter": { "command": "bash tools/graph.sh", "files": ["tools/graph.sh"] },
-  "scoped_tiers": ["fast"], "full_on": [], "inert": [".specnaut/specs/"],
-  "checks": [{ "gate": "echo whole-suite", "scoped": "echo scoped-to \"$SPECNAUT_AFFECTED_OWNERS\"" }] }
-DECLARATION
-printf 'fast_gate:\n  - echo whole-suite\nfull_gate:\n  - echo whole-suite\n' >.specnaut/gates.yml
-git config init.defaultBranch "$(git symbolic-ref --short HEAD)"
-commit "opt in"
-START="$(git rev-parse HEAD)"
-git switch -q -c feature
-
-echo changed >apps/two/a.txt
-commit "change the dependent"
-out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
-if echo "$out" | grep -q "ec=0" && echo "$out" | grep -qx "scope: owners two" && echo "$out" | grep -qx "scoped-to two"; then
-  pass "a change runs its owner's scoped command, with the owners in the variable"
-else
-  fail "the scoped command did not run for its owner" "$out"
-fi
-echo changed >apps/one/a.txt
-commit "change what it depends on"
-out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
-echo "$out" | grep -qx "scoped-to one two" && pass "a change reaches its reverse dependents" \
-  || fail "the closure did not reach the dependent" "$out"
-out=$(bash "$GATE" full --base "$START" 2>&1; echo "ec=$?")
-if echo "$out" | grep -qx "whole-suite" && echo "$out" | grep -qx "fallback: tier-not-scoped: full"; then
-  pass "a tier outside scoped_tiers runs whole, and names why"
-else
-  fail "an unscoped tier did not run whole" "$out"
-fi
-echo stray >stray.txt
-commit "a path no owner holds"
-out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
-if echo "$out" | grep -qx "whole-suite" && echo "$out" | grep -qx "fallback: unowned: stray.txt"; then
-  pass "an unowned path widens to the whole tier, and names why"
-else
-  fail "an unowned path did not widen" "$out"
-fi
-out=$(bash "$GATE" fast --base "$(git rev-parse HEAD)" 2>&1; echo "ec=$?")
-if echo "$out" | grep -q "ec=4" && echo "$out" | grep -qx "scope: none"; then
-  pass "every command omitted is exit 4, never a pass"
-else
-  fail "a run that checked nothing did not exit 4" "$out"
-fi
-printf 'fast_gate:\nfull_gate:\n  - echo whole-suite\n' >.specnaut/gates.yml
-commit "empty the tier"
-out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
-if echo "$out" | grep -q "ec=4" && echo "$out" | grep -qx "removed: echo whole-suite"; then
-  pass "a tier emptied on the branch is exit 4, and names what left it"
-else
-  fail "an emptied tier did not exit 4 naming the command" "$out"
-fi
-echo dirt >dirt.txt
-out=$(bash "$GATE" fast --base "$START" 2>&1; echo "ec=$?")
-if echo "$out" | grep -q "ec=3" && echo "$out" | grep -q "candidate: refused (dirty-tree"; then
-  pass "a dirty tree is refused, exit 3"
-else
-  fail "a dirty tree was not refused" "$out"
-fi
-rm dirt.txt
-[ "$(git worktree list | wc -l | tr -d ' ')" = 1 ] && pass "no temporary worktree stayed behind" \
-  || fail "a temporary worktree stayed behind" "$(git worktree list)"
-
 echo "═══ the git library the phases read the seats' data through ═══"
 check "git-read.sh installs beside its library, _scope_globs.sh and _explicit_head.sh; the scope script has copies, and _audit_scopes.sh" \
   '[ -x .specnaut/scripts/bash/git-read.sh ] && [ -f .specnaut/scripts/bash/_git_untrusted.sh ] &&

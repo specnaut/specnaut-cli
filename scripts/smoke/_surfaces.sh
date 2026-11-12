@@ -15,7 +15,7 @@ SURFACES=(
   # Spec 037 moved the pipeline phases under /task. Listed before the
   # `task/*.md` backlog-doc glob below, which `case` would otherwise let
   # swallow them — its `*` traverses `/`.
-  'templates/core/skills/task/phases/*.md|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-merge.sh smoke-task.sh|phase-doc'
+  'templates/core/skills/task/phases/*.md|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-merge.sh smoke-task.sh smoke-impact-gates.sh|phase-doc'
   'templates/core/skills/ship/SKILL.md|smoke-tag-release.sh|bundled-skill'
   'templates/core/skills/ship/phases/*.md|smoke-tag-release.sh|ship-doc'
   'templates/core/skills/ship/scripts/*|smoke-tag-release.sh|tag-release-script'
@@ -28,7 +28,7 @@ SURFACES=(
   # map keyed on claims.
   'templates/core/skills/task/scripts/cloud/*|smoke-backlog-cloud.sh smoke-backlog-plan.sh|cloud-backlog-script'
   'templates/core/hooks/*|smoke-hooks.sh|bundled-hook'
-  'templates/core/specnaut/scripts/*/*|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-merge.sh smoke-gates.sh|specnaut-helper-script'
+  'templates/core/specnaut/scripts/*/*|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-merge.sh smoke-gates.sh smoke-impact-gates.sh|specnaut-helper-script'
   'templates/core/specnaut/LABELS.md|smoke-features.sh smoke-backlog-github.sh smoke-backlog-gitlab.sh|labels-doc'
   # Categories that ship and were claimed by no glob. Explicit, NOT
   # `templates/core/specnaut/*.md` or `skills/*/*.md`: `case` globs traverse

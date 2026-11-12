@@ -3,6 +3,7 @@ import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { everyBundleOption } from "../../src/application/bundle_options.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import { restates } from "./po_single_home.ts";
 import { flat, phase } from "./task_docs.ts";
 
 /**
@@ -102,41 +103,6 @@ Deno.test("the plan stop points at the section", () => {
   );
 });
 
-/** Prose sentences: code is dropped, and a table row, heading or list item ends one. */
-function sentences(text: string): string[] {
-  return text.replace(/```[\s\S]*?```/g, " ").replace(/`[^`\n]*`/g, " ")
-    .split(/\n\s*\n|\n(?=\s*(?:[|#]|[-*] |\d+\. ))/)
-    .flatMap((block) => flat(block).split(/(?<=[.;:])\s/));
-}
-
-const CALLS = [/\bpriority\b/i, /\bsizes?\b/i, /\btypes?\b/i, /\bsplits?\b/i];
-/**
- * Somebody deciding, in any of the three ways prose says it: an active verb
- * ("the product owner sets"), a passive one ("are set by", "assigned by"), or a
- * noun ("the product owner's decision", "the call of the product owner").
- * Active verbs alone let a passive restatement through (cli#770).
- */
-const DECIDES = new RegExp(
-  [
-    String.raw`\b(decid(e|es|ed|ing)|sets|assigns?|chooses|picks|calls)\b`,
-    String.raw`\b(set|decided|chosen|picked|assigned|called|made|determined)\s+by\b`,
-    String.raw`['\u2019]s\s+(decision|call|choice)s?\b`,
-    String.raw`\b(decision|call|choice)s?\s+of\s+the\b`,
-  ].join("|"),
-  "i",
-);
-
-/**
- * A sentence restates the list when it names a split beside a priority, or names
- * two of the calls as somebody's decision. Two of them without a deciding verb
- * is how the backlog docs describe the fields themselves, and is not flagged.
- */
-const restates = (text: string) =>
-  sentences(text).some((s) =>
-    (/\bpriority\b/i.test(s) && /\bsplits?\b/i.test(s)) ||
-    (DECIDES.test(s) && CALLS.filter((c) => c.test(s)).length >= 2)
-  );
-
 /** Each phrasing of a second home the guard must flag, and what it must let through. */
 const PHRASINGS: [sentence: string, flagged: boolean][] = [
   ["The product owner sets the priority and the size of every item.", true],
@@ -147,6 +113,16 @@ const PHRASINGS: [sentence: string, flagged: boolean][] = [
   ["Priority and size are the product owner's decision.", true],
   ["Priority and size are the product owner\u2019s decision.", true],
   ["Priority and size remain the call of the product owner.", true],
+  ["The product owner will set the priority and the size of every item.", true],
+  ["The product owner determines the priority and the size of every item.", true],
+  ["Priority and size are chosen, never asked.", true],
+  ["Priority and size are the product owner's.", true],
+  ["An item's type and size is up to the product owner.", true],
+  // Neutral prose: a mechanism or a field, nobody deciding.
+  ["The choice of the priority and size fields is documented once.", false],
+  ["Each call of the priority and size reader costs one request.", false],
+  ["The priority and size check is called by the pre-commit hook.", false],
+  ["Priority and size changes are made by the edit script, in one request.", false],
   [
     'What the product owner decides is listed once, in `product-owner.md`\'s "What you decide" section.',
     false,

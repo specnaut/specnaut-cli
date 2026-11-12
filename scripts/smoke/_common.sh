@@ -101,6 +101,7 @@ smoke-agents.sh
 smoke-contracts.sh
 smoke-merge.sh
 smoke-gates.sh
+smoke-impact-gates.sh
 smoke-task.sh
 smoke-backlog-local.sh
 smoke-backlog-github.sh

@@ -14,9 +14,10 @@ import {
 } from "./secret_samples.ts";
 
 /**
- * `text_refusal`, the one rule every backlog write meets, sourced from a real
- * install of `_backlog_plan.sh`: the function the writers call, every sample
- * judged in one bash process.
+ * `text_refusal`, the one rule every backlog write meets, defined in
+ * `_clean_text.sh` and sourced from a real install as the writers source it,
+ * through `_backlog_plan.sh`: the function they call, every sample judged in
+ * one bash process.
  */
 
 /** Every sample, with the verdict text_refusal prints for it: its status, then its class. */
