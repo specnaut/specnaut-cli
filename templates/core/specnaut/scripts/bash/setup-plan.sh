@@ -31,8 +31,8 @@ say() { if $JSON_MODE; then echo "$1" >&2; else echo "$1"; fi; }
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-# Get all paths and variables from common functions
-_paths_output=$(get_feature_paths) || { echo "ERROR: Failed to resolve feature paths" >&2; exit 1; }
+# Get all paths and variables from common functions: a failure has printed its own one line
+_paths_output=$(get_feature_paths) || exit 1
 eval "$_paths_output"
 unset _paths_output
 

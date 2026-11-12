@@ -2,16 +2,40 @@
 # What `.specnaut/feature.json` names, and whether that contradicts the branch.
 # Sourced by `common.sh`, whose `get_feature_paths` is the one caller.
 
-# The "feature_directory" of the feature.json at $1: by jq, else python3, else a
-# single-line grep (which misses a pretty-printed file).
+# The "feature_directory" of the feature.json at $1, by jq, else python3, else a
+# single-line grep (which misses a pretty-printed file). Nothing, status 0, when
+# it names none: no key, a null, or not an object, as Get-FeatureJsonDirectory
+# reads it.
+#
+# A feature.json that exists is a pointer `plan` wrote, so one that cannot be
+# read or parsed is refused (cli#778), status 1, never swapped for a guess from
+# the branch: the act `_feature_json_contradicts_branch` refuses. The line is
+# Get-FeatureJsonDirectory's, with the .NET type its reader throws for the same
+# failure, so both twins print one text; a reader's own message names the file.
+# The grep reader cannot tell an unparseable file from one without the key, and
+# falls back to the branch on both.
 _feature_json_dir() {
-    if command -v jq >/dev/null 2>&1; then
-        jq_lf -r '.feature_directory // empty' "$1" 2>/dev/null
+    local _fj_type=ArgumentException
+    if [ ! -r "$1" ]; then
+        _fj_type=UnauthorizedAccessException
+    elif command -v jq >/dev/null 2>&1; then
+        jq_lf -r 'if type == "object" then .feature_directory // empty else empty end' "$1" 2>/dev/null && return 0
     elif command -v python3 >/dev/null 2>&1; then
-        python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "$1" 2>/dev/null
+        # UTF-8 bytes and no newline: a Windows python3 ends a print with \r\n.
+        python3 -c "
+import json, sys
+text = open(sys.argv[1], encoding='utf-8-sig').read()
+data = json.loads(text) if text.strip() else None
+value = data.get('feature_directory') if isinstance(data, dict) else None
+sys.stdout.buffer.write(('' if value is None or value is False else str(value)).encode('utf-8'))
+" "$1" 2>/dev/null && return 0
     else
-        grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/'
+        # No match is "no key"; under pipefail grep's status would say otherwise.
+        grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/' || :
+        return 0
     fi
+    echo "ERROR: Failed to parse .specnaut/feature.json ($_fj_type)" >&2
+    return 1
 }
 
 # A resolution that contradicts the branch is an error, not an output: status 0,
