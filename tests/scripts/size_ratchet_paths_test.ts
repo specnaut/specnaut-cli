@@ -88,25 +88,31 @@ Deno.test({
 // whose second line is a managed path was taken for that managed file and
 // passed at any size. The name is staged through the index alone: no file
 // system is asked to hold a newline in a name.
-Deno.test("a name holding a newline is never exempt, even when one line names a managed file", async () => {
-  const dir = await repo(10, FILE(300, 400));
-  await Deno.writeTextFile(
-    join(dir, ".specnaut/installed.lock"),
-    "version: 2\nentries:\n  managed.ts:\n    sha256: abc\ntemplates_version: 1\n",
-  );
-  await run("git", ["add", ".specnaut/installed.lock"], dir);
-  await run("git", ["commit", "-q", "-m", "lock"], dir);
-  const blob = await child("git", ["hash-object", "-w", "--stdin"], dir, {}, lines(900));
-  const name = "grown.ts\nmanaged.ts";
-  const staged = await child(
-    "git",
-    ["update-index", "-z", "--index-info"],
-    dir,
-    {},
-    `100644 ${blob.stdout.trim()}\t${name}\0`,
-  );
-  assertEquals(staged.code, 0, staged.stderr);
-  const r = await ratchet(dir);
-  assertEquals(r.code, 1, r.stdout + r.stderr);
-  assertStringIncludes(r.stderr, `${name}: 0 → 900 (target 300, ceiling 400) — over the ceiling`);
+Deno.test({
+  name: "a name holding a newline is never exempt, even when one line names a managed file",
+  // Git for Windows lists no staged entry whose name holds a newline, so the
+  // case has nothing to measure there.
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const dir = await repo(10, FILE(300, 400));
+    await Deno.writeTextFile(
+      join(dir, ".specnaut/installed.lock"),
+      "version: 2\nentries:\n  managed.ts:\n    sha256: abc\ntemplates_version: 1\n",
+    );
+    await run("git", ["add", ".specnaut/installed.lock"], dir);
+    await run("git", ["commit", "-q", "-m", "lock"], dir);
+    const blob = await child("git", ["hash-object", "-w", "--stdin"], dir, {}, lines(900));
+    const name = "grown.ts\nmanaged.ts";
+    const staged = await child(
+      "git",
+      ["update-index", "-z", "--index-info"],
+      dir,
+      {},
+      `100644 ${blob.stdout.trim()}\t${name}\0`,
+    );
+    assertEquals(staged.code, 0, staged.stderr);
+    const r = await ratchet(dir);
+    assertEquals(r.code, 1, r.stdout + r.stderr);
+    assertStringIncludes(r.stderr, `${name}: 0 → 900 (target 300, ceiling 400) — over the ceiling`);
+  },
 });
