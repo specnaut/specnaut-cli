@@ -54,8 +54,7 @@ DEFAULT_SMOKE_DIR="$SMOKE_DIR"
 smoke_code_lines() {
   [ -n "${1:-}" ] || { echo "smoke_code_lines: needs a file" >&2; return 2; }
   [ -r "$1" ] || { echo "smoke_code_lines: cannot read '$1'" >&2; return 2; }
-  # Read via redirection, never as an operand: a path is data here, and a
-  # filename is not going to be mistaken for an option.
+  # Read via redirection, never as an operand: a path is data, never an option.
   awk -v SQ="'" -v DQ='"' '
     {
       # Scan for the cut INDEX; never accumulate the kept text. Building the
@@ -109,6 +108,7 @@ smoke-backlog-gitlab.sh
 smoke-backlog-cloud.sh
 smoke-backlog-plan.sh
 smoke-hooks.sh
+smoke-record-checkout.sh
 smoke-picker.sh
 smoke-all-harnesses.sh
 smoke-tag-release.sh
