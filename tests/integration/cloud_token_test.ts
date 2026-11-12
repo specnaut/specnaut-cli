@@ -55,13 +55,7 @@ Deno.test("`cloud token` hands the headless token over for the canonical endpoin
 Deno.test("`cloud token` refuses the headless token for a deployment the environment did not name", async () => {
   const home = await Deno.makeTempDir({ prefix: "specnaut-nohome-" });
   try {
-    for (
-      const url of [
-        "https://api.example.com",
-        "http://api.specnaut.com",
-        "https://api.specnaut.com.evil.test",
-      ]
-    ) {
+    for (const url of ["https://api.example.com", "https://api.specnaut.com.evil.test"]) {
       const r = await runSpecnaut(
         ["cloud", "token", "--api-url", url],
         { HOME: home, SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
@@ -73,6 +67,24 @@ Deno.test("`cloud token` refuses the headless token for a deployment the environ
       // The env's token was just refused: setting it is not the way out.
       assertEquals(r.stderr.includes("(or set SPECNAUT_CLOUD_TOKEN)"), false, r.stderr);
     }
+  } finally {
+    await Deno.remove(home, { recursive: true });
+  }
+});
+
+// Plain http to a host that is not loopback is no API URL at all: the command stops on the URL,
+// before any token is chosen, and the headless one is never printed.
+Deno.test("`cloud token` refuses a plain-http API URL before it reaches any token", async () => {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-nohome-" });
+  try {
+    const url = "http://api.specnaut.com";
+    const r = await runSpecnaut(
+      ["cloud", "token", "--api-url", url],
+      { HOME: home, SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
+    );
+    assertEquals(r.code, 1, url);
+    assertEquals(r.stdout.includes("sfc_headless_xyz"), false, url);
+    assertStringIncludes(r.stderr, "invalid Specnaut Cloud API URL", url);
   } finally {
     await Deno.remove(home, { recursive: true });
   }
