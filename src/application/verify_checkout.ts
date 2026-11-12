@@ -2,18 +2,31 @@ import { CHECKOUT_SCOPE } from "../domain/checkout_scope.ts";
 import { judgeCheckout, restartAdvice } from "../domain/checkout_trust.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
 import type { Untrusted } from "../domain/script_trust.ts";
-import type { CheckoutTreeWalker } from "./script_trust_ports.ts";
+import {
+  judgeRecord,
+  SESSION_REASON,
+  type SessionRecord,
+  startReasons,
+  tipDigests,
+} from "../domain/session_record.ts";
+import { parseRecord } from "../domain/session_record_json.ts";
+import type { CheckoutTreeWalker, SessionRecordReader } from "./script_trust_ports.ts";
 import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
 
 /**
  * Whether the session's checkout may be trusted to review a branch it does not trust: the rule is
  * {@link judgeCheckout}'s, the base is `specnaut verify-scripts`' (origin's copy of the default
- * branch), and the branch is named by its head's full sha, already fetched as objects. Every way
- * the check cannot conclude is a failure with a reason, never a pass; a throw from git is the
- * caller's to report as one.
+ * branch), and the branch is named by its head's full sha, already fetched as objects. The rule
+ * judges the checkout twice: as it is now, and as the session's start record holds it
+ * ({@link judgeRecord}), since the harness loaded it then. No record is a failure, never a check of
+ * the checkout as it is now alone. Every way the check cannot conclude is a failure with a reason,
+ * never a pass; a throw from git is the caller's to report as one.
  */
 
-export type VerifyCheckoutDeps = VerifyScriptsDeps & { readonly checkout: CheckoutTreeWalker };
+export type VerifyCheckoutDeps = VerifyScriptsDeps & {
+  readonly checkout: CheckoutTreeWalker;
+  readonly session: SessionRecordReader;
+};
 
 export type CheckoutOutcome =
   | { readonly kind: "trusted"; readonly baseTip: string }
@@ -37,11 +50,16 @@ export async function verifyCheckout(
   if (await deps.git.commitOf(untrustedHead) !== untrustedHead) {
     return restart("head", "names no commit in this repository: fetch it first", tip);
   }
+  const record = await startRecord(deps);
+  if (record.kind === "refused") return restart(SESSION_REASON.path, record.reason, tip);
   const facts = await gather(deps, tip, untrustedHead);
-  const verdict = judgeCheckout({ ...facts, scripts: scripts.verdict });
-  if (verdict.holds) return { kind: "trusted", baseTip: tip };
-  return { kind: "restart", reasons: verdict.reasons, advice: restartAdvice(tip) };
+  const now = judgeCheckout({ ...facts, scripts: scripts.verdict }).reasons;
+  const reasons = [...now, ...startReasons(now, await atStart(deps, record.record, tip, facts))];
+  if (reasons.length === 0) return { kind: "trusted", baseTip: tip };
+  return { kind: "restart", reasons, advice: restartAdvice(tip) };
 }
+
+type Facts = Awaited<ReturnType<typeof gather>>;
 
 /** What the rule reads besides the scripts: each side's commits, the checked files on both sides. */
 async function gather(deps: VerifyCheckoutDeps, tip: string, untrustedHead: string) {
@@ -53,6 +71,35 @@ async function gather(deps: VerifyCheckoutDeps, tip: string, untrustedHead: stri
     Promise.all(CHECKOUT_SCOPE.map((root) => git.listRoot(tip, root))),
   ]);
   return { headCommits, untrustedCommits, tree, tip: atTip.flat() };
+}
+
+async function startRecord(
+  deps: VerifyCheckoutDeps,
+): Promise<{ kind: "found"; record: SessionRecord } | { kind: "refused"; reason: string }> {
+  const read = await deps.session.read();
+  if (read.kind === "refused") return read;
+  const parsed = parseRecord(read.text);
+  if (parsed.kind === "parsed") return { kind: "found", record: parsed.record };
+  return { kind: "refused", reason: `${SESSION_REASON.malformed}: ${parsed.why}` };
+}
+
+/** The reasons the record gives: its HEAD's commits and its files, against the same tip. */
+async function atStart(
+  deps: VerifyCheckoutDeps,
+  record: SessionRecord,
+  tip: string,
+  facts: Facts,
+): Promise<readonly Untrusted[]> {
+  if (await deps.git.commitOf(record.head) !== record.head) {
+    return [{ path: record.head, reason: SESSION_REASON.headUnknown }];
+  }
+  return judgeRecord({
+    headCommits: await deps.git.commitsAhead(tip, record.head),
+    untrustedCommits: facts.untrustedCommits,
+    tree: record.tree,
+    tip: facts.tip,
+    tipDigests: await tipDigests(facts.tip),
+  }).reasons;
 }
 
 function restart(path: string, reason: string, tip: string | null): CheckoutOutcome {

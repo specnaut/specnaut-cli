@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { CHECKOUT_REASON } from "../../src/domain/checkout_trust.ts";
 import { REASON } from "../../src/domain/script_trust.ts";
-import { check, onBase, reasons, setUp } from "./verify_checkout_fixture.ts";
+import { check, onBase, reasons, setUp, startSession } from "./verify_checkout_fixture.ts";
 import { write } from "./verify_scripts_fixture.ts";
 
 /**
@@ -57,6 +57,7 @@ Deno.test({
   fn: async () => {
     const { root, head } = await withLinks({ [L]: "../../outside.md" });
     await Deno.writeTextFile(join(root, "..", "outside.md"), "rules\n");
+    await startSession(root); // once the link leads somewhere, as the check then finds it
     assertEquals(reasons(await check(root, head)), [{
       path: L,
       reason: CHECKOUT_REASON.linkLeaves,

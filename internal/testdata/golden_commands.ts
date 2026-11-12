@@ -1,7 +1,7 @@
 // The parse golden's cases for the commands added after golden.ts reached its size target
-// (`specnaut scan`, cli#747, `specnaut verify-scripts` and `specnaut sandbox`): parser.ts's own answer for each
-// command line, which internal/cli/parse_test.go holds the Go parser to. A later command's cases
-// go here too, never into golden.ts.
+// (`specnaut scan`, cli#747, `specnaut verify-scripts`, `specnaut sandbox`, `specnaut
+// record-checkout`): parser.ts's own answer for each command line, which internal/cli/parse_test.go
+// holds the Go parser to. A later command's cases go here too, never into golden.ts.
 //
 // Regenerate after changing a case or the TypeScript side (CI regenerates it and fails on a diff):
 //   deno run --allow-read --allow-write internal/testdata/golden_commands.ts
@@ -53,6 +53,9 @@ const argv: string[][] = [
   ["sandbox", "exec", SHA, "--toolchain", "/a", "--toolchain", "b", "--", "make"],
   ["sandbox", "exec", SHA, "--help", "--", "make"], ["sandbox", "exec", SHA, "--", "make", "--help"],
   ["--toolchain", "/a", "sandbox", "probe"], ["init", "--toolchain", "x"],
+  // `specnaut record-checkout`: no argument; its input is stdin, never argv.
+  ["record-checkout"], ["record-checkout", "x"], ["record-checkout", "--path", "x"],
+  ["record-checkout", "--help"], ["record-checkout", "a", "b"], ["--force", "record-checkout"],
 ];
 
 function intentOf(args: string[]): unknown {

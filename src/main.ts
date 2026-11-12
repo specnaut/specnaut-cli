@@ -47,6 +47,8 @@ async function dispatch(argv: string[]): Promise<number> {
       return (await import("./cli/handlers/sandbox_handler.ts")).runSandbox(intent);
     case "verify-scripts":
       return (await import("./cli/handlers/verify_scripts_handler.ts")).runVerifyScripts();
+    case "record-checkout":
+      return (await import("./cli/handlers/record_checkout_handler.ts")).runRecordCheckout();
     case "reconcile-status":
     case "reconcile-path":
       return (await import("./cli/handlers/reconcile_handler.ts")).runReconcile(intent);

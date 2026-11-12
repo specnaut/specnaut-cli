@@ -133,6 +133,14 @@ func parseVerifyScripts(_ Args, rest []string) Intent {
 	return Intent{Kind: "verify-scripts"}
 }
 
+// parseRecordCheckout: the command takes no argument; it reads a hook's input on stdin.
+func parseRecordCheckout(_ Args, rest []string) Intent {
+	if len(rest) > 0 {
+		return unknown("record-checkout takes no argument")
+	}
+	return Intent{Kind: "record-checkout"}
+}
+
 func parseReconcile(a Args, rest []string) Intent {
 	upstream, current := truthy(a, "accept-upstream"), truthy(a, "accept-current")
 	if truthy(a, "status") {

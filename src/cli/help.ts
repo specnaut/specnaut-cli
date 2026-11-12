@@ -20,6 +20,8 @@ ${bold("Usage:")}
   specnaut verify-scripts             Check .specnaut/scripts/ against a copy the branch does not carry,
                                       before a review or a merge runs them (read-only). Exit 0 trusted,
                                       1 untrusted, 3 no base
+  specnaut record-checkout            Record the checkout a session started on (HEAD and the instruction and
+                                      config files it loaded), from a SessionStart hook's input on stdin
   specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other
                                       one cannot (read-only). Exit 0 one is available, 1 none: static only
   specnaut sandbox exec <sha> [--toolchain <dir>[:<dir>...]] -- <command> [<arg>...]

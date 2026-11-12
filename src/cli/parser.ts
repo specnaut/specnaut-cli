@@ -68,6 +68,11 @@ export function parseArgs(argv: string[]): Intent {
     return { kind: "verify-scripts" };
   }
 
+  if (command === "record-checkout") {
+    if (rest.length > 0) return { kind: "unknown", received: "record-checkout takes no argument" };
+    return { kind: "record-checkout" };
+  }
+
   if (command === "self-update") {
     return { kind: "self-update", checkOnly: Boolean(parsed.check) };
   }

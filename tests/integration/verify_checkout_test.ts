@@ -129,6 +129,7 @@ Deno.test("an unknown base fails, never a check measured against nothing", async
     git: git as unknown as GitObjectReader,
     walker: { walk: () => Promise.reject(new Error("not reached")) },
     checkout: { walk: () => Promise.reject(new Error("not reached")) },
+    session: { read: () => Promise.reject(new Error("not reached")) },
     core: CORE_BUNDLE,
     findHarness,
   }, "c".repeat(40));

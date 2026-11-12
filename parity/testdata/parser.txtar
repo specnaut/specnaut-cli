@@ -51,3 +51,6 @@ specnaut sandbox exec abc -- make
 specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567
 specnaut sandbox -- exec 0123456789abcdef0123456789abcdef01234567 make
 specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567 --toolchain rel -- make
+# record-checkout refusals: it takes no argument.
+specnaut record-checkout extra
+specnaut record-checkout a b

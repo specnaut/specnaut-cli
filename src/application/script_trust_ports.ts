@@ -57,3 +57,22 @@ export interface ScriptTreeWalker {
 export interface CheckoutTreeWalker {
   walk(root: ScopeRoot): Promise<CheckoutWalk>;
 }
+
+/**
+ * What the session's start record reads as: its text, or why the check cannot read it (no record,
+ * one named outside the record folder, a file that cannot be read). Each refusal is final: the
+ * check never falls back to the checkout as it is now.
+ */
+export type RecordRead =
+  | { readonly kind: "read"; readonly text: string }
+  | { readonly kind: "refused"; readonly reason: string };
+
+/** The record of the checkout the running session started on. */
+export interface SessionRecordReader {
+  read(): Promise<RecordRead>;
+}
+
+/** Stores the record of the session `sessionId`, replacing an earlier one; its path. */
+export interface SessionRecordWriter {
+  write(sessionId: string, text: string): Promise<string>;
+}

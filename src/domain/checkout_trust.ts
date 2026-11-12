@@ -27,14 +27,35 @@ import { LINK_REASON, type LinkEnd, linkReason } from "./checkout_link.ts";
  *    included. A link holds only as the tip's own, by where it leads on disk (`checkout_link.ts`).
  *
  * Anything else stops the review, which never falls back to reading the checkout as it is.
+ *
+ * The harness loaded the checkout as it was when the session started, so the check judges that too:
+ * the record a `SessionStart` hook took (`session_record.ts`), by rules 1 and 3. A checkout switched
+ * to the base after the session started passes on disk and fails there. Its limit: a session that
+ * started on a branch changing the harness settings, or putting another `specnaut` first on the
+ * PATH, ran that branch's hooks instead, as the same user, and they can write any record. That
+ * session is already lost, as {@link restartAdvice} says; the record covers the session whose
+ * settings were the user's own and whose checkout was switched afterwards.
  */
 
 /** A tree entry as the checkout walk reads it: a file with its identity, a link with its end. */
 export type CheckoutEntry = TreeEntry & { readonly id?: string | null; readonly end?: LinkEnd };
 
-export type CheckoutWalk =
-  | { readonly kind: "walked"; readonly entries: readonly CheckoutEntry[] }
+/** A file as a session record holds it: the SHA-256 of its bytes, in lowercase hex, for the bytes. */
+export type RecordedFile = Omit<Extract<CheckoutEntry, { kind: "file" }>, "bytes"> & {
+  readonly sha256: string;
+};
+export type RecordedEntry = Exclude<CheckoutEntry, { kind: "file" }> | RecordedFile;
+
+/** A walk of one root: its entries, or the folder on the way that stopped it. */
+type Walk<E> =
+  | { readonly kind: "walked"; readonly entries: readonly E[] }
   | { readonly kind: "blocked"; readonly path: string; readonly why: string };
+export type CheckoutWalk = Walk<CheckoutEntry>;
+export type RecordedWalk = Walk<RecordedEntry>;
+
+type JudgedFile = Extract<CheckoutEntry | RecordedEntry, { kind: "file" }>;
+/** Whether a file holds what the tip has at its path: a blob's bytes, or a link's target. */
+export type HoldsTip = (file: JudgedFile, base: BaseEntry) => boolean;
 
 export type CheckoutInput = {
   /** The commits of base..HEAD. */
@@ -65,8 +86,8 @@ export const CHECKOUT_REASON = {
  * could not be named.
  */
 export function restartAdvice(baseTip: string | null): string {
-  return "This checkout is not the base, and this session already loaded its settings and " +
-    "instructions. A new harness process is required: never switch branches, reset or check " +
+  return "This session is not shown to have started on the base, and it already loaded its " +
+    "settings and instructions. A new harness process is required: never switch branches, reset or check " +
     "anything out from this session. Create a clean checkout of the base in a folder outside " +
     `\`.claude/\`: \`git worktree add --detach <dir> ${baseTip ?? "<BASE_TIP>"}\`, ` +
     "then start a new session in that folder.";
@@ -76,12 +97,15 @@ export function judgeCheckout(input: CheckoutInput): CheckoutVerdict {
   const reasons = [
     ...commitReasons(input),
     ...scriptReasons(input.scripts),
-    ...configReasons(input),
+    ...configReasons(input.tree, input.tip, holdsBytes),
   ];
   return { holds: reasons.length === 0, reasons };
 }
 
-function commitReasons(input: CheckoutInput): Untrusted[] {
+/** Rule 1: each commit HEAD holds that the tip lacks, named as the branch's or as another. */
+export function commitReasons(
+  input: Pick<CheckoutInput, "headCommits" | "untrustedCommits">,
+): Untrusted[] {
   const outside = new Set(input.untrustedCommits);
   return input.headCommits.map((path) => ({
     path,
@@ -95,19 +119,34 @@ function scriptReasons(scripts: ScriptVerdict): readonly Untrusted[] {
   return [{ path: SCRIPTS_DIR, reason: CHECKOUT_REASON.scripts }];
 }
 
-/** Each walk that stopped, each tree entry the tip does not match, each tip entry the tree lacks. */
-function configReasons(input: CheckoutInput): Untrusted[] {
+/** A file the walk read holds the tip's blob, or, where links are off, the tip's link's target. */
+const holdsBytes: HoldsTip = (file, base) => {
+  if (!("bytes" in file)) return false;
+  if (base.kind === "blob") return sameBytes(file.bytes, base.bytes);
+  return base.kind === "link" && base.target !== undefined &&
+    sameBytes(file.bytes, new TextEncoder().encode(base.target));
+};
+
+/**
+ * Rule 3: each walk that stopped, each tree entry the tip does not match, each tip entry the tree
+ * lacks. `holds` compares a file with the tip: by its bytes, or by the digest a record holds.
+ */
+export function configReasons(
+  tree: readonly Walk<CheckoutEntry | RecordedEntry>[],
+  tipEntries: readonly BaseEntry[],
+  holds: HoldsTip,
+): Untrusted[] {
   const out: Untrusted[] = [];
-  const entries: CheckoutEntry[] = [];
-  for (const walk of input.tree) {
+  const entries: (CheckoutEntry | RecordedEntry)[] = [];
+  for (const walk of tree) {
     if (walk.kind === "blocked") out.push({ path: walk.path, reason: walk.why });
     else entries.push(...walk.entries.filter((e) => inCheckoutScope(e.path)));
   }
-  const tip = input.tip.filter((e) => inCheckoutScope(e.path));
+  const tip = tipEntries.filter((e) => inCheckoutScope(e.path));
   const atTip = new Map(tip.map((e) => [e.path, e]));
   const ids = new Set(entries.flatMap((e) => e.kind === "file" && e.id ? [e.id] : []));
   for (const entry of entries) {
-    const reason = entryReason(entry, atTip, ids);
+    const reason = entryReason(entry, atTip, ids, holds);
     if (reason !== null) out.push({ path: entry.path, reason });
   }
   const inTree = new Set(entries.map((e) => e.path));
@@ -119,9 +158,10 @@ function configReasons(input: CheckoutInput): Untrusted[] {
 }
 
 function entryReason(
-  entry: CheckoutEntry,
+  entry: CheckoutEntry | RecordedEntry,
   atTip: ReadonlyMap<string, BaseEntry>,
   ids: ReadonlySet<string>,
+  holds: HoldsTip,
 ): string | null {
   if (entry.kind === "other") return REASON.notRegular;
   if (entry.kind === "unreadable") return `unreadable: ${entry.why}`;
@@ -131,10 +171,5 @@ function entryReason(
   }
   if (entry.kind === "link") return linkReason(entry, base, ids);
   if (entry.links > 1) return REASON.hardLinked;
-  if (base.kind === "blob" && sameBytes(entry.bytes, base.bytes)) return null;
-  // A link checked out where links are off is a file holding the link's target: the tip's blob.
-  if (base.kind === "link" && base.target !== undefined) {
-    if (sameBytes(entry.bytes, new TextEncoder().encode(base.target))) return null;
-  }
-  return REASON.differs;
+  return holds(entry, base) ? null : REASON.differs;
 }

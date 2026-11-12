@@ -32,19 +32,20 @@ var Surface = FlagTable{
 // parse-time refusals (parse.go). A command dispatch.go does not run answers
 // with the not-ported notice. `login` is `cloud login` (#398).
 var Commands = map[string]func(Args, []string) Intent{
-	"init":           parseInit,
-	"self-update":    kindOnly("self-update"),
-	"check":          kindOnly("check"),
-	"upgrade":        parseUpgrade,
-	"diff":           parseDiff,
-	"reconcile":      parseReconcile,
-	"login":          kindOnly("cloud"),
-	"cloud":          subcommand("cloud", CloudSubs),
-	"gate":           subcommand("gate", GateSubs),
-	"spec":           subcommand("spec", SpecSubs),
-	"scan":           parseScan,
-	"sandbox":        parseSandbox,
-	"verify-scripts": parseVerifyScripts,
+	"init":            parseInit,
+	"self-update":     kindOnly("self-update"),
+	"check":           kindOnly("check"),
+	"upgrade":         parseUpgrade,
+	"diff":            parseDiff,
+	"reconcile":       parseReconcile,
+	"login":           kindOnly("cloud"),
+	"cloud":           subcommand("cloud", CloudSubs),
+	"gate":            subcommand("gate", GateSubs),
+	"spec":            subcommand("spec", SpecSubs),
+	"scan":            parseScan,
+	"sandbox":         parseSandbox,
+	"verify-scripts":  parseVerifyScripts,
+	"record-checkout": parseRecordCheckout,
 }
 
 // Subcommand words, as parser.ts accepts them.

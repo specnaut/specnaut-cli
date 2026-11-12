@@ -97,3 +97,9 @@
 {"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--","make","--help"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":[],"command":["make","--help"]}}
 {"args":["--toolchain","/a","sandbox","probe"],"intent":{"kind":"sandbox","sub":"probe"}}
 {"args":["init","--toolchain","x"],"intent":{"kind":"init","projectName":null,"here":false,"noGit":false,"ai":null,"backlog":null,"backlogUrl":null,"backlogRepo":null,"scheme":null,"specBackend":null,"force":false,"dryRun":false,"resetPreserved":false}}
+{"args":["record-checkout"],"intent":{"kind":"record-checkout"}}
+{"args":["record-checkout","x"],"intent":{"kind":"unknown","received":"record-checkout takes no argument"}}
+{"args":["record-checkout","--path","x"],"intent":{"kind":"record-checkout"}}
+{"args":["record-checkout","--help"],"intent":{"kind":"help"}}
+{"args":["record-checkout","a","b"],"intent":{"kind":"unknown","received":"record-checkout takes no argument"}}
+{"args":["--force","record-checkout"],"intent":{"kind":"record-checkout"}}

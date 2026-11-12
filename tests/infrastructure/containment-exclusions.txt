@@ -34,3 +34,5 @@ src/infrastructure/fs_export_files.ts  writes only inside the export's seats/ an
 src/infrastructure/fs_sandbox_host.ts::removeAll  removes only the scratch folder scratch() made new with makeTempDir in the system temp folder, never a path built from a project directory
 src/infrastructure/fs_sandbox_host.ts::reopen  restores the owner's permissions inside that same new scratch folder so it can be removed; it touches nothing outside it
 src/infrastructure/sandbox_runners.ts::run  creates only the policy's write folders, which the policy places under the run's new scratch folder in the system temp folder, never under a project directory
+src/infrastructure/fs_session_records.ts  writes only under the repository's own git directory, as `git rev-parse --absolute-git-dir` names it, never a path built from the work tree: in `specnaut/session/` there, whose two folders are lstat'ed and refused as a link, the record created new beside its name and renamed onto it
+src/infrastructure/claude_env_file.ts::exportToSession  appends one line to the file the harness names in CLAUDE_ENV_FILE, a path from the environment, never built from a project directory
