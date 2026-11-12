@@ -8,6 +8,7 @@
 // grep matches them: line by line, over the text's UTF-8 bytes.
 
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
+import { assertPortable } from "./ere_portability.ts";
 
 /** Where the pattern file sits in the bundle: beside the bash scan that reads it too. */
 const PATTERNS_SUFFIX = "scripts/bash/_secret_patterns.txt";
@@ -49,8 +50,9 @@ const NAMES = {
 /**
  * The patterns of a `_secret_patterns.txt` source, read as `_report_text.sh` reads
  * them: `name pattern` lines, a repeated name joined by `|`, other lines skipped.
- * Throws when a pattern is missing or uses a bracket class this translation does
- * not know: a check with less than the scan's patterns is no check.
+ * Throws when a pattern is missing, or uses an ERE spelling JavaScript reads
+ * differently (`assertPortable`): a check with less than the scan's patterns, or
+ * other ones, is no check.
  */
 export function compilePatterns(source: string): CredentialPatterns {
   const joined = new Map<string, string>();
@@ -64,11 +66,9 @@ export function compilePatterns(source: string): CredentialPatterns {
   for (const [name, [role, flags]] of Object.entries(NAMES)) {
     const ere = joined.get(name);
     if (!ere) throw new Error(`the credential patterns have no ${name}`);
+    assertPortable(name, ere);
     // [:space:] in the C locale; JavaScript has no POSIX classes.
-    const js = ere.replaceAll("[:space:]", " \\t\\n\\v\\f\\r");
-    const unknown = /\[:[a-z]+:\]/.exec(js);
-    if (unknown) throw new Error(`${name} uses ${unknown[0]}, which the binary cannot read`);
-    out[role] = new RegExp(js, flags);
+    out[role] = new RegExp(ere.replaceAll("[:space:]", " \\t\\n\\v\\f\\r"), flags);
   }
   return out as CredentialPatterns;
 }

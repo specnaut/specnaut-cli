@@ -31797,10 +31797,12 @@ sanitise_title() {
     content: `# The credential patterns, in their one home. Two readers: _report_text.sh's
 # scan_hard, under grep -E in the C locale, and the specnaut binary, over the text
 # it sends to Specnaut Cloud. A pattern added here is refused by both; list it in
-# report-upstream.sh's header too.
+# report-upstream.sh's header too, and add a sample it refuses to
+# tests/scripts/secret_samples.ts: both readers are proven against those samples.
 # A line is a name, one space, then a POSIX extended regular expression, to the end
 # of the line. A name on several lines is one pattern: its lines joined by \`|\`.
-# The one bracket class used is [:space:]; the binary translates no other. Every run
+# The one bracket class used is [:space:]; the binary translates no other, and refuses
+# any spelling JavaScript reads differently (ere_portability.ts). Every run
 # a pattern repeats before something must follow is bounded ({0,64}, not *): unbounded,
 # a long line makes a backtracking engine rescan it from every position. No bound
 # exceeds 255, POSIX's RE_DUP_MAX: grep refuses a pattern that does.

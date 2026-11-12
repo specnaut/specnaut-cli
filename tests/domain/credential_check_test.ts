@@ -69,6 +69,27 @@ Deno.test("a pattern file missing a pattern, or using a class it cannot read, is
   assertThrows(() => compilePatterns(`${source}\nSECRET_RE x[[:alpha:]]`), Error, "[:alpha:]");
 });
 
+/** ERE spellings JavaScript reads differently, each with what the refusal names. */
+const NOT_PORTABLE: [string, string][] = [
+  ["a[]x]", "a ] first"],
+  ["a[^]x]", "a ] first"],
+  ["a[\\d]", "a backslash in a bracket"],
+  ["a[[.x.]]", "[.x.]"],
+  ["a[[=x=]]", "[=x=]"],
+  ["\\<word\\>", "\\<"],
+  ["word\\>", "\\>"],
+  ["a{,3}", "{,n}"],
+  ["a[bc", "never closed"],
+];
+
+Deno.test("a pattern grep and JavaScript would read differently is refused", () => {
+  const source = Deno.readTextFileSync(PATTERNS);
+  for (const [ere, what] of NOT_PORTABLE) {
+    assertThrows(() => compilePatterns(`${source}\nSECRET_RE ${ere}`), Error, what, ere);
+  }
+  compilePatterns(`${source}\nSECRET_RE a[^/[:space:]"']{1,8}\\.b`); // portable: compiles
+});
+
 Deno.test("a refusal names the field and the class, and never the value", () => {
   const value = "plainwords1234";
   const e = assertThrows(
