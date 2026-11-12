@@ -19,8 +19,7 @@ export const PLUGIN_NAME = "specnaut-plugin";
  *   - customized on disk (SHA differs)   → `preserve` with
  *                                          `pluginAvailable: true`
  *
- * When the plugin is NOT installed, this predicate is irrelevant —
- * upgrade behavior is unchanged.
+ * When the plugin is NOT installed, this predicate is irrelevant.
  *
  * Coverage is **Claude-harness only**. The plugin is Claude-specific;
  * Cursor/Codex/etc. projects keep their on-disk files binary-
@@ -191,6 +190,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/task/spec-autogen.md",
   ...[
     "plan",
+    "plan-reentry",
     "implement",
     "epic-commits",
     "quality-gates",

@@ -54,9 +54,8 @@ export interface ContractDoc {
 const tk = (phase: string): PhaseAddress => ({ skill: "task", phase });
 
 /**
- * Parents follow the `/task` router's own account of who loads what.
- * `auto-chain` is loaded by the router when a chainable phase completes, so its
- * step belongs in the addendum of the phase it follows.
+ * Parents follow the `/task` router's own account of who loads what. `auto-chain` is loaded
+ * when a chainable phase completes, so its step belongs in the addendum of the phase it follows.
  */
 export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "merge-squash", parents: [tk("merge")] },
@@ -73,6 +72,7 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "orphan-specs", parents: [tk("groom")] },
   // The review aggregation, loaded by review before its first seat brief (#678).
   { skill: "task", doc: "review-seats", parents: [tk("review")] },
+  { skill: "task", doc: "plan-reentry", parents: [tk("plan")] },
 ];
 
 /**

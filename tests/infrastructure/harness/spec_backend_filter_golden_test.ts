@@ -31,6 +31,7 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // And again when step 1 became the verify-scripts gate block, and its epic and missing-seat
 // sections moved to epic-loop.md and review-seats.md behind a pointer.
 // cli#744 re-captured plan's: step 7 points at the product owner's "What you decide" calls.
+// cli#774 re-captured plan's: its Re-entry section moved to plan-reentry.md behind a pointer.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

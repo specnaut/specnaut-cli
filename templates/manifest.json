@@ -15,6 +15,12 @@
     {
       "category": "phase",
       "name": "task",
+      "suffix": "plan-reentry.md",
+      "source": "core/skills/task/phases/plan-reentry.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
       "suffix": "implement.md",
       "source": "core/skills/task/phases/implement.md"
     },

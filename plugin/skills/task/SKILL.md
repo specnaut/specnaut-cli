@@ -55,6 +55,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 
 | Contract doc | Loaded by |
 | :--- | :--- |
+| `phases/plan-reentry.md` | `plan <id>`, before its step 2 |
 | `phases/merge-squash.md` | `merge`, on Exit 14 — standalone |
 | `phases/epic-commits.md` | `implement`, on an epic |
 | `phases/quality-gates.md` | `implement`, `review` and `merge` |

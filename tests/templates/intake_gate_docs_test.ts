@@ -153,10 +153,11 @@ Deno.test("resume reads the gate's lines in the plan's row order, and names its 
   assertStringIncludes(resume, "except through `phases/merge-close.md` § Re-entry.");
 });
 
-Deno.test("epic-commits.md names both places that map epic-status.sh's exits", () => {
+Deno.test("epic-commits.md points at every table that maps epic-status.sh's exits", () => {
   const doc = flat(read("phases/epic-commits.md"));
   assertStringIncludes(doc, "`phases/merge.md` step 1 for the branch");
   assertStringIncludes(doc, "`phases/merge-close.md` § Re-entry for `--landed`");
+  assertStringIncludes(doc, "the header of `.specnaut/scripts/bash/_intake_gate.sh`");
 });
 
 /**

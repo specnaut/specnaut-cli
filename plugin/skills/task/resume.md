@@ -48,7 +48,7 @@ normal routing, addendum included.
 | a gate line other than its last, the verdict | nothing: quote it and point where `phases/auto-chain.md` points, then stop |
 | the item is closed | nothing: name the line `wip-audit.sh` printed, with its sha (or "closed without a landing commit"), and stop |
 | `LANDED`, the item open | nothing: name the sha and stop. It may be a delivery across several branches, so settling it is `/task close <id>` or the next branch's `merge` |
-| `IDLE`, and the working tree's `.specnaut/feature.json` links the item | `plan`, at its section "The plan stop", as an adopted plan (`phases/plan.md`, "Re-entry") |
+| `IDLE`, and the working tree's `.specnaut/feature.json` links the item | `plan`, at its section "The plan stop", as an adopted plan (`phases/plan-reentry.md`) |
 | `IDLE` | `plan <id>` |
 | `ACTIVE`, and the provenance gate below fails | nothing: name the sha and the check that failed, and stop |
 | `ACTIVE`, and the gate passes | check out the branch, then `implement` |

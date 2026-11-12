@@ -16,7 +16,7 @@ HEAD's own commits set, never one inherited from the base; otherwise stop and as
 epic's child it is the epic, and `<epoch>` is `<task>`'s creation time.
 If `view.sh` printed `—` for it, the header of `wip-audit.sh` says what to pass. First, run
 `specnaut spec pull <task>` once: it writes the spec to the gitignored `.specnaut/specs/.cache/<task>/`,
-and you read it from there. Read its outcome as `phases/plan.md`'s Re-entry does: anything but a
+and you read it from there. Read its outcome as `phases/plan-reentry.md` does: anything but a
 materialised `1-plan.md` stops. Then the branch, from
 `bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>`; a non-zero exit stops:
 

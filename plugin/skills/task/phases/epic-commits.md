@@ -61,6 +61,6 @@ epic merge path, not here.
 has two commits, and fails when the history does not read back to the board. Never parse the log a
 second way; its exits are mapped in two places: `phases/merge.md` step 1 for the branch, and
 `phases/merge-close.md` § Re-entry for `--landed`, which reads what the published base shipped
-across every delivery (the intake gate takes any other exit as a failed read). A history that does not read
-back was rewritten by something that did not follow this file: stop and say so rather than picking
+across every delivery; the intake gate's reading of it is its own exit table, the header of
+`.specnaut/scripts/bash/_intake_gate.sh`. A history that does not read back was rewritten by something that did not follow this file: stop and say so rather than picking
 one reading.

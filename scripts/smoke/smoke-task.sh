@@ -28,6 +28,8 @@ for phase in doc list upgrade; do
 done
 check "phase doc issue.md scaffolded, and routed by the /specnaut router (cli#726)" \
   '[ -f .claude/skills/specnaut/phases/issue.md ] && grep -qF "phases/issue.md" .claude/skills/specnaut/SKILL.md'
+check "plan-reentry.md scaffolded, and plan.md loads it before step 2 (cli#774)" \
+  '[ -f .claude/skills/task/phases/plan-reentry.md ] && grep -qF "phases/plan-reentry.md" .claude/skills/task/phases/plan.md'
 
 echo
 echo "═══ spec 037  /task audit replaced the audit skills ═══"
