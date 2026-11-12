@@ -7,7 +7,13 @@
 # Requires REPO_ROOT. Every git call goes through gate_git: this runs inside hooks,
 # where git has exported GIT_DIR and friends pointing at someone else's view of
 # the repository.
+#
+# Given a head (gate_candidate_head, _explicit_head.sh), the candidate is that
+# commit, read from git's objects by its id: never HEAD, the index or a work tree,
+# so it cannot dirty or move, and nothing on disk is taken for it.
 
+# shellcheck source=SCRIPTDIR/_explicit_head.sh disable=SC1091
+. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_explicit_head.sh" || return 70
 GATE_LOCAL_ENV="$(git rev-parse --local-env-vars 2>/dev/null)"
 
 # gate_git <git args...> - git on this repository, with the inherited repository
@@ -15,6 +21,7 @@ GATE_LOCAL_ENV="$(git rev-parse --local-env-vars 2>/dev/null)"
 gate_git() {
   (
     for gate_var in $GATE_LOCAL_ENV; do unset "$gate_var"; done
+    explicit_head_env
     git -C "$REPO_ROOT" -c core.fsmonitor=false "$@"
   )
 }
@@ -34,11 +41,37 @@ gate_candidate_in_repo() {
   [ "$prefix" = "true" ]
 }
 
+# gate_candidate_head [--head <sha> [--objects <dir>]] - takes the head; with no
+# argument, nothing changes. A refusal leaves its cause in EXPLICIT_REFUSAL and
+# returns 1.
+# shellcheck disable=SC2034  # EXPLICIT_REFUSAL is read by the script that calls this
+gate_candidate_head() {
+  local sha="" objects=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --head) sha="${2:-}" ;;
+      --objects) objects="${2:-}" ;;
+      *) EXPLICIT_REFUSAL="usage: [--head <sha> [--objects <dir>]], not $1"; return 1 ;;
+    esac
+    shift 2 2>/dev/null || { EXPLICIT_REFUSAL="usage: $1 takes a value"; return 1; }
+  done
+  [ -n "$sha$objects" ] || return 0
+  [ -n "$sha" ] || { EXPLICIT_REFUSAL="--objects needs --head"; return 1; }
+  explicit_head_take "$sha" "$objects" gate_git || return 1
+}
+
 # gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the
 # refusal and returns 1 when it is not. Status is read with the submodule flag
-# the change set uses, so neither can see a change the other cannot.
+# the change set uses, so neither can see a change the other cannot. Given a head,
+# the commit is asked instead: an id names one tree, whatever the disk holds.
 gate_candidate_check() {
   local status head
+  if [ -n "$EXPLICIT_HEAD" ]; then
+    head="$(gate_git rev-parse --verify --quiet "$EXPLICIT_HEAD^{tree}" 2>/dev/null)" ||
+      { echo "no-commit"; return 1; }
+    [ "$head" = "$1" ] || { echo "tree-moved: $EXPLICIT_HEAD holds $head"; return 1; }
+    return 0
+  fi
   status="$(gate_git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" ||
     { echo "status-failed"; return 1; }
   if [ -n "$status" ]; then
@@ -54,13 +87,13 @@ gate_candidate_check() {
   return 0
 }
 
-# gate_candidate_merge_base <name> - the merge-base of HEAD and the default branch <name>,
+# gate_candidate_merge_base <name> - the merge-base of HEAD, or the head, and the default branch <name>,
 # from the remote's copy when there is one, as that is where the branch will land.
 gate_candidate_merge_base() {
   local ref
   for ref in "refs/remotes/origin/$1" "refs/heads/$1"; do
     gate_git rev-parse --verify --quiet "$ref" >/dev/null 2>&1 || continue
-    gate_git merge-base HEAD "$ref" 2>/dev/null
+    gate_git merge-base "${EXPLICIT_HEAD:-HEAD}" "$ref" 2>/dev/null
     return $?
   done
   return 1
@@ -68,23 +101,25 @@ gate_candidate_merge_base() {
 
 # gate_candidate_declares <path> <commit...> - does the work tree hold <path>, a link
 # included, or does HEAD or a given commit? One deleted on the branch is a change,
-# not a project that never opted in. Outside a repository only the tree is asked.
+# not a project that never opted in. Outside a repository only the tree is asked;
+# given a head, the work tree is not, and the head stands for HEAD.
 gate_candidate_declares() {
   local commit
-  [ -e "$REPO_ROOT/$1" ] || [ -L "$REPO_ROOT/$1" ] && return 0
+  if [ -z "$EXPLICIT_HEAD" ]; then [ -e "$REPO_ROOT/$1" ] || [ -L "$REPO_ROOT/$1" ] && return 0; fi
   gate_candidate_in_repo || return 1
-  for commit in HEAD "${@:2}"; do
+  for commit in "${EXPLICIT_HEAD:-HEAD}" "${@:2}"; do
     gate_git cat-file -e "$commit:$1" 2>/dev/null && return 0
   done
   return 1
 }
 
-# gate_candidate_capture - sets CANDIDATE_TREE and CANDIDATE_COMMIT from HEAD. Called
+# gate_candidate_capture - sets CANDIDATE_TREE and CANDIDATE_COMMIT from HEAD or the head. Called
 # in the caller's own shell, so they stay set; returns 1 when HEAD holds no commit.
 # shellcheck disable=SC2034  # read by the scripts that source this one
 gate_candidate_capture() {
-  CANDIDATE_COMMIT="$(gate_git rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null)" || return 1
-  CANDIDATE_TREE="$(gate_git rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null)" || return 1
+  local rev="${EXPLICIT_HEAD:-HEAD}"
+  CANDIDATE_COMMIT="$(gate_git rev-parse --verify --quiet "$rev^{commit}" 2>/dev/null)" || return 1
+  CANDIDATE_TREE="$(gate_git rev-parse --verify --quiet "$rev^{tree}" 2>/dev/null)" || return 1
 }
 
 # gate_candidate_same_tree <local sha...> - does every pushed sha hold CANDIDATE_TREE? Prints the refusal, naming each tree that is not, and returns 1 otherwise:

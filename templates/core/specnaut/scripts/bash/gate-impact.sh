@@ -2,7 +2,8 @@
 # Decide which of a tier's commands this candidate needs. Called by run-gate.sh, and
 # by nothing else:
 #
-#   gate-impact.sh <tier> <commands-file> <records-file> <--base <rev> | --refs-stdin>
+#   gate-impact.sh <tier> <commands-file> <records-file> <--base <rev> | --refs-stdin> <rev or "">
+#                  [--head <sha> [--objects <dir>]]   the candidate is that commit (_gate_candidate.sh)
 #
 # It takes data and returns data. <commands-file> holds the tier's parsed commands,
 # one per line; <records-file> receives tab-separated records and a final `end`:
@@ -199,6 +200,7 @@ decide() {
     *) widen "tier-not-scoped: $TIER"; return 0 ;;
   esac
   check_every_protected || return 0
+  [ -z "$EXPLICIT_HEAD" ] || { widen "head-not-checked-out: the adapter describes a work tree"; return 0; }
   take_snapshots || { drift="$(gate_candidate_check "$CANDIDATE_TREE")" || refuse "$drift"; return 0; }
   drift="$(gate_candidate_check "$CANDIDATE_TREE")" || refuse "$drift"
   compute_affected || return 0
@@ -265,6 +267,7 @@ write_selection() {
 
 main() {
   local refusal in_repo=0
+  gate_candidate_head "$@" || refuse "head-refused: $EXPLICIT_REFUSAL"
   gate_candidate_in_repo && in_repo=1
   if [ "$in_repo" -eq 1 ]; then
     case "$MODE" in
@@ -282,4 +285,4 @@ main() {
   write_selection
 }
 
-main
+main "${@:6}"

@@ -2,7 +2,8 @@
 # (SC2034: EXPLICIT_* are read by the sourcing script.)
 # _explicit_head.sh - the one home of an explicit head: the commit a script is told to
 # judge, by its full id, in place of HEAD. Sourced, never run, by size-ratchet.sh,
-# boundary-check.sh and _git_untrusted.sh (git-read.sh, collect-audit-scope.sh).
+# boundary-check.sh, _git_untrusted.sh (git-read.sh, collect-audit-scope.sh) and
+# _gate_candidate.sh (gate-impact.sh).
 #
 #   --head <sha>      a full commit id: 40 or 64 lowercase hex digits, the object
 #                     format's own length, so no ref name, revision expression or
