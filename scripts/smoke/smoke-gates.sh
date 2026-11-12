@@ -201,8 +201,7 @@ rm dirt.txt
 echo "═══ the git library the phases read the seats' data through ═══"
 check "git-read.sh installs beside its library, _scope_globs.sh and _explicit_head.sh; the scope script has copies, and _audit_scopes.sh" \
   '[ -x .specnaut/scripts/bash/git-read.sh ] && [ -f .specnaut/scripts/bash/_git_untrusted.sh ] &&
-   [ -f .specnaut/scripts/audit/_audit_scopes.sh ] &&
-   for f in _git_untrusted.sh _scope_globs.sh _explicit_head.sh; do
+   [ -f .specnaut/scripts/audit/_audit_scopes.sh ] && for f in _git_untrusted.sh _scope_globs.sh _explicit_head.sh; do
      cmp -s ".specnaut/scripts/bash/$f" ".specnaut/scripts/audit/$f" || ! break; done'
 check "the installed git-read refuses an option where a revision belongs, before git runs" \
   'r=0; bash .specnaut/scripts/bash/git-read.sh names --output=smoke-out HEAD 2>/dev/null || r=$?;
