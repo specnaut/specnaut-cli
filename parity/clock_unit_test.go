@@ -1,6 +1,8 @@
 package parity
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -18,6 +20,23 @@ func TestPinClockLeavesEverythingElse(t *testing.T) {
 	in := "templates_version: 7.0.3\nsha256: 2026\n"
 	if got, n := PinClock(in); got != in || n != 0 {
 		t.Errorf("PinClock = %q, %d; want it unchanged, 0", got, n)
+	}
+}
+
+// A file with no timestamp is refused, not pinned in silence: the scenario
+// pinned the wrong file, and its commit ids would vary again.
+func TestPinFileRefusesAFileWithNoTimestamp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lock.yml")
+	in := "templates_version: 7.0.3\n"
+	if err := os.WriteFile(path, []byte(in), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := pinFile(path, "lock.yml")
+	if err == nil || err.Error() != "pin-clock: lock.yml holds no timestamp to pin" {
+		t.Errorf("pinFile = %v; want the no-timestamp refusal", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != in {
+		t.Errorf("the refused file changed: %q", got)
 	}
 }
 

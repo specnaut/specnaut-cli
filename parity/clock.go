@@ -1,6 +1,7 @@
 package parity
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 
@@ -25,21 +26,32 @@ func PinClock(s string) (string, int) {
 }
 
 // pinClock is `pin-clock <file>...`: a scenario runs it on a file the binary
-// wrote, before git commits it. A file with no timestamp fails the scenario:
-// the pin would be a no-op, and the commit ids would vary again in silence.
+// wrote, before git commits it.
 func pinClock(ts *testscript.TestScript, neg bool, args []string) {
 	if neg || len(args) == 0 {
 		ts.Fatalf("usage: pin-clock file...")
 	}
 	for _, name := range args {
-		path := ts.MkAbs(name)
-		data, err := os.ReadFile(path)
-		ts.Check(err)
-		pinned, n := PinClock(string(data))
-		if n == 0 {
-			ts.Fatalf("pin-clock: %s holds no timestamp to pin", name)
+		if err := pinFile(ts.MkAbs(name), name); err != nil {
+			ts.Fatalf("%v", err)
 		}
-		// The file exists, so WriteFile keeps its mode; the permission is unused.
-		ts.Check(os.WriteFile(path, []byte(pinned), 0o644))
 	}
+}
+
+// pinFile pins the timestamps of the file at path, which a scenario calls
+// name. A file with no timestamp is an error and stays as it was: the pin
+// would be a no-op, and the commit ids would vary again in silence. A plain
+// function, so a unit test reads the refusal that ts.Fatalf would end a
+// script on.
+func pinFile(path, name string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	pinned, n := PinClock(string(data))
+	if n == 0 {
+		return fmt.Errorf("pin-clock: %s holds no timestamp to pin", name)
+	}
+	// The file exists, so WriteFile keeps its mode; the permission is unused.
+	return os.WriteFile(path, []byte(pinned), 0o644)
 }
