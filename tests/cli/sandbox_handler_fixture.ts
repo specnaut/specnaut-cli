@@ -38,6 +38,7 @@ export const EXEC: SandboxIntent = {
   sha: SHA,
   toolchain: [],
   command: ["make"],
+  log: null,
 };
 export const PROBE: SandboxIntent = { kind: "sandbox", sub: "probe" };
 

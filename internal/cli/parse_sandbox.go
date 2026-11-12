@@ -51,7 +51,17 @@ func parseSandboxExec(a Args, before []string, after int) Intent {
 	if v, ok := a.Flag("toolchain"); ok && !isToolchain(v) {
 		return sandboxRefused("exec --toolchain takes absolute folders separated by :")
 	}
+	if v, ok := a.Flag("log"); ok && !isAbsoluteFile(v) {
+		return sandboxRefused("exec --log takes an absolute file path")
+	}
 	return Intent{Kind: "sandbox"}
+}
+
+// absoluteFile is sandbox_parser.ts's isAbsolutePath: `/x`, or a drive letter's `C:\x` / `C:/x`.
+var absoluteFile = regexp.MustCompile(`^(/|[A-Za-z]:[\\/]).`)
+
+func isAbsoluteFile(v Value) bool {
+	return v.Kind == String && absoluteFile.MatchString(v.S)
 }
 
 // isToolchain is sandbox_parser.ts's toolchainOf: a string of absolute folders joined by `:`.

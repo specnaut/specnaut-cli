@@ -23,7 +23,15 @@ export type ScanIntent = {
  */
 export type SandboxIntent =
   | { kind: "sandbox"; sub: "probe" }
-  | { kind: "sandbox"; sub: "exec"; sha: string; toolchain: string[]; command: string[] };
+  | {
+    kind: "sandbox";
+    sub: "exec";
+    sha: string;
+    toolchain: string[];
+    command: string[];
+    /** `--log`: the new file the run's output goes to, capped and control-stripped; else ours. */
+    log: string | null;
+  };
 
 /**
  * `specnaut review`: `gate` is the hook's checkout check, `start` exports the branch `source`

@@ -22,7 +22,7 @@ var Surface = FlagTable{
 	Strings: []string{
 		"ai", "backlog", "backlog-url", "backlog-repo", "scheme", "spec-backend",
 		"api-url", "type", "title", "payload", "task", "path", "format", "top",
-		"toolchain",
+		"toolchain", "log",
 	},
 	Aliases: map[string]string{"v": "version", "h": "help"},
 }

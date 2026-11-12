@@ -53,6 +53,9 @@ const argv: string[][] = [
   ["sandbox", "exec", SHA, "--toolchain", "/a", "--toolchain", "b", "--", "make"],
   ["sandbox", "exec", SHA, "--help", "--", "make"], ["sandbox", "exec", SHA, "--", "make", "--help"],
   ["--toolchain", "/a", "sandbox", "probe"], ["init", "--toolchain", "x"],
+  ["sandbox", "exec", SHA, "--log", "/tmp/run.log", "--", "make"], ["sandbox", "exec", SHA, "--log", "rel.log", "--", "make"],
+  ["sandbox", "exec", SHA, "--log", "", "--", "make"], ["sandbox", "exec", SHA, "--log", "--", "make"],
+  ["sandbox", "exec", SHA, "--log", "C:\\r.log", "--", "make"], ["sandbox", "exec", SHA, "--log", "/", "--", "make"],
   // `specnaut record-checkout`: no argument; its input is stdin, never argv.
   ["record-checkout"], ["record-checkout", "x"], ["record-checkout", "--path", "x"],
   ["record-checkout", "--help"], ["record-checkout", "a", "b"], ["--force", "record-checkout"],

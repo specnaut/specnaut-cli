@@ -45,6 +45,7 @@ const PARSE_OPTIONS = {
     "format",
     "top",
     "toolchain",
+    "log",
   ],
   alias: { v: "version", h: "help" },
 } as const;

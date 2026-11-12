@@ -26,12 +26,13 @@ export function parseSandbox(
     return { kind: "sandbox", sub: "probe" };
   }
   if (sub !== "exec") return { kind: "unknown", received: `sandbox ${sub ?? ""}`.trim() };
-  return parseExec(parsed.toolchain, before, command);
+  return parseExec(parsed.toolchain, parsed.log, before, command);
 }
 
 /** `exec`'s words: one full commit id before `--`, a command after it, and `--toolchain`. */
 function parseExec(
   rawToolchain: unknown,
+  rawLog: unknown,
   before: readonly string[],
   command: string[] | null,
 ): Intent {
@@ -41,7 +42,11 @@ function parseExec(
   if (command === null || command.length === 0) return refused("exec needs a command after --");
   const toolchain = toolchainOf(rawToolchain);
   if (toolchain === null) return refused("exec --toolchain takes absolute folders separated by :");
-  return { kind: "sandbox", sub: "exec", sha: before[0], toolchain, command };
+  if (rawLog !== undefined && !isAbsolutePath(rawLog)) {
+    return refused("exec --log takes an absolute file path");
+  }
+  const log = rawLog === undefined ? null : rawLog as string;
+  return { kind: "sandbox", sub: "exec", sha: before[0], toolchain, command, log };
 }
 
 /**
@@ -53,4 +58,9 @@ function toolchainOf(raw: unknown): string[] | null {
   if (typeof raw !== "string") return null;
   const folders = raw.split(":");
   return folders.every((f) => f.startsWith("/")) ? folders : null;
+}
+
+/** An absolute path on this platform's terms: `/x`, or a drive letter's `C:\x` / `C:/x`. */
+function isAbsolutePath(raw: unknown): raw is string {
+  return typeof raw === "string" && /^(\/|[A-Za-z]:[\\/])./.test(raw);
 }

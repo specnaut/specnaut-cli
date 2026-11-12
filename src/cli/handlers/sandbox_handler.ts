@@ -19,6 +19,7 @@ import {
 } from "../../domain/sandbox_limits.ts";
 import { userBus } from "../../domain/sandbox_args.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
+import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
 import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
@@ -43,7 +44,9 @@ import type { SandboxIntent } from "../intent.ts";
  *          a stop that failed (a container left behind) is said on a second line.
  *          125: nothing ran (static only, no such export, a layout the policy refuses, or a
  *          launcher that could not start). Every 124 and 125 says why on stderr; the command's own
- *          output is passed through unchanged.
+ *          output is passed through unchanged, or, with `--log <file>`, written to that new file
+ *          with every control but tab and line feed dropped and cut at `LOG_CAP_BYTES`: a review
+ *          briefs the file by path, and reads the result from the exit code alone.
  *
  * Usage errors are the parser's: exit 2 with the help, before anything is probed.
  */
@@ -53,7 +56,7 @@ export type SandboxDeps = {
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
   readonly probe: () => Promise<BackendProbe>;
-  readonly exec: (request: ExecRequest) => Promise<ExecOutcome>;
+  readonly exec: (request: ExecRequest & { readonly log: string | null }) => Promise<ExecOutcome>;
 };
 
 export async function runSandbox(
@@ -123,12 +126,23 @@ function defaultDeps(): SandboxDeps {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     probe: () => prober.probe(),
-    exec: (request) => execInSandbox(execDeps(prober, checkout), request),
+    exec: async (request) => {
+      const log = request.log === null ? null : await openCappedLog(request.log);
+      try {
+        return await execInSandbox(execDeps(prober, checkout, log), request);
+      } finally {
+        await log?.close();
+      }
+    },
   };
 }
 
 /** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
-function execDeps(prober: HostBackendProber, checkout: () => Promise<string>): ExecDeps {
+function execDeps(
+  prober: HostBackendProber,
+  checkout: () => Promise<string>,
+  log: CappedLog | null,
+): ExecDeps {
   const { os, arch } = Deno.build;
   const env = (name: string) => Deno.env.get(name);
   const path = env("PATH") ?? "/usr/bin:/bin";
@@ -136,7 +150,11 @@ function execDeps(prober: HostBackendProber, checkout: () => Promise<string>): E
     prober,
     host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
     runnerFor: (backend) =>
-      runnerFor(backend, new DenoProcessLauncher(), { arch, path, bus: userBus(env) }),
+      runnerFor(backend, new DenoProcessLauncher(log?.out, log?.err), {
+        arch,
+        path,
+        bus: userBus(env),
+      }),
   };
 }
 

@@ -32,10 +32,11 @@ ${bold("Usage:")}
   specnaut review end <sha>           Remove the export of <sha>
   specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other
                                       one cannot (read-only). Exit 0 one is available, 1 none: static only
-  specnaut sandbox exec <sha> [--toolchain <dir>[:<dir>...]] -- <command> [<arg>...]
+  specnaut sandbox exec <sha> [--toolchain <dir>[:<dir>...]] [--log <file>] -- <command> [<arg>...]
                                       Run <command> on the exported tree of commit <sha> in that sandbox:
                                       the tree read-only, no network, no home, the --toolchain folders
-                                      read-only and on its PATH. Exit: the command's; 124 out of time;
+                                      read-only and on its PATH. --log: its output to that new file,
+                                      controls dropped, capped. Exit: the command's; 124 out of time;
                                       125 not run
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current

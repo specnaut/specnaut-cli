@@ -26,6 +26,7 @@ Deno.test("sandbox exec: the commit, the toolchain, and the command after --, un
     sha: SHA,
     toolchain: ["/opt/a/bin", "/opt/b"],
     command: ["deno", "--version"],
+    log: null,
   });
   assertEquals(parseArgs(["sandbox", "exec", SHA, "--", "make", "007", "-h", "--", "x"]), {
     kind: "sandbox",
@@ -33,7 +34,10 @@ Deno.test("sandbox exec: the commit, the toolchain, and the command after --, un
     sha: SHA,
     toolchain: [],
     command: ["make", "007", "-h", "--", "x"],
+    log: null,
   });
+  const logged = parseArgs(["sandbox", "exec", SHA, "--log", "/tmp/run.log", "--", "make"]);
+  assertEquals(logged.kind === "sandbox" && logged.sub === "exec" && logged.log, "/tmp/run.log");
 });
 
 function refused(argv: string[]): string {
@@ -42,6 +46,10 @@ function refused(argv: string[]): string {
 }
 
 const REFUSALS: ReadonlyArray<[string[], string]> = [
+  [
+    ["sandbox", "exec", SHA, "--log", "run.log", "--", "make"],
+    "sandbox exec --log takes an absolute file path",
+  ],
   [["sandbox"], "sandbox"],
   [["sandbox", "bogus"], "sandbox bogus"],
   [["sandbox", "probe", "x"], "sandbox probe takes no argument"],
