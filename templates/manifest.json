@@ -2291,6 +2291,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_gate_sandbox.sh",
+      "source": "core/specnaut/scripts/bash/_gate_sandbox.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/merge-mode.sh",
       "source": "core/specnaut/scripts/bash/merge-mode.sh",
       "executable": true

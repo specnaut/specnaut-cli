@@ -20,6 +20,8 @@
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
+#   5   --sandbox, --head, --objects or --evidence: this runner is static only, so
+#       nothing ran and the gate is NOT RUN, never a pass
 #
 # Bare, it never reads `.specnaut/impact.json` and is the manual full override.
 # Behind a flag it asks gate-impact.ps1 which commands this candidate needs, runs that
@@ -92,6 +94,10 @@ for ($n = 1; $n -lt $scriptArgs.Count; $n++) {
         '--refs-stdin' {
             if ($flag.Length -gt 0) { Stop-FlagUsage }
             $flag = '--refs-stdin'
+        }
+        { [Array]::IndexOf([string[]]@('--sandbox', '--head', '--objects', '--evidence'), [string]$_) -ge 0 } {
+            [Console]::Error.WriteLine("run-gate.ps1 is static only: it runs no gate in a sandbox, so $_ is refused and the gate is NOT RUN")
+            exit 5
         }
         '--parse-gates' {
             if ($n + 2 -ne $scriptArgs.Count) { Stop-FlagUsage }

@@ -61,9 +61,15 @@ specnaut sandbox exec "$HEAD" --log "$LOGS/<n>.log" [--toolchain <dir>[:<dir>...
 bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "$BASE_TIP" --head "$HEAD" --objects "$OBJECTS" --evidence "$LOGS" --sandbox
 ```
 
-The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. A log is briefed by its
-path, never pasted. Where `specnaut sandbox probe` exits 1 (no sandbox, as on Windows), the review
-is static only: every gate, the tests included, is `NOT RUN`.
+`run-gate.sh` reads this checkout's `gates.yml`, runs each command through `specnaut sandbox exec`
+on the scratch copy, prints one `log: <file>` line per command, and writes its evidence under
+`$LOGS`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. A log is briefed
+by its path, never pasted. Where `specnaut sandbox probe` exits 1 (no sandbox, as on Windows), the
+review is static only: every gate, the tests included, is `NOT RUN`.
+
+**Windows is static only.** No gate runs there: `run-gate.ps1` refuses `--sandbox`, `--head`,
+`--objects` and `--evidence` with exit 5, which is `NOT RUN` too. The tests are reported `NOT RUN`,
+so the verdict is capped at `needs_followup` (below), never `pass`.
 
 ## The verdict, and nothing after it
 

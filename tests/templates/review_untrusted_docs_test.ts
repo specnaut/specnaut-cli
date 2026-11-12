@@ -52,6 +52,14 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   );
 });
 
+Deno.test("Windows is static only: run-gate.ps1's refusal is NOT RUN, and the verdict is capped", () => {
+  const doc = flat("review-untrusted.md");
+  assertStringIncludes(doc, "**Windows is static only.**");
+  assertStringIncludes(doc, "`--objects` and `--evidence` with exit 5, which is `NOT RUN` too");
+  assertStringIncludes(doc, "The tests are reported `NOT RUN`, so the verdict is capped at");
+  assertStringIncludes(doc, "`needs_followup` (below), never `pass`");
+});
+
 Deno.test("the seats read the read-only copy, and instruction files only as data by blob SHA", () => {
   const doc = flat("review-untrusted.md");
   assertStringIncludes(doc, "A brief names `$SEATS` as where the branch's files are");

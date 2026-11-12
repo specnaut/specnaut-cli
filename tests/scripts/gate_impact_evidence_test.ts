@@ -225,6 +225,7 @@ const FILES = {
     "_gate_impact_graph.sh",
     "_gate_evidence.sh",
     "_gate_selected.sh",
+    "_gate_sandbox.sh",
   ],
   powershell: [
     "run-gate.ps1",

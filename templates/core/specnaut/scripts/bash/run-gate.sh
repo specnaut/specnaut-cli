@@ -2,6 +2,7 @@
 # Run one declared quality-gate tier.
 #
 #   run-gate.sh <fast|full> [--base <rev> | --refs-stdin]
+#               [--head <sha> [--objects <dir>] --evidence <dir> --sandbox]
 #
 # Reads `.specnaut/gates.yml` and runs the commands under `fast_gate:` or
 # `full_gate:`, in order, from the repository root.
@@ -21,6 +22,12 @@
 #   3   behind a flag: the candidate is refused, before or after the commands
 #   4   behind a flag: every command was omitted, or the tier was emptied on the
 #       branch. A skip is never a pass
+#   125 behind --sandbox: the sandbox ran nothing, so the tier is NOT RUN, never a pass
+#
+# --sandbox runs each command on the exported copy of the head commit <sha> through
+# `specnaut sandbox exec` (_gate_sandbox.sh), its output to a new file under the
+# --evidence folder, judged by its exit code alone. --head and --objects are only for it,
+# and reach gate-impact.sh as given; the evidence goes to that folder.
 #
 # Bare, it never reads `.specnaut/impact.json` and is the manual full override.
 # Behind a flag it asks gate-impact.sh which commands this candidate needs, runs
@@ -78,8 +85,12 @@ parse_tier() {
   ' < "$1"
 }
 
-FLAG="" BASE_VALUE=""
-flag_usage() { echo "usage: run-gate.sh <fast|full> [--base <rev> | --refs-stdin]" >&2; exit 2; }
+FLAG="" BASE_VALUE="" EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+flag_usage() {
+  [ -z "${1:-}" ] || echo "run-gate: $1" >&2
+  echo "usage: run-gate.sh <fast|full> [--base <rev> | --refs-stdin] [--head <sha> [--objects <dir>] --evidence <dir> --sandbox]" >&2
+  exit 2
+}
 parse_flags() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -94,6 +105,17 @@ parse_flags() {
         FLAG=--refs-stdin
         shift
         ;;
+      --head | --objects)
+        [ "$#" -ge 2 ] || flag_usage "$1 takes a value"
+        HEAD_ARGS+=("$1" "$2")
+        shift 2
+        ;;
+      --evidence)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || flag_usage "--evidence takes a value"
+        EVIDENCE="$2"
+        shift 2
+        ;;
+      --sandbox) SANDBOX=1 && shift ;;
       --parse-gates)
         [ "$#" -eq 2 ] || flag_usage
         parse_tier "$2"
@@ -104,6 +126,7 @@ parse_flags() {
   done
 }
 parse_flags "${@:2}"
+[ "${#HEAD_ARGS[@]}" -eq 0 ] || [ "$SANDBOX" = 1 ] || flag_usage "--head and --objects need --sandbox"
 
 # gate_run_one <owners or -> <command> - the one place a command of the tier is run:
 # from the repository root, stdin from /dev/null, and the owners in the one variable
@@ -112,6 +135,7 @@ parse_flags "${@:2}"
 gate_run_one() {
   local owners="$1" cmd="$2"
   shift 2
+  [ "$SANDBOX" = 0 ] || { gate_run_sandboxed "$cmd"; return; }
   (
     cd "$REPO_ROOT" || exit 125
     if [ "$owners" = "-" ]; then unset SPECNAUT_AFFECTED_OWNERS; else export SPECNAUT_AFFECTED_OWNERS="$owners"; fi
@@ -121,11 +145,14 @@ gate_run_one() {
 
 # Behind a flag, the selected run (_gate_selected.sh) exits with its own report, or
 # returns when gate-impact.sh answers `inactive`, for the bare path below.
-if [ -n "$FLAG" ]; then
+if [ -n "$FLAG" ] || [ "$SANDBOX" = 1 ]; then
   # shellcheck source=SCRIPTDIR/_gate_selected.sh
   . "$SCRIPT_DIR/_gate_selected.sh" || { echo "run-gate: _gate_selected.sh is missing" >&2; exit 3; }
-  run_selected
+  # shellcheck source=SCRIPTDIR/_gate_sandbox.sh
+  . "$SCRIPT_DIR/_gate_sandbox.sh" || { echo "run-gate: _gate_sandbox.sh is missing" >&2; exit 3; }
 fi
+[ "$SANDBOX" = 0 ] || gate_sandbox_start
+[ -z "$FLAG" ] || run_selected
 
 if [ ! -r "$GATES" ]; then
   echo "no $TIER gate declared — $GATES is absent, so nothing ran"
@@ -151,8 +178,9 @@ while IFS= read -r cmd; do
   # relocate the next one. Stdin from /dev/null: this loop reads its list from
   # stdin, so a command inheriting it would consume the commands after it, and
   # the tier would report them as passed without running them.
-  ( cd "$REPO_ROOT" && eval "$cmd" ) </dev/null
+  if [ "$SANDBOX" = 1 ]; then gate_run_sandboxed "$cmd"; else ( cd "$REPO_ROOT" && eval "$cmd" ) </dev/null; fi
   rc=$?
+  [ "$SANDBOX" = 0 ] || [ "$rc" -ne 125 ] || gate_not_run "$i/$count"
   if [ "$rc" -ne 0 ]; then
     echo "  ✗ the $TIER gate failed at command $i/$count (exit $rc): $cmd" >&2
     exit 1
