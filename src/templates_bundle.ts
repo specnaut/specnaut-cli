@@ -29350,16 +29350,6 @@ read_merge_base() {
   if commit="\$(gate_candidate_merge_base "\$name")"; then COMPARE+=("\$commit"); else widen "merge-base-unresolved: \$name"; fi
 }
 
-# Does a commit in reach hold a declaration the work tree does not? One deleted on the
-# branch is a change, not a project that never opted in.
-declaration_on_a_side() {
-  local commit
-  for commit in HEAD \${COMPARE[@]+"\${COMPARE[@]}"}; do
-    gate_git cat-file -e "\$commit:\$DECLARATION" 2>/dev/null && return 0
-  done
-  return 1
-}
-
 # FR-006, for one path: tracked and regular on every side, and the same on every side.
 check_protected() {
   local path="\$1" mine theirs commit mine_rc theirs_rc
@@ -29531,9 +29521,7 @@ main() {
     esac
     read_merge_base
   fi
-  if [ ! -e "\$REPO_ROOT/\$DECLARATION" ] && [ ! -L "\$REPO_ROOT/\$DECLARATION" ]; then
-    if [ "\$in_repo" -eq 0 ] || ! declaration_on_a_side; then inactive; fi
-  fi
+  gate_candidate_declares "\$DECLARATION" \${COMPARE[@]+"\${COMPARE[@]}"} || inactive
   [ "\$in_repo" -eq 1 ] || refuse "not-a-repository: a declaration needs a work tree to vouch for"
   gate_candidate_capture || refuse "no-commit"
   refusal="\$(gate_candidate_check "\$CANDIDATE_TREE")" || refuse "\$refusal"
@@ -29616,6 +29604,19 @@ gate_candidate_merge_base() {
     gate_git rev-parse --verify --quiet "\$ref" >/dev/null 2>&1 || continue
     gate_git merge-base HEAD "\$ref" 2>/dev/null
     return \$?
+  done
+  return 1
+}
+
+# gate_candidate_declares <path> <commit...> - does the work tree hold <path>, a link
+# included, or does HEAD or a given commit? One deleted on the branch is a change,
+# not a project that never opted in. Outside a repository only the tree is asked.
+gate_candidate_declares() {
+  local commit
+  [ -e "\$REPO_ROOT/\$1" ] || [ -L "\$REPO_ROOT/\$1" ] && return 0
+  gate_candidate_in_repo || return 1
+  for commit in HEAD "\${@:2}"; do
+    gate_git cat-file -e "\$commit:\$1" 2>/dev/null && return 0
   done
   return 1
 }

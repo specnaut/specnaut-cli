@@ -66,6 +66,19 @@ gate_candidate_merge_base() {
   return 1
 }
 
+# gate_candidate_declares <path> <commit...> - does the work tree hold <path>, a link
+# included, or does HEAD or a given commit? One deleted on the branch is a change,
+# not a project that never opted in. Outside a repository only the tree is asked.
+gate_candidate_declares() {
+  local commit
+  [ -e "$REPO_ROOT/$1" ] || [ -L "$REPO_ROOT/$1" ] && return 0
+  gate_candidate_in_repo || return 1
+  for commit in HEAD "${@:2}"; do
+    gate_git cat-file -e "$commit:$1" 2>/dev/null && return 0
+  done
+  return 1
+}
+
 # gate_candidate_capture - sets CANDIDATE_TREE and CANDIDATE_COMMIT from HEAD. Called
 # in the caller's own shell, so they stay set; returns 1 when HEAD holds no commit.
 # shellcheck disable=SC2034  # read by the scripts that source this one
