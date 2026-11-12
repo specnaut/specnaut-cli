@@ -15,18 +15,18 @@ export async function openCappedLog(path: string, cap = LOG_CAP_BYTES): Promise<
   const file = await Deno.open(path, { write: true, createNew: true, mode: 0o600 });
   const filter = new LogFilter(cap);
   let pending: Promise<unknown> = Promise.resolve();
-  const write = (chunk: Uint8Array) => {
-    const kept = filter.push(chunk);
+  /** Bytes the filter kept, queued behind earlier ones: never filtered or counted again. */
+  const append = (kept: Uint8Array) => {
     pending = pending.then(() => kept.length > 0 ? writeAll(file, kept) : undefined);
     return pending.then(() => undefined);
   };
+  const write = (chunk: Uint8Array) => append(filter.push(chunk));
   const stream = () => new WritableStream<Uint8Array>({ write });
   return {
     out: stream(),
     err: stream(),
     close: async () => {
-      await write(filter.end());
-      await pending;
+      await append(filter.end());
       if (filter.truncated) {
         await writeAll(file, new TextEncoder().encode(`\n[output cut at ${cap} bytes]\n`));
       }

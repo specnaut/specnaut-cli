@@ -30,3 +30,17 @@ Deno.test("a log is never written over a file or through a link already at its p
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("what a sequence cut at the end leaves is filtered and counted once", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "capped-log-" });
+  try {
+    const path = join(dir, "run.log");
+    const log = await openCappedLog(path, 4);
+    const out = log.out.getWriter();
+    await out.write(new Uint8Array([0x61, 0xe2]));
+    await log.close();
+    assertEquals(await Deno.readTextFile(path), "a�", "the cap was not reached");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
