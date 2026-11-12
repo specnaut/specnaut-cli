@@ -13,6 +13,10 @@ $ARGUMENTS
 - `$ARGUMENTS` may carry, in any order: **`--pr`** — deliver through a pull request instead of a
   local merge; **`--no-close`** — merge and push but leave the backlog item open (a feature
   delivered across several branches, on every branch but the last).
+- **An untrusted head is never merged here; the forge merges it.** When this session reviewed the
+  branch in untrusted mode (`phases/review-untrusted.md`), or `$ARGUMENTS` names a PR number or a
+  `<remote>/<branch>`, stop before step 0 and say so: nothing lands, is pushed, closed or moved. On
+  Claude Code the review lock refuses that session's landing script and every push besides.
 - The base branch is the `BASE_BRANCH` that `specnaut verify-scripts` prints at step 0. No such line
   means it is unknown: stop and say so — never assume `main`.
 

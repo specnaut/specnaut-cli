@@ -46,6 +46,14 @@ check "review-gate.sh registered on PreToolUse for Bash" \
 out=$(echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | bash .claude/hooks/review-gate.sh 2>&1; echo "ec=$?")
 [ "$out" = "ec=0" ] && pass "review-gate.sh lets a command with no review through, silent" \
   || fail "review-gate.sh stopped or spoke on an unrelated command" "$out"
+# The review lock before every tool call: registered on every tool, and with no
+# lock held a call is let through without starting the binary.
+check "review-lock.sh executable" '[ -x .claude/hooks/review-lock.sh ]'
+check "review-lock.sh registered on PreToolUse for every tool" \
+  'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"*\") | .hooks[].command | select(test(\"review-lock\\\\.sh\"))] | length == 1" .claude/settings.json >/dev/null'
+out=$(echo '{"session_id":"s","tool_name":"Bash","tool_input":{"command":"ls"}}' | bash .claude/hooks/review-lock.sh 2>&1; echo "ec=$?")
+[ "$out" = "ec=0" ] && pass "review-lock.sh lets a call through with no lock held, silent" \
+  || fail "review-lock.sh stopped or spoke with no lock held" "$out"
 check "retired protect-generated copy not scaffolded" '[ ! -e .claude/hooks/protect-generated.sh ]'
 check "retired log-subagent copy not scaffolded" '[ ! -e .claude/hooks/log-subagent.sh ]'
 # Every script a registration runs exists: a moved hook left registered at its

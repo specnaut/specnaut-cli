@@ -2683,6 +2683,12 @@
       "executable": true
     },
     {
+      "harness": "claude",
+      "destination": ".claude/hooks/review-lock.sh",
+      "source": "harness-specific/claude/hooks/review-lock.sh",
+      "executable": true
+    },
+    {
       "harness": "codex",
       "destination": ".specnaut/hooks/_guard.sh",
       "source": "harness-specific/shared/hooks/_guard.sh"

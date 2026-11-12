@@ -1,5 +1,6 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
+import { REVIEW_SEATS } from "../../src/domain/review_lock.ts";
 
 /**
  * The review of a branch the session cannot trust, as the phase documents tell an agent to run it.
@@ -82,4 +83,34 @@ Deno.test("tests that did not run cap the verdict, and the review ends with the 
   const doc = flat("review-untrusted.md");
   assertStringIncludes(doc, "never merge, push, close an item or move a card for this head");
   assertStringIncludes(doc, 'run `specnaut review end "$HEAD"`');
+  assertStringIncludes(doc, "under the lock nothing is removed");
+});
+
+Deno.test("from the start on, the session is under the review lock, each command alone", () => {
+  const doc = flat("review-untrusted.md");
+  assertStringIncludes(
+    doc,
+    "From the start's exit 0 until this session ends, the `review-lock` hook",
+  );
+  assertStringIncludes(doc, "**Each command runs alone, its values written out:**");
+  assertStringIncludes(doc, "MCP tools and WebFetch included");
+  assertStringIncludes(doc, "Nothing removes the lock");
+  assertStringIncludes(doc, "Run `specnaut verify-scripts` alone, not step 1's block");
+  assertStringIncludes(doc, "The brief says the seat is under the review lock");
+  assert(!doc.includes("to a temp file"), "a redirection the lock refuses");
+});
+
+Deno.test("the merge phase refuses an untrusted head: the forge merges it", () => {
+  const doc = flat("merge.md");
+  assertStringIncludes(doc, "**An untrusted head is never merged here; the forge merges it.**");
+  assertStringIncludes(
+    doc,
+    "stop before step 0 and say so: nothing lands, is pushed, closed or moved",
+  );
+});
+
+Deno.test("the lock dispatches exactly the seats review.md's seat table names", () => {
+  const table = read("review.md").split("### Seat selection")[1].split("###")[0];
+  const seats = [...table.matchAll(/^\| `([a-z-]+)`/gm)].map((m) => m[1]);
+  assertEquals(seats, [...REVIEW_SEATS]);
 });
