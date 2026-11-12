@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { versionsIn } from "../../scripts/check-release-commit.ts";
 import { writeVersions } from "../../scripts/bump-version.ts";
 import {
@@ -20,14 +20,26 @@ import {
  * with a feature" from "the tag captured half a feature".
  */
 
+Deno.test("each fixture repository is removed once its test is done", async () => {
+  let dir: string;
+  {
+    await using repo = await repoAt("3.0.0", "chore: release v3.0.0");
+    dir = repo.dir;
+  }
+  await assertRejects(() => Deno.stat(dir), Deno.errors.NotFound);
+});
+
 Deno.test("a correct release commit passes", async () => {
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0");
-  assertEquals((await run(dir, "v3.0.0")).code, 0);
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0");
+  assertEquals((await run(repo.dir, "v3.0.0")).code, 0);
 });
 
 Deno.test("the v3.0.0 mistake is refused — bump swept into a feat commit", async () => {
-  const dir = await repoAt("3.0.0", "feat(changelog): let a release lead with what it is about");
-  const { code, err } = await run(dir, "v3.0.0");
+  await using repo = await repoAt(
+    "3.0.0",
+    "feat(changelog): let a release lead with what it is about",
+  );
+  const { code, err } = await run(repo.dir, "v3.0.0");
   assertEquals(code, 1);
   assert(err.includes('expected "chore: release v3.0.0"'), err);
 });
@@ -36,8 +48,8 @@ Deno.test("version files that disagree are refused", async () => {
   // bump-version.ts writes all six in lockstep, but a hand-edit or a partial
   // revert can desync them — and a binary whose --version disagrees with its
   // templates manifest is a support ticket nobody can reproduce.
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0", { desync: "2.1.0" });
-  const { code, err } = await run(dir, "v3.0.0");
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0", { desync: "2.1.0" });
+  const { code, err } = await run(repo.dir, "v3.0.0");
   assertEquals(code, 1);
   assert(err.includes("src/domain/version.ts declares 2.1.0"), err);
 });
@@ -45,24 +57,24 @@ Deno.test("version files that disagree are refused", async () => {
 Deno.test("a catalog entry left on the previous tag is refused", async () => {
   // The marketplace copies the catalog verbatim at the tag: an entry still
   // pinned to the previous tag installs the previous plugin.
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0", { staleRef: "2.9.0" });
-  const { code, err } = await run(dir, "v3.0.0");
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0", { staleRef: "2.9.0" });
+  const { code, err } = await run(repo.dir, "v3.0.0");
   assertEquals(code, 1);
   assert(err.includes('b is pinned to "v2.9.0", not v3.0.0'), err);
 });
 
 Deno.test("a dirty tree is refused", async () => {
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0");
-  await Deno.writeTextFile(`${dir}/stray.txt`, "not in the tag");
-  const { code, err } = await run(dir, "v3.0.0");
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0");
+  await Deno.writeTextFile(`${repo.dir}/stray.txt`, "not in the tag");
+  const { code, err } = await run(repo.dir, "v3.0.0");
   assertEquals(code, 1);
   assert(err.includes("working tree is dirty"), err);
 });
 
 Deno.test("a malformed tag is a usage error, not a release verdict", async () => {
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0");
-  assertEquals((await run(dir, "3.0.0")).code, 2);
-  assertEquals((await run(dir, "latest")).code, 2);
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0");
+  assertEquals((await run(repo.dir, "3.0.0")).code, 2);
+  assertEquals((await run(repo.dir, "latest")).code, 2);
 });
 
 Deno.test("versionsIn finds both the JSON field and the TS constant", () => {
@@ -87,8 +99,8 @@ Deno.test("versionsIn finds both the JSON field and the TS constant", () => {
  */
 
 Deno.test("highlights already published at the previous tag are refused", async () => {
-  const dir = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async () => {});
-  const { code, err } = await run(dir, "v1.1.0");
+  await using repo = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async () => {});
+  const { code, err } = await run(repo.dir, "v1.1.0");
   assertEquals(code, 1);
   assert(err.includes("already published at v1.0.0"), err);
 });
@@ -97,18 +109,18 @@ Deno.test("a whitespace reflow after the tag does NOT make stale highlights fres
   // THE defect. Under the previous provenance check this passed, because the
   // reflow commit is not an ancestor of the tag — and the reader sees the same
   // words either way.
-  const dir = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
+  await using repo = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
     await Deno.writeTextFile(`${d}/${H}`, LEAD.replace(/, and here is why/, ",\nand here is why"));
     await git(d, "add", "-A");
     await git(d, "commit", "-q", "-m", "style: reflow HIGHLIGHTS.md to the fmt width");
   });
-  const { code, err } = await run(dir, "v1.1.0");
+  const { code, err } = await run(repo.dir, "v1.1.0");
   assertEquals(code, 1, `a reflow must not clear the staleness flag:\n${err}`);
   assert(err.includes("already published at v1.0.0"), err);
 });
 
 Deno.test("highlights genuinely rewritten for this release are accepted", async () => {
-  const dir = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
+  await using repo = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
     await Deno.writeTextFile(
       `${d}/${H}`,
       "**Something else entirely shipped.**\n\nDifferent words.\n",
@@ -116,39 +128,39 @@ Deno.test("highlights genuinely rewritten for this release are accepted", async 
     await git(d, "add", "-A");
     await git(d, "commit", "-q", "-m", "docs(release): the new lead");
   });
-  assertEquals((await run(dir, "v1.1.0")).code, 0);
+  assertEquals((await run(repo.dir, "v1.1.0")).code, 0);
 });
 
 Deno.test("an emptied highlights file is accepted — a release with no lead is normal", async () => {
-  const dir = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
+  await using repo = await repoWithHighlights("v1.0.0", "v1.1.0", LEAD, async (d) => {
     await Deno.writeTextFile(`${d}/${H}`, "");
     await git(d, "add", "-A");
     await git(d, "commit", "-q", "-m", "docs(release): no lead this time");
   });
-  assertEquals((await run(dir, "v1.1.0")).code, 0);
+  assertEquals((await run(repo.dir, "v1.1.0")).code, 0);
 });
 
 Deno.test("highlights absent at the previous tag cannot have been republished", async () => {
   // The file is new since the last release. There is nothing it could repeat.
-  const dir = await repoAt("1.0.0", "chore: release v1.0.0");
-  await git(dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0");
-  await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
-  await Deno.writeTextFile(`${dir}/${H}`, LEAD);
-  await writeVersions("1.1.0", dir);
-  await recordHistory(dir, "v1.1.0", LEAD);
-  await git(dir, "add", "-A");
-  await git(dir, "commit", "-q", "-m", "chore: release v1.1.0");
-  assertEquals((await run(dir, "v1.1.0")).code, 0);
+  await using repo = await repoAt("1.0.0", "chore: release v1.0.0");
+  await git(repo.dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0");
+  await Deno.mkdir(`${repo.dir}/.specnaut/release`, { recursive: true });
+  await Deno.writeTextFile(`${repo.dir}/${H}`, LEAD);
+  await writeVersions("1.1.0", repo.dir);
+  await recordHistory(repo.dir, "v1.1.0", LEAD);
+  await git(repo.dir, "add", "-A");
+  await git(repo.dir, "commit", "-q", "-m", "chore: release v1.1.0");
+  assertEquals((await run(repo.dir, "v1.1.0")).code, 0);
 });
 
 Deno.test("an OpenCode install line left on the previous release is refused (cli#667)", async () => {
-  const dir = await repoAt("3.0.0", "chore: release v3.0.0");
+  await using repo = await repoAt("3.0.0", "chore: release v3.0.0");
   await Deno.writeTextFile(
-    `${dir}/README.md`,
+    `${repo.dir}/README.md`,
     '`"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v2.9.0"]`\n',
   );
-  await git(dir, "commit", "-qam", "chore: release v3.0.0");
-  const { code, err } = await run(dir, "v3.0.0");
+  await git(repo.dir, "commit", "-qam", "chore: release v3.0.0");
+  const { code, err } = await run(repo.dir, "v3.0.0");
   assertEquals(code, 1);
   assertStringIncludes(err, "README.md: the OpenCode install line is pinned to v2.9.0, not v3.0.0");
 });

@@ -9,13 +9,26 @@ import { historyFileProblems, readReleaseHistory } from "../../scripts/bundle-re
  * has its own case, and each must fail the bundle on its own.
  */
 
-async function historyDir(files: Record<string, string>): Promise<URL> {
+/** A temp history directory holding `files`, removed when the test's `await using` ends. */
+async function historyDir(files: Record<string, string>): Promise<AsyncDisposable & { url: URL }> {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-history-" });
   for (const [name, content] of Object.entries(files)) {
     await Deno.writeTextFile(join(dir, name), content);
   }
-  return toFileUrl(`${dir}/`);
+  return {
+    url: toFileUrl(`${dir}/`),
+    [Symbol.asyncDispose]: () => Deno.remove(dir, { recursive: true }),
+  };
 }
+
+Deno.test("each history directory is removed once its test is done", async () => {
+  let url: URL;
+  {
+    await using dir = await historyDir({ "v1.0.0.md": "" });
+    url = dir.url;
+  }
+  await assertRejects(() => Deno.stat(url), Deno.errors.NotFound);
+});
 
 /**
  * Refused by Unicode property, not by a list of ranges (cli#775): control
@@ -45,8 +58,8 @@ const CLASSES: Array<[string, string, string]> = [
 
 for (const [what, content, named] of CLASSES) {
   Deno.test(`a history file holding ${what} fails the bundle`, async () => {
-    const dir = await historyDir({ "v1.0.0.md": "**Fine.**\n", "v1.1.0.md": content });
-    const err = await assertRejects(() => readReleaseHistory(dir), Error);
+    await using dir = await historyDir({ "v1.0.0.md": "**Fine.**\n", "v1.1.0.md": content });
+    const err = await assertRejects(() => readReleaseHistory(dir.url), Error);
     assertStringIncludes(err.message, "v1.1.0.md");
     assertStringIncludes(err.message, named);
   });
@@ -58,23 +71,23 @@ Deno.test("CRLF is named once, not again as a carriage return", () => {
 
 for (const name of ["9.1.0.md", "v9.1.md", "v09.1.0.md", "vv9.1.0.md", "v9.1.0.txt", "notes.md"]) {
   Deno.test(`a history file named ${name} fails the bundle`, async () => {
-    const dir = await historyDir({ [name]: "**Lead.**\n" });
-    const err = await assertRejects(() => readReleaseHistory(dir), Error);
+    await using dir = await historyDir({ [name]: "**Lead.**\n" });
+    const err = await assertRejects(() => readReleaseHistory(dir.url), Error);
     assertStringIncludes(err.message, `${name}: not named v<MAJOR.MINOR.PATCH[-PRERELEASE]>.md`);
   });
 }
 
 Deno.test("a prerelease's history file is accepted under its own name", async () => {
-  const dir = await historyDir({ "v1.0.0-rc.1.md": "**Candidate.**\n" });
-  assertEquals((await readReleaseHistory(dir)).map((e) => e.version), ["1.0.0-rc.1"]);
+  await using dir = await historyDir({ "v1.0.0-rc.1.md": "**Candidate.**\n" });
+  assertEquals((await readReleaseHistory(dir.url)).map((e) => e.version), ["1.0.0-rc.1"]);
 });
 
 Deno.test("plain Markdown, an empty file and non-ASCII prose are accepted", async () => {
-  const dir = await historyDir({
+  await using dir = await historyDir({
     "v1.0.0.md": "**Lead — with a dash.** Café, `code`, émoji-free.\n\nSecond paragraph.\n",
     "v1.0.1.md": "",
   });
-  assertEquals(await readReleaseHistory(dir), [
+  assertEquals(await readReleaseHistory(dir.url), [
     {
       version: "1.0.0",
       content: "**Lead — with a dash.** Café, `code`, émoji-free.\n\nSecond paragraph.\n",
@@ -84,8 +97,8 @@ Deno.test("plain Markdown, an empty file and non-ASCII prose are accepted", asyn
 });
 
 Deno.test("the history is read in version order", async () => {
-  const dir = await historyDir({ "v10.0.0.md": "", "v9.0.0.md": "", "v9.10.0.md": "" });
-  assertEquals((await readReleaseHistory(dir)).map((e) => e.version), [
+  await using dir = await historyDir({ "v10.0.0.md": "", "v9.0.0.md": "", "v9.10.0.md": "" });
+  assertEquals((await readReleaseHistory(dir.url)).map((e) => e.version), [
     "9.0.0",
     "9.10.0",
     "10.0.0",

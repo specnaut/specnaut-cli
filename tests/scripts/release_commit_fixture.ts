@@ -20,12 +20,15 @@ export async function git(cwd: string, ...args: string[]) {
   assert(out.success, `git ${args.join(" ")} failed`);
 }
 
+/** A temp repository, removed when the test's `await using` ends. */
+export type Repo = AsyncDisposable & { readonly dir: string };
+
 /** A repo carrying every version file at `version`, committed with `subject`. */
 export async function repoAt(
   version: string,
   subject: string,
   opts: { desync?: string; staleRef?: string } = {},
-) {
+): Promise<Repo> {
   const dir = await Deno.makeTempDir();
   await git(dir, "init", "-q");
   await git(dir, "config", "user.email", "t@t");
@@ -86,7 +89,7 @@ export async function repoAt(
   await recordHistory(dir, `v${version}`, "");
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
-  return dir;
+  return { dir, [Symbol.asyncDispose]: () => Deno.remove(dir, { recursive: true }) };
 }
 
 export const H = ".specnaut/release/HIGHLIGHTS.md";
@@ -113,8 +116,9 @@ export async function repoWithHighlights(
   lead: string,
   after: (dir: string) => Promise<void>,
   record?: string | null,
-): Promise<string> {
-  const dir = await repoAt(prev.slice(1), `chore: release ${prev}`);
+): Promise<Repo> {
+  const repo = await repoAt(prev.slice(1), `chore: release ${prev}`);
+  const { dir } = repo;
   await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
   await Deno.writeTextFile(`${dir}/${H}`, lead);
   await git(dir, "add", "-A");
@@ -131,5 +135,5 @@ export async function repoWithHighlights(
   );
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", `chore: release ${next}`);
-  return dir;
+  return repo;
 }
