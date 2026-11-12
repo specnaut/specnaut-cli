@@ -1,5 +1,15 @@
 import { fromFileUrl } from "@std/path";
 import { walk } from "@std/fs/walk";
+import {
+  type Call,
+  GUARDS,
+  holds,
+  MUTATOR_NAMES,
+  type Owner,
+  type Span,
+  walkAst,
+  type Walked,
+} from "./containment_sweep_ast.ts";
 
 /**
  * The containment sweep's scanner (cli#574): which modules under `src/` mutate
@@ -10,18 +20,11 @@ import { walk } from "@std/fs/walk";
 
 const SRC = fromFileUrl(new URL("../../src", import.meta.url));
 
-/** Deno APIs that create, move, delete or re-permission something on disk. */
-const MUTATOR_NAMES =
-  "writeTextFile writeFile mkdir remove rename chmod create truncate symlink link".split(" ");
-
 /** A call to one of them, as text: how the population of mutating modules is found. */
 export const MUTATOR_CALLS = new RegExp(`Deno\\.(${MUTATOR_NAMES.join("|")})\\(`, "g");
 
 /** The generated bundle is 27k lines of template literals, not code that runs. */
 const NOT_CODE = /src\/templates_bundle\.ts$/;
-
-/** The containment checks, called by name: the only calls that may guard a sink. */
-const GUARDS = ["assertInsideProject", "assertRemovableInProject"];
 
 /**
  * The guards that may stand in front of a sink. A removal or a rename acts on
@@ -38,19 +41,6 @@ function guardsFor(api: string): string[] {
  * `from`; and the guard calls that stand in front of it.
  */
 export type Sink = { api: string; at: number; owner: string; from: number; guards: string[] };
-
-type Span = { start: number; end: number };
-type Owner = Span & { name: string };
-type Call = { name: string; at: number };
-type Walked = { owners: Owner[]; fns: Span[]; calls: Call[]; guards: Call[]; comments: Span[] };
-
-const holds = (s: Span, at: number) => s.start <= at && at < s.end;
-
-const isFunction = (node: { type: string } | null) =>
-  node?.type === "ArrowFunctionExpression" || node?.type === "FunctionExpression";
-
-const nameOf = (key: Deno.lint.Node) =>
-  key.type === "Identifier" || key.type === "PrivateIdentifier" ? key.name : null;
 
 /**
  * Parses `src` with Deno's own TypeScript parser (the lint plugin AST) and
@@ -83,71 +73,6 @@ function guardsBefore({ fns, guards }: Walked, from: number, at: number): string
   const inFront = (g: Call) =>
     from <= g.at && g.at < at && fns.every((f) => !holds(f, g.at) || holds(f, at));
   return guards.filter(inFront).map((g) => g.name);
-}
-
-/** The owners, function spans, mutating calls, guard calls and comments of `src`. */
-function walkAst(src: string): Walked {
-  const walked: Walked = { owners: [], fns: [], calls: [], guards: [], comments: [] };
-  const create = (ctx: Deno.lint.RuleContext) => {
-    for (const { range } of ctx.sourceCode.getAllComments()) {
-      walked.comments.push({ start: range[0], end: range[1] });
-    }
-    return visitor(walked);
-  };
-  // `runPlugin` exists only under `deno test`, the only caller.
-  Deno.lint.runPlugin({ name: "containment-sweep", rules: { scan: { create } } }, "scan.ts", src);
-  return walked;
-}
-
-/** The AST visitor that fills `walked`. */
-const visitor = (walked: Walked): Deno.lint.LintVisitor => ({
-  ...ownerVisitor(walked),
-  ...callVisitor(walked),
-});
-
-/** Which nodes are owners: declarations with a name (see `parseSinks`). */
-function ownerVisitor({ owners }: Walked): Deno.lint.LintVisitor {
-  const own = (name: string | null, [start, end]: Deno.lint.Range) => {
-    if (name !== null) owners.push({ name, start, end });
-  };
-  return {
-    FunctionDeclaration: (n) => own(n.id?.name ?? null, n.range),
-    MethodDefinition: (n) => own(nameOf(n.key), n.range),
-    Property: (n) => {
-      if (n.method) own(nameOf(n.key), n.range);
-    },
-    PropertyDefinition: (n) => {
-      if (isFunction(n.value)) own(nameOf(n.key), n.range);
-    },
-    VariableDeclarator: (n) => {
-      if (n.id.type === "Identifier" && isFunction(n.init)) own(n.id.name, n.range);
-    },
-  };
-}
-
-/** Every function's span, every mutating call and every guard call. */
-function callVisitor({ fns, calls, guards }: Walked): Deno.lint.LintVisitor {
-  return {
-    "FunctionDeclaration, FunctionExpression, ArrowFunctionExpression": ({ range }) => {
-      fns.push({ start: range[0], end: range[1] });
-    },
-    CallExpression: ({ callee, range }) => {
-      const api = mutatorOf(callee);
-      if (api !== null) calls.push({ name: api, at: range[0] });
-      if (callee.type === "Identifier" && GUARDS.includes(callee.name)) {
-        guards.push({ name: callee.name, at: range[0] });
-      }
-    },
-  };
-}
-
-/** The mutator a call reaches, written `Deno.<name>(…)`, or null. */
-function mutatorOf(callee: Deno.lint.CallExpression["callee"]): string | null {
-  if (callee.type !== "MemberExpression" || callee.computed) return null;
-  const { object, property } = callee;
-  if (object.type !== "Identifier" || object.name !== "Deno") return null;
-  if (property.type !== "Identifier" || !MUTATOR_NAMES.includes(property.name)) return null;
-  return property.name;
 }
 
 /** The owner whose span holds `at` and starts last; spans nest, so that is the innermost. */
