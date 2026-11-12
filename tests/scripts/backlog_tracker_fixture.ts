@@ -28,7 +28,9 @@ const CONFIG: Record<Backend, string | null> = {
  * Each stand-in logs one line per call: its name, then every argument on its
  * own `\t` field, a newline inside an argument folded to a space (a JSON
  * payload stays parseable). `calls.raw` keeps the bytes: every argument, and
- * the content of every `--body-file`, each ended by a NUL.
+ * the content of every `--body-file`, each ended by a NUL. `calls.body` keeps
+ * each request body sent off the command line — glab's `--input -` from
+ * stdin, curl's `--data-binary @<file>` from the file — each ended by a NUL.
  */
 const LOG = `printf '%s' "\${0##*/}" >> "$FAKE_ROOT/calls.log"
 for a in "$@"; do printf '\\t%s' "\${a//$'\\n'/ }" >> "$FAKE_ROOT/calls.log"; done
@@ -37,6 +39,8 @@ prev=""
 for a in "$@"; do
   printf '%s\\0' "$a" >> "$FAKE_ROOT/calls.raw"
   [ "$prev" != --body-file ] || { cat -- "$a"; printf '\\0'; } >> "$FAKE_ROOT/calls.raw"
+  [ "$prev $a" != "--input -" ] || { cat; printf '\\0'; } >> "$FAKE_ROOT/calls.body"
+  [ "$prev" != --data-binary ] || { cat -- "\${a#@}"; printf '\\0'; } >> "$FAKE_ROOT/calls.body"
   prev=$a
 done`;
 
@@ -49,6 +53,7 @@ exit 0`,
   glab: `${LOG}
 case "$1 \${2:-}" in
   "issue create") echo "https://gitlab.example.com/acme/my-app/-/issues/5" ;;
+  "api -X") echo '{"iid":5,"web_url":"https://gitlab.example.com/acme/my-app/-/issues/5"}' ;;
   *) echo '{}' ;;
 esac
 exit 0`,
@@ -68,6 +73,8 @@ export interface Result {
   calls: string;
   /** Every argument and `--body-file` content the stand-ins received, NUL-separated. */
   raw: string;
+  /** Every request body sent off the command line, in order. */
+  bodies: string[];
 }
 
 export interface Project {
@@ -116,6 +123,7 @@ export async function project(backend: Backend): Promise<Project> {
   }
   await Deno.writeTextFile(join(dir, "calls.log"), "");
   await Deno.writeTextFile(join(dir, "calls.raw"), "");
+  await Deno.writeTextFile(join(dir, "calls.body"), "");
   const read = (rel: string) => Deno.readTextFile(join(dir, rel));
   return {
     dir,
@@ -124,7 +132,7 @@ export async function project(backend: Backend): Promise<Project> {
         args: [
           "-c",
           'export FAKE_ROOT="$PWD" HOME="$PWD" PATH="$PWD/bin:$PATH"; chmod +x bin/*; ' +
-          ': > calls.log; : > calls.raw; s=$1; shift; exec bash ".specnaut/scripts/backlog/$s" "$@"',
+          ': > calls.log; : > calls.raw; : > calls.body; s=$1; shift; exec bash ".specnaut/scripts/backlog/$s" "$@"',
           "driver",
           script,
           ...args,
@@ -141,6 +149,7 @@ export async function project(backend: Backend): Promise<Project> {
         stderr: dec.decode(out.stderr),
         calls: await read("calls.log"),
         raw: await read("calls.raw"),
+        bodies: (await read("calls.body")).split("\0").slice(0, -1),
       };
     },
     read,

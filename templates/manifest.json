@@ -1011,6 +1011,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_cloud_send",
+      "suffix": "_cloud_send.sh",
+      "source": "core/skills/task/scripts/cloud/_cloud_send.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
       "name": "list",
       "suffix": "list.sh",
       "source": "core/skills/task/scripts/cloud/list.sh",

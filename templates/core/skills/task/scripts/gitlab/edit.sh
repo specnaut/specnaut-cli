@@ -5,7 +5,8 @@
 #
 # Usage: edit.sh <number> [--title <title>] [--append-file <path>]
 #
-# Each value reaches glab as one argument, with no shell between the two.
+# Each text travels in the JSON request body glab reads on stdin (glab_send,
+# _config.sh), never as an argument.
 # Exit: 0 edited · 2 usage · 3 the description could not be read · 14 a text
 # its secret check refused (require_clean_text), or a description that holds a
 # quick action, which a rewrite would run: nothing sent · other glab's
@@ -33,8 +34,7 @@ done
 [ "$HAS_TITLE" = false ] || require_clean_text title "$TITLE"
 if [ -n "$APPEND" ]; then require_clean_file append "$APPEND"; APPEND=$CLEAN_FILE; fi
 
-ARGS=(issue update "$NUM" --repo "$PROJECT_ID")
-[ "$HAS_TITLE" = false ] || ARGS+=(--title "$TITLE")
+BODY=""
 if [ -n "$APPEND" ]; then
   BODY=$(glab issue view "$NUM" --repo "$PROJECT_ID" --output json | jq_lf -r '.description // ""') ||
     { echo "edit.sh: could not read #$NUM's description" >&2; exit 3; }
@@ -43,7 +43,12 @@ if [ -n "$APPEND" ]; then
   case $rc in 0) ;; 1) echo "REFUSED quick-action description" >&2; exit 14 ;; *) exit 2 ;; esac
   ADDED=$(cat -- "$APPEND"; printf x)
   if [ -n "$BODY" ]; then BODY="$BODY"$'\n\n'"${ADDED%x}"; else BODY=${ADDED%x}; fi
-  ARGS+=(--description "$BODY")
 fi
-glab "${ARGS[@]}" >/dev/null
+# Each text NUL-ended, the one byte no shell variable holds; a field the caller
+# did not give is left out of the request.
+printf '%s\0' "$TITLE" "$BODY" |
+  jq_lf -c -Rs --arg t "$HAS_TITLE" --arg d "${APPEND:+true}" 'split("\u0000") as [$title, $description]
+    | (if $t == "true" then {title: $title} else {} end)
+    + (if $d == "true" then {description: $description} else {} end)' |
+  glab_send PUT "issues/$NUM" >/dev/null
 echo "edited #$NUM"

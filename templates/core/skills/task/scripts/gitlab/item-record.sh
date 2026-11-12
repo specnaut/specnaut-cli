@@ -42,10 +42,8 @@ for a in "$@"; do
   ITEMS+=("$n")
 done
 
-# The API path segment: a `group/project` path must be URL-encoded; a numeric
-# id passes through unchanged. `-j`, never `-r`: no newline is written, so a
-# native Windows jq.exe has none to turn into CRLF — `acme%2Fwidget\r` is no project.
-PROJECT_PATH=$(jq_lf -jn --arg p "$PROJECT_ID" '$p | @uri')
+# The API path segment (project_path, _config.sh).
+PROJECT_PATH=$(project_path)
 
 # The signed-in user's id, or "" — then no author is known to be the viewer.
 VIEWER=$(glab api user 2>/dev/null | jq_lf -j '.id | numbers' 2>/dev/null) || VIEWER=""

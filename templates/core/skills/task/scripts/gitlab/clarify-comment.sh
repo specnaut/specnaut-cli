@@ -4,7 +4,8 @@
 #        clarify-comment.sh <number> --body-file <path>
 #
 # `--body-file` keeps the text off the caller's command line: the file is read
-# here and handed to glab as one argument, with no shell between the two.
+# here, and the text travels in the JSON request body glab reads on stdin
+# (glab_send, _config.sh), never as an argument.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
 # (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
@@ -27,4 +28,5 @@ else
   require_clean_text body "$QUESTION"
 fi
 
-glab issue note "$NUM" --repo "$PROJECT_ID" --message "$QUESTION"
+printf '%s' "$QUESTION" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/$NUM/notes" >/dev/null
+echo "commented on #$NUM"

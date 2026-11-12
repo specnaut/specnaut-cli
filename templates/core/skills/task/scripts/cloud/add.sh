@@ -3,8 +3,9 @@
 #
 # Usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]
 #
-# `--body-file` reads the body from a file, in place of the positional one; it
-# travels in the JSON payload, with no shell between the two.
+# `--body-file` reads the body from a file, in place of the positional one.
+# Every text travels in the JSON request body, sent from a file (cloud_send,
+# _cloud_send.sh), never as an argument.
 #
 # `--parent` makes the new task a sub-task of an existing one, in the same
 # shape as the local and github versions. It travels as `parentNumber` on the
@@ -21,18 +22,19 @@ parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <pa
 . "$(dirname "$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "$(dirname "$0")/_backlog_plan.sh"
+# shellcheck source=./_cloud_send.sh
+. "$(dirname "$0")/_cloud_send.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 require_clean_text title "$TITLE"
 if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
 
-PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --arg t "$TITLE" --arg b "$BODY" --arg p "$PARENT" \
-  '{ projectKey: $k, title: $t }
+# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
+RESP=$(printf '%s\0' "$TITLE" "$BODY" |
+  jq_lf -c -Rs --arg k "$PROJECT_KEY" --arg p "$PARENT" 'split("\u0000") as [$t, $b]
+   | { projectKey: $k, title: $t }
    + (if $b == "" then {} else { body: $b } end)
-   + (if $p == "" then {} else { parentNumber: ($p | tonumber) } end)')
-
-RESP=$(cloud_curl -X POST "$API_BASE/tasks" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
+   + (if $p == "" then {} else { parentNumber: ($p | tonumber) } end)' |
+  cloud_send POST "$API_BASE/tasks")
 
 KEY=$(echo "$RESP" | jq_lf -r '.task.key // empty')
 if [ -n "$KEY" ]; then

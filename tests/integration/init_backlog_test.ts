@@ -165,7 +165,11 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     const addScript = await Deno.readTextFile(
       join(parent, "demo/.specnaut/scripts/backlog/add.sh"),
     );
-    assertStringIncludes(addScript, "cloud_curl");
+    assertStringIncludes(addScript, "cloud_send POST");
+    assertEquals(
+      await exists(join(parent, "demo/.specnaut/scripts/backlog/_cloud_send.sh")),
+      true,
+    );
     assertStringIncludes(addScript, "$API_BASE/tasks");
     assertEquals(addScript.includes("gh issue create"), false);
     // The /api/v1 base lives in _config.sh, which now sources a fresh token
@@ -234,7 +238,7 @@ Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub",
     const addScript = await Deno.readTextFile(
       join(parent, "demo/.specnaut/scripts/backlog/add.sh"),
     );
-    assertStringIncludes(addScript, "glab issue create");
+    assertStringIncludes(addScript, "glab_send POST issues");
     assertStringIncludes(addScript, "Status::Backlog");
 
     // Config stub populated from --backlog-url

@@ -5,13 +5,15 @@ import { gitProject } from "./read_items_fixture.ts";
 /**
  * `apply-plan.sh` beside GitLab, through its real entry point: what each
  * operation hands `glab`, read back from the stand-in's log. An argument is
- * logged as it arrived, newlines included.
+ * logged as it arrived, newlines included; a request body read on stdin
+ * (`--input -`) follows on a `BODY` line.
  */
 
 const GLAB = `#!/usr/bin/env bash
 printf glab >> "$FAKE_ROOT/calls.log"
 for a in "$@"; do printf '\\t%s' "$a" >> "$FAKE_ROOT/calls.log"; done
 echo >> "$FAKE_ROOT/calls.log"
+case " $* " in *" --input - "*) printf 'BODY\\t%s\\n' "$(cat)" >> "$FAKE_ROOT/calls.log" ;; esac
 case "$1 $2" in
   "api user") echo '{"id":1}' ;;
   "issue view") echo '{"iid":4,"title":"T","description":"Body","created_at":"2026-02-03T04:05:06Z","labels":[],"state":"opened","author":{"id":2,"username":"someone"}}' ;;
@@ -50,7 +52,7 @@ Deno.test("gitlab: a classification is its scoped label; a close reason it canno
       jsonl({ op: "close", target: 4, reason: "not_planned" }),
     );
     assertEquals([close.code, close.lines], [3, ["UNSUPPORTED close", "RECEIPT: none"]]);
-    assert(!/glab\tissue\t(close|update)/.test(close.calls), close.calls);
+    assert(!/glab\t(issue\t(close|update)|api\t-X)/.test(close.calls), close.calls);
   } finally {
     await p.cleanup();
   }
@@ -67,8 +69,10 @@ Deno.test("gitlab: an edit sends the old description, a blank line, then the app
     assertEquals([out.code, out.lines], [0, ["APPLIED edit 4", "RECEIPT: none"]], out.stderr);
     assertStringIncludes(
       out.calls,
-      "glab\tissue\tupdate\t4\t--repo\tacme/my-app\t--title\tNew title" +
-        "\t--description\tBody\n\nMore text.\nSecond line.\n",
+      "glab\tapi\t-X\tPUT\tprojects/acme%2Fmy-app/issues/4\t-H\tContent-Type: application/json" +
+        "\t--input\t-\nBODY\t" +
+        JSON.stringify({ title: "New title", description: "Body\n\nMore text.\nSecond line." }) +
+        "\n",
     );
   } finally {
     await p.cleanup();
@@ -105,7 +109,7 @@ Deno.test("gitlab: a plan names no scoped label the executor sets itself", async
       const out = await readThenApply(p, read, jsonl(op));
       const seen = `${JSON.stringify(op)}\n${out.stdout}${out.stderr}`;
       assertEquals([out.code, out.lines], [3, ["REFUSED label 1.labels", "RECEIPT: none"]], seen);
-      assert(!/glab\tissue\t(create|update)/.test(out.calls), out.calls);
+      assert(!/glab\t(issue\t(create|update)|api\t-X)/.test(out.calls), out.calls);
     }
   } finally {
     await p.cleanup();

@@ -75,6 +75,20 @@ BACKLOG_QUICK_ACTIONS=1
 export GITLAB_HOST="$HOST"
 export PROJECT_ID
 
+# project_path -- project_id as one API path segment: a `group/project` path
+# URL-encoded, a numeric id unchanged. `-j`, never `-r`: no newline is written,
+# so a native Windows jq.exe has none to turn into CRLF.
+project_path() { jq_lf -jn --arg p "$PROJECT_ID" '$p | @uri'; }
+
+# glab_send <method> <path under the project> -- a write whose JSON request body
+# glab reads on stdin. Never an argument: there it is visible to every process
+# on the host, and a long text passes the limit on one command's arguments.
+glab_send() {
+  local p
+  p=$(project_path) || return 2
+  glab api -X "$1" "projects/$p/$2" -H "Content-Type: application/json" --input -
+}
+
 # require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
 # a refusal on stderr and status 2. Every script that takes an id runs it first:
 # the id reaches a URL path, a query variable or a file glob, so it is digits

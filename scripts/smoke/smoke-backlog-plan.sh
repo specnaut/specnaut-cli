@@ -133,7 +133,8 @@ check "close.sh closes with the plan's reason; item-record.sh read the item firs
 echo "═══ gitlab: what the executor hands glab ═══"
 scaffold gitlab $'host: https://gitlab.example.com\nproject_id: acme/my-app\n' \
   --backlog-url "https://gitlab.com/example/proj"
-stub glab 'case "$1 $2" in
+stub glab 'case " $* " in *" --input - "*) { cat; echo; } >>"$FAKE_ROOT/calls" ;; esac
+case "$1 $2" in
   "api user") echo "{\"id\":1}" ;;
   "issue view") echo "{\"iid\":4,\"title\":\"T\",\"description\":\"Body\",\"labels\":[],\"state\":\"opened\",\"author\":{\"id\":2,\"username\":\"someone\"}}" ;;
   "api --paginate") echo "[{\"name\":\"bug\"},{\"name\":\"Status::Done\"}]" ;;
@@ -142,10 +143,10 @@ esac'
 apply "edit --id 4" '{"op":"edit","target":4,"append":"More."}
 {"op":"classify","target":4,"axis":"Priority","value":"P1"}
 {"op":"label","target":4,"labels":["bug"]}'
-check "edit.sh appends after a blank line; set-field.sh and label.sh set labels; item-record.sh read #4" \
+check "edit.sh appends after a blank line, sent on glab's stdin; set-field.sh and label.sh set labels; item-record.sh read #4" \
   'said 0 "APPLIED edit 4" "APPLIED classify 4" "APPLIED label 4" "RECEIPT: none" &&
    grep -qF "item: 4" "$ITEMS" &&
-   printf "%s\n" "$CALLS" | grep -qF -e "$(printf -- "--description\tBody  More.")" &&
+   printf "%s\n" "$CALLS" | grep -qF "{\"description\":\"Body\\n\\nMore.\"}" &&
    printf "%s\n" "$CALLS" | grep -qF -e "$(printf -- "--label\tpriority::P1")"'
 apply "edit --id 4" '{"op":"label","target":4,"labels":["Status::Done"]}'
 check "apply-plan.sh refuses a scoped label the executor sets itself" \
@@ -162,6 +163,7 @@ echo "═══ cloud: the terminal column, whatever it is called ═══"
 scaffold cloud $'backend: cloud\napi_url: "http://127.0.0.1:9"\nproject_key: K\n'
 stub specnaut 'echo tok-smoke'
 stub curl 'cat >/dev/null
+for a in "$@"; do case $a in @*) { cat -- "${a#@}"; echo; } >>"$FAKE_ROOT/calls" ;; esac; done
 case "$*" in
   *PATCH*) b="{\"ok\":true}" ;;
   *columns*) b="{\"columns\":[{\"id\":\"c1\",\"order\":1,\"name\":\"Shipped\"},{\"id\":\"c0\",\"order\":0,\"name\":\"Ready\"}]}" ;;
@@ -174,6 +176,6 @@ check "apply-plan.sh keeps the terminal column out of a move; item-record.sh rea
   'said 3 "REFUSED status 1.status" "RECEIPT: none" && grep -qF "item: 3" "$ITEMS"'
 apply "close --id 3" '{"op":"close","target":3,"reason":"completed"}'
 check "a close moves the task into the column the board names last" \
-  'said 0 "APPLIED close 3" "RECEIPT: none" && printf "%s\n" "$CALLS" | grep -qF "\"status\": \"Shipped\""'
+  'said 0 "APPLIED close 3" "RECEIPT: none" && printf "%s\n" "$CALLS" | grep -qF "\"status\":\"Shipped\""'
 
 finish "BACKLOG-PLAN"

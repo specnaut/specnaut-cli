@@ -25,7 +25,7 @@ board_statuses() { printf '%s\n' Backlog Ready "In progress" "In review" Done; }
 # pass, so no plan may name one.
 repo_labels() {
   local enc
-  enc=$(jq_lf -rn --arg p "$PROJECT_ID" '$p | @uri')
+  enc=$(project_path)
   glab api --paginate "projects/$enc/labels?per_page=100" |
     jq_lf -r '.[]?.name // empty | strings | select(test("^(status|parent|priority|size|type)::"; "i") | not)'
 }

@@ -4,7 +4,8 @@
 #        clarify-comment.sh <number> --body-file <path>
 #
 # `--body-file` keeps the text off the caller's command line: the file is read
-# here and travels in the JSON payload, with no shell between the two.
+# here, and the text travels in the JSON request body, sent from a file
+# (cloud_send, _cloud_send.sh), never as an argument.
 # Exit: 0 posted · 1 the board refused · 2 usage · 14 a text its secret check refused
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
@@ -17,6 +18,8 @@ parse_comment_args "$@"
 . "$(dirname "$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "$(dirname "$0")/_backlog_plan.sh"
+# shellcheck source=./_cloud_send.sh
+. "$(dirname "$0")/_cloud_send.sh"
 
 NUM=$(require_issue_number "$NUM_ARG") || exit 2
 QUESTION=$BODY
@@ -27,12 +30,9 @@ else
   require_clean_text body "$QUESTION"
 fi
 
-PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg b "$QUESTION" \
-  '{ projectKey: $k, number: $n, body: $b }')
-
-RESP=$(cloud_curl -X POST "$API_BASE/comments" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
+RESP=$(printf '%s' "$QUESTION" |
+  jq_lf -c -Rs --arg k "$PROJECT_KEY" --argjson n "$NUM" '{ projectKey: $k, number: $n, body: . }' |
+  cloud_send POST "$API_BASE/comments")
 
 if echo "$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ commented on #$NUM"

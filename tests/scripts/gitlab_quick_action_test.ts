@@ -25,7 +25,8 @@ case "$1 $2" in
 esac
 `;
 
-const WRITES = /^glab\tissue\t(note|update|create|close)/m;
+/** Every call that writes to GitLab: the issue verbs, and a write through `glab api`. */
+const WRITES = /^glab\t(issue\t(note|update|create|close)|api\t-X)/m;
 
 async function gitlab() {
   const p = await gitProject("gitlab");

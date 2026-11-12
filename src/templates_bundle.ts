@@ -12561,6 +12561,20 @@ BACKLOG_QUICK_ACTIONS=1
 export GITLAB_HOST="\$HOST"
 export PROJECT_ID
 
+# project_path -- project_id as one API path segment: a \`group/project\` path
+# URL-encoded, a numeric id unchanged. \`-j\`, never \`-r\`: no newline is written,
+# so a native Windows jq.exe has none to turn into CRLF.
+project_path() { jq_lf -jn --arg p "\$PROJECT_ID" '\$p | @uri'; }
+
+# glab_send <method> <path under the project> -- a write whose JSON request body
+# glab reads on stdin. Never an argument: there it is visible to every process
+# on the host, and a long text passes the limit on one command's arguments.
+glab_send() {
+  local p
+  p=\$(project_path) || return 2
+  glab api -X "\$1" "projects/\$p/\$2" -H "Content-Type: application/json" --input -
+}
+
 # require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
 # a refusal on stderr and status 2. Every script that takes an id runs it first:
 # the id reaches a URL path, a query variable or a file glob, so it is digits
@@ -12792,10 +12806,8 @@ for a in "\$@"; do
   ITEMS+=("\$n")
 done
 
-# The API path segment: a \`group/project\` path must be URL-encoded; a numeric
-# id passes through unchanged. \`-j\`, never \`-r\`: no newline is written, so a
-# native Windows jq.exe has none to turn into CRLF — \`acme%2Fwidget\\r\` is no project.
-PROJECT_PATH=\$(jq_lf -jn --arg p "\$PROJECT_ID" '\$p | @uri')
+# The API path segment (project_path, _config.sh).
+PROJECT_PATH=\$(project_path)
 
 # The signed-in user's id, or "" — then no author is known to be the viewer.
 VIEWER=\$(glab api user 2>/dev/null | jq_lf -j '.id | numbers' 2>/dev/null) || VIEWER=""
@@ -12863,9 +12875,11 @@ printf '%s' "\$RECORDS"
 #   add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]
 #
 # \`--body-file\` reads the body from a file, in place of the positional one
-# (pass "" there to give labels); it reaches glab as one argument, no shell.
-# Exit: 0 created · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _clean_text.sh), nothing sent · other glab's
+# (pass "" there to give labels). Every text travels in the JSON request body
+# glab reads on stdin (glab_send, _config.sh), never as an argument.
+# Exit: 0 created · 1 GitLab answered no issue URL · 2 usage · 14 a text its
+# secret check refused (require_clean_text, _clean_text.sh), nothing sent ·
+# other glab's
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
@@ -12893,14 +12907,12 @@ if [ -n "\$PARENT" ]; then
   LABELS="\$LABELS,parent::#\$PARENT"
 fi
 
-CREATE_ARGS=(
-  "--repo" "\$PROJECT_ID"
-  "--title" "\$TITLE"
-  "--label" "\$LABELS"
-  "--description" "\$BODY"
-)
-
-URL=\$(glab issue create "\${CREATE_ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
+# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
+RESP=\$(printf '%s\\0' "\$TITLE" "\$BODY" "\$LABELS" |
+  jq_lf -c -Rs 'split("\\u0000") as [\$t, \$d, \$l] | {title: \$t, description: \$d, labels: \$l}' |
+  glab_send POST issues)
+URL=\$(printf '%s' "\$RESP" | jq_lf -r '.web_url // empty | strings')
+[ -n "\$URL" ] || { echo "error: create failed: GitLab answered no issue URL" >&2; exit 1; }
 echo "✓ created: \$URL"
 if [ -n "\$PARENT" ]; then
   echo "✓ tagged parent::#\$PARENT (scoped label)"
@@ -13106,7 +13118,8 @@ fi
 #        clarify-comment.sh <number> --body-file <path>
 #
 # \`--body-file\` keeps the text off the caller's command line: the file is read
-# here and handed to glab as one argument, with no shell between the two.
+# here, and the text travels in the JSON request body glab reads on stdin
+# (glab_send, _config.sh), never as an argument.
 # Exit: 0 posted · 2 usage · 14 a text its secret check refused
 # (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
@@ -13129,7 +13142,8 @@ else
   require_clean_text body "\$QUESTION"
 fi
 
-glab issue note "\$NUM" --repo "\$PROJECT_ID" --message "\$QUESTION"
+printf '%s' "\$QUESTION" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/\$NUM/notes" >/dev/null
+echo "commented on #\$NUM"
 `,
     executable: true,
     backend: "gitlab",
@@ -13731,7 +13745,7 @@ board_statuses() { printf '%s\\n' Backlog Ready "In progress" "In review" Done; 
 # pass, so no plan may name one.
 repo_labels() {
   local enc
-  enc=\$(jq_lf -rn --arg p "\$PROJECT_ID" '\$p | @uri')
+  enc=\$(project_path)
   glab api --paginate "projects/\$enc/labels?per_page=100" |
     jq_lf -r '.[]?.name // empty | strings | select(test("^(status|parent|priority|size|type)::"; "i") | not)'
 }
@@ -13770,7 +13784,8 @@ receipt_snapshot() { :; }
 #
 # Usage: edit.sh <number> [--title <title>] [--append-file <path>]
 #
-# Each value reaches glab as one argument, with no shell between the two.
+# Each text travels in the JSON request body glab reads on stdin (glab_send,
+# _config.sh), never as an argument.
 # Exit: 0 edited · 2 usage · 3 the description could not be read · 14 a text
 # its secret check refused (require_clean_text), or a description that holds a
 # quick action, which a rewrite would run: nothing sent · other glab's
@@ -13798,8 +13813,7 @@ done
 [ "\$HAS_TITLE" = false ] || require_clean_text title "\$TITLE"
 if [ -n "\$APPEND" ]; then require_clean_file append "\$APPEND"; APPEND=\$CLEAN_FILE; fi
 
-ARGS=(issue update "\$NUM" --repo "\$PROJECT_ID")
-[ "\$HAS_TITLE" = false ] || ARGS+=(--title "\$TITLE")
+BODY=""
 if [ -n "\$APPEND" ]; then
   BODY=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json | jq_lf -r '.description // ""') ||
     { echo "edit.sh: could not read #\$NUM's description" >&2; exit 3; }
@@ -13808,9 +13822,14 @@ if [ -n "\$APPEND" ]; then
   case \$rc in 0) ;; 1) echo "REFUSED quick-action description" >&2; exit 14 ;; *) exit 2 ;; esac
   ADDED=\$(cat -- "\$APPEND"; printf x)
   if [ -n "\$BODY" ]; then BODY="\$BODY"\$'\\n\\n'"\${ADDED%x}"; else BODY=\${ADDED%x}; fi
-  ARGS+=(--description "\$BODY")
 fi
-glab "\${ARGS[@]}" >/dev/null
+# Each text NUL-ended, the one byte no shell variable holds; a field the caller
+# did not give is left out of the request.
+printf '%s\\0' "\$TITLE" "\$BODY" |
+  jq_lf -c -Rs --arg t "\$HAS_TITLE" --arg d "\${APPEND:+true}" 'split("\\u0000") as [\$title, \$description]
+    | (if \$t == "true" then {title: \$title} else {} end)
+    + (if \$d == "true" then {description: \$description} else {} end)' |
+  glab_send PUT "issues/\$NUM" >/dev/null
 echo "edited #\$NUM"
 `,
     executable: true,
@@ -14901,6 +14920,34 @@ open_columns() {
   },
   {
     category: "backlog-script",
+    name: "_cloud_send",
+    suffix: "_cloud_send.sh",
+    content: `# shellcheck shell=bash
+# cloud_send <method> <url> -- the one way a cloud writer sends a request with a
+# JSON body, which it reads on stdin. The body goes through cloud_curl
+# (_config.sh) from a private file, removed when the request ends; never as an
+# argument, where it is visible to every process on the host and a long one
+# passes the limit on one command's arguments. Not on curl's stdin either:
+# cloud_curl hands curl the Authorization header there. Sourced after
+# _config.sh; installed beside it. A subshell, so its EXIT trap is its own.
+cloud_send() (
+  dir=\$(mktemp -d "\${TMPDIR:-/tmp}/cloud-body.XXXXXXXX") ||
+    { echo "\${0##*/}: no temporary directory" >&2; exit 2; }
+  trap 'rm -rf -- "\$dir"' EXIT
+  chmod 700 "\$dir"
+  cat >"\$dir/body.json" || { echo "\${0##*/}: could not write the request body" >&2; exit 2; }
+  file=\$dir/body.json
+  # A native Windows curl opens a Windows path, not the one MSYS shows bash.
+  if command -v cygpath >/dev/null 2>&1; then file=\$(cygpath -m "\$file"); fi
+  cloud_curl -X "\$1" "\$2" -H "Content-Type: application/json" --data-binary "@\$file"
+)
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "list",
     suffix: "list.sh",
     content: `#!/usr/bin/env bash
@@ -15123,8 +15170,9 @@ printf '%s' "\$RECORDS"
 #
 # Usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]
 #
-# \`--body-file\` reads the body from a file, in place of the positional one; it
-# travels in the JSON payload, with no shell between the two.
+# \`--body-file\` reads the body from a file, in place of the positional one.
+# Every text travels in the JSON request body, sent from a file (cloud_send,
+# _cloud_send.sh), never as an argument.
 #
 # \`--parent\` makes the new task a sub-task of an existing one, in the same
 # shape as the local and github versions. It travels as \`parentNumber\` on the
@@ -15141,18 +15189,19 @@ parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <pa
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
+# shellcheck source=./_cloud_send.sh
+. "\$(dirname "\$0")/_cloud_send.sh"
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 require_clean_text title "\$TITLE"
 if [ -n "\$BODY_FILE" ]; then require_clean_file body "\$BODY_FILE"; BODY=\$(cat -- "\$CLEAN_FILE"); else require_clean_text body "\$BODY"; fi
 
-PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" --arg p "\$PARENT" \\
-  '{ projectKey: \$k, title: \$t }
+# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
+RESP=\$(printf '%s\\0' "\$TITLE" "\$BODY" |
+  jq_lf -c -Rs --arg k "\$PROJECT_KEY" --arg p "\$PARENT" 'split("\\u0000") as [\$t, \$b]
+   | { projectKey: \$k, title: \$t }
    + (if \$b == "" then {} else { body: \$b } end)
-   + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)')
-
-RESP=\$(cloud_curl -X POST "\$API_BASE/tasks" \\
-  -H "Content-Type: application/json" \\
-  -d "\$PAYLOAD")
+   + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)' |
+  cloud_send POST "\$API_BASE/tasks")
 
 KEY=\$(echo "\$RESP" | jq_lf -r '.task.key // empty')
 if [ -n "\$KEY" ]; then
@@ -15179,6 +15228,8 @@ set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
+# shellcheck source=./_cloud_send.sh
+. "\$(dirname "\$0")/_cloud_send.sh"
 
 if [ "\$#" -lt 2 ]; then
   echo 'usage: move.sh <number> <Status>' >&2
@@ -15188,12 +15239,10 @@ fi
 NUM=\$(require_issue_number "\$1") || exit 2
 STATUS="\$2"
 
-PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
-  '{ projectKey: \$k, number: \$n, status: \$s }')
-
-RESP=\$(cloud_curl -X PATCH "\$API_BASE/tasks" \\
-  -H "Content-Type: application/json" \\
-  -d "\$PAYLOAD")
+# The request body is sent from a file (cloud_send), never as an argument.
+RESP=\$(printf '%s' "\$STATUS" |
+  jq_lf -c -Rs --arg k "\$PROJECT_KEY" --argjson n "\$NUM" '{ projectKey: \$k, number: \$n, status: . }' |
+  cloud_send PATCH "\$API_BASE/tasks")
 
 if echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ #\$NUM → \$STATUS"
@@ -16494,7 +16543,8 @@ exit 0
 #        clarify-comment.sh <number> --body-file <path>
 #
 # \`--body-file\` keeps the text off the caller's command line: the file is read
-# here and travels in the JSON payload, with no shell between the two.
+# here, and the text travels in the JSON request body, sent from a file
+# (cloud_send, _cloud_send.sh), never as an argument.
 # Exit: 0 posted · 1 the board refused · 2 usage · 14 a text its secret check refused
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
@@ -16507,6 +16557,8 @@ parse_comment_args "\$@"
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
+# shellcheck source=./_cloud_send.sh
+. "\$(dirname "\$0")/_cloud_send.sh"
 
 NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
 QUESTION=\$BODY
@@ -16517,12 +16569,9 @@ else
   require_clean_text body "\$QUESTION"
 fi
 
-PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
-  '{ projectKey: \$k, number: \$n, body: \$b }')
-
-RESP=\$(cloud_curl -X POST "\$API_BASE/comments" \\
-  -H "Content-Type: application/json" \\
-  -d "\$PAYLOAD")
+RESP=\$(printf '%s' "\$QUESTION" |
+  jq_lf -c -Rs --arg k "\$PROJECT_KEY" --argjson n "\$NUM" '{ projectKey: \$k, number: \$n, body: . }' |
+  cloud_send POST "\$API_BASE/comments")
 
 if echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ commented on #\$NUM"

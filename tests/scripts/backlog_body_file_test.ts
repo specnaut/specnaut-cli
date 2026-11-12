@@ -52,32 +52,34 @@ Deno.test("github: --body-file hands gh the path, never the text", async () => {
   }
 });
 
-Deno.test("gitlab: --body-file text reaches glab as one argument, unexpanded", async () => {
+Deno.test("gitlab: --body-file text travels in the request body glab reads, unexpanded", async () => {
   const p = await project("gitlab");
   try {
     await p.write("body.md", TEXT);
     const add = await p.run("add.sh", ["A title", "--body-file", "body.md"]);
     assertEquals(add.code, 0, add.stderr);
-    assertEquals(argAfter(add.calls, "glab\tissue\tcreate", "--description"), TEXT);
+    argAfter(add.calls, "glab\tapi\t-X\tPOST\tprojects/acme%2Fmy-app/issues", "--input");
+    assertEquals(JSON.parse(add.bodies[0]).description, TEXT);
     const note = await p.run("clarify-comment.sh", ["7", "--body-file", "body.md"]);
     assertEquals(note.code, 0, note.stderr);
-    assertEquals(argAfter(note.calls, "glab\tissue\tnote\t7", "--message"), TEXT);
+    argAfter(note.calls, "glab\tapi\t-X\tPOST\tprojects/acme%2Fmy-app/issues/7/notes", "--input");
+    assertEquals(JSON.parse(note.bodies[0]).body, TEXT);
     await noneRan(p.dir);
   } finally {
     await p.cleanup();
   }
 });
 
-Deno.test("cloud: --body-file text travels in the JSON payload, unexpanded", async () => {
+Deno.test("cloud: --body-file text travels in the JSON request body, unexpanded", async () => {
   const p = await project("cloud");
   try {
     await p.write("body.md", TEXT);
     const add = await p.run("add.sh", ["A title", "--body-file", "body.md"]);
     assertEquals(add.code, 0, add.stdout + add.stderr);
-    assertEquals(JSON.parse(argAfter(add.calls, "curl", "-d")!).body, TEXT);
+    assertEquals(JSON.parse(add.bodies[0]).body, TEXT);
     const note = await p.run("clarify-comment.sh", ["7", "--body-file", "body.md"]);
     assertEquals(note.code, 0, note.stdout + note.stderr);
-    assertEquals(JSON.parse(argAfter(note.calls, "curl", "-d")!).body, TEXT);
+    assertEquals(JSON.parse(note.bodies[0]).body, TEXT);
     await noneRan(p.dir);
   } finally {
     await p.cleanup();
@@ -103,10 +105,10 @@ Deno.test("local: --body-file text lands in the item file, unexpanded", async ()
 
 /** merge-close.md posts its close comment this way, with no product-owner dispatch. */
 for (
-  const [backend, note, flag] of [["github", "comment", "--body-file"], [
+  const [backend, note, flag] of [["github", "issue\tcomment\t7", "--body-file"], [
     "gitlab",
-    "note",
-    "--message",
+    "api\t-X\tPOST\tprojects/acme%2Fmy-app/issues/7/notes",
+    "--input",
   ]] as const
 ) {
   Deno.test(`${backend}: close.sh --body-file comments from the file, then closes`, async () => {
@@ -116,14 +118,15 @@ for (
       const r = await p.run("close.sh", ["7", "completed", "--body-file", "body.md"]);
       assertEquals(r.code, 0, r.stderr);
       const tool = backend === "github" ? "gh" : "glab";
-      const sent = argAfter(r.calls, `${tool}\tissue\t${note}\t7`, flag);
+      const sent = argAfter(r.calls, `${tool}\t${note}`, flag);
       if (backend === "github") {
         assertMatch(sent ?? "", /backlog-text\.[^/]+\/body$/);
         assertStringIncludes(r.raw, `${TEXT}\0`);
-      } else assertEquals(sent, TEXT);
-      const order = r.calls.split("\n").map((l) => l.split("\t").slice(0, 3).join(" "));
+      } else assertEquals(JSON.parse(r.bodies[0]).body, TEXT);
+      const order = r.calls.split("\n").map((l) => l.split("\t").slice(0, 3).join("\t"));
       assert(
-        order.indexOf(`${tool} issue ${note}`) < order.indexOf(`${tool} issue close`),
+        order.indexOf(`${tool}\t${note.split("\t").slice(0, 2).join("\t")}`) <
+          order.indexOf(`${tool}\tissue\tclose`),
         r.calls,
       );
       await noneRan(p.dir);
@@ -152,7 +155,7 @@ for (const backend of BACKENDS) {
       ) {
         const r = await p.run(script, [...args]);
         assertEquals(r.code, 2, `${script} ${args.join(" ")}\n${r.stderr}`);
-        assert(!/issue\tcreate|issue\tcomment|issue\tnote|^curl/m.test(r.calls), r.calls);
+        assert(!/issue\tcreate|issue\tcomment|issue\tnote|api\t-X|^curl/m.test(r.calls), r.calls);
       }
     } finally {
       await p.cleanup();

@@ -9,9 +9,11 @@
 #   add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]
 #
 # `--body-file` reads the body from a file, in place of the positional one
-# (pass "" there to give labels); it reaches glab as one argument, no shell.
-# Exit: 0 created · 2 usage · 14 a text its secret check refused
-# (require_clean_text, _clean_text.sh), nothing sent · other glab's
+# (pass "" there to give labels). Every text travels in the JSON request body
+# glab reads on stdin (glab_send, _config.sh), never as an argument.
+# Exit: 0 created · 1 GitLab answered no issue URL · 2 usage · 14 a text its
+# secret check refused (require_clean_text, _clean_text.sh), nothing sent ·
+# other glab's
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so `--help` and unknown-flag
@@ -39,14 +41,12 @@ if [ -n "$PARENT" ]; then
   LABELS="$LABELS,parent::#$PARENT"
 fi
 
-CREATE_ARGS=(
-  "--repo" "$PROJECT_ID"
-  "--title" "$TITLE"
-  "--label" "$LABELS"
-  "--description" "$BODY"
-)
-
-URL=$(glab issue create "${CREATE_ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
+# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
+RESP=$(printf '%s\0' "$TITLE" "$BODY" "$LABELS" |
+  jq_lf -c -Rs 'split("\u0000") as [$t, $d, $l] | {title: $t, description: $d, labels: $l}' |
+  glab_send POST issues)
+URL=$(printf '%s' "$RESP" | jq_lf -r '.web_url // empty | strings')
+[ -n "$URL" ] || { echo "error: create failed: GitLab answered no issue URL" >&2; exit 1; }
 echo "✓ created: $URL"
 if [ -n "$PARENT" ]; then
   echo "✓ tagged parent::#$PARENT (scoped label)"
