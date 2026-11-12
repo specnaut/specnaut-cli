@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { type Project, project } from "./backlog_tracker_fixture.ts";
 import {
+  AUTH_PROSE,
   CLEAN_BODY,
   CLEAN_TITLE,
   ENV_VALUE,
@@ -9,6 +10,7 @@ import {
   SECRET_NAMES,
   SECRET_SAMPLES,
   SURVIVORS,
+  TOKEN_VALUED,
 } from "./secret_samples.ts";
 
 /**
@@ -19,7 +21,10 @@ import {
 
 /** Every sample, with the verdict text_refusal prints for it: its status, then its class. */
 const CASES: [string, string][] = [
-  ...SECRET_SAMPLES.map((t): [string, string] => [t, "1 secret"]),
+  // The bash writers keep the strict rule: a header or an assignment is refused whatever its value.
+  ...[...SECRET_SAMPLES, ...AUTH_PROSE, ...TOKEN_VALUED].map((
+    t,
+  ): [string, string] => [t, "1 secret"]),
   ...HIDDEN_SAMPLES.map((t): [string, string] => [t, "1 hidden"]),
   ...[...SURVIVORS, CLEAN_BODY, CLEAN_TITLE].map((t): [string, string] => [t, "0 "]),
 ];

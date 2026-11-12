@@ -62,6 +62,37 @@ export const SECRET_SAMPLES: readonly string[] = [
 ];
 
 /**
+ * In SECRET_SAMPLES, but refused only in the scan's strict mode: a header or an
+ * assignment whose value is no token. Text bound for Cloud lets them through.
+ */
+export const NAMED_ONLY: readonly string[] = [
+  "Authorization: x",
+  "Authorization= x",
+  "x-api-key: abc",
+];
+
+/** What a spec about authentication says: the scan refuses it, text bound for Cloud does not. */
+export const AUTH_PROSE: readonly string[] = [
+  "Authorization: Bearer <token>",
+  "Send the Cookie: header with each call",
+  "token: required",
+  // Only the value is judged, not the words after it.
+  "token: required for every v2 call",
+  "secret: rotation",
+  "Set api_key: yourkeyhere in the config",
+];
+
+/** A header or an assignment with a value shaped like a token: refused in both modes. */
+export const TOKEN_VALUED: readonly string[] = [
+  `Authori${"zation"}: abc123XYZ987`,
+  `Coo${"kie"}: sid=9f8e7d6c5b4a`,
+  `x-api-${"key"}: AbC123xyz789`,
+  `tok${"en"}: ghx9Kq2mZp7L`,
+  // A harmless first assignment does not hide a second one.
+  `secret: rotation, then pass${"word"}=plainwords1234`,
+];
+
+/**
  * Refused as `hidden`: a control or invisible character, an HTML comment, a
  * link-reference definition. The second holds a NUL, which no argv can carry:
  * it reaches a script only as a file or on stdin.

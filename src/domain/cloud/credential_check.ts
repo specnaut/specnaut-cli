@@ -8,6 +8,15 @@
 //
 // The patterns are POSIX ERE run by grep in the C locale, so they are matched the way
 // grep matches them: line by line, over the text's UTF-8 bytes.
+//
+// Two modes, one pattern list. `scan` is scan_hard's rule, which the bash writers keep
+// for text bound for a tracker: a credential keyword assigned a value, or an
+// Authorization, Cookie or X-Api-Key header, is refused whatever follows it. `cloud`,
+// what every client applies, refuses such a match only when its value is shaped like a
+// token (TOKEN_LIKE_RE, the test a Bearer value already meets): a spec about
+// authentication says `Authorization: Bearer <token>` or `token: required`, and a
+// placeholder or a plain word is no credential. The token shapes (SECRET_RE, URL
+// userinfo included) are refused the same in both.
 
 import { assertPortable } from "./ere_portability.ts";
 
@@ -31,6 +40,9 @@ export class CredentialRefused extends Error {
   }
 }
 
+/** `scan`: scan_hard's strict rule; `cloud`: an assignment needs a token-shaped value. */
+export type CheckMode = "scan" | "cloud";
+
 export type CredentialPatterns = {
   token: RegExp;
   assignment: RegExp;
@@ -41,7 +53,7 @@ export type CredentialPatterns = {
 /** Each name the file holds, the flags grep runs it with (`-i` or not), and its role. */
 const NAMES = {
   SECRET_RE: ["token", "s"],
-  SECRET_ANYCASE_RE: ["assignment", "is"],
+  SECRET_ANYCASE_RE: ["assignment", "gis"],
   SCHEME_VALUE_RE: ["scheme", "gis"],
   TOKEN_LIKE_RE: ["tokenLike", "s"],
 } as const;
@@ -76,10 +88,11 @@ export function compilePatterns(source: string): CredentialPatterns {
 export function credentialKind(
   text: string,
   patterns: CredentialPatterns,
+  mode: CheckMode = "cloud",
 ): CredentialKind | null {
   const lines = bytesOf(text).split("\n");
   if (lines.some((l) => patterns.token.test(l))) return "token";
-  if (lines.some((l) => patterns.assignment.test(l))) return "assignment";
+  if (lines.some((l) => assigned(l, patterns, mode))) return "assignment";
   // `Bearer token` is prose: only a value shaped like a token is one. The value is
   // the second field `read` splits the match into, as scheme_value_in reads it.
   for (const line of lines) {
@@ -88,6 +101,21 @@ export function credentialKind(
     }
   }
   return null;
+}
+
+/**
+ * Whether the line assigns a credential. In `cloud` mode the value is what follows
+ * the match's first `:` or `=`, past spaces and quotes, up to the next space, quote
+ * or `<`; it must be token-shaped. (`search`, not `test`: the pattern is global.)
+ */
+function assigned(line: string, patterns: CredentialPatterns, mode: CheckMode): boolean {
+  if (mode === "scan") return line.search(patterns.assignment) >= 0;
+  for (const m of line.matchAll(patterns.assignment)) {
+    const after = line.slice(m.index + m[0].search(/[:=]/) + 1);
+    const value = /^[ \t\n\v\f\r"']*([^ \t\n\v\f\r"'<]*)/.exec(after)![1];
+    if (patterns.tokenLike.test(value)) return true;
+  }
+  return false;
 }
 
 /**

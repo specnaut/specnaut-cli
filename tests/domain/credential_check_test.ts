@@ -7,7 +7,15 @@ import {
   CredentialRefused,
   refuseCredentials,
 } from "../../src/domain/cloud/credential_check.ts";
-import { CLEAN_BODY, CLEAN_TITLE, SECRET_SAMPLES, SURVIVORS } from "../scripts/secret_samples.ts";
+import {
+  AUTH_PROSE,
+  CLEAN_BODY,
+  CLEAN_TITLE,
+  NAMED_ONLY,
+  SECRET_SAMPLES,
+  SURVIVORS,
+  TOKEN_VALUED,
+} from "../scripts/secret_samples.ts";
 
 /**
  * The check the binary runs over text it sends to Specnaut Cloud. Its samples are the
@@ -25,9 +33,23 @@ Deno.test("the binary's patterns are the file the bash scan reads, as bundled", 
   assertEquals(bundled?.content, await Deno.readTextFile(PATTERN_FILE));
 });
 
-Deno.test("every secret sample is refused", () => {
+Deno.test("in the scan's mode every secret sample is refused, as the bash scan refuses it", () => {
+  for (const sample of [...SECRET_SAMPLES, ...AUTH_PROSE, ...TOKEN_VALUED]) {
+    assertEquals(credentialKind(`see ${sample} here`, PATTERNS, "scan") !== null, true, sample);
+  }
+});
+
+Deno.test("for Cloud, every secret sample is refused but a header with no token after it", () => {
   for (const sample of SECRET_SAMPLES) {
-    assertEquals(credentialKind(`see ${sample} here`, PATTERNS) !== null, true, sample);
+    const refused = credentialKind(`see ${sample} here`, PATTERNS) !== null;
+    assertEquals(refused, !NAMED_ONLY.includes(sample), sample);
+  }
+});
+
+Deno.test("for Cloud, prose about authentication passes and a token-shaped value does not", () => {
+  for (const prose of AUTH_PROSE) assertEquals(credentialKind(prose, PATTERNS), null, prose);
+  for (const sample of TOKEN_VALUED) {
+    assertEquals(credentialKind(`see ${sample} here`, PATTERNS), "assignment", sample);
   }
 });
 
@@ -35,7 +57,7 @@ Deno.test("a refusal names the class of the pattern that matched", () => {
   const kinds = [
     [`ghp_${"a".repeat(36)}`, "token"],
     ["password=plainwords1234", "assignment"],
-    ["Authorization: x", "assignment"],
+    [`Authorization: ${"x1"}`, "assignment"],
     ["Bearer abcdefgh12345", "scheme"],
   ] as const;
   for (const [sample, kind] of kinds) assertEquals(credentialKind(sample, PATTERNS), kind, sample);
