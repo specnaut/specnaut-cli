@@ -9,7 +9,7 @@ import type { BaseEntry } from "../domain/script_trust.ts";
 import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 
 /**
- * Reads a repository's commits for `specnaut verify-scripts`, through the hardened git. Every
+ * Reads a repository's commits for the script and checkout checks, through the hardened git. Every
  * object is read raw (`ls-tree`, `cat-file --batch`), never through a filter or a textconv, and
  * nothing here touches the work tree: no `status`, no hashing of a file on disk, no diff against
  * it. A test greps this module for those subcommands.

@@ -19,10 +19,11 @@ import { inCheckoutScope, inDeepRoot } from "./checkout_scope.ts";
  *
  * 1. HEAD is the base's tip or one of its ancestors: it holds no commit the tip lacks, the
  *    branch's or any other, since any of them could carry the branch's files;
- * 2. the helper scripts are trusted, as {@link judgeScripts} judges them (the bundle is their
- *    second copy);
- * 3. every file in `CHECKOUT_SCOPE` equals its blob at the base's tip, byte for byte, and the
- *    tip has every one the tree has: no extra file, untracked or ignored ones included.
+ * 2. the helper scripts are trusted, as `judgeScripts` in `script_trust.ts` judges them (the
+ *    bundle is their second copy);
+ * 3. every file in `CHECKOUT_SCOPE` (`checkout_scope.ts`) equals its blob at the base's tip, byte
+ *    for byte, and the tip has every one the tree has: no extra file, untracked or ignored ones
+ *    included. A link holds only as the tip's own, by where it leads on disk (`linkReason`).
  *
  * Anything else stops the review, which never falls back to reading the checkout as it is.
  */

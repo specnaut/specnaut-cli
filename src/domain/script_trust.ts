@@ -13,7 +13,8 @@
  *
  * Its limit: it guards against mistakes (a branch editing the helpers that grade or land it, a
  * stale or dogfooding copy), not deliberate rewrites: the phase docs calling it and the harness's
- * settings are out of its reach, and a review already runs the branch's own tests.
+ * settings are out of its reach (`checkout_trust.ts` checks those against the base), and a review
+ * already runs the branch's own tests.
  */
 
 import { sameBytes } from "./bytes.ts";

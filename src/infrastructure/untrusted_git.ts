@@ -9,8 +9,9 @@ import { isAbsolute, join } from "@std/path";
  * "Read-only" git still runs programs a repository names: a plain `git ls-files` spawns whatever
  * `core.fsmonitor` says. So every call turns off each program or redirection the repository's own
  * configuration could name, takes pathspecs literally, asks for no optional lock, reads no system
- * configuration, and runs with an environment cleared to an allowlist, so no `GIT_*` variable of
- * the caller's reaches it. `safe.directory` is never passed, so a refusal stays a refusal.
+ * configuration, follows no replace ref and no grafts file (a repository holding one is refused),
+ * and runs with an environment cleared to an allowlist, so no `GIT_*` variable of the caller's
+ * reaches it. `safe.directory` is never passed, so a refusal stays a refusal.
  */
 
 /** The defaults `_gu_git` in `_git_untrusted.sh` passes before every subcommand, in its order. */
