@@ -10,6 +10,7 @@ import type { ImageSource } from "../../src/domain/sandbox_image.ts";
 const IMAGE: ImageSource = { kind: "pinned", ref: `acme/dev@sha256:${"a".repeat(64)}` };
 const CGROUPS_WHY =
   "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
+const OLD_BWRAP_WHY = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";
 const NO_IMAGE: ImageSource = { kind: "none", why: "no devcontainer" };
 
 const NOTHING: BackendProbe = {
@@ -19,6 +20,7 @@ const NOTHING: BackendProbe = {
   podmanCgroups: false,
   docker: false,
   bwrap: "absent",
+  bwrapVersion: "bubblewrap 0.8.0",
   sandboxExec: false,
 };
 
@@ -65,6 +67,16 @@ Deno.test("chooseBackend: bubblewrap blocked by the user-namespace restriction i
   assertEquals(chosen.kind, "static");
   if (chosen.kind === "static") {
     assertEquals(chosen.why.some((w) => w.includes("user namespaces")), true);
+  }
+});
+
+Deno.test("chooseBackend: bubblewrap older than 0.8 cannot forbid nested user namespaces", () => {
+  for (const bwrapVersion of ["bubblewrap 0.7.0", "0.6.1", "garbled", null]) {
+    const old = chooseBackend(probe({ bwrap: "usable", bwrapVersion }));
+    assertEquals(old.kind === "static" && old.why.at(-1), OLD_BWRAP_WHY, String(bwrapVersion));
+  }
+  for (const bwrapVersion of ["bubblewrap 0.8.0", "0.11.0", "1.0.0"]) {
+    assertEquals(chooseBackend(probe({ bwrap: "usable", bwrapVersion })), { kind: "bwrap" });
   }
 });
 

@@ -61,8 +61,10 @@ const SHM = "/dev/shm";
 
 /**
  * `bwrap` arguments: every namespace unshared (network included, so loopback is the sandbox's
- * own), killed with its parent, a new session (no terminal to inject keystrokes into), an empty
- * environment refilled from the policy, no capabilities. System folders are bound read-only when
+ * own; the user namespace always, so that `--disable-userns` can forbid the process from making a
+ * nested one, where it would hold every capability again), killed with its parent, a new
+ * session (no terminal to inject keystrokes into), an empty environment refilled from the
+ * policy, no capabilities. System folders are bound read-only when
  * the host has them, the toolchain and the tree always; the scratch folders and shared memory are
  * size-capped tmpfs. The sandbox's own root is remounted read-only last, so nothing outside those
  * folders can be created in it. `--` ends the options: a command starting with `-` is never one.
@@ -70,7 +72,8 @@ const SHM = "/dev/shm";
 export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): string[] {
   const size = String(policy.limits.scratchBytes);
   return [
-    ...["--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--cap-drop", "ALL"],
+    ...["--unshare-all", "--unshare-user", "--disable-userns"],
+    ...["--die-with-parent", "--new-session", "--clearenv", "--cap-drop", "ALL"],
     ...bwrapNetwork(policy.network),
     ...policy.system.flatMap((p) => ["--ro-bind-try", safePath(p), p]),
     ...policy.reads.flatMap((p) => ["--ro-bind", safePath(p), p]),

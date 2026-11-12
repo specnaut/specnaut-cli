@@ -121,8 +121,10 @@ Deno.test("containerArgs: the image is pinned by digest and the command follows 
 
 Deno.test("bwrapArgs: every namespace unshared, tied to its parent, new session, bare environment", () => {
   const args = bwrap();
-  assertEquals(args.slice(0, 6), [
+  assertEquals(args.slice(0, 8), [
     "--unshare-all",
+    "--unshare-user",
+    "--disable-userns",
     "--die-with-parent",
     "--new-session",
     "--clearenv",

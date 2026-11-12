@@ -46,6 +46,8 @@ export type BackendProbe = {
   readonly docker: boolean;
   /** Bubblewrap ran a trial command, or was stopped by the user-namespace restriction. */
   readonly bwrap: "usable" | "userns_restricted" | "absent";
+  /** What `bwrap --version` printed, or `null` when it printed nothing. */
+  readonly bwrapVersion: string | null;
   readonly sandboxExec: boolean;
 };
 
@@ -64,16 +66,30 @@ export function chooseBackend(probe: BackendProbe): Backend {
       probe.podman === "rootless" ? UNCAPPED_PODMAN : "container: no rootless podman and no docker",
     );}
   if (probe.os === "linux") {
-    if (probe.bwrap === "usable") return { kind: "bwrap" };
-    why.push(
-      `bubblewrap: ${probe.bwrap === "absent" ? "not installed" : "user namespaces restricted"}`,
-    );
+    const passedOver = bwrapWhy(probe);
+    if (passedOver === null) return { kind: "bwrap" };
+    why.push(passedOver);
   }
   if (probe.os === "darwin") {
     if (probe.sandboxExec) return { kind: "seatbelt" };
     why.push("sandbox-exec: not available");
   }
   return { kind: "static", why };
+}
+
+/** Why bubblewrap cannot run on this host, or `null` when it can. */
+function bwrapWhy(probe: BackendProbe): string | null {
+  if (probe.bwrap === "absent") return "bubblewrap: not installed";
+  if (probe.bwrap === "userns_restricted") return "bubblewrap: user namespaces restricted";
+  return forbidsNestedUserns(probe.bwrapVersion) ? null : OLD_BWRAP;
+}
+
+const OLD_BWRAP = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";
+
+/** `--disable-userns` arrived in bubblewrap 0.8; an unreadable version counts as older. */
+function forbidsNestedUserns(version: string | null): boolean {
+  const found = version?.match(/(\d+)\.(\d+)/);
+  return found ? Number(found[1]) > 0 || Number(found[2]) >= 8 : false;
 }
 
 /** The host's layout, as the caller resolved it: real paths, no link on the way. */
