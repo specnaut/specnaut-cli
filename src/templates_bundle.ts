@@ -16923,7 +16923,8 @@ gu_base() {
 #     taken as git reads it, so what the two would read differently is refused: a NUL
 #     or another control byte, a \`.\` or \`..\` component (git resolves them by spelling,
 #     the file system through links), a drive letter outside MSYS (git reads it there
-#     as a relative path);
+#     as a relative path), a leading \`/\` under MSYS (bash maps it to a drive, git.exe
+#     does not);
 #   - its commit graphs and multi-pack indexes, which git reads in place of the
 #     objects: explicit_head_git runs git with both off.
 #
@@ -17032,7 +17033,7 @@ _explicit_head_objects_refusal() {
 # file of exactly one line naming, absolutely, the objects folder of the repository
 # <git...> runs in: what GitBranchFetcher writes. A line in another form - relative, a
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
-# outside MSYS - is one git would read and this check could not judge.
+# outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
   local file="\$1" line own
   shift
@@ -17043,7 +17044,8 @@ _explicit_head_own_alternates() {
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in
-    /*) ;;
+    # Under MSYS, bash maps \`/c/x\` to C:\\x, while git.exe reads it from the current drive.
+    /*) ! _explicit_head_msys || return 1 ;;
     [A-Za-z]:[/\\\\]*) _explicit_head_msys || return 1; line="\${line//\\\\//}" ;;
     *) return 1 ;;
   esac
@@ -17083,7 +17085,7 @@ gu_manifests() {
   _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
   local out names f rc=0 picked=()
   out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
-  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || { rm -f "\$out"; return 1; }
   _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
   while IFS= read -r -d '' f; do
     matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")
@@ -32728,9 +32730,9 @@ is_exempt() { config_exempt "\$1" \${exempt[@]+"\${exempt[@]}"}; }
 
 # \`ls-files -z\` output holds NULs, which no bash variable can, and a process
 # substitution's exit status is lost on bash 3.2 — so it goes through a file.
-listing="\$(mktemp "\${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary file"
-blob="\$listing.blob"
-trap 'rm -f -- "\$listing" "\$blob"' EXIT
+work="\$(mktemp -d "\${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary folder"
+listing="\$work/listing" blob="\$work/blob"
+trap 'rm -rf -- "\$work"' EXIT
 
 list_domain() {
   if [ -n "\$EXPLICIT_HEAD" ]; then
@@ -33040,7 +33042,8 @@ gu_base() {
 #     taken as git reads it, so what the two would read differently is refused: a NUL
 #     or another control byte, a \`.\` or \`..\` component (git resolves them by spelling,
 #     the file system through links), a drive letter outside MSYS (git reads it there
-#     as a relative path);
+#     as a relative path), a leading \`/\` under MSYS (bash maps it to a drive, git.exe
+#     does not);
 #   - its commit graphs and multi-pack indexes, which git reads in place of the
 #     objects: explicit_head_git runs git with both off.
 #
@@ -33149,7 +33152,7 @@ _explicit_head_objects_refusal() {
 # file of exactly one line naming, absolutely, the objects folder of the repository
 # <git...> runs in: what GitBranchFetcher writes. A line in another form - relative, a
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
-# outside MSYS - is one git would read and this check could not judge.
+# outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
   local file="\$1" line own
   shift
@@ -33160,7 +33163,8 @@ _explicit_head_own_alternates() {
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in
-    /*) ;;
+    # Under MSYS, bash maps \`/c/x\` to C:\\x, while git.exe reads it from the current drive.
+    /*) ! _explicit_head_msys || return 1 ;;
     [A-Za-z]:[/\\\\]*) _explicit_head_msys || return 1; line="\${line//\\\\//}" ;;
     *) return 1 ;;
   esac
@@ -33200,7 +33204,7 @@ gu_manifests() {
   _gu_need_rev "\$1" && _gu_need_rev "\$2" || return 2
   local out names f rc=0 picked=()
   out="\$(mktemp "\${TMPDIR:-/tmp}/git-read-manifests.XXXXXX")" || return 1
-  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || return 1
+  names="\$(mktemp "\${TMPDIR:-/tmp}/git-read-names.XXXXXX")" || { rm -f "\$out"; return 1; }
   _gu_git diff --name-only -z "\${_GU_PLAIN[@]}" --end-of-options "\$1" "\$2" -- >"\$names" || rc=\$?
   while IFS= read -r -d '' f; do
     matches_any "\$f" "\${SCOPE_DEP_GLOBS[@]}" && picked+=("\$f")

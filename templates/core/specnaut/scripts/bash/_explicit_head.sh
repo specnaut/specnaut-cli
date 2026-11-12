@@ -35,7 +35,8 @@
 #     taken as git reads it, so what the two would read differently is refused: a NUL
 #     or another control byte, a `.` or `..` component (git resolves them by spelling,
 #     the file system through links), a drive letter outside MSYS (git reads it there
-#     as a relative path);
+#     as a relative path), a leading `/` under MSYS (bash maps it to a drive, git.exe
+#     does not);
 #   - its commit graphs and multi-pack indexes, which git reads in place of the
 #     objects: explicit_head_git runs git with both off.
 #
@@ -144,7 +145,7 @@ _explicit_head_objects_refusal() {
 # file of exactly one line naming, absolutely, the objects folder of the repository
 # <git...> runs in: what GitBranchFetcher writes. A line in another form - relative, a
 # comment, quoted, a second line, a control byte, a `.` or `..` component, a drive letter
-# outside MSYS - is one git would read and this check could not judge.
+# outside MSYS, a leading `/` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
   local file="$1" line own
   shift
@@ -155,7 +156,8 @@ _explicit_head_own_alternates() {
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"$file" && [ "$(cat -- "$file")" = "$line" ] || return 1
   case "$line" in
-    /*) ;;
+    # Under MSYS, bash maps `/c/x` to C:\x, while git.exe reads it from the current drive.
+    /*) ! _explicit_head_msys || return 1 ;;
     [A-Za-z]:[/\\]*) _explicit_head_msys || return 1; line="${line//\\//}" ;;
     *) return 1 ;;
   esac

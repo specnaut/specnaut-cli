@@ -130,18 +130,24 @@ const lineShapes: {
   { what: "a NUL byte", line: (own) => `${own}\0` },
   { what: "a `..` component", line: (own) => `${own}/../objects` },
   { what: "a `.` component", line: (own) => own.replace(/\/objects$/, "/./objects") },
-  ...(Deno.build.os === "windows" ? [] : [
-    {
-      what: "a carriage return",
-      line: (own: string) => `${own}\r`,
-      prepare: (_root: string, own: string) => Deno.symlink(own, `${own}\r`),
-    },
-    {
-      what: "a drive letter outside Windows",
-      line: (own: string) => `C:${own}`,
-      prepare: (root: string) => Deno.symlink("/", join(root, "C:")),
-    },
-  ]),
+  ...(Deno.build.os === "windows"
+    ? [{
+      what: "a leading `/` under MSYS",
+      // `C:/x` as MSYS spells it, `/c/x`: bash maps it back to the folder, git.exe does not.
+      line: (own: string) => `/${own[0].toLowerCase()}${own.slice(2)}`,
+    }]
+    : [
+      {
+        what: "a carriage return",
+        line: (own: string) => `${own}\r`,
+        prepare: (_root: string, own: string) => Deno.symlink(own, `${own}\r`),
+      },
+      {
+        what: "a drive letter outside Windows",
+        line: (own: string) => `C:${own}`,
+        prepare: (root: string) => Deno.symlink("/", join(root, "C:")),
+      },
+    ]),
 ];
 
 for (const shape of lineShapes) {
