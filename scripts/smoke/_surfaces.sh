@@ -75,8 +75,10 @@ SURFACES=(
   # #551 — twelve shipped files, including all three bundled hooks, that the
   # coverage scan had never once looked at while its success line claimed
   # otherwise.
-  # The SessionStart record hook has a script of its own; named before the glob.
+  # The SessionStart record hook and the backlog-prereqs hook have scripts of their
+  # own; named before the glob.
   'templates/harness-specific/claude/hooks/record-checkout.sh|smoke-record-checkout.sh|bundled-hook'
+  'templates/harness-specific/claude/hooks/check-backlog-prereqs.sh|smoke-backlog-prereqs.sh|bundled-hook'
   'templates/harness-specific/*/hooks/*|smoke-hooks.sh|bundled-hook'
   # The two hook registries (spec 036). Named before the catch-all below, which
   # would send them to smoke-features.sh — the hook checks moved out of it.

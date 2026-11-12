@@ -109,6 +109,7 @@ smoke-backlog-gitlab.sh
 smoke-backlog-cloud.sh
 smoke-backlog-plan.sh
 smoke-hooks.sh
+smoke-backlog-prereqs.sh
 smoke-record-checkout.sh
 smoke-picker.sh
 smoke-all-harnesses.sh
