@@ -16524,9 +16524,13 @@ done
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$here/_git_untrusted.sh" ] || { echo "error: \$here/_git_untrusted.sh is missing" >&2 && exit 70; }
+for lib in _git_untrusted.sh _audit_scopes.sh; do
+  [ -f "\$here/\$lib" ] || { echo "error: \$here/\$lib is missing" >&2 && exit 70; }
+done
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "\$here/_git_untrusted.sh" || exit 70
+# shellcheck source=SCRIPTDIR/_audit_scopes.sh
+. "\$here/_audit_scopes.sh" || exit 70
 
 PATH_ARG=""
 RANGE_ARG=""
@@ -16599,6 +16603,7 @@ if ! _gu_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 explicit_head_from_options _gu_git || { echo "error: --head: \$EXPLICIT_REFUSAL" >&2; exit 2; }
+# shellcheck disable=SC2034  # read by _audit_scopes.sh
 TIP="\${EXPLICIT_HEAD:-HEAD}"
 
 SCOPE=""
@@ -16606,68 +16611,17 @@ SCOPE_LABEL=""
 COMMITS=""
 FILES=""
 
-# scope_read <form> <args...> - the form's output. A refusal by the library stops
-# the audit with its message: an argument it refuses is an error, not an empty
-# scope. Any other failure (an unknown revision) reads as empty, as before.
-scope_read() {
-  local out rc=0 err
-  err="\$(mktemp)"
-  out="\$("\$@" 2>"\$err")" || rc=\$?
-  if [ "\$rc" -eq 2 ] && grep -q '^git-read: refused' "\$err"; then
-    cat "\$err" >&2
-    rm -f "\$err"
-    exit 2
-  fi
-  rm -f "\$err"
-  printf '%s' "\$out"
-}
-
+# Each scope resolves in _audit_scopes.sh; the first that applies wins.
 if [ -n "\$PATH_ARG" ]; then
-  SCOPE="path"
-  SCOPE_LABEL="\$PATH_ARG"
-  # Tracked files under the subtree; no commit list for a path scope.
-  FILES="\$(scope_read gu_files "\$PATH_ARG")"
-  COMMITS=""
-  if [ -z "\$FILES" ]; then
-    echo "warning: --path '\$PATH_ARG' matched no tracked files (empty scope)" >&2
-  fi
+  scope_path
 elif [ -n "\$RANGE_ARG" ]; then
-  SCOPE="range"
-  SCOPE_LABEL="\$RANGE_ARG"
-  # The library takes the two endpoints apart; each is validated again there.
-  FILES="\$(scope_read gu_names "\${RANGE_ARG%%..*}" "\${RANGE_ARG#*..}")"
-  COMMITS="\$(scope_read gu_log "\$RANGE_ARG")"
-elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  local_count="\$(_gu_git rev-list --count "origin/main..\$TIP" 2>/dev/null || echo 0)" &&
-  [ "\$local_count" -gt 0 ]; then
-  # Reuse the count captured in the guard rather than running rev-list twice.
-  SCOPE="unpushed"
-  SCOPE_LABEL="origin/main..\$TIP (\${local_count} commits)"
-  FILES="\$(scope_read gu_names origin/main "\$TIP")"
-  COMMITS="\$(scope_read gu_log "origin/main..\$TIP")"
-elif TAG="\$(_gu_git describe --tags --abbrev=0 "\$TIP" 2>/dev/null)" && [ -n "\$TAG" ]; then
-  SCOPE="since-tag"
-  SCOPE_LABEL="\${TAG}..\$TIP"
-  FILES="\$(scope_read gu_names "\$TAG" "\$TIP")"
-  COMMITS="\$(scope_read gu_log "\${TAG}..\$TIP")"
+  scope_range
+elif count="\$(scope_unpushed_count)"; then
+  scope_unpushed "\$count"
+elif tag="\$(scope_latest_tag)"; then
+  scope_since_tag "\$tag"
 else
-  SCOPE="last-N"
-  # Clamp N to the available history so HEAD~N never points before the root.
-  AVAIL="\$(_gu_git rev-list --count "\$TIP" 2>/dev/null || echo 1)"
-  N="\$LAST_N"
-  if [ "\$N" -gt "\$AVAIL" ]; then
-    N="\$AVAIL"
-  fi
-  SCOPE_LABEL="last \${N} commits"
-  if [ "\$N" -ge "\$AVAIL" ]; then
-    # The window covers all of history; HEAD~N would precede the root, so diff
-    # against the empty tree to surface every file the history touched.
-    EMPTY_TREE="\$(_gu_git hash-object -t tree /dev/null)"
-    FILES="\$(scope_read gu_names "\$EMPTY_TREE" "\$TIP")"
-  else
-    FILES="\$(scope_read gu_names "\$TIP~\${N}" "\$TIP")"
-  fi
-  COMMITS="\$(scope_read gu_log "\$TIP" "\$N")"
+  scope_last_n
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.
@@ -17113,6 +17067,108 @@ scope_classify() {
 EOF
   # A trailing non-match leaves \$? non-zero; the job is the counters, not a status.
   return 0
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/audit/_audit_scopes.sh",
+    content: `# shellcheck shell=bash
+# _audit_scopes.sh - the one home of how each scope of collect-audit-scope.sh resolves:
+# each scope_<kind> sets SCOPE, SCOPE_LABEL, COMMITS and FILES. Sourced, never run, by
+# collect-audit-scope.sh, after _git_untrusted.sh: every read goes through its forms.
+# Reads TIP (HEAD, or the head given), and the script's PATH_ARG, RANGE_ARG and LAST_N.
+# shellcheck disable=SC2034  # SCOPE, SCOPE_LABEL, COMMITS and FILES are the script's
+
+# scope_read <form> <args...> - the form's output. A refusal by the library stops
+# the audit with its message: an argument it refuses is an error, not an empty
+# scope. Any other failure (an unknown revision) reads as empty, as before.
+scope_read() {
+  local out rc=0 err
+  err="\$(mktemp)"
+  out="\$("\$@" 2>"\$err")" || rc=\$?
+  if [ "\$rc" -eq 2 ] && grep -q '^git-read: refused' "\$err"; then
+    cat "\$err" >&2
+    rm -f "\$err"
+    exit 2
+  fi
+  rm -f "\$err"
+  printf '%s' "\$out"
+}
+
+# scope_path - the tracked files under the subtree; no commit list for a path scope.
+scope_path() {
+  SCOPE="path"
+  SCOPE_LABEL="\$PATH_ARG"
+  FILES="\$(scope_read gu_files "\$PATH_ARG")"
+  COMMITS=""
+  if [ -z "\$FILES" ]; then
+    echo "warning: --path '\$PATH_ARG' matched no tracked files (empty scope)" >&2
+  fi
+}
+
+# scope_range - an explicit range; the library takes the two endpoints apart, and
+# validates each again there.
+scope_range() {
+  SCOPE="range"
+  SCOPE_LABEL="\$RANGE_ARG"
+  FILES="\$(scope_read gu_names "\${RANGE_ARG%%..*}" "\${RANGE_ARG#*..}")"
+  COMMITS="\$(scope_read gu_log "\$RANGE_ARG")"
+}
+
+# scope_unpushed_count - prints how many commits TIP holds that origin/main does not;
+# false when there is no origin/main or none.
+scope_unpushed_count() {
+  local count
+  _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 || return 1
+  count="\$(_gu_git rev-list --count "origin/main..\$TIP" 2>/dev/null || echo 0)"
+  [ "\$count" -gt 0 ] && echo "\$count"
+}
+
+# scope_unpushed <count> - what origin/main does not hold yet; the count comes from
+# scope_unpushed_count, so rev-list does not run twice.
+scope_unpushed() {
+  SCOPE="unpushed"
+  SCOPE_LABEL="origin/main..\$TIP (\$1 commits)"
+  FILES="\$(scope_read gu_names origin/main "\$TIP")"
+  COMMITS="\$(scope_read gu_log "origin/main..\$TIP")"
+}
+
+# scope_latest_tag - prints the latest tag TIP reaches; false when there is none.
+scope_latest_tag() {
+  local tag
+  tag="\$(_gu_git describe --tags --abbrev=0 "\$TIP" 2>/dev/null)" && [ -n "\$tag" ] && echo "\$tag"
+}
+
+# scope_since_tag <tag> - every commit since that tag.
+scope_since_tag() {
+  SCOPE="since-tag"
+  SCOPE_LABEL="\$1..\$TIP"
+  FILES="\$(scope_read gu_names "\$1" "\$TIP")"
+  COMMITS="\$(scope_read gu_log "\$1..\$TIP")"
+}
+
+# scope_last_n - the last LAST_N commits, clamped to the available history so TIP~N
+# never points before the root.
+scope_last_n() {
+  local avail n="\$LAST_N" empty
+  SCOPE="last-N"
+  avail="\$(_gu_git rev-list --count "\$TIP" 2>/dev/null || echo 1)"
+  [ "\$n" -le "\$avail" ] || n="\$avail"
+  SCOPE_LABEL="last \${n} commits"
+  if [ "\$n" -ge "\$avail" ]; then
+    # The window covers all of history; TIP~N would precede the root, so diff
+    # against the empty tree to surface every file the history touched.
+    empty="\$(_gu_git hash-object -t tree /dev/null)"
+    FILES="\$(scope_read gu_names "\$empty" "\$TIP")"
+  else
+    FILES="\$(scope_read gu_names "\$TIP~\${n}" "\$TIP")"
+  fi
+  COMMITS="\$(scope_read gu_log "\$TIP" "\$n")"
 }
 `,
     executable: true,

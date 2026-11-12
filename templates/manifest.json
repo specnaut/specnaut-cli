@@ -1174,6 +1174,13 @@
       "executable": true
     },
     {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/audit/_audit_scopes.sh",
+      "source": "core/specnaut/scripts/bash/_audit_scopes.sh",
+      "executable": true
+    },
+    {
       "category": "skill",
       "name": "status-audit",
       "source": "core/skills/status-audit/SKILL.md"
