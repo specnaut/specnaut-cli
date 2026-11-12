@@ -76,7 +76,15 @@ export async function project(backend: string, files: string[], config?: string)
   await installWriterDeps(scripts);
   // groom-rules.sh sources common.sh (its CR-safe jq), which sources the git
   // probe and the template resolver: the four are installed side by side.
-  for (const f of ["groom-rules.sh", "common.sh", "_git_probe.sh", "template-resolution.sh"]) {
+  for (
+    const f of [
+      "groom-rules.sh",
+      "common.sh",
+      "_git_probe.sh",
+      "_feature_json.sh",
+      "template-resolution.sh",
+    ]
+  ) {
     await Deno.copyFile(join(dirname(RULES), f), join(bash, f));
   }
   if (config) await Deno.writeTextFile(join(dir, ".specnaut/backlog-config.yml"), config);

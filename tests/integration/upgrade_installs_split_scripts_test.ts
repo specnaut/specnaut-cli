@@ -19,6 +19,7 @@ const HELPERS = [
   ".specnaut/scripts/powershell/branch-naming.ps1",
   ".specnaut/scripts/powershell/template-resolution.ps1",
   ".specnaut/scripts/bash/_git_probe.sh",
+  ".specnaut/scripts/bash/_feature_json.sh",
   ".specnaut/scripts/powershell/_git_probe.ps1",
 ];
 

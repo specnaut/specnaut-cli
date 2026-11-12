@@ -15,6 +15,7 @@ import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 
 const TEMPLATES = fromFileUrl(new URL("../../templates/core/", import.meta.url));
 const SPEC = join(TEMPLATES, "specnaut/scripts/bash");
+const SPEC_FILES = ["common.sh", "_git_probe.sh", "_feature_json.sh", "template-resolution.sh"];
 const BOARD = join(TEMPLATES, "skills/task/scripts");
 const BACKENDS = ["cloud", "github", "gitlab", "local"] as const;
 
@@ -78,14 +79,13 @@ async function install(root: string, family: string): Promise<string> {
   const spec = family === "spec";
   const dir = join(root, spec ? ".specnaut/scripts/bash" : ".specnaut/scripts/backlog");
   await Deno.mkdir(dir, { recursive: true });
-  const files = spec ? ["common.sh", "_git_probe.sh", "template-resolution.sh"] : ["_config.sh"];
+  const shared = spec ? "common.sh" : "_config.sh";
   // A backend's `_config.sh` sources the shared character rule beside it.
-  for (const f of spec ? files : [...files, "../_issue_text.sh"]) {
+  for (const f of spec ? SPEC_FILES : [shared, "../_issue_text.sh"]) {
     await Deno.copyFile(join(spec ? SPEC : join(BOARD, family), f), join(dir, basename(f)));
   }
   const config = CONFIG[family];
   if (config) await Deno.writeTextFile(join(root, ".specnaut/backlog-config.yml"), config);
-  const shared = family === "spec" ? "common.sh" : "_config.sh";
   // Each value framed in <…>, so a trailing \r is visible to the assertion.
   await Deno.writeTextFile(
     join(dir, "driver.sh"),

@@ -2137,6 +2137,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_feature_json.sh",
+      "source": "core/specnaut/scripts/bash/_feature_json.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/create-new-feature.sh",
       "source": "core/specnaut/scripts/bash/create-new-feature.sh",
       "executable": true

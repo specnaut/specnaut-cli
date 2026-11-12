@@ -90,6 +90,7 @@ export async function project(backend: Backend): Promise<Project> {
     const f of [
       "common.sh",
       "_git_probe.sh",
+      "_feature_json.sh",
       "template-resolution.sh",
       "_report_text.sh",
       "_secret_patterns.txt",
