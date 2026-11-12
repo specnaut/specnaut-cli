@@ -6,7 +6,7 @@ import { applyHarnessStatic } from "./harness_static.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
-import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { frontmatterField, frontmatterTools, splitFrontmatter } from "./frontmatter.ts";
 import { tierToAntigravityModel } from "../../domain/antigravity_models.ts";
 import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
@@ -22,7 +22,7 @@ function toAntigravityAgentMarkdown(entry: CoreEntry): string {
   const body = split ? split.rest.replace(/^\n+/, "") : entry.content;
   const description = frontmatterField(fmBody, "description") ??
     `Specnaut ${entry.name} agent`;
-  const tools = frontmatterField(fmBody, "tools");
+  const tools = frontmatterTools(fmBody);
   const model = frontmatterField(fmBody, "model");
   const skills = frontmatterField(fmBody, "skills");
   const lines: string[] = [

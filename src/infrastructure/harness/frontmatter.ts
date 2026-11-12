@@ -29,6 +29,23 @@ export function splitFrontmatter(content: string): FrontmatterParts | null {
  * shipped frontmatter strict).
  */
 export function frontmatterField(fmBody: string, key: string): string | null {
+  const value = rawField(fmBody, key);
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * The `tools` line, or null when the key is absent. Present and not a string —
+ * a YAML list, an empty value — throws: read as absent, a grant renders as the
+ * harness default, every tool.
+ */
+export function frontmatterTools(fmBody: string): string | null {
+  const value = rawField(fmBody, "tools");
+  if (value === undefined || typeof value === "string") return value ?? null;
+  throw new Error(`frontmatter "tools" is not a comma-separated string: ${JSON.stringify(value)}`);
+}
+
+/** The key's parsed value, `undefined` when absent; malformed YAML throws. */
+function rawField(fmBody: string, key: string): unknown {
   let parsed: unknown;
   try {
     parsed = parseYaml(fmBody);
@@ -36,8 +53,7 @@ export function frontmatterField(fmBody: string, key: string): string | null {
     throw new Error(`frontmatter is not valid YAML, so "${key}" cannot be read`, { cause: e });
   }
   if (parsed && typeof parsed === "object" && key in parsed) {
-    const value = (parsed as Record<string, unknown>)[key];
-    return typeof value === "string" ? value : null;
+    return (parsed as Record<string, unknown>)[key];
   }
-  return null;
+  return undefined;
 }

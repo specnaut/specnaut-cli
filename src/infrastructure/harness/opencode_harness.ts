@@ -6,7 +6,7 @@ import { applyHarnessStatic } from "./harness_static.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
-import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { frontmatterField, frontmatterTools, splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
@@ -101,7 +101,7 @@ function toOpenCodeAgentMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
   const body = split ? split.rest.replace(/^\n+/, "") : entry.content;
   const description = split ? frontmatterField(split.fmBody, "description") : null;
-  const tools = split ? frontmatterField(split.fmBody, "tools") : null;
+  const tools = split ? frontmatterTools(split.fmBody) : null;
   const perms = translateToolsToPermissions(tools);
   const lines: string[] = [];
   lines.push(description !== null ? `description: ${description}` : `description: ${entry.name}`);

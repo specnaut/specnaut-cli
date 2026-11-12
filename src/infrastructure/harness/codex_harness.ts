@@ -13,7 +13,7 @@ import {
   codexAgentDefaultsBlock,
 } from "../../domain/codex_config.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
-import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { frontmatterField, frontmatterTools, splitFrontmatter } from "./frontmatter.ts";
 import { claudeTier, codexFamilyOf, effortToCodexReasoning } from "../../domain/codex_models.ts";
 import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
@@ -43,7 +43,7 @@ function parseAgentFrontmatter(
     description: frontmatterField(split.fmBody, "description") ?? "",
     model: frontmatterField(split.fmBody, "model"),
     effort: frontmatterField(split.fmBody, "effort"),
-    tools: frontmatterField(split.fmBody, "tools"),
+    tools: frontmatterTools(split.fmBody),
     body: split.rest.replace(/^\n+/, ""),
   };
 }

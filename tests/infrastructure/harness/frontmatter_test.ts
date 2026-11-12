@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import {
   frontmatterField,
+  frontmatterTools,
   splitFrontmatter,
 } from "../../../src/infrastructure/harness/frontmatter.ts";
 
@@ -48,4 +49,14 @@ Deno.test("frontmatterField: returns null for non-string values", () => {
 // render as the harness default: every tool. Broken frontmatter is a defect to stop on.
 Deno.test("frontmatterField: malformed YAML throws, naming the key, never reads as absent", () => {
   assertThrows(() => frontmatterField("tools: [Read, Grep\n", "tools"), Error, "tools");
+});
+
+// A grant written as a YAML list, or left empty, is not "no tools line": read as one, it renders
+// as the harness default.
+Deno.test("frontmatterTools: a tools key that is not a string throws; absent is null", () => {
+  for (const fm of ["tools: [Read, Grep]\n", "tools:\n", "tools: 3\n", "tools:\n  - Read\n"]) {
+    assertThrows(() => frontmatterTools(fm), Error, "tools", JSON.stringify(fm));
+  }
+  assertEquals(frontmatterTools("tools: Read, Grep\n"), "Read, Grep");
+  assertEquals(frontmatterTools("name: x\n"), null);
 });
