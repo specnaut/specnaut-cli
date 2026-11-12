@@ -4,7 +4,7 @@
 # (_config.sh) from a private file, removed when the request ends; never as an
 # argument, where it is visible to every process on the host and a long one
 # passes the limit on one command's arguments. Not on curl's stdin either:
-# cloud_curl hands curl the Authorization header there. Sourced after
+# cloud_curl hands curl the token header there. Sourced after
 # _config.sh; installed beside it. A subshell, so its EXIT trap is its own.
 cloud_send() (
   dir=$(mktemp -d "${TMPDIR:-/tmp}/cloud-body.XXXXXXXX") ||
