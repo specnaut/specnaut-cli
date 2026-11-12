@@ -94,6 +94,16 @@ Deno.test("a deleted instruction file fails", async () => {
   assertEquals(reasons(await check(root, head)), [{ path: "AGENTS.md", reason: REASON.missing }]);
 });
 
+Deno.test("a project in a folder of its repository is checked at its own paths", async () => {
+  const { project, head } = await setUp(undefined, "apps/web");
+  assertEquals((await check(project, head)).kind, "trusted");
+  await write(project, { [SETTINGS]: '{"hooks":{}}\n', ".mcp.json": "{}\n" });
+  assertEquals(reasons(await check(project, head)), [
+    { path: ".mcp.json", reason: REASON.notOnBase },
+    { path: SETTINGS, reason: REASON.differs },
+  ]);
+});
+
 Deno.test("files outside the checked ones change nothing", async () => {
   const { root, head } = await setUp();
   await write(root, { "README.md": "notes\n", ".specnaut/specs/001-x/plan.md": "# plan\n" });

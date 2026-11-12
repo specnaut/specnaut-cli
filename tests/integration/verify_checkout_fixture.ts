@@ -28,15 +28,18 @@ export const BASE_FILES = {
   ".gitignore": ".claude/settings.local.json\n",
 };
 
-/** The fixture, plus a branch `outside` one commit past the base: its head sha. */
-export async function setUp(files: Record<string, string> = BASE_FILES) {
-  const { root } = await fixture({ files });
+/**
+ * The fixture, plus a branch `outside` one commit past the base: its head sha. With `prefix`, the
+ * project is that folder of the repository, and `project` names it.
+ */
+export async function setUp(files: Record<string, string> = BASE_FILES, prefix?: string) {
+  const { root, project } = await fixture({ files, ...(prefix ? { prefix } : {}) });
   await git(root, "checkout", "-q", "-b", "outside", "main");
   await write(root, { "src/a.ts": "export const a = 1;\n" });
   await commitAll(root, "outside work");
   const head = (await git(root, "rev-parse", "HEAD")).trim();
   await git(root, "checkout", "-q", "feature");
-  return { root, head };
+  return { root, project, head };
 }
 
 /** Moves the base forward by `change`, committed and pushed, and brings the checkout to its tip. */
