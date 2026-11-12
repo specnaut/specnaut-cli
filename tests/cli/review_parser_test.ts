@@ -26,3 +26,15 @@ Deno.test("review refuses a missing or extra argument, and an end that is not a 
     ]
   ) assertEquals(parseArgs(argv).kind, "unknown", argv.join(" "));
 });
+
+Deno.test("review start takes no option and no --, wherever it is", () => {
+  for (
+    const argv of [
+      ["review", "--force", "start", "12"],
+      ["review", "--", "start", "12"],
+      ["review", "start", "--", "12"],
+      ["review", "start", "12", "--force"],
+      ["review", "start", "--toolchain", "/x", "12"],
+    ]
+  ) assertEquals(parseArgs(argv), { kind: "unknown", received: "review start takes no option" });
+});

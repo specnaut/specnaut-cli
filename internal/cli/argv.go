@@ -39,6 +39,8 @@ type Args struct {
 	// AfterDash is every word after the first `--`, as given, or nil with no `--`: what
 	// sandbox_parser.ts reads from the raw argument list.
 	AfterDash []string
+	// Raw is the argument list as given: what review_parser.ts reads to refuse an option.
+	Raw []string
 }
 
 type tokeniser struct {
@@ -53,6 +55,7 @@ type tokeniser struct {
 // the caller reports it as the uncaught failure TypeScript prints.
 func Tokenise(args []string, table FlagTable) (Args, error) {
 	t := newTokeniser(table)
+	t.out.Raw = args
 	flags, notFlags := args, []string(nil)
 	if i := slices.Index(args, "--"); i >= 0 {
 		flags, notFlags = args[:i], args[i+1:]

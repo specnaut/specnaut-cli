@@ -1,10 +1,13 @@
 package cli
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // parseReview is review_parser.ts's parseReview: `gate` takes no word, `start` one non-empty
-// source, `end` one full commit id. The Go binary answers each as not ported.
-func parseReview(_ Args, rest []string) Intent {
+// source and no option, `end` one full commit id. The Go binary answers each as not ported.
+func parseReview(a Args, rest []string) Intent {
 	sub, words := "", []string{}
 	if len(rest) > 0 {
 		sub, words = rest[0], rest[1:]
@@ -15,6 +18,9 @@ func parseReview(_ Args, rest []string) Intent {
 			return unknown("review gate takes no argument")
 		}
 	case "start":
+		if slices.ContainsFunc(a.Raw, func(w string) bool { return strings.HasPrefix(w, "-") }) {
+			return unknown("review start takes no option")
+		}
 		if len(words) != 1 || words[0] == "" {
 			return unknown("review start takes one source")
 		}

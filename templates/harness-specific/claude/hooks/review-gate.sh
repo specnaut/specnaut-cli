@@ -8,10 +8,16 @@
 # Exit 2 stops the command and shows the session why; 0 lets it run. Input that
 # never mentions a review is let through without starting the binary. With no
 # `specnaut` on PATH, `specnaut review start` cannot run either, so nothing is
-# stopped here.
+# stopped here. Either way the pass a gated line left is removed first: a pass
+# lives only until the next command, whichever it is.
 input=$(cat)
-case "$input" in *review*) ;; *) exit 0 ;; esac
-command -v specnaut >/dev/null 2>&1 || exit 0
+drop_pass() {
+  local git_dir
+  git_dir=$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && git rev-parse --absolute-git-dir 2>/dev/null) || return 0
+  rm -f -- "$git_dir/specnaut/review-pass.json"
+}
+case "$input" in *review*) ;; *) drop_pass; exit 0 ;; esac
+command -v specnaut >/dev/null 2>&1 || { drop_pass; exit 0; }
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || {
   echo "review-gate: cannot enter the project folder" >&2
   exit 2

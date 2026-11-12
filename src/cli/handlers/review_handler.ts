@@ -1,5 +1,6 @@
 import { red } from "@std/fmt/colors";
 import { type StartDeps, startReview } from "../../application/review_start.ts";
+import { baseTipOf } from "../../application/verify_scripts.ts";
 import { type BranchExport, exportBranchTree } from "../../application/untrusted_review.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
@@ -9,6 +10,7 @@ import {
   removeKeptExport,
 } from "../../infrastructure/fs_tree_export.ts";
 import { GitBranchFetcher } from "../../infrastructure/git_branch_fetch.ts";
+import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { GitTreeObjects } from "../../infrastructure/git_tree_objects.ts";
 import type { ReviewIntent } from "../intent.ts";
 import { runReviewGate } from "./review_gate_handler.ts";
@@ -93,7 +95,8 @@ function defaultDeps(): ReviewDeps {
         windows: Deno.build.os === "windows",
       };
       const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
-      return { pass, now: Date.now, exportBranch };
+      const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
+      return { pass, now: Date.now, baseTip, exportBranch };
     },
   };
 }

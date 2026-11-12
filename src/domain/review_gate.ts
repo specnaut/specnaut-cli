@@ -9,8 +9,12 @@
 
 /**
  * Whether a shell command line starts such a review: the words `review start`, wherever they are
- * on the line. Wider than the command itself on purpose, since a line the gate misses only meets
- * a start that finds no pass, while a line it takes wrongly only costs a check.
+ * on the line. Wider than the command itself on purpose: a line it takes wrongly only costs a
+ * check. A pass lives only until the next command, every other one removing it, and the start
+ * refuses any option or `--`, so a line the gate misses meets a start that finds no pass.
+ *
+ * Known limit: while a pass exists, this pattern is load-bearing. A line that starts a review
+ * under a spelling it does not match, run right after a line it did match, would take that pass.
  */
 export function startsReview(command: string): boolean {
   return /(^|[^\w-])review\s+start($|[^\w-])/.test(command);

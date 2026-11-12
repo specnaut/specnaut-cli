@@ -83,6 +83,12 @@ function judged(base: Base, prefix: string, names: readonly string[]) {
   };
 }
 
+/** The base branch's tip as the check resolves it, or `null` when it cannot. */
+export async function baseTipOf(git: GitObjectReader): Promise<string | null> {
+  const base = await resolveBase(git);
+  return base.kind === "known" ? base.tip : null;
+}
+
 async function resolveBase(git: GitObjectReader): Promise<Base | Unknown> {
   const branch = await baseBranchName(git);
   if (branch.kind === "unknown") return { kind: "base_unknown", why: branch.why };

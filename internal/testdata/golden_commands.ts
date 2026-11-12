@@ -63,7 +63,9 @@ const argv: string[][] = [
   ["review"], ["review", "gate"], ["review", "gate", "x"], ["review", "start"], ["review", "start", "12"],
   ["review", "start", "origin/topic"], ["review", "start", ""], ["review", "start", "a", "b"],
   ["review", "end"], ["review", "end", SHA], ["review", "end", "HEAD"], ["review", "merge"],
-  ["review", "start", "12", "--force"], ["--help", "review", "gate"],
+  ["review", "start", "12", "--force"], ["--help", "review", "gate"], ["review", "--force", "start", "12"],
+  ["review", "--", "start", "12"], ["review", "start", "--", "12"], ["review", "start", "-12"],
+  ["review", "start", "--toolchain", "/x", "12"], ["review", "end", SHA, "--force"],
 ];
 
 function intentOf(args: string[]): unknown {

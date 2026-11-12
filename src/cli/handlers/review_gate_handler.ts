@@ -73,7 +73,9 @@ export function openGate(cwd: string): GateDeps {
       await verifyCheckout(await checkDeps(cwd, (await opened()).records, sessionId), null),
     pass: {
       grant: async (tip) => await (await opened()).pass.grant(tip),
-      revoke: async () => await (await opened()).pass.revoke(),
+      // Not the repository's records: a command that starts no review only removes a pass, and
+      // outside a repository there is none to remove.
+      revoke: async () => await (await FsReviewPass.open(cwd))?.revoke(),
       take: async () => await (await opened()).pass.take(),
     },
   };

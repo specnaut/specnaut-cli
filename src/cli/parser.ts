@@ -65,7 +65,7 @@ export function parseArgs(argv: string[]): Intent {
 
   if (command === "sandbox") return parseSandbox(parsed, rest, argv);
 
-  if (command === "review") return parseReview(rest);
+  if (command === "review") return parseReview(rest, argv);
 
   if (command === "verify-scripts") {
     if (rest.length > 0) return { kind: "unknown", received: "verify-scripts takes no argument" };

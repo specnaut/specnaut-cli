@@ -121,5 +121,11 @@
 {"args":["review","end","0123456789abcdef0123456789abcdef01234567"],"intent":{"kind":"review","sub":"end","sha":"0123456789abcdef0123456789abcdef01234567"}}
 {"args":["review","end","HEAD"],"intent":{"kind":"unknown","received":"review end takes one full commit id"}}
 {"args":["review","merge"],"intent":{"kind":"unknown","received":"review merge"}}
-{"args":["review","start","12","--force"],"intent":{"kind":"review","sub":"start","source":"12"}}
+{"args":["review","start","12","--force"],"intent":{"kind":"unknown","received":"review start takes no option"}}
 {"args":["--help","review","gate"],"intent":{"kind":"help"}}
+{"args":["review","--force","start","12"],"intent":{"kind":"unknown","received":"review start takes no option"}}
+{"args":["review","--","start","12"],"intent":{"kind":"unknown","received":"review start takes no option"}}
+{"args":["review","start","--","12"],"intent":{"kind":"unknown","received":"review start takes no option"}}
+{"args":["review","start","-12"],"intent":{"kind":"unknown","received":"review start takes no option"}}
+{"args":["review","start","--toolchain","/x","12"],"intent":{"kind":"unknown","received":"review start takes no option"}}
+{"args":["review","end","0123456789abcdef0123456789abcdef01234567","--force"],"intent":{"kind":"review","sub":"end","sha":"0123456789abcdef0123456789abcdef01234567"}}

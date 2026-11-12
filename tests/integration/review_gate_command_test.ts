@@ -56,6 +56,12 @@ Deno.test("the gate judges the record of the hook's session id, never the one SP
     assertStringIncludes(none.err, "this session has no session-start record");
     assertEquals((await gate(root, hook("clean-session"))).code, 0);
     assert(await exists(passFile(root)), "a holding checkout leaves the pass");
+    const taken = await (await FsReviewPass.open(root))!.take();
+    assert(/^[0-9a-f]{40}$/.test(taken?.baseTip ?? ""), "the pass names the base tip it holds for");
+    assertEquals((await gate(root, hook("clean-session"))).code, 0);
+    assertEquals((await gate(root, hook("clean-session", "echo done"))).code, 0);
+    assertEquals(await exists(passFile(root)), false, "the next command removes the pass");
+    assertEquals((await gate(root, hook("clean-session"))).code, 0);
     assertEquals((await gate(root, hook("current-session"))).code, 2);
     assertEquals(await exists(passFile(root)), false, "a refusal removes the pass");
   } finally {

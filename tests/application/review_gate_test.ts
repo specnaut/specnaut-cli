@@ -15,14 +15,30 @@ function pass(said: string[]): ReviewPass {
 const TIP = "a".repeat(40);
 const START = "specnaut review start 12";
 
-Deno.test("a command that starts no review is not gated: nothing is checked", async () => {
+Deno.test("a command that starts no review is not gated: nothing is checked, and any pass goes", async () => {
   const said: string[] = [];
   const verify = () => Promise.reject(new Error("not reached"));
   for (const command of ["git status", null]) {
     const outcome = await gateReview({ verify, pass: pass(said) }, { sessionId: "s", command });
     assertEquals(outcome, { kind: "not_gated" });
   }
-  assertEquals(said, []);
+  assertEquals(said, ["revoke", "revoke"]);
+});
+
+Deno.test("a pass lives only until the next command: one that starts no review leaves none", async () => {
+  let held: { granted: number; baseTip: string } | null = null;
+  const memory: ReviewPass = {
+    grant: (baseTip) => Promise.resolve(void (held = { granted: 1, baseTip })),
+    revoke: () => Promise.resolve(void (held = null)),
+    take: () => Promise.resolve(held).finally(() => held = null),
+  };
+  const verify = () => Promise.resolve<CheckoutOutcome>({ kind: "trusted", baseTip: TIP });
+  await gateReview({ verify, pass: memory }, { sessionId: "s", command: "echo review start" });
+  await gateReview({ verify, pass: memory }, {
+    sessionId: "s",
+    command: "specnaut review --force start 12",
+  });
+  assertEquals(await memory.take(), null);
 });
 
 Deno.test("a start is checked for the session the hook names, and a holding checkout leaves a pass", async () => {

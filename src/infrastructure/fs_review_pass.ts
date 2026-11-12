@@ -1,5 +1,5 @@
 import { dirname, join } from "@std/path";
-import type { ReviewPass } from "../application/review_ports.ts";
+import type { GrantedPass, ReviewPass } from "../application/review_ports.ts";
 import { firstLine } from "./git_text.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 
@@ -44,25 +44,28 @@ export class FsReviewPass implements ReviewPass {
     }
   }
 
-  async take(): Promise<number | null> {
+  async take(): Promise<GrantedPass | null> {
     const info = await lstatOrNull(this.path);
     if (info === null) return null;
     if (!info.isFile) throw new Error(`${this.path} is not a regular file`);
     const text = await Deno.readTextFile(this.path);
     await Deno.remove(this.path);
-    return grantedAt(text);
+    return passOf(text);
   }
 }
 
-/** When the pass was granted, or `NaN` for a file that does not say: a pass that never holds. */
-function grantedAt(text: string): number {
+/** The pass the file holds; `NaN` and `""` for what it does not say: a pass that never holds. */
+function passOf(text: string): GrantedPass {
   try {
-    const granted = (JSON.parse(text) as { granted?: unknown }).granted;
-    return typeof granted === "number" ? granted : NaN;
+    const { granted, baseTip } = JSON.parse(text) as { granted?: unknown; baseTip?: unknown };
+    return {
+      granted: typeof granted === "number" ? granted : NaN,
+      baseTip: typeof baseTip === "string" ? baseTip : "",
+    };
   } catch (err) {
     // Not swallowed: a pass that is not JSON is one that never holds.
     if (!(err instanceof SyntaxError)) throw err;
-    return NaN;
+    return { granted: NaN, baseTip: "" };
   }
 }
 

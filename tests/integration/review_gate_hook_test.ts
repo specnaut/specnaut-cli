@@ -15,7 +15,7 @@ const HOOK = fromFileUrl(
   new URL("../../templates/harness-specific/claude/hooks/review-gate.sh", import.meta.url),
 );
 
-async function runHook(input: string, stubExit: number) {
+async function runHook(input: string, stubExit: number, path?: string, project?: string) {
   const dir = await Deno.makeTempDir({ prefix: "review-hook-" });
   try {
     const seen = join(dir, "seen");
@@ -23,7 +23,7 @@ async function runHook(input: string, stubExit: number) {
     await Deno.writeTextFile(join(dir, "specnaut"), stub, { mode: 0o755 });
     const out = await new Deno.Command("bash", {
       args: [HOOK],
-      env: { PATH: `${dir}:${Deno.env.get("PATH")}`, CLAUDE_PROJECT_DIR: dir },
+      env: { PATH: path ?? `${dir}:${Deno.env.get("PATH")}`, CLAUDE_PROJECT_DIR: project ?? dir },
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -55,6 +55,29 @@ Deno.test({
     assertEquals((await runHook(START, 1)).code, 2, "every failure of the gate stops it");
     const other = await runHook(JSON.stringify({ tool_input: { command: "ls" } }), 2);
     assertEquals(other, { code: 0, called: null });
+  },
+});
+
+Deno.test({
+  name: "a command the gate never sees still removes the pass: one with no review, or no specnaut",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const project = await Deno.makeTempDir({ prefix: "review-hook-project-" });
+    try {
+      await new Deno.Command("git", { args: ["init", "-q", project] }).output();
+      const pass = join(project, ".git", "specnaut", "review-pass.json");
+      await Deno.mkdir(join(project, ".git", "specnaut"));
+      const ls = JSON.stringify({ tool_input: { command: "ls" } });
+      for (const [input, path] of [[ls, undefined], [START, "/usr/bin:/bin"]] as const) {
+        await Deno.writeTextFile(pass, '{"granted":1,"baseTip":""}\n');
+        const run = await runHook(input, 0, path, project);
+        assertEquals([run.code, run.called], [0, null], input);
+        const left = await Deno.lstat(pass).then(() => true, () => false);
+        assertEquals(left, false, `the pass outlived ${input}`);
+      }
+    } finally {
+      await Deno.remove(project, { recursive: true });
+    }
   },
 });
 
