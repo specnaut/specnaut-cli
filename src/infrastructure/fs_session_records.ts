@@ -31,13 +31,24 @@ export class FsSessionRecords implements SessionRecordWriter {
   /**
    * Written to a file created new beside it, then hard-linked to `<id>.json`, which fails when
    * anything is already there: no file or link is ever opened for writing, and a session's first
-   * record is never replaced. A resumed session finds that one, whatever it resumed on. Other
-   * sessions' records past {@link RECORD_RETENTION_MS} are removed first.
+   * record is never replaced. A resumed session finds that one, whatever it resumed on, and renews
+   * it. Then other sessions' records unused for {@link RECORD_RETENTION_MS} are removed: a failure
+   * there is returned beside the record, which it never undoes.
    */
   async write(sessionId: string, text: string): Promise<RecordWrite> {
+    const placed = await this.#place(sessionId, text);
+    try {
+      await this.#prune(sessionId, Date.now());
+      return placed;
+    } catch (err) {
+      // Not swallowed: the failure is returned for the caller to report beside the record.
+      return { ...placed, pruneFailure: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  async #place(sessionId: string, text: string): Promise<RecordWrite> {
     if (!isSessionId(sessionId)) throw new Error(`not a session id: ${sessionId}`);
     await this.#folder();
-    await this.#prune(sessionId, Date.now());
     const path = join(this.dir, `${sessionId}.json`);
     const temp = join(this.dir, `.${sessionId}.${crypto.randomUUID()}.tmp`);
     await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
@@ -49,7 +60,17 @@ export class FsSessionRecords implements SessionRecordWriter {
       throw err;
     }
     await Deno.remove(temp);
+    if (placed.kind === "existing") await renew(path);
     return placed;
+  }
+
+  /** The record a resumed or forked session's start took, renewed; `null` when it took none. */
+  async find(sessionId: string): Promise<RecordWrite | null> {
+    if (!isSessionId(sessionId)) throw new Error(`not a session id: ${sessionId}`);
+    const path = join(this.dir, `${sessionId}.json`);
+    if (await lstatOrNull(path) === null) return null;
+    await renew(path);
+    return { kind: "existing", path };
   }
 
   /** The record `named` names (`SPECNAUT_SESSION_RECORD`), read only from this folder. */
@@ -73,6 +94,7 @@ export class FsSessionRecords implements SessionRecordWriter {
       return refused(`${SESSION_REASON.unreadable}: over ${MAX_RECORD_BYTES} bytes`);
     }
     try {
+      await renew(named);
       return { kind: "read", text: await Deno.readTextFile(named) };
     } catch (err) {
       if (err instanceof Deno.errors.NotCapable || !(err instanceof Error)) throw err;
@@ -146,6 +168,16 @@ async function removeAfter(temp: string, failure: unknown): Promise<void> {
       cause: failure,
     });
   }
+}
+
+/**
+ * A record's last use set to now, from which its retention counts. Only a regular file: a link is
+ * left as it is, never followed, and refused when read.
+ */
+async function renew(path: string): Promise<void> {
+  if (!(await lstatOrNull(path))?.isFile) return;
+  const now = new Date();
+  await Deno.utime(path, now, now);
 }
 
 async function removeIfThere(path: string): Promise<void> {

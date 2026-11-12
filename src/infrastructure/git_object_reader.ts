@@ -1,7 +1,6 @@
 import {
   type BaseFile,
   type GitObjectReader,
-  type HeadReflogReader,
   MAX_SCRIPT_BYTES,
 } from "../application/script_trust_ports.ts";
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
@@ -17,7 +16,7 @@ import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
  * it. A test greps this module for those subcommands.
  */
 
-export class GitObjects implements GitObjectReader, HeadReflogReader {
+export class GitObjects implements GitObjectReader {
   readonly #git: UntrustedGit;
 
   /** `prefix` is the project's folder under git's top level: `""`, or `sub/dir/`. */
@@ -95,15 +94,6 @@ export class GitObjects implements GitObjectReader, HeadReflogReader {
     if (record === undefined || record.path !== path) return { kind: "absent" };
     if (record.kind !== "blob") return { kind: "not_regular" };
     return { kind: "blob", bytes: (await catFiles(this.#git, commit, [record])).get(record.sha)! };
-  }
-
-  /**
-   * `rev-list --walk-reflogs`: one commit per entry. With no reflog it lists HEAD alone, and an
-   * entry whose commit is gone is left out; the check refuses when either shifts what it marked.
-   */
-  async headReflog(): Promise<string[]> {
-    const out = decode(await this.#git.run("rev-list", ["--walk-reflogs", "HEAD", "--"]));
-    return out.split("\n").filter(isFullSha);
   }
 
   async changedNames(from: string, to: string): Promise<string[]> {

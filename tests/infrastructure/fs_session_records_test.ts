@@ -37,12 +37,53 @@ Deno.test("a write removes another session's record past the retention, and keep
   assert(await exists(recent), "within the retention");
 });
 
-Deno.test("a write never removes its own session's record, however old", async () => {
+/** Whether `path` was last written within the last minute. */
+const fresh = async (path: string) =>
+  Date.now() - (await Deno.lstat(path)).mtime!.getTime() < 60 * 1000;
+
+Deno.test("a write never removes its own session's record, however old, and renews it", async () => {
   const store = await records();
   const own = (await store.write("own-session", "{}\n")).path;
   await aged(own);
   assertEquals((await store.write("own-session", "{}\n")).kind, "existing");
   assert(await exists(own));
+  assert(await fresh(own), "retention counts from the last use");
+});
+
+Deno.test("a resume finding its record renews it; one with none finds nothing", async () => {
+  const store = await records();
+  const own = (await store.write("own-session", "{}\n")).path;
+  await aged(own);
+  assertEquals(await store.find("own-session"), { kind: "existing", path: own });
+  assert(await fresh(own));
+  assertEquals(await store.find("other-session"), null);
+});
+
+Deno.test("a check reading a record renews it", async () => {
+  const store = await records();
+  const own = (await store.write("own-session", "{}\n")).path;
+  await aged(own);
+  assertEquals((await store.reader(own).read()).kind, "read");
+  assert(await fresh(own));
+});
+
+Deno.test("a record is taken though old ones cannot be removed, and the failure is returned with it", async () => {
+  const store = await records();
+  const old = (await store.write("old-session", "{}\n")).path;
+  await aged(old);
+  const remove = Deno.remove;
+  Deno.remove = (path, options) =>
+    path === old
+      ? Promise.reject(new Deno.errors.PermissionDenied("remove refused"))
+      : remove(path, options);
+  try {
+    const written = await store.write("new-session", "{}\n");
+    assertEquals(written.kind, "taken");
+    assert(await exists(written.path));
+    assertStringIncludes(written.pruneFailure ?? "", "remove refused");
+  } finally {
+    Deno.remove = remove;
+  }
 });
 
 Deno.test("a link that fails is the error reported, even when removing the temp file fails too", async () => {

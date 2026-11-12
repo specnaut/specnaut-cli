@@ -2,9 +2,9 @@ import { CHECKOUT_SCOPE } from "../domain/checkout_scope.ts";
 import { judgeCheckout, restartAdvice } from "../domain/checkout_trust.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
 import type { ScriptVerdict, Untrusted } from "../domain/script_trust.ts";
+import { reflogSince } from "../domain/head_reflog.ts";
 import {
   judgeRecord,
-  reflogSince,
   SESSION_REASON,
   type SessionRecord,
   startReasons,
@@ -13,7 +13,6 @@ import {
 import { parseRecord } from "../domain/session_record_json.ts";
 import type {
   CheckoutTreeWalker,
-  GitObjectReader,
   HeadReflogReader,
   SessionRecordReader,
 } from "./script_trust_ports.ts";
@@ -31,7 +30,7 @@ import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
  */
 
 export type VerifyCheckoutDeps = VerifyScriptsDeps & {
-  readonly git: GitObjectReader & HeadReflogReader;
+  readonly reflog: HeadReflogReader;
   readonly checkout: CheckoutTreeWalker;
   readonly session: SessionRecordReader;
 };
@@ -130,7 +129,9 @@ async function sinceStart(
   tip: string,
   told: readonly Untrusted[],
 ): Promise<Untrusted[]> {
-  const since = reflogSince(record.reflog, await deps.git.headReflog());
+  const log = await readReflog(deps);
+  if (log.kind === "unreadable") return [{ path: "HEAD", reason: log.reason }];
+  const since = log.bytes === null ? null : await reflogSince(record.reflog, log.bytes);
   if (since === null) return [{ path: "HEAD", reason: SESSION_REASON.reflogRewritten }];
   const said = new Set(told.map((u) => u.path));
   const visited: Untrusted[] = [];
@@ -139,6 +140,19 @@ async function sinceStart(
     visited.push({ path: commit, reason: SESSION_REASON.visited });
   }
   return visited;
+}
+
+/** The reflog's bytes, or why it cannot be read: a link, or a file over the cap, is a reason. */
+async function readReflog(
+  deps: VerifyCheckoutDeps,
+): Promise<{ kind: "read"; bytes: Uint8Array | null } | { kind: "unreadable"; reason: string }> {
+  try {
+    return { kind: "read", bytes: await deps.reflog.headReflog() };
+  } catch (err) {
+    // Not swallowed: the failure is the reason the check refuses with.
+    if (err instanceof Deno.errors.NotCapable || !(err instanceof Error)) throw err;
+    return { kind: "unreadable", reason: `${SESSION_REASON.reflogUnreadable}: ${err.message}` };
+  }
 }
 
 function restart(path: string, reason: string, tip: string | null): CheckoutOutcome {

@@ -6,6 +6,7 @@
 import { recordCheckout } from "../../src/application/record_checkout.ts";
 import { type CheckoutOutcome, verifyCheckout } from "../../src/application/verify_checkout.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
+import { FsHeadReflog } from "../../src/infrastructure/fs_head_reflog.ts";
 import { FsSessionRecords } from "../../src/infrastructure/fs_session_records.ts";
 import { FsScriptTreeWalker } from "../../src/infrastructure/fs_script_tree_walker.ts";
 import { FsTreeWalker } from "../../src/infrastructure/fs_tree_walker.ts";
@@ -63,7 +64,7 @@ export async function startSession(
   const store = (await FsSessionRecords.open(dir))!;
   const git = await GitObjects.open(dir);
   const outcome = await recordCheckout(
-    { git, checkout: new FsTreeWalker(dir), records: store },
+    { git, reflog: await FsHeadReflog.open(dir), checkout: new FsTreeWalker(dir), records: store },
     { sessionId, source },
   );
   if (outcome.kind !== "taken" && outcome.kind !== "existing") {
@@ -99,6 +100,7 @@ export async function check(
   const { named } = session;
   return await verifyCheckout({
     git: await GitObjects.open(root),
+    reflog: await FsHeadReflog.open(root),
     walker: new FsScriptTreeWalker(root),
     checkout: new FsTreeWalker(root),
     session: (await FsSessionRecords.open(root))!.reader(named),

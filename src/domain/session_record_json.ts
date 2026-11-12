@@ -1,7 +1,8 @@
 import type { LinkEnd } from "./checkout_link.ts";
 import type { RecordedEntry, RecordedWalk } from "./checkout_trust.ts";
 import { isFullSha } from "./commit_sha.ts";
-import { isSessionId, type ReflogMark, type SessionRecord } from "./session_record.ts";
+import { isReflogMark, type ReflogMark } from "./head_reflog.ts";
+import { isSessionId, type SessionRecord } from "./session_record.ts";
 
 /**
  * The session record as a file, and the `SessionStart` hook's input. A record is read back only
@@ -10,7 +11,7 @@ import { isSessionId, type ReflogMark, type SessionRecord } from "./session_reco
  */
 
 /** The record format; a record of another version is malformed. */
-const VERSION = 2;
+const VERSION = 3;
 
 export type ParsedRecord =
   | { readonly kind: "parsed"; readonly record: SessionRecord }
@@ -28,6 +29,10 @@ export function parseRecord(text: string): ParsedRecord {
   } catch (err) {
     // Not swallowed: the parser's message is the reason the check gives.
     return { kind: "malformed", why: `not JSON: ${err instanceof Error ? err.message : err}` };
+  }
+  if (isObject(value) && Number.isInteger(value.version) && value.version !== VERSION) {
+    const why = `a version ${value.version} record, where this specnaut reads version ${VERSION}`;
+    return { kind: "malformed", why: `${why}: start a new session` };
   }
   const record = recordOfJson(value);
   return record === null
@@ -60,10 +65,7 @@ function recordOfJson(v: unknown): SessionRecord | null {
 }
 
 function reflogOf(v: unknown): ReflogMark | null {
-  if (!isObject(v) || !Number.isInteger(v.entries) || (v.entries as number) < 1) return null;
-  return isString(v.newest) && isFullSha(v.newest)
-    ? { entries: v.entries as number, newest: v.newest }
-    : null;
+  return isObject(v) && isReflogMark(v) ? { bytes: v.bytes, sha256: v.sha256 } : null;
 }
 
 function walkOf(v: unknown): RecordedWalk | null {

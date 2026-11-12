@@ -48,10 +48,10 @@ export interface GitObjectReader {
   changedNames(from: string, to: string): Promise<string[]>;
 }
 
-/** HEAD's reflog, read as commits: never a ref moved, never an entry expired. */
+/** HEAD's reflog, read only: never a ref moved, never an entry expired. */
 export interface HeadReflogReader {
-  /** The commit each entry of HEAD's reflog names, newest first. */
-  headReflog(): Promise<string[]>;
+  /** The reflog's bytes, oldest entry first, or `null` when git keeps none for HEAD. */
+  headReflog(): Promise<Uint8Array | null>;
 }
 
 /** Walks the scripts folder of the work tree, following no link. */
@@ -78,10 +78,19 @@ export interface SessionRecordReader {
   read(): Promise<RecordRead>;
 }
 
-/** Where the session's record is: taken now, or the one it already had, which is never replaced. */
-export type RecordWrite = { readonly kind: "taken" | "existing"; readonly path: string };
+/**
+ * Where the session's record is: taken now, or the one it already had, which is never replaced.
+ * `pruneFailure` says why other sessions' old records could not all be removed: the record stands.
+ */
+export type RecordWrite = {
+  readonly kind: "taken" | "existing";
+  readonly path: string;
+  readonly pruneFailure?: string;
+};
 
-/** Stores the first record of the session `sessionId`. */
+/** Stores the first record of the session `sessionId`, and finds it again. */
 export interface SessionRecordWriter {
   write(sessionId: string, text: string): Promise<RecordWrite>;
+  /** The session's record as an `existing` one, renewed, or `null` when it has none. */
+  find(sessionId: string): Promise<RecordWrite | null>;
 }

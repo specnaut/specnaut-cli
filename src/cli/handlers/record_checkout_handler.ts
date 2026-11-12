@@ -1,9 +1,10 @@
-import { red } from "@std/fmt/colors";
+import { red, yellow } from "@std/fmt/colors";
 import { recordCheckout, type RecordCheckoutDeps } from "../../application/record_checkout.ts";
 import { SESSION_RECORD_VAR } from "../../domain/session_record.ts";
 import { type SessionStart, sessionStartOf } from "../../domain/session_record_json.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { exportToSession } from "../../infrastructure/claude_env_file.ts";
+import { FsHeadReflog } from "../../infrastructure/fs_head_reflog.ts";
 import { FsSessionRecords } from "../../infrastructure/fs_session_records.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
@@ -15,8 +16,9 @@ import { GitObjects } from "../../infrastructure/git_object_reader.ts";
  * the file `CLAUDE_ENV_FILE` names, so the session's later commands find its record:
  *
  *   0  taken, or the session's first record kept and its path exported again, or nothing to
- *      take: a source that keeps the record (`clear`, `compact`), or a folder in no git repository
- *   1  the record could not be taken, the reason on stderr
+ *      take: a source that keeps the record (`clear`, `compact`), or a folder in no git repository;
+ *      old records of other sessions that could not be removed are a warning on stderr
+ *   1  the record could not be taken, or a resumed or forked session has none, the reason on stderr
  *   2  usage: stdin is a terminal or not a `SessionStart` hook's input, or `CLAUDE_ENV_FILE` is unset
  *
  * Nothing is printed on stdout: a `SessionStart` hook's stdout is added to the session's context.
@@ -45,7 +47,12 @@ function defaultDeps(): RecordCheckoutHandlerDeps {
     open: async (cwd) => {
       const records = await FsSessionRecords.open(cwd);
       if (records === null) return null;
-      return { git: await GitObjects.open(cwd), checkout: new FsTreeWalker(cwd), records };
+      return {
+        git: await GitObjects.open(cwd),
+        reflog: await FsHeadReflog.open(cwd),
+        checkout: new FsTreeWalker(cwd),
+        records,
+      };
     },
     exportToSession,
   };
@@ -87,6 +94,10 @@ async function take(
   if (outcome.kind === "refused") return fail(deps, EXIT.failed, outcome.why);
   if (outcome.kind === "taken" || outcome.kind === "existing") {
     await deps.exportToSession(envFile, SESSION_RECORD_VAR, outcome.path);
+    if (outcome.pruneFailure !== undefined) {
+      const why = `old session records could not all be removed: ${outcome.pruneFailure}`;
+      deps.err(yellow(`warning: specnaut record-checkout: ${terminalText(why)}`));
+    }
   }
   return EXIT.done;
 }

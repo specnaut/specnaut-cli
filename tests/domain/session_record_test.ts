@@ -20,8 +20,8 @@ const S = ".claude/settings.json";
 const L = ".claude/skills/x";
 const HEAD = "c".repeat(40);
 const OUTSIDE = "a".repeat(40);
-/** HEAD's reflog at session start: three entries, the newest naming HEAD. */
-const MARK = { entries: 3, newest: HEAD };
+/** HEAD's reflog at session start: its length and digest. */
+const MARK = { bytes: 120, sha256: "e".repeat(64) };
 const blob = (path: string, text: string): BaseEntry => ({ kind: "blob", path, bytes: enc(text) });
 const TIP: BaseEntry[] = [blob(S, "{}\n"), { kind: "link", path: L, target: "../x" }];
 /** Where the link leads: a root the check walks whole. */
@@ -96,17 +96,17 @@ Deno.test("a record reads back as it was written", async () => {
 });
 
 Deno.test("a record that is not one of this version's is malformed, never read in part", () => {
-  const ok = { version: 2, head: HEAD, reflog: MARK, tree: [] };
+  const ok = { version: 3, head: HEAD, reflog: MARK, tree: [] };
   const file = { kind: "file", path: S, sha256: "f".repeat(64), links: 1 };
   const cases: unknown[] = [
     null,
     [],
-    { ...ok, version: 1 },
+    { ...ok, version: 2 },
     { ...ok, head: "HEAD" },
     { ...ok, reflog: undefined },
-    { ...ok, reflog: { ...MARK, entries: 0 } },
-    { ...ok, reflog: { ...MARK, entries: 1.5 } },
-    { ...ok, reflog: { ...MARK, newest: "HEAD" } },
+    { ...ok, reflog: {} },
+    { ...ok, reflog: { ...MARK, bytes: 0 } },
+    { ...ok, reflog: { ...MARK, sha256: "HEAD" } },
     { ...ok, tree: {} },
     { ...ok, tree: [{ kind: "walked" }] },
     { ...ok, tree: [{ kind: "blocked", path: "x" }] },

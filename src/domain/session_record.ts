@@ -10,6 +10,7 @@ import {
   type RecordedWalk,
 } from "./checkout_trust.ts";
 import type { BaseEntry, Untrusted } from "./script_trust.ts";
+import type { ReflogMark } from "./head_reflog.ts";
 import { sha256HexBytes } from "./sha256.ts";
 
 /**
@@ -26,33 +27,17 @@ export type SessionRecord = {
 };
 
 /**
- * Where HEAD's reflog stood at session start: how many entries it held, and the commit its newest
- * one named. Every entry written since is a commit HEAD was on during the session, so a branch
- * checked out and left again is still seen, though HEAD and the folder no longer show it.
- */
-export type ReflogMark = { readonly entries: number; readonly newest: string };
-
-/**
- * The commits the reflog entries written since `mark` name, each once, newest first; `now` is the
- * commit of every entry, newest first. `null` when the entry `mark` names is not where it stood:
- * the reflog was rewritten or expired, and what it held since cannot be told. A reflog shorter than
- * at the start lands there too, since no entry stands at a negative index.
- */
-export function reflogSince(mark: ReflogMark, now: readonly string[]): string[] | null {
-  const added = now.length - mark.entries;
-  if (now[added] !== mark.newest) return null;
-  return [...new Set(now.slice(0, added))];
-}
-
-/**
- * The `SessionStart` sources that take the record: each one is a harness process that has just
- * loaded the checkout. `clear` and `compact` load nothing anew, and a record retaken there would
- * describe a checkout switched inside the session, the case the record exists for. Any other
- * source takes none: a missing record refuses, where a wrong one would pass. A session keeps its
- * first record: `resume` or `fork` under an id that has one takes none, so a session started on a
- * branch cannot pass by switching to the base and resuming.
+ * The `SessionStart` sources that name the session's record: each one is a harness process that
+ * has just loaded the checkout. Only {@link TAKING_SOURCE} takes it; `resume` and `fork` find the
+ * one the session's start took, and without one are refused: a record taken later would describe
+ * the checkout as it is then, not the one the session first loaded. `clear` and `compact` load
+ * nothing anew and leave the record as it was. Any other source names none: a missing record
+ * refuses, where a wrong one would pass.
  */
 export const RECORDED_SOURCES: ReadonlySet<string> = new Set(["startup", "resume", "fork"]);
+
+/** The one source that takes a session's record: the session's start. */
+export const TAKING_SOURCE = "startup";
 
 /** A session id as the record's file name: what the harness issues, never a path of its own. */
 export function isSessionId(id: string): boolean {
@@ -60,12 +45,13 @@ export function isSessionId(id: string): boolean {
 }
 
 /**
- * How long another session's record is kept: a write removes the folder's records older than this,
- * so no stale record is left for a later session to be pointed at. Thirty days is Claude Code's
- * default `cleanupPeriodDays`, past which a session's transcript, and with it any resume, is gone.
- * A session resumed past it finds no record and takes a new one of the checkout as it is then.
+ * How long a record unused is kept: a write removes the folder's other records last used longer
+ * ago, so no stale record stays in it. Using one renews it: a resume that finds it, and a check
+ * that reads it. Thirty days is Claude Code's default `cleanupPeriodDays`, the life of a session's
+ * transcript.
  */
-export const RECORD_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const RECORD_RETENTION_DAYS = 30;
+export const RECORD_RETENTION_MS = RECORD_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 /** The variable that names the record to the session's later commands, set through `CLAUDE_ENV_FILE`. */
 export const SESSION_RECORD_VAR = "SPECNAUT_SESSION_RECORD";
@@ -79,14 +65,16 @@ export const SESSION_REASON = {
     "SessionStart hook ran `specnaut record-checkout` has one, and a `/clear` may drop it; " +
     "start a new session",
   outside: "names a file outside this checkout's session records",
-  missing: "the session-start record is missing",
+  missing: `the session-start record is missing: a record unused for ${RECORD_RETENTION_DAYS} ` +
+    "days is removed; start a new session",
   unreadable: "the session-start record cannot be read",
   malformed: "the session-start record cannot be parsed",
   headUnknown: "the session started on a commit this repository does not have",
   atStart: "at session start",
   visited: "HEAD was on this commit during the session, and the base's tip lacks it",
-  reflogRewritten: "HEAD's reflog no longer holds the entry the session started at: it was " +
-    "rewritten or expired since",
+  reflogUnreadable: "HEAD's reflog cannot be read",
+  reflogRewritten: "HEAD's reflog no longer holds the entry the session started at, or is not " +
+    "a reflog git wrote: what HEAD was on since cannot be told",
 } as const;
 
 /** The record of `tree` at `head`: each file's bytes replaced by their digest. */

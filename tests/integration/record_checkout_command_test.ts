@@ -34,10 +34,11 @@ async function session(root: string, source: string, id = ID) {
   return { ...run, env: await Deno.readTextFile(envFile) };
 }
 
+const gitDir = async (root: string) => (await git(root, "rev-parse", "--absolute-git-dir")).trim();
+
 /** Where the record of session `id` lives: the worktree's own git directory, never the tree. */
 async function recordPath(root: string, id = ID): Promise<string> {
-  const gitDir = (await git(root, "rev-parse", "--absolute-git-dir")).trim();
-  return join(gitDir, "specnaut", "session", `${id}.json`);
+  return join(await gitDir(root), "specnaut", "session", `${id}.json`);
 }
 
 /** Whether the command said anything on stderr (the runtime's own warnings aside). */
@@ -47,16 +48,16 @@ const exists = (path: string) => Deno.lstat(path).then(() => true, () => false);
 
 Deno.test("a session's start records HEAD and every checked file, untracked and ignored ones included", async () => {
   const { root } = await setUp();
-  await git(root, "commit", "-q", "--allow-empty", "-m", "HEAD's newest reflog entry"); // not its oldest
   await write(root, { ".claude/settings.local.json": "{}\n", ".mise.toml": "x\n" });
   const run = await session(root, "startup");
   assertEquals([run.code, run.stdout, said(run.stderr)], [0, "", false]);
   const path = await recordPath(root);
   const record = JSON.parse(await Deno.readTextFile(path));
-  assertEquals(record.version, 2);
+  assertEquals(record.version, 3);
   assertEquals(record.head, (await git(root, "rev-parse", "HEAD")).trim());
-  const reflog = (await git(root, "rev-list", "-g", "HEAD")).trim().split("\n");
-  assertEquals(record.reflog, { entries: reflog.length, newest: reflog[0] }, "HEAD's reflog");
+  const reflog = await Deno.readFile(join(await gitDir(root), "logs", "HEAD"));
+  const mark = { bytes: reflog.length, sha256: await sha256HexBytes(reflog) };
+  assertEquals(record.reflog, mark, "HEAD's reflog as the session started");
   const files = new Map<string, string>();
   for (const walk of record.tree) {
     for (const e of walk.entries ?? []) if (e.kind === "file") files.set(e.path, e.sha256);
@@ -72,16 +73,19 @@ Deno.test("a session's start records HEAD and every checked file, untracked and 
   assertEquals(status.includes("session"), false, "nothing written in the work tree");
 });
 
-Deno.test("startup, resume and fork take the record; clear and compact keep it as it was", async () => {
+Deno.test("startup takes the record; resume and fork only find it; clear and compact keep it as it was", async () => {
   const { root } = await setUp();
   const path = await recordPath(root);
-  for (const source of ["startup", "resume", "fork"]) {
-    if (await exists(path)) await Deno.remove(path);
+  for (const source of ["resume", "fork"]) {
     const run = await session(root, source);
-    assertEquals(run.code, 0, source);
-    assert(await exists(path), `${source} takes a record`);
-    assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`, source);
+    assertEquals([run.code, run.stdout, run.env], [1, "", ""], source);
+    assertStringIncludes(run.stderr, "this session has no first record: start a new session");
+    assertEquals(await exists(path), false, `${source} takes none`);
   }
+  const run = await session(root, "startup");
+  assertEquals(run.code, 0);
+  assert(await exists(path), "startup takes a record");
+  assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`);
   const taken = await Deno.readTextFile(path);
   await write(root, { "AGENTS.md": "switched inside the session\n" });
   for (const source of ["clear", "compact", "other"]) {
@@ -155,6 +159,15 @@ Deno.test("an input that is not a SessionStart hook's, or no CLAUDE_ENV_FILE, is
     assertEquals([run.code, run.stdout], [2, ""], stdin);
     assertStringIncludes(run.stderr, says);
   }
+  assertEquals(await exists(await recordPath(root)), false);
+});
+
+Deno.test("a checkout whose HEAD has no reflog takes no record, saying why", async () => {
+  const { root } = await setUp();
+  await Deno.remove(join(await gitDir(root), "logs", "HEAD"));
+  const run = await session(root, "startup");
+  assertEquals([run.code, run.stdout, run.env], [1, "", ""]);
+  assertStringIncludes(run.stderr, "HEAD has no reflog");
   assertEquals(await exists(await recordPath(root)), false);
 });
 

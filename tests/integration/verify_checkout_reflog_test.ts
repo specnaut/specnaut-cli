@@ -1,0 +1,87 @@
+import { assertEquals, assertStringIncludes } from "@std/assert";
+import { join } from "@std/path";
+import { CHECKOUT_REASON } from "../../src/domain/checkout_trust.ts";
+import { SESSION_REASON } from "../../src/domain/session_record.ts";
+import { check, reasons, setUp, startSession } from "./verify_checkout_fixture.ts";
+import { git } from "./verify_scripts_fixture.ts";
+
+/**
+ * The checkout check reads HEAD's reflog against where it stood when the session started: the
+ * file must still begin with the bytes it held then, and every commit an entry written since names
+ * must be the base tip's, so a branch checked out and left again is still seen.
+ */
+
+const rewritten = [{ path: "HEAD", reason: SESSION_REASON.reflogRewritten }];
+const logsHead = async (root: string) =>
+  join((await git(root, "rev-parse", "--absolute-git-dir")).trim(), "logs", "HEAD");
+
+Deno.test("a branch checked out and left after the session started fails, by HEAD's reflog", async () => {
+  const { root, head } = await setUp();
+  await git(root, "checkout", "-q", "outside");
+  assertEquals(
+    reasons(await check(root, head)),
+    [{ path: head, reason: CHECKOUT_REASON.headHolds }],
+    "each cause once while HEAD is still there",
+  );
+  await git(root, "checkout", "-q", "feature");
+  assertEquals(reasons(await check(root, head)), [{ path: head, reason: SESSION_REASON.visited }]);
+});
+
+Deno.test("a branch visit whose own entry was deleted is still seen, by the entry after it", async () => {
+  const { root, head } = await setUp();
+  await git(root, "checkout", "-q", "outside");
+  await git(root, "checkout", "-q", "feature");
+  await git(root, "reflog", "delete", "HEAD@{1}"); // the move to `outside`
+  assertEquals(reasons(await check(root, head)), [{ path: head, reason: SESSION_REASON.visited }]);
+});
+
+Deno.test("a reflog whose entries before the start were removed fails, whatever it holds since", async () => {
+  const { root, head } = await setUp();
+  const entries = (await git(root, "rev-list", "-g", "HEAD")).trim().split("\n").length;
+  for (const oldest of [entries - 1, entries - 2]) {
+    await git(root, "reflog", "delete", `HEAD@{${oldest}}`);
+  }
+  await git(root, "checkout", "-q", "outside");
+  await git(root, "checkout", "-q", "feature");
+  assertEquals(reasons(await check(root, head)), rewritten);
+});
+
+Deno.test("a reflog without the entry the session started at fails", async () => {
+  const { root, head } = await setUp();
+  await git(root, "checkout", "-q", "--detach");
+  await startSession(root);
+  await git(root, "checkout", "-q", "feature");
+  await git(root, "reflog", "delete", "HEAD@{1}"); // the newest entry when the session started
+  assertEquals(reasons(await check(root, head)), rewritten);
+});
+
+Deno.test("a reflog removed since the session started fails", async () => {
+  const { root, head } = await setUp();
+  await Deno.remove(await logsHead(root));
+  assertEquals(reasons(await check(root, head)), rewritten);
+});
+
+Deno.test("a reflog over the size cap fails, as a reason, never an uncaught error", async () => {
+  const { root, head } = await setUp();
+  await Deno.truncate(await logsHead(root), 33 * 1024 * 1024);
+  const [found] = reasons(await check(root, head));
+  assertEquals(found.path, "HEAD");
+  assertStringIncludes(found.reason, `${SESSION_REASON.reflogUnreadable}: `);
+  assertStringIncludes(found.reason, "bytes");
+});
+
+Deno.test({
+  name: "a reflog that is a link fails, as a reason, never read through",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const { root, head } = await setUp();
+    const path = await logsHead(root);
+    const elsewhere = join(root, "..", "reflog");
+    await Deno.rename(path, elsewhere);
+    await Deno.symlink(elsewhere, path);
+    const [found] = reasons(await check(root, head));
+    assertEquals(found.path, "HEAD");
+    assertStringIncludes(found.reason, `${SESSION_REASON.reflogUnreadable}: `);
+    assertStringIncludes(found.reason, "a link is not followed");
+  },
+});
