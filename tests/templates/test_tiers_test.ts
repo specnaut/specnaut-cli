@@ -57,12 +57,15 @@ Deno.test("quality-gates.md names three moments, and fast is static", () => {
     !doc.includes("no bundled Specnaut file names"),
     "the false claim is back: review.md's detection table names runners",
   );
-  assertStringIncludes(doc, "`phases/review.md`'s auto-detect table");
+  assertStringIncludes(doc, "`phases/review-gates.md`'s auto-detect table");
 });
 
 Deno.test("review.md runs the test command once per item and reports the skip", () => {
   const doc = read("skills/task/phases/review.md");
-  const phase2 = section(doc, "## Phase 2 — Quality gates (auto-detected)");
+  const phase2 = section(
+    read("skills/task/phases/review-gates.md"),
+    "## Phase 2 — Quality gates (auto-detected)",
+  );
   assertStringIncludes(phase2, "**do not\nrun the test command**");
   assertStringIncludes(phase2, "never as PASS");
   const report = section(doc, "## Phase 4 — Final report");

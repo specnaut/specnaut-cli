@@ -9,6 +9,7 @@ export const TASK_PHASES: readonly string[] = [
   "implement",
   "review",
   "review-seats",
+  "review-gates",
   "merge",
   "audit",
   "constitution",

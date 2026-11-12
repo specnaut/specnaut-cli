@@ -55,7 +55,7 @@ The constraint holds **structurally** rather than by review. There is nowhere
 in the mechanism for a tool name to be written: the declaration is yours, the
 runner executes what it reads, and neither this document nor the script has a
 default to fall back to. The one sanctioned place where runners are named is
-`phases/review.md`'s auto-detect table, which recognises common toolchains by
+`phases/review-gates.md`'s auto-detect table, which recognises common toolchains by
 their marker files; it is detection, not a default this mechanism falls back
 to.
 

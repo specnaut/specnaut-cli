@@ -69,6 +69,12 @@
     {
       "category": "phase",
       "name": "task",
+      "suffix": "review-gates.md",
+      "source": "core/skills/task/phases/review-gates.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
       "suffix": "merge.md",
       "source": "core/skills/task/phases/merge.md"
     },
