@@ -5,7 +5,8 @@ import { bwrapArgs, containerArgs } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { isFilterArch, SECCOMP_FD, seccompFilter } from "../domain/sandbox_seccomp.ts";
 import { armExitTrap } from "./exit_trap.ts";
-import { type ProcessLauncher, untilWallClock } from "./sandbox_process.ts";
+import type { ProcessLauncher } from "./sandbox_process.ts";
+import { untilWallClock } from "./sandbox_wall_clock.ts";
 
 /**
  * One runner per backend. Each launches exactly what the domain generated for the policy, adds

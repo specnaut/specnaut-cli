@@ -1,9 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import {
-  DenoProcessLauncher,
-  type Started,
-  untilWallClock,
-} from "../../src/infrastructure/sandbox_process.ts";
+import { DenoProcessLauncher, type Started } from "../../src/infrastructure/sandbox_process.ts";
+import { untilWallClock } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import { capture } from "./sandbox_live_fixture.ts";
 
 /**
