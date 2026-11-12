@@ -183,26 +183,22 @@ export class CloudClient {
 
   async listProjects(accessToken: string): Promise<CloudProject[]> {
     const json = await this.getJson("/projects", accessToken, "list projects failed");
-    const raw = Array.isArray(json.projects) ? json.projects : [];
-    return raw.map((p) => {
-      const o = p as Record<string, unknown>;
-      return { key: cleanText(o.key), name: cleanText(o.name), role: cleanText(o.role) };
-    });
+    return listOf(json, "projects").map((o) => ({
+      key: cleanText(o.key),
+      name: cleanText(o.name),
+      role: cleanText(o.role),
+    }));
   }
 
   /** The orgs the authenticated account belongs to (`specnaut cloud orgs`). */
   async listOrgs(accessToken: string): Promise<CloudOrg[]> {
     const json = await this.getJson("/orgs", accessToken, "list orgs failed");
-    const raw = Array.isArray(json.orgs) ? json.orgs : [];
-    return raw.map((o) => {
-      const r = o as Record<string, unknown>;
-      return {
-        slug: cleanText(r.slug),
-        name: cleanText(r.name),
-        role: cleanText(r.role),
-        isActive: Boolean(r.isActive),
-      };
-    });
+    return listOf(json, "orgs").map((r) => ({
+      slug: cleanText(r.slug),
+      name: cleanText(r.name),
+      role: cleanText(r.role),
+      isActive: Boolean(r.isActive),
+    }));
   }
 
   /** The board's columns for a project (`specnaut cloud board`). */
@@ -212,11 +208,11 @@ export class CloudClient {
       accessToken,
       "list columns failed",
     );
-    const raw = Array.isArray(json.columns) ? json.columns : [];
-    return raw.map((c) => {
-      const o = c as Record<string, unknown>;
-      return { id: String(o.id), name: cleanText(o.name), order: Number(o.order ?? 0) };
-    });
+    return listOf(json, "columns").map((o) => ({
+      id: String(o.id),
+      name: cleanText(o.name),
+      order: Number(o.order ?? 0),
+    }));
   }
 
   /** The project's tasks (`specnaut cloud board`). */
@@ -226,17 +222,7 @@ export class CloudClient {
       accessToken,
       "list tasks failed",
     );
-    const raw = Array.isArray(json.tasks) ? json.tasks : [];
-    return raw.map((t) => {
-      const o = t as Record<string, unknown>;
-      return {
-        number: Number(o.number ?? 0),
-        title: cleanText(o.title),
-        columnId: String(o.columnId ?? ""),
-        priority: strField(o, "priority"),
-        size: strField(o, "size"),
-      };
-    });
+    return listOf(json, "tasks").map((o) => taskOf(o));
   }
 
   async createProject(
@@ -271,13 +257,23 @@ export class CloudClient {
     if (status !== 201 && status !== 200) {
       throw new CloudApiError(status, strField(json, "error") ?? "create task failed");
     }
-    const t = (json.task ?? {}) as Record<string, unknown>;
-    return {
-      number: Number(t.number ?? 0),
-      title: cleanText(t.title ?? title),
-      columnId: String(t.columnId ?? ""),
-      priority: strField(t, "priority"),
-      size: strField(t, "size"),
-    };
+    return taskOf((json.task ?? {}) as Record<string, unknown>, title);
   }
+}
+
+/** A list field of a body, each element read as an object; anything else is an empty list. */
+function listOf(json: Record<string, unknown>, field: string): Record<string, unknown>[] {
+  const raw = json[field];
+  return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+}
+
+/** A task from its wire object; `title` stands in when the answer carries none. */
+function taskOf(o: Record<string, unknown>, title?: string): CloudTask {
+  return {
+    number: Number(o.number ?? 0),
+    title: cleanText(o.title ?? title),
+    columnId: String(o.columnId ?? ""),
+    priority: strField(o, "priority"),
+    size: strField(o, "size"),
+  };
 }
