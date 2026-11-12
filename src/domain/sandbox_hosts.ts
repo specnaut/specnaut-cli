@@ -44,3 +44,16 @@ export const DEVICES = ["/dev/null", "/dev/zero", "/dev/random", "/dev/urandom"]
 
 /** On macOS the loader reads the root folder's own listing (its names, nothing beneath it). */
 export const SEATBELT_LISTINGS: readonly string[] = ["/"];
+
+/** Kernel values a sandboxed process may read on macOS, by exact name or by prefix. */
+export type Sysctls = { readonly names: readonly string[]; readonly prefixes: readonly string[] };
+
+/**
+ * What a toolchain reads to size itself: CPU count, page size (Deno aborts without it), the
+ * argument limit, the kernel release and the CPU's optional features. Nothing that names the
+ * machine, its user or its other processes.
+ */
+export const SEATBELT_SYSCTLS: Sysctls = {
+  names: ["hw.ncpu", "hw.pagesize_compat", "kern.argmax", "kern.osrelease"],
+  prefixes: ["hw.optional."],
+};

@@ -107,3 +107,16 @@ Deno.test("seatbeltProfile: every file allow carries a filter; an empty list nev
   );
   assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), reads: ["/"] }));
 });
+
+Deno.test("seatbeltProfile: only named kernel values may be read, never all of them", () => {
+  const sysctl = allowLines().filter((l) => l.startsWith("(allow sysctl-read"));
+  assertEquals(sysctl, [
+    '(allow sysctl-read (sysctl-name "hw.ncpu") (sysctl-name "hw.pagesize_compat") ' +
+    '(sysctl-name "kern.argmax") (sysctl-name "kern.osrelease") ' +
+    '(sysctl-name-prefix "hw.optional."))',
+  ]);
+  const none = { names: [], prefixes: [] };
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), sysctls: none }));
+  const odd = { names: ['kern.x") (allow default) ("'], prefixes: [] };
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), sysctls: odd }));
+});

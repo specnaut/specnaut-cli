@@ -9,6 +9,7 @@
  */
 
 import type { SandboxPolicy } from "./sandbox.ts";
+import type { Sysctls } from "./sandbox_hosts.ts";
 import { FORBIDDEN_SERVICES } from "./sandbox_hosts.ts";
 import { safePath } from "./sandbox_paths.ts";
 
@@ -23,7 +24,7 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
     "(allow process-exec)",
     "(allow signal (target same-sandbox))",
     "(allow process-info* (target same-sandbox))",
-    "(allow sysctl-read)",
+    `(allow sysctl-read ${sysctlRules(policy.sysctls)})`,
     `(allow file-read-metadata ${rules("literal", policy.lookups)})`,
     `(allow file-read-data ${rules("literal", policy.listings)})`,
     `(allow file-read* ${rules("subpath", folders)})`,
@@ -59,4 +60,19 @@ function networkRule(network: SandboxPolicy["network"]): string {
     case "none":
       return "(deny network*)";
   }
+}
+
+/** A kernel value's name: dotted words, nothing that could close the rule's quotes. */
+const SYSCTL_NAME = /^[a-z0-9_]+(\.[a-z0-9_]+)*\.?$/;
+
+/** The named kernel values; like a file rule, an empty list throws rather than allow them all. */
+function sysctlRules({ names, prefixes }: Sysctls): string {
+  const all = [...names, ...prefixes];
+  if (all.length === 0) throw new Error("a seatbelt sysctl rule needs at least one name");
+  const odd = all.find((n) => !SYSCTL_NAME.test(n));
+  if (odd !== undefined) throw new Error(`sysctl name ${JSON.stringify(odd)} is not plain`);
+  return [
+    ...names.map((n) => `(sysctl-name "${n}")`),
+    ...prefixes.map((p) => `(sysctl-name-prefix "${p}")`),
+  ].join(" ");
 }

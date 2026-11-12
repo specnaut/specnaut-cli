@@ -1,6 +1,10 @@
 import { assert, assertEquals } from "@std/assert";
 import { LIMITS, type SandboxPaths, sandboxPolicy } from "../../src/domain/sandbox.ts";
-import { ALLOWED_SERVICES, FORBIDDEN_SERVICES } from "../../src/domain/sandbox_hosts.ts";
+import {
+  ALLOWED_SERVICES,
+  FORBIDDEN_SERVICES,
+  SEATBELT_SYSCTLS,
+} from "../../src/domain/sandbox_hosts.ts";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
@@ -141,4 +145,9 @@ Deno.test("sandboxPolicy: on macOS only the folders above a visible one may be l
   assert(!policy.lookups.includes(`${PATHS.home}/.ssh`));
   assertEquals(policy.listings, ["/"]);
   assertEquals([policyOf("bwrap").lookups, policyOf("container").listings], [[], []]);
+});
+
+Deno.test("sandboxPolicy: kernel values are named on macOS only", () => {
+  assertEquals(policyOf("seatbelt").sysctls, SEATBELT_SYSCTLS);
+  assertEquals(policyOf("bwrap").sysctls, { names: [], prefixes: [] });
 });

@@ -16,6 +16,8 @@ import {
   ALLOWED_SERVICES,
   DEVICES,
   SEATBELT_LISTINGS,
+  SEATBELT_SYSCTLS,
+  type Sysctls,
   SYSTEM,
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
@@ -126,6 +128,8 @@ export type SandboxPolicy = {
   /** No network at all: loopback, unix sockets and dependency installs included. */
   readonly network: "none";
   readonly services: readonly string[];
+  /** Kernel values readable on macOS; none elsewhere, where the launcher has no such filter. */
+  readonly sysctls: Sysctls;
   /** The container's user: `nobody`, never the image's default, which is often root. */
   readonly user: string;
   readonly limits: SandboxLimits;
@@ -157,6 +161,7 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
     devices: DEVICES,
     network: "none",
     services: onMac ? ALLOWED_SERVICES : [],
+    sysctls: onMac ? SEATBELT_SYSCTLS : { names: [], prefixes: [] },
     user: "65534:65534",
     limits: LIMITS,
   };
