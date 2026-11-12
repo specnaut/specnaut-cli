@@ -10,7 +10,8 @@ import { fromFileUrl, join } from "@std/path";
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
-const read = (p: string) => Deno.readTextFile(join(ROOT, p));
+// A Windows checkout reads CRLF; the section pattern is written in LF.
+const read = async (p: string) => (await Deno.readTextFile(join(ROOT, p))).replaceAll("\r\n", "\n");
 const flat = (s: string) => s.replace(/\s+/g, " ");
 
 const CONTRACT = "templates/core/skills/review-findings-contract/SKILL.md";
