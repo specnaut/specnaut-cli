@@ -3,6 +3,7 @@ import type { InstalledLock } from "../domain/installed_lock.ts";
 import { computeAcceptCurrent, computeAcceptUpstream } from "../domain/reconcile.ts";
 import { PathRefusal } from "./path_refusal.ts";
 import { leftAlone, tidyStagingRoot } from "./upgrade_staging.ts";
+import { terminalText } from "../domain/terminal_text.ts";
 
 export type ReconcileMode = "accept-upstream" | "accept-current";
 
@@ -157,7 +158,12 @@ export class ListPendingReconciliationsUseCase {
         if (ready.status === "ok") out.pending.push(path);
       } catch (err) {
         if (!(err instanceof PathRefusal)) throw err;
-        out.refused.push({ path, reason: leftAlone(`.specnaut/upgrade-staging/${path}`, err) });
+        // Shown, never acted on: the walk prints it verbatim, so it is escaped (cli#776).
+        const shown = terminalText(path);
+        out.refused.push({
+          path: shown,
+          reason: leftAlone(`.specnaut/upgrade-staging/${path}`, err),
+        });
       }
     }
     return out;

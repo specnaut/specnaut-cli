@@ -7,6 +7,7 @@ import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { findHarness } from "../harnesses.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
+import { errorText } from "../../domain/terminal_text.ts";
 
 export type DiffIntent = {
   kind: "diff";
@@ -45,8 +46,7 @@ export async function runDiff(intent: DiffIntent): Promise<number> {
     });
   } catch (err) {
     if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(red(`error: ${msg}`));
+    console.error(red(`error: ${errorText(err)}`));
     return 2;
   }
 

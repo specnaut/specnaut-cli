@@ -6,6 +6,7 @@ import {
   replaceRunningBinary,
 } from "../../infrastructure/github_api.ts";
 import { VERSION } from "../../domain/version.ts";
+import { errorText } from "../../domain/terminal_text.ts";
 
 export type SelfUpdateIntent = {
   kind: "self-update";
@@ -73,8 +74,7 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
         return 0;
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`error: ${msg}`);
+    console.error(`error: ${errorText(err)}`);
     return 1;
   }
 }

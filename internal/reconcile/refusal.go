@@ -46,7 +46,7 @@ func linkedStagingRefusal(dir, rel string) error {
 // refused. "Safe to delete by hand" would invite deleting what a link points
 // at, a file Specnaut never wrote, so the advice names the link itself.
 func leftAlone(path string, err *PathRefusal) string {
-	return "left " + path + " in place — " + err.Error() + "\n" +
+	return "left " + lockfile.TerminalText(path) + " in place — " + lockfile.InertText(err.Error()) + "\n" +
 		"It is not a plain staged copy: check where that link points, then remove the link " +
 		"itself, never what it points at."
 }

@@ -23,6 +23,7 @@ import { printUpgradeHookTrust } from "./hook_trust_note.ts";
 import { type BacklogBackend, RemovedHarnessError } from "../../domain/installed_lock.ts";
 import { switchBacklogBackend } from "./upgrade_backlog_switch.ts";
 import { printReleaseNotes } from "./upgrade_notes.ts";
+import { errorText } from "../../domain/terminal_text.ts";
 
 export type UpgradeIntent = {
   kind: "upgrade";
@@ -113,8 +114,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
         }
       } catch (err) {
         if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(red(`error: ${msg}`));
+        console.error(red(`error: ${errorText(err)}`));
         return 2;
       }
     }
@@ -165,8 +165,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     });
   } catch (err) {
     if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(red(`error: ${msg}`));
+    console.error(red(`error: ${errorText(err)}`));
     return 2;
   }
 

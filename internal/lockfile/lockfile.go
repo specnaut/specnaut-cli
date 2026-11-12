@@ -108,7 +108,7 @@ func Parse(data []byte) (*Lock, error) {
 	}
 	version, _ := root["version"].(float64)
 	if _, isNum := root["version"].(float64); !isNum || (version != 1 && version != 2) {
-		return nil, fmt.Errorf("Unsupported lock version (expected 1 or 2): %s", jsString(root["version"]))
+		return nil, fmt.Errorf("Unsupported lock version (expected 1 or 2): %s", TerminalText(jsString(root["version"])))
 	}
 	harness := "claude"
 	if version == 2 {
@@ -133,7 +133,7 @@ func knownHarness(v any) (string, error) {
 		return "", &RemovedHarnessError{Harness: s}
 	}
 	if !ok || !slices.Contains(KnownHarnesses, s) {
-		return "", fmt.Errorf("Unsupported harness '%s' — known: %s", jsString(v), strings.Join(KnownHarnesses, ", "))
+		return "", fmt.Errorf("Unsupported harness '%s' — known: %s", TerminalText(jsString(v)), strings.Join(KnownHarnesses, ", "))
 	}
 	return s, nil
 }

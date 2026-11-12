@@ -1,3 +1,5 @@
+import { inertText, terminalText } from "./terminal_text.ts";
+
 /**
  * What every `mergeJson` flavor shares, whatever the file: how the user's side
  * is parsed, how a malformed one is reported, and how the result is written
@@ -19,7 +21,8 @@ export type JsonMergeResult = { readonly content: string; readonly changed: bool
 export class JsonMergeParseError extends Error {
   constructor(public readonly destPath: string, override readonly cause: Error) {
     super(
-      `${destPath} is not valid JSON: ${cause.message}\n` +
+      // Both parts shown inert (cli#776): a parse error quotes the file's content.
+      `${terminalText(destPath)} is not valid JSON: ${inertText(cause.message)}\n` +
         `Fix the file (or back it up and re-run with --force) before re-running specnaut.`,
     );
     this.name = "JsonMergeParseError";

@@ -56,6 +56,22 @@ export function terminalText(value: string): string {
   return value.replaceAll("\\", "\\\\").replace(UNSAFE, textEscaped);
 }
 
+/**
+ * The pass at an output sink (cli#776): a message whose parts were shown through `terminalText`
+ * where they were composed, made inert as a whole. Unsafe code points are escaped; backslashes are
+ * left alone, so a part escaped at its source is not escaped twice:
+ * `inertText(terminalText(x)) === terminalText(x)`. A line feed is kept: a message may span lines,
+ * and a new line is all a line feed does to a terminal.
+ */
+export function inertText(value: string): string {
+  return value.replace(UNSAFE, (c) => c === "\n" ? c : textEscaped(c));
+}
+
+/** What a thrown value says, made inert for a terminal: the one form every error sink prints. */
+export function errorText(err: unknown): string {
+  return inertText(err instanceof Error ? err.message : String(err));
+}
+
 /** What a Mermaid label may hold as it is: no quote, bracket, `#`, `%`, `<` or backtick. */
 const MERMAID_PLAIN = /^[A-Za-z0-9 _./,:()-]$/;
 

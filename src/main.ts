@@ -5,6 +5,7 @@ import { isLegacyInvocation, LEGACY_INVOCATION_WARNING } from "./domain/deprecat
 import { RemovedHarnessError, removedHarnessInitNotice } from "./domain/installed_lock.ts";
 import { VERSION } from "./domain/version.ts";
 import { TEMPLATES_VERSION } from "./templates_bundle.ts";
+import { errorText } from "./domain/terminal_text.ts";
 
 export async function run(argv: string[]): Promise<number> {
   try {
@@ -14,7 +15,7 @@ export async function run(argv: string[]): Promise<number> {
     // command that loads the lock lands here, so the message is said once
     // and never reaches the user as a stack trace.
     if (err instanceof RemovedHarnessError) {
-      console.error(red(`error: ${err.message}`));
+      console.error(red(`error: ${errorText(err)}`));
       return 1;
     }
     throw err;

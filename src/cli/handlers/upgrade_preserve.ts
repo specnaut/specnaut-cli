@@ -8,6 +8,7 @@ import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { InstalledLock } from "../../domain/installed_lock.ts";
 import type { Harness } from "../../application/ports.ts";
 import { CONSTITUTION_PATH, LEGACY_CONSTITUTION_PATH } from "../../domain/constitution_paths.ts";
+import { terminalText } from "../../domain/terminal_text.ts";
 
 /**
  * Upgrade's preserve declarations (spec 011 / issue #367): the effective ones,
@@ -48,7 +49,9 @@ export async function resolveUpgradePreserves(
   }
   const known = resolved.known.filter((p) => !legacy(p));
   for (const path of resolved.unknown.filter((p) => !legacy(p))) {
-    console.error(yellow(`warn: ${path} — declared preserved but not a managed file (ignored)`));
+    console.error(
+      yellow(`warn: ${terminalText(path)} — declared preserved but not a managed file (ignored)`),
+    );
   }
   const declared = new Set(resetPreserved ? [] : known);
   return { known, isDeclaredPreserved: (dest) => declared.has(dest) };

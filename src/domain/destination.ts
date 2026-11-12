@@ -20,7 +20,7 @@ import { hasControl, terminalText } from "./terminal_text.ts";
  * Reproduced in both directions before this function existed.
  *
  * `relative()`, never a string prefix. A prefix test hardcodes the POSIX
- * separator, so it silently never fires on Windows — `pruneEmptyParents` below
+ * separator, so it silently never fires on Windows — `pruneEmptyParents` (`fs_prune.ts`)
  * shipped exactly that bug once — and it is wrong on POSIX too: `/a/bc` starts
  * with `/a/b` while being nowhere inside it.
  *
@@ -49,16 +49,15 @@ export function isInside(root: string, target: string): boolean {
  * characters that are no control but still act on a terminal (bidi, zero-width).
  */
 export function assertSafeDestination(dest: string): void {
-  const shown = terminalText(dest);
   if (hasControl(dest)) {
-    throw new Error(`Unsafe destination (a control character): ${shown}`);
+    throw new Error(`Unsafe destination (a control character): ${terminalText(dest)}`);
   }
   const normalized = normalize(dest);
   if (isAbsolute(normalized)) {
-    throw new Error(`Unsafe destination (absolute path): ${shown}`);
+    throw new Error(`Unsafe destination (absolute path): ${terminalText(dest)}`);
   }
   if (normalized.replace(/[\\/]+$/, "") === ".") {
-    throw new Error(`Unsafe destination (the target directory itself): ${shown}`);
+    throw new Error(`Unsafe destination (the target directory itself): ${terminalText(dest)}`);
   }
   if (
     normalized === ".." ||
@@ -66,9 +65,11 @@ export function assertSafeDestination(dest: string): void {
     normalized.includes(`${SEPARATOR}..${SEPARATOR}`) ||
     normalized.endsWith(`${SEPARATOR}..`)
   ) {
-    throw new Error(`Unsafe destination (escape attempt): ${shown}`);
+    throw new Error(`Unsafe destination (escape attempt): ${terminalText(dest)}`);
   }
   if (/[\\/]$/.test(normalized) || normalized.split(/[\\/]/).some((s) => /[. ]$/.test(s))) {
-    throw new Error(`Unsafe destination (a name the filesystem may read differently): ${shown}`);
+    throw new Error(
+      `Unsafe destination (a name the filesystem may read differently): ${terminalText(dest)}`,
+    );
   }
 }

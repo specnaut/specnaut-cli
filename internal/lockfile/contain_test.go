@@ -54,12 +54,16 @@ func TestOpenContainedRefusesHomeThroughALink(t *testing.T) {
 type textCase struct {
 	Text  string `json:"text"`
 	Shown string `json:"shown"`
+	Inert string `json:"inert"`
 }
 
 func TestTerminalTextMatchesTypeScript(t *testing.T) {
 	for _, c := range golden.Load[textCase](t, "testdata/terminal_text_golden.jsonl", 10) {
 		if got := TerminalText(c.Text); got != c.Shown {
 			t.Errorf("TerminalText(%q) = %q; terminalText: %q", c.Text, got, c.Shown)
+		}
+		if got := InertText(c.Text); got != c.Inert {
+			t.Errorf("InertText(%q) = %q; inertText: %q", c.Text, got, c.Inert)
 		}
 	}
 }

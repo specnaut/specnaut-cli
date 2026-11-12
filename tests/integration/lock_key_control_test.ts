@@ -56,3 +56,50 @@ Deno.test("a lock key with control characters is refused, escaped, on stderr", a
     await Deno.remove(proj, { recursive: true });
   }
 });
+
+/** Lock values that are not keys (cli#776 review): each reaches stderr through its command's sink. */
+const VALUE_CASES = [
+  {
+    name: "harness",
+    lock: 'version: 2\nharness: "\\e[2J"\ntemplates_version: 0.0.1\n',
+    shown: "\\u001b[2J",
+  },
+  { name: "version", lock: 'version: "\\x9b2J"\nharness: claude\n', shown: "\\u009b2J" },
+];
+
+for (const c of VALUE_CASES) {
+  for (const command of [["reconcile", "--status"], ["upgrade"], ["diff"]]) {
+    Deno.test(`a lock ${c.name} with a control character reaches \`${command[0]}\`'s stderr escaped`, async () => {
+      const proj = await Deno.makeTempDir({ prefix: "lock-value-control-" });
+      try {
+        await Deno.mkdir(join(proj, ".specnaut"));
+        await Deno.writeTextFile(join(proj, ".specnaut/installed.lock"), c.lock);
+        const out = await new Deno.Command(Deno.execPath(), {
+          args: [
+            "run",
+            "--allow-read",
+            "--allow-write",
+            "--allow-run",
+            "--allow-env",
+            MAIN,
+            ...command,
+          ],
+          cwd: proj,
+          env: { NO_COLOR: "1" },
+          stdout: "piped",
+          stderr: "piped",
+        }).output();
+        const stderr = new TextDecoder().decode(out.stderr);
+        assertNotEquals(out.code, 0, "the lock was accepted");
+        assertStringIncludes(
+          stderr,
+          `Unsupported ${c.name === "harness" ? "harness '" : "lock version"}`,
+        );
+        assertStringIncludes(stderr, c.shown);
+        assert(!RAW_CONTROL.test(stderr), `raw control on stderr: ${JSON.stringify(stderr)}`);
+      } finally {
+        await Deno.remove(proj, { recursive: true });
+      }
+    });
+  }
+}

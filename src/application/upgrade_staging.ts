@@ -3,6 +3,7 @@ import type { Bundle } from "../domain/template.ts";
 import type { LockEntry } from "../domain/installed_lock.ts";
 import type { UpgradeAction, UpgradePlan } from "../domain/upgrade_plan.ts";
 import { PathRefusal } from "./path_refusal.ts";
+import { errorText, inertText, terminalText } from "../domain/terminal_text.ts";
 
 /**
  * `.specnaut/upgrade-staging/` as `upgrade` fills and empties it: the upstream
@@ -101,7 +102,9 @@ export async function pruneStaging(
       refusals.push(...await stagingStore.delete(projectDir, rel));
     } catch (err) {
       const path = `.specnaut/upgrade-staging/${rel}`;
-      refusals.push(refusalLine(path, err, `could not clear the stale staged copy ${path}`));
+      refusals.push(
+        refusalLine(path, err, `could not clear the stale staged copy ${terminalText(path)}`),
+      );
     }
   }
   const tidy = await tidyStagingRoot(stagingStore, projectDir);
@@ -154,7 +157,8 @@ export async function tidyStagingRoot(
   }
 }
 
-const why = (err: unknown) => err instanceof Error ? err.message : String(err);
+/** A failure as a line may show it: the name it quotes comes from the staging tree (cli#776). */
+const why = errorText;
 
 /** A refused path names the link (`leftAlone`); any other failure is safe to clear by hand. */
 const refusalLine = (path: string, err: unknown, failed: string) =>
@@ -167,9 +171,10 @@ const refusalLine = (path: string, err: unknown, failed: string) =>
  * or sits behind one, leading out of the project or round a cycle. "Safe to
  * delete by hand" would invite deleting what it points at — a file Specnaut
  * never wrote — so the advice names the link. `reconcile --status` reports a copy
- * it cannot read in the same words.
+ * it cannot read in the same words. The path is the staging tree's, so it is shown
+ * through `terminalText`, and the refusal, escaped where it was built, made inert (cli#776).
  */
 export const leftAlone = (path: string, err: PathRefusal) =>
-  `left ${path} in place — ${err.message}\n` +
+  `left ${terminalText(path)} in place — ${inertText(err.message)}\n` +
   `It is not a plain staged copy: check where that link points, then remove the link ` +
   `itself, never what it points at.`;

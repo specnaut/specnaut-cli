@@ -18,10 +18,22 @@ import (
 // and V8's may name a different Unicode version, so a code point assigned in
 // only one of them can differ; terminal_text_golden.jsonl pins the rest.
 func TerminalText(s string) string {
+	return escape(strings.ReplaceAll(s, `\`, `\\`), false)
+}
+
+// InertText is inertText: the pass over a message whose parts TerminalText
+// already escaped. Unsafe code points are escaped, backslashes left alone, so
+// InertText(TerminalText(x)) == TerminalText(x). A line feed is kept: a
+// message may span lines.
+func InertText(s string) string {
+	return escape(s, true)
+}
+
+func escape(s string, keepNewline bool) string {
 	var b strings.Builder
-	for _, r := range strings.ReplaceAll(s, `\`, `\\`) {
+	for _, r := range s {
 		switch {
-		case !unsafeRune(r):
+		case !unsafeRune(r) || (keepNewline && r == '\n'):
 			b.WriteRune(r)
 		case r > 0xffff:
 			fmt.Fprintf(&b, `\u{%x}`, r)

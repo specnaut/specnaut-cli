@@ -33,21 +33,20 @@ var trailingName = regexp.MustCompile(`[. ]$`)
 // refused first, and every refusal shows dest through TerminalText (cli#776).
 // Pure: no I/O.
 func SafeDestination(dest string) error {
-	shown := TerminalText(dest)
 	if hasControl(dest) {
-		return errors.New("Unsafe destination (a control character): " + shown)
+		return errors.New("Unsafe destination (a control character): " + TerminalText(dest))
 	}
 	n := normalize(dest)
 	switch {
 	case strings.HasPrefix(n, "/"):
-		return errors.New("Unsafe destination (absolute path): " + shown)
+		return errors.New("Unsafe destination (absolute path): " + TerminalText(dest))
 	case strings.TrimRight(n, `\/`) == ".":
-		return errors.New("Unsafe destination (the target directory itself): " + shown)
+		return errors.New("Unsafe destination (the target directory itself): " + TerminalText(dest))
 	case n == ".." || strings.HasPrefix(n, "../") || strings.Contains(n, "/../") || strings.HasSuffix(n, "/.."):
-		return errors.New("Unsafe destination (escape attempt): " + shown)
+		return errors.New("Unsafe destination (escape attempt): " + TerminalText(dest))
 	}
 	if strings.HasSuffix(n, "/") || strings.HasSuffix(n, `\`) || anySegment(n, trailingName) {
-		return errors.New("Unsafe destination (a name the filesystem may read differently): " + shown)
+		return errors.New("Unsafe destination (a name the filesystem may read differently): " + TerminalText(dest))
 	}
 	return nil
 }

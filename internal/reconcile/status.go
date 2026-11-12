@@ -57,7 +57,7 @@ func Status(p Project) (Queue, error) {
 		var refusal *PathRefusal
 		switch {
 		case errors.As(err, &refusal):
-			q.Refused = append(q.Refused, Refused{path, leftAlone(StagingDir+"/"+path, refusal)})
+			q.Refused = append(q.Refused, Refused{lockfile.TerminalText(path), leftAlone(StagingDir+"/"+path, refusal)})
 		case err != nil:
 			return Queue{}, err
 		case checked.Refusal == Ready:

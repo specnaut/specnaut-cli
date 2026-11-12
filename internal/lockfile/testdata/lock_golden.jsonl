@@ -31,3 +31,5 @@
 {"name":"bool-yes","yaml":"version: 2\nharness: claude\ntemplates_version: 0.0.1\nspec_autogen: yes\n","result":{"harness":"claude","entries":[]}}
 {"name":"entry-control-key","yaml":"version: 2\nharness: claude\ntemplates_version: 0.0.1\nentries:\n  \"a\\u001b]0;x\\u0007b.md\":\n    sha256: x\n    installed_at: '2026-01-01T00:00:00.000Z'\n    templates_version: 0.0.1\n","result":{"error":"Error: entries[a\\u001b]0;x\\u0007b.md] is not a legal destination: Unsafe destination (a control character): a\\u001b]0;x\\u0007b.md"}}
 {"name":"entry-format-key","yaml":"version: 2\nharness: claude\ntemplates_version: 0.0.1\nentries:\n  \"a\\u202eb.md\": 7\n","result":{"error":"Error: entries[a\\u202eb.md] must be an object"}}
+{"name":"harness-control","yaml":"version: 2\nharness: \"\\e[2J\"\ntemplates_version: 0.0.1\n","result":{"error":"Error: Unsupported harness '\\u001b[2J' — known: claude, cursor, codex, copilot, opencode, antigravity"}}
+{"name":"version-control","yaml":"version: \"\\x9b2J\"\nharness: claude\n","result":{"error":"Error: Unsupported lock version (expected 1 or 2): \\u009b2J"}}

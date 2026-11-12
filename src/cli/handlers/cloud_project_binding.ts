@@ -9,6 +9,7 @@ import { generateProjectKey } from "../../domain/cloud/project_key.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
 import { requireCloudToken } from "./cloud_token.ts";
+import { errorText } from "../../domain/terminal_text.ts";
 
 /**
  * The client login binds with, and the store it signs in through: it may create a
@@ -35,7 +36,7 @@ export async function bindProject(
   try {
     projectKey = await chooseProject(client, token);
   } catch (e) {
-    console.error(red(`error: ${e instanceof Error ? e.message : String(e)}`));
+    console.error(red(`error: ${errorText(e)}`));
     return 1;
   }
   if (!projectKey) {

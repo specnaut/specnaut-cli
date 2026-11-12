@@ -153,7 +153,7 @@ function assertKnownHarness(v: unknown): asserts v is KnownHarness {
   }
   if (typeof v !== "string" || !KNOWN_HARNESSES.includes(v as KnownHarness)) {
     throw new Error(
-      `Unsupported harness '${String(v)}' — known: ${KNOWN_HARNESSES.join(", ")}`,
+      `Unsupported harness '${terminalText(String(v))}' — known: ${KNOWN_HARNESSES.join(", ")}`,
     );
   }
 }
@@ -162,7 +162,9 @@ export function parseLock(yaml: string): InstalledLock {
   const root = asObject(parseYaml(yaml), "lock root");
   const rawVersion = root.version;
   if (rawVersion !== 1 && rawVersion !== 2) {
-    throw new Error(`Unsupported lock version (expected 1 or 2): ${String(rawVersion)}`);
+    throw new Error(
+      `Unsupported lock version (expected 1 or 2): ${terminalText(String(rawVersion))}`,
+    );
   }
 
   let harness: KnownHarness;

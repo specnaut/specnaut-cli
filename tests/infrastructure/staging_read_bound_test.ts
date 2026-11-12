@@ -114,3 +114,72 @@ Deno.test("a staged copy swapped between its check and its open is refused (cli#
     await Deno.remove(proj, { recursive: true });
   }
 });
+
+/**
+ * `Deno.open` wrapped to run `before` first and, if asked, `lstat` and the handle's `stat`
+ * reporting no inode, as a platform without one does.
+ */
+function stubOpen(staged: string, before: () => Promise<void>, hideIno: boolean): () => void {
+  const [realOpen, realLstat] = [Deno.open, Deno.lstat];
+  if (hideIno) {
+    Deno.lstat = async (p) => {
+      const info = await realLstat(p);
+      return String(p) === staged ? { ...info, ino: null } : info;
+    };
+  }
+  Deno.open = async (path, options) => {
+    if (String(path) !== staged) return realOpen(path, options);
+    await before();
+    const file = await realOpen(path, options);
+    if (!hideIno) return file;
+    return new Proxy(file, {
+      get: (t, p) =>
+        p === "stat"
+          ? async () => ({ ...(await t.stat()), ino: null })
+          : typeof Reflect.get(t, p, t) === "function"
+          ? Reflect.get(t, p, t).bind(t)
+          : Reflect.get(t, p, t),
+    });
+  };
+  return () => void ([Deno.open, Deno.lstat] = [realOpen, realLstat]);
+}
+
+Deno.test("where the handle reports no inode, a swapped copy is still refused", async () => {
+  const proj = await Deno.makeTempDir({ prefix: "staging-read-noino-" });
+  const staged = join(proj, ".specnaut/upgrade-staging", REL);
+  await Deno.mkdir(join(staged, ".."), { recursive: true });
+  await Deno.writeTextFile(staged, "UPSTREAM\n");
+  await Deno.writeTextFile(join(proj, "swap"), "SWAPPED!!\n");
+  const restore = stubOpen(staged, () => Deno.rename(join(proj, "swap"), staged), true);
+  try {
+    const err = await new FsStagingStore().read(proj, REL).then(() => null, (e: unknown) => e);
+    assertIsError(err, PathRefusal, "changed between its check and its read");
+  } finally {
+    restore();
+    await Deno.remove(proj, { recursive: true });
+  }
+});
+
+Deno.test({
+  name: "a staged FIFO is refused before it is opened, never waited on",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const proj = await Deno.makeTempDir({ prefix: "staging-read-fifo-" });
+    const staged = join(proj, ".specnaut/upgrade-staging", REL);
+    await Deno.mkdir(join(staged, ".."), { recursive: true });
+    await new Deno.Command("mkfifo", { args: [staged] }).output();
+    let opened = false;
+    const restore = stubOpen(staged, () => {
+      opened = true;
+      return Promise.reject(new Error("opened a FIFO"));
+    }, false);
+    try {
+      const err = await new FsStagingStore().read(proj, REL).then(() => null, (e: unknown) => e);
+      assertIsError(err, PathRefusal, "not a plain file");
+      assertEquals(opened, false);
+    } finally {
+      restore();
+      await Deno.remove(proj, { recursive: true });
+    }
+  },
+});

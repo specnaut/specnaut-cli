@@ -133,7 +133,7 @@ symlinkTest(
         () => assertLinkTargetInProject(real, at, "nope/AGENTS.md"),
         UnwalkableRefusal,
       );
-      assert(unwalkable.message.includes(`missing: ${join(real, ".claude/nope")}`));
+      assert(unwalkable.message.includes(`missing: ${terminalText(join(real, ".claude/nope"))}`));
       const loop = await assertRejects(
         () => assertLinkTargetInProject(real, at, "../cyc-a/x.md"),
         LoopRefusal,

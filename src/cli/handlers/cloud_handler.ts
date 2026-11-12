@@ -6,9 +6,8 @@
 //           writes .specnaut/backlog-config.yml. Also reachable as the
 //           top-level `specnaut login` alias.
 //   token   prints a fresh access token to stdout (refreshing transparently);
-//           used by the bundled cloud/*.sh scripts. Honors SPECNAUT_CLOUD_TOKEN
-//           (legacy SPECFLOW_CLOUD_TOKEN as a fallback) as a headless / CI
-//           escape hatch.
+//           used by the bundled cloud/*.sh scripts. SPECNAUT_CLOUD_TOKEN (or legacy
+//           SPECFLOW_CLOUD_TOKEN) is the headless / CI escape hatch.
 //   logout  removes the stored credentials for the deployment.
 //   orgs    lists the account's organizations (active one flagged).
 //   board   shows the linked project's board, tasks grouped by column.
@@ -24,6 +23,7 @@ import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
+import { errorText } from "../../domain/terminal_text.ts";
 
 export type CloudIntent = {
   kind: "cloud";
@@ -131,7 +131,7 @@ async function runOrgs(intent: CloudIntent): Promise<number> {
   try {
     orgs = await session.client.listOrgs(session.token);
   } catch (e) {
-    console.error(red(`error: ${e instanceof Error ? e.message : String(e)}`));
+    console.error(red(`error: ${errorText(e)}`));
     return 1;
   }
 
@@ -170,7 +170,7 @@ async function runBoard(intent: CloudIntent): Promise<number> {
       session.client.listTasks(session.token, projectKey),
     ]);
   } catch (e) {
-    console.error(red(`error: ${e instanceof Error ? e.message : String(e)}`));
+    console.error(red(`error: ${errorText(e)}`));
     return 1;
   }
 

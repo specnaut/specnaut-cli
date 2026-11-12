@@ -1,6 +1,8 @@
 import { assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
 import {
+  errorText,
   hasControl,
+  inertText,
   mermaidLabel,
   terminalJson,
   terminalText,
@@ -80,4 +82,18 @@ Deno.test("mermaidLabel: nothing can close the label or open a directive", () =>
 Deno.test("mermaidLabel: a control reaches the renderer as visible text, never as an entity", () => {
   const out = mermaidLabel("a\x1bb\u202e");
   assertEquals(out, "a#92;u001bb#92;u202e");
+});
+
+Deno.test("inertText: a sink pass escapes what is unsafe and never escapes a source's escape again", () => {
+  assertEquals(inertText("a\x1b[2J\u009bb"), "a\\u001b[2J\\u009bb");
+  for (const x of [HOSTILE, "C:\\proj\\a.md", "a\\u001bb"]) {
+    assertEquals(inertText(terminalText(x)), terminalText(x), JSON.stringify(x));
+  }
+  assertEquals(inertText("C:\\proj"), "C:\\proj");
+  assertEquals(inertText("line one\nline\rtwo"), "line one\nline\\u000dtwo");
+});
+
+Deno.test("errorText: an error's message, or any thrown value, made inert", () => {
+  assertEquals(errorText(new Error("bad \x1b[2J")), "bad \\u001b[2J");
+  assertEquals(errorText("\x9b"), "\\u009b");
 });
