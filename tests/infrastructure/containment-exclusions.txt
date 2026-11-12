@@ -27,3 +27,5 @@ src/infrastructure/deno_fs_writer.ts::writeEntry  DenoFsWriter.writeBundle's pha
 src/infrastructure/deno_fs_writer.ts::writeOwnedFile  called only from writeEntry in writeBundle's phase 2, after phase 1 (assertDestinations) ran assertInsideProject on this exact path; its chmod re-asserts it, since a mode change follows a link created since
 src/cli/handlers/init_handler.ts::runInit  its only mutation is the git adapter's ensureDir, which receives the target directory itself rather than a path built under it
 src/cli/handlers/verify_scripts_handler.ts::defaultDeps  its only write is the names list, to a fresh file from Deno.makeTempFile in the OS temp directory; no path is built from a project directory
+src/infrastructure/fs_tree_export.ts  writes only under the user's cache folder, which stage() refuses when it resolves inside the project; every file and folder it makes is created new under a commit-id-named folder it made itself, so no path is built from a project directory
+src/infrastructure/git_branch_fetch.ts::fetch  its only write is the alternates file of the bare repository the export store staged for it in the user's cache folder, outside the project
