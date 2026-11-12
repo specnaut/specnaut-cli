@@ -30011,14 +30011,14 @@ exit 0
 # A script whose exit table gives a failed read another code redefines
 # \`unread\` after sourcing this file (epic-status.sh: 15).
 #
-# resolve_base_refs sets four names, every ref fully qualified so a tag named
-# like the base cannot shadow it:
+# resolve_base_refs sets four names, then cd's to the repository's top; every
+# ref is fully qualified so a tag named like the base cannot shadow it:
 #   base       the base branch's name, from base-branch.sh (unknown: exit 3)
 #   remote     refs/remotes/origin/<base>, or "" when it does not exist
 #   local      refs/heads/<base>, or "" when it does not exist
 #   published  remote, else local; neither resolving is exit 3
-# and moves to the repository's top, so every pathspec after it is the
-# repository's, whatever directory the caller ran in (cli#774).
+# The cd makes every pathspec after it the repository's, whatever directory
+# the caller ran in (cli#774).
 #
 # A read that fails is never taken for one that found nothing: git's own
 # errors are discarded (they can carry ref text) and the script stops, 3.
@@ -30033,6 +30033,7 @@ present() {
   return "\$s"
 }
 resolve_base_refs() {
+  local top
   base=\$(bash "\$here/base-branch.sh") || exit 3
   remote="refs/remotes/origin/\$base" local="refs/heads/\$base"
   present "\$remote" || remote=""

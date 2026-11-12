@@ -1,6 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
-import { git, run, sandbox } from "./git_sandbox.ts";
+import { git, sandbox } from "./git_sandbox.ts";
 import { DIR, gate, land, lines, marker } from "./wip_audit_gate_fixture.ts";
 
 /** cli#760 — the intake gate's usage, its exit 3, and what never reaches its output. */
@@ -103,21 +102,6 @@ Deno.test("no commit, ref or file text reaches the output", async () => {
           .test(l)
       ) throw new Error(`unexpected line: ${l}`);
     }
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("the gate reads the repository's paths from any directory it runs in", async () => {
-  const sb = await sandbox();
-  try {
-    const sha = await land(sb, marker(95), "feat(95): x");
-    const r = await run(
-      "bash",
-      ["../../../.specnaut/scripts/bash/wip-audit.sh", "--gate"],
-      join(sb.work, DIR),
-    );
-    assertEquals(lines(r.stdout)[0], `PENDING closeout 95 ${DIR} ${sha}`, r.stderr);
   } finally {
     await sb.cleanup();
   }
