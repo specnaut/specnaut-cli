@@ -1,7 +1,7 @@
 import { CHECKOUT_SCOPE } from "../domain/checkout_scope.ts";
 import { judgeCheckout, restartAdvice } from "../domain/checkout_trust.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
-import type { Untrusted } from "../domain/script_trust.ts";
+import type { ScriptVerdict, Untrusted } from "../domain/script_trust.ts";
 import {
   judgeRecord,
   SESSION_REASON,
@@ -52,11 +52,20 @@ export async function verifyCheckout(
   }
   const record = await startRecord(deps);
   if (record.kind === "refused") return restart(SESSION_REASON.path, record.reason, tip);
-  const facts = await gather(deps, tip, untrustedHead);
-  const now = judgeCheckout({ ...facts, scripts: scripts.verdict }).reasons;
-  const reasons = [...now, ...startReasons(now, await atStart(deps, record.record, tip, facts))];
-  if (reasons.length === 0) return { kind: "trusted", baseTip: tip };
-  return { kind: "restart", reasons, advice: restartAdvice(tip) };
+  return await judged(deps, { tip, untrustedHead, scripts: scripts.verdict }, record.record);
+}
+
+/** The checkout judged as it is now, then its start record's reasons the folder does not give. */
+async function judged(
+  deps: VerifyCheckoutDeps,
+  run: { tip: string; untrustedHead: string; scripts: ScriptVerdict },
+  record: SessionRecord,
+): Promise<CheckoutOutcome> {
+  const facts = await gather(deps, run.tip, run.untrustedHead);
+  const now = judgeCheckout({ ...facts, scripts: run.scripts }).reasons;
+  const reasons = [...now, ...startReasons(now, await atStart(deps, record, run.tip, facts))];
+  if (reasons.length === 0) return { kind: "trusted", baseTip: run.tip };
+  return { kind: "restart", reasons, advice: restartAdvice(run.tip) };
 }
 
 type Facts = Awaited<ReturnType<typeof gather>>;

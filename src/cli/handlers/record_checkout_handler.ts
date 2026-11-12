@@ -1,7 +1,7 @@
 import { red } from "@std/fmt/colors";
 import { recordCheckout, type RecordCheckoutDeps } from "../../application/record_checkout.ts";
 import { SESSION_RECORD_VAR } from "../../domain/session_record.ts";
-import { sessionStartOf } from "../../domain/session_record_json.ts";
+import { type SessionStart, sessionStartOf } from "../../domain/session_record_json.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { exportToSession } from "../../infrastructure/claude_env_file.ts";
 import { FsSessionRecords } from "../../infrastructure/fs_session_records.ts";
@@ -55,26 +55,40 @@ export async function runRecordCheckout(
   deps: RecordCheckoutHandlerDeps = defaultDeps(),
 ): Promise<number> {
   try {
-    const text = await deps.input();
-    if (text === null) return fail(deps, EXIT.usage, "reads a SessionStart hook's input on stdin");
-    const start = sessionStartOf(parsed(text));
-    if (start === null) {
-      return fail(deps, EXIT.usage, "the input names no session id and source of a SessionStart");
-    }
-    const envFile = deps.env("CLAUDE_ENV_FILE");
-    if (!envFile) return fail(deps, EXIT.usage, "CLAUDE_ENV_FILE is not set: run it from the hook");
-    const opened = await deps.open(deps.cwd);
-    if (opened === null) return EXIT.done;
-    const outcome = await recordCheckout(opened, start);
-    if (outcome.kind === "refused") return fail(deps, EXIT.failed, outcome.why);
-    if (outcome.kind === "taken") {
-      await deps.exportToSession(envFile, SESSION_RECORD_VAR, outcome.path);
-    }
-    return EXIT.done;
+    return await fromHook(deps);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     return fail(deps, EXIT.failed, `the record could not be taken: ${why}`);
   }
+}
+
+/** The hook's input and environment checked, then the record taken. */
+async function fromHook(deps: RecordCheckoutHandlerDeps): Promise<number> {
+  const text = await deps.input();
+  if (text === null) return fail(deps, EXIT.usage, "reads a SessionStart hook's input on stdin");
+  const start = sessionStartOf(parsed(text));
+  if (start === null) {
+    return fail(deps, EXIT.usage, "the input names no session id and source of a SessionStart");
+  }
+  const envFile = deps.env("CLAUDE_ENV_FILE");
+  if (!envFile) return fail(deps, EXIT.usage, "CLAUDE_ENV_FILE is not set: run it from the hook");
+  return await take(deps, start, envFile);
+}
+
+/** The record taken in the repository the folder is in, and its path exported to the session. */
+async function take(
+  deps: RecordCheckoutHandlerDeps,
+  start: SessionStart,
+  envFile: string,
+): Promise<number> {
+  const opened = await deps.open(deps.cwd);
+  if (opened === null) return EXIT.done;
+  const outcome = await recordCheckout(opened, start);
+  if (outcome.kind === "refused") return fail(deps, EXIT.failed, outcome.why);
+  if (outcome.kind === "taken") {
+    await deps.exportToSession(envFile, SESSION_RECORD_VAR, outcome.path);
+  }
+  return EXIT.done;
 }
 
 /** The input as JSON, or `undefined`: the caller refuses either way the payload is not one. */
