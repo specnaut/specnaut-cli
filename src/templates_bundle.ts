@@ -28000,7 +28000,7 @@ unset _common_dir
 # (read as absent), 1 malformed (anything else). The ids are written as bytes
 # with \`\\n\`: a Windows python3 would end each with \`\\r\\n\` in text mode.
 _preset_ids_by_priority() {
-    SPECNAUT_REGISTRY="\$1" python3 -c "
+    SPECNAUT_REGISTRY="\$1" python3 -I -c "
 import json, sys, os
 try:
     with open(os.environ['SPECNAUT_REGISTRY'], encoding='utf-8-sig') as f:
@@ -28168,7 +28168,7 @@ _feature_json_dir() {
         jq_lf -r 'if type == "object" then .feature_directory // empty else empty end' "\$1" 2>/dev/null && return 0
     elif command -v python3 >/dev/null 2>&1; then
         # UTF-8 bytes and no newline: a Windows python3 ends a print with \\r\\n.
-        python3 -c "
+        python3 -I -c "
 import json, sys
 text = open(sys.argv[1], encoding='utf-8-sig').read()
 data = json.loads(text) if text.strip() else None

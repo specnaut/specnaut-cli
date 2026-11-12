@@ -22,7 +22,7 @@ _feature_json_dir() {
         jq_lf -r 'if type == "object" then .feature_directory // empty else empty end' "$1" 2>/dev/null && return 0
     elif command -v python3 >/dev/null 2>&1; then
         # UTF-8 bytes and no newline: a Windows python3 ends a print with \r\n.
-        python3 -c "
+        python3 -I -c "
 import json, sys
 text = open(sys.argv[1], encoding='utf-8-sig').read()
 data = json.loads(text) if text.strip() else None

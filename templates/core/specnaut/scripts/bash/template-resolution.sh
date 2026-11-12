@@ -9,7 +9,7 @@
 # (read as absent), 1 malformed (anything else). The ids are written as bytes
 # with `\n`: a Windows python3 would end each with `\r\n` in text mode.
 _preset_ids_by_priority() {
-    SPECNAUT_REGISTRY="$1" python3 -c "
+    SPECNAUT_REGISTRY="$1" python3 -I -c "
 import json, sys, os
 try:
     with open(os.environ['SPECNAUT_REGISTRY'], encoding='utf-8-sig') as f:
