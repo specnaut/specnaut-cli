@@ -47,7 +47,10 @@ export const NO_PERL = exists("/usr/bin/perl") ? null : "perl at /usr/bin/perl";
  * out of the process group, holding the output open; the shell itself ends at once with 0.
  */
 export function detaching(seconds: string): string {
-  const perl = `use POSIX; exit if fork; setsid(); exec "sleep", "${seconds}"`;
+  // The parent waits for the child to have left the group (its end of the pipe closes after
+  // `setsid`), so the group's kill at the shell's end can never catch it first.
+  const perl = "use POSIX; pipe(R, W); if (fork) { close W; <R>; exit } " +
+    `close R; setsid(); close W; exec "sleep", "${seconds}"`;
   return `echo before; /usr/bin/perl -e '${perl}'`;
 }
 
