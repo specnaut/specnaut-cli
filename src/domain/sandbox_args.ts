@@ -6,6 +6,7 @@
  */
 
 import type { SandboxPolicy } from "./sandbox.ts";
+import type { SandboxLimits } from "./sandbox_limits.ts";
 import { isPinned } from "./sandbox_image.ts";
 import { safePath } from "./sandbox_paths.ts";
 
@@ -27,33 +28,54 @@ const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
  */
 export function containerArgs(
   policy: SandboxPolicy,
-  { image, name }: ContainerRun,
+  run: ContainerRun,
   command: readonly string[],
 ): string[] {
-  if (!isPinned(image)) throw new Error(`container image ${image} is not pinned by digest`);
-  if (!CONTAINER_NAME.test(name)) {
-    throw new Error(`container name ${JSON.stringify(name)} is not plain`);
-  }
-  const { limits } = policy;
-  const tmpfs = `rw,nosuid,nodev,size=${limits.scratchBytes},mode=1777`;
+  const { image, name } = checkedRun(run);
   return [
-    "run",
-    "--rm",
-    ...["--name", name, "--init", "--log-driver", "none"],
+    ...["run", "--rm", "--name", name, "--init", "--log-driver", "none"],
     ...containerNetwork(policy.network),
     ...["--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
-    ...["--pids-limit", String(limits.processes), "--memory", String(limits.memoryBytes)],
-    ...["--memory-swap", String(limits.memoryBytes), "--cpus", String(limits.cpus)],
-    ...policy.writes.flatMap((p) => ["--tmpfs", `${safePath(p)}:${tmpfs}`]),
-    ...policy.reads.flatMap((
-      p,
-    ) => ["--mount", `type=bind,src=${p},dst=${safePath(p)},readonly=true`]),
-    ...["--workdir", safePath(policy.workdir)],
+    ...containerCaps(policy.limits),
+    ...containerFolders(policy),
     ...Object.entries(policy.env).flatMap(([k, v]) => ["--env", `${k}=${v}`]),
     image,
     ...command,
   ];
+}
+
+/** `run`, once its image is pinned by digest and its name is plain; otherwise a thrown error. */
+function checkedRun(run: ContainerRun): ContainerRun {
+  if (!isPinned(run.image)) throw new Error(`container image ${run.image} is not pinned by digest`);
+  if (!CONTAINER_NAME.test(run.name)) {
+    throw new Error(`container name ${JSON.stringify(run.name)} is not plain`);
+  }
+  return run;
+}
+
+/** The process, memory and CPU caps; swap is set to the memory cap, so none is added. */
+function containerCaps(limits: SandboxLimits): string[] {
+  return [
+    ...["--pids-limit", String(limits.processes), "--memory", String(limits.memoryBytes)],
+    ...["--memory-swap", String(limits.memoryBytes), "--cpus", String(limits.cpus)],
+  ];
+}
+
+/** Scratch folders as capped tmpfs, the tree as a read-only bind mount, the tree as workdir. */
+function containerFolders(policy: SandboxPolicy): string[] {
+  const tmpfs = `rw,nosuid,nodev,size=${policy.limits.scratchBytes},mode=1777`;
+  return [
+    ...policy.writes.flatMap((p) => ["--tmpfs", `${safePath(p)}:${tmpfs}`]),
+    ...policy.reads.flatMap((p) => ["--mount", bindMount(p)]),
+    ...["--workdir", safePath(policy.workdir)],
+  ];
+}
+
+/** A read-only bind mount of `path` at the same path inside. */
+function bindMount(path: string): string {
+  const p = safePath(path);
+  return `type=bind,src=${p},dst=${p},readonly=true`;
 }
 
 /** `--dev` brings a writable shared-memory folder of its own; a capped tmpfs replaces it. */

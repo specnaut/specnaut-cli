@@ -13,13 +13,16 @@ import type { Sysctls } from "./sandbox_hosts.ts";
 import { FORBIDDEN_SERVICES } from "./sandbox_hosts.ts";
 import { safePath } from "./sandbox_paths.ts";
 
-/** The profile text, one rule per line. */
+/** The profile text, one rule per line: deny by default, the allows, then the closing denies. */
 export function seatbeltProfile(policy: SandboxPolicy): string {
+  return ["(version 1)", "(deny default)", ...allows(policy), ...closingDenies(policy), ""]
+    .join("\n");
+}
+
+/** Processes, named kernel values, the policy's files and devices, the allowed services. */
+function allows(policy: SandboxPolicy): string[] {
   const folders = [...policy.system, ...policy.reads, ...policy.writes];
-  const forbidden = Object.values(FORBIDDEN_SERVICES).flat();
   return [
-    "(version 1)",
-    "(deny default)",
     "(allow process-fork)",
     "(allow process-exec)",
     "(allow signal (target same-sandbox))",
@@ -33,12 +36,18 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
     ...(policy.services.length > 0
       ? [`(allow mach-lookup ${policy.services.map(service).join(" ")})`]
       : []),
+  ];
+}
+
+/** Denies no allow above can reopen: the network, launchd jobs, hidden folders, services. */
+function closingDenies(policy: SandboxPolicy): string[] {
+  const forbidden = Object.values(FORBIDDEN_SERVICES).flat();
+  return [
     networkRule(policy.network),
     "(deny job-creation)",
     ...(policy.hidden.length > 0 ? [`(deny file-read* ${rules("subpath", policy.hidden)})`] : []),
     `(deny mach-lookup ${forbidden.map(service).join(" ")})`,
-    "",
-  ].join("\n");
+  ];
 }
 
 /**

@@ -27,48 +27,52 @@ function pairsAfter(args: readonly string[], flag: string): string[][] {
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
 
+const TMPFS = `rw,nosuid,nodev,size=${LIMITS.scratchBytes},mode=1777`;
+
+/** The whole `run` argument list for the fixture's policy, in order. */
+const EXPECTED_CONTAINER_ARGS = [
+  "run",
+  "--rm",
+  "--name",
+  NAME,
+  "--init",
+  "--log-driver",
+  "none",
+  "--network",
+  "none",
+  "--read-only",
+  "--cap-drop",
+  "ALL",
+  "--security-opt",
+  "no-new-privileges",
+  "--user",
+  "65534:65534",
+  "--pids-limit",
+  String(LIMITS.processes),
+  "--memory",
+  String(LIMITS.memoryBytes),
+  "--memory-swap",
+  String(LIMITS.memoryBytes),
+  "--cpus",
+  String(LIMITS.cpus),
+  "--tmpfs",
+  `${SCRATCH_HOME}:${TMPFS}`,
+  "--tmpfs",
+  `${SCRATCH_TMP}:${TMPFS}`,
+  "--mount",
+  `type=bind,src=${PATHS.tree},dst=${PATHS.tree},readonly=true`,
+  "--workdir",
+  PATHS.tree,
+  "--env",
+  `HOME=${SCRATCH_HOME}`,
+  "--env",
+  `TMPDIR=${SCRATCH_TMP}`,
+  IMAGE,
+  ...COMMAND,
+];
+
 Deno.test("containerArgs: the whole argument list, in order", () => {
-  const tmpfs = `rw,nosuid,nodev,size=${LIMITS.scratchBytes},mode=1777`;
-  assertEquals(container(), [
-    "run",
-    "--rm",
-    "--name",
-    NAME,
-    "--init",
-    "--log-driver",
-    "none",
-    "--network",
-    "none",
-    "--read-only",
-    "--cap-drop",
-    "ALL",
-    "--security-opt",
-    "no-new-privileges",
-    "--user",
-    "65534:65534",
-    "--pids-limit",
-    String(LIMITS.processes),
-    "--memory",
-    String(LIMITS.memoryBytes),
-    "--memory-swap",
-    String(LIMITS.memoryBytes),
-    "--cpus",
-    String(LIMITS.cpus),
-    "--tmpfs",
-    `${SCRATCH_HOME}:${tmpfs}`,
-    "--tmpfs",
-    `${SCRATCH_TMP}:${tmpfs}`,
-    "--mount",
-    `type=bind,src=${PATHS.tree},dst=${PATHS.tree},readonly=true`,
-    "--workdir",
-    PATHS.tree,
-    "--env",
-    `HOME=${SCRATCH_HOME}`,
-    "--env",
-    `TMPDIR=${SCRATCH_TMP}`,
-    IMAGE,
-    ...COMMAND,
-  ]);
+  assertEquals(container(), EXPECTED_CONTAINER_ARGS);
 });
 
 Deno.test("containerArgs: no network, read-only root, no capabilities, no privilege gain", () => {

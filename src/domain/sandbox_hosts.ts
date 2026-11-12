@@ -67,3 +67,19 @@ export const SEATBELT_SYSCTLS: Sysctls = {
  * volume, whose own entries `/System` would otherwise expose.
  */
 export const SEATBELT_HIDDEN: readonly string[] = ["/System/Volumes/Data"];
+
+/** What only `sandbox-exec` filters beyond folders, taken whole by a macOS policy. */
+export const SEATBELT_RULES = {
+  listings: SEATBELT_LISTINGS,
+  hidden: SEATBELT_HIDDEN,
+  services: ALLOWED_SERVICES,
+  sysctls: SEATBELT_SYSCTLS,
+} as const;
+
+/** The same filters for a backend that has none of them: each list empty. */
+export const NO_SEATBELT_RULES: typeof SEATBELT_RULES = {
+  listings: [],
+  hidden: [],
+  services: [],
+  sysctls: { names: [], prefixes: [] },
+};

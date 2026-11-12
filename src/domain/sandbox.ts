@@ -13,11 +13,9 @@
 
 import type { ImageSource } from "./sandbox_image.ts";
 import {
-  ALLOWED_SERVICES,
   DEVICES,
-  SEATBELT_HIDDEN,
-  SEATBELT_LISTINGS,
-  SEATBELT_SYSCTLS,
+  NO_SEATBELT_RULES,
+  SEATBELT_RULES,
   type Sysctls,
   SYSTEM,
   SYSTEM_PATH,
@@ -59,13 +57,8 @@ const UNCAPPED_PODMAN =
 export function chooseBackend(probe: BackendProbe): Backend {
   if (probe.os === "windows") return { kind: "static", why: ["no sandbox on Windows"] };
   const why: string[] = [];
-  const podman = probe.podman === "rootless" && probe.podmanCgroups;
-  const engine = podman ? "podman" : probe.docker ? "docker" : null;
-  if (probe.image.kind === "none") why.push(`no container image: ${probe.image.why}`);
-  else if (engine) return { kind: "container", engine, image: probe.image.ref };
-  else {why.push(
-      probe.podman === "rootless" ? UNCAPPED_PODMAN : "container: no rootless podman and no docker",
-    );}
+  const container = containerOn(probe, why);
+  if (container !== null) return container;
   if (probe.os === "linux") {
     const passedOver = bwrapWhy(probe);
     if (passedOver === null) return { kind: "bwrap" };
@@ -76,6 +69,19 @@ export function chooseBackend(probe: BackendProbe): Backend {
     why.push("sandbox-exec: not available");
   }
   return { kind: "static", why };
+}
+
+/** The container backend `probe` offers, or `null` with the reason added to `why`. */
+function containerOn(probe: BackendProbe, why: string[]): Backend | null {
+  const podman = probe.podman === "rootless" && probe.podmanCgroups;
+  const engine = podman ? "podman" : probe.docker ? "docker" : null;
+  if (probe.image.kind === "pinned" && engine) {
+    return { kind: "container", engine, image: probe.image.ref };
+  }
+  if (probe.image.kind === "none") why.push(`no container image: ${probe.image.why}`);
+  else if (probe.podman === "rootless") why.push(UNCAPPED_PODMAN);
+  else why.push("container: no rootless podman and no docker");
+  return null;
 }
 
 /** Why bubblewrap cannot run on this host, or `null` when it can. */
@@ -131,32 +137,44 @@ export type PolicyResult =
 /** The policy for `backend` over `paths`, or why that layout cannot be sandboxed safely. */
 export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): PolicyResult {
   const inContainer = backend === "container";
-  const home = `${paths.scratch}/home`;
-  const tmp = `${paths.scratch}/tmp`;
-  const system = SYSTEM[backend];
-  const reads = inContainer ? [paths.tree] : [...paths.toolchain, paths.tree];
-  const writes = [home, tmp];
   const onMac = backend === "seatbelt";
+  const visible = folders(backend, paths);
   const policy: SandboxPolicy = {
     workdir: paths.tree,
-    env: inContainer
-      ? { HOME: home, TMPDIR: tmp }
-      : { PATH: [...paths.path, ...SYSTEM_PATH].join(":"), HOME: home, TMPDIR: tmp },
-    system,
-    reads,
-    writes,
-    lookups: onMac ? ancestors([...system, ...reads, ...writes]) : [],
-    listings: onMac ? SEATBELT_LISTINGS : [],
-    hidden: onMac ? SEATBELT_HIDDEN : [],
+    env: environment(inContainer, paths.path, visible.writes),
+    ...visible,
+    ...(onMac ? SEATBELT_RULES : NO_SEATBELT_RULES),
+    lookups: onMac ? ancestors([...visible.system, ...visible.reads, ...visible.writes]) : [],
     devices: DEVICES,
     network: "none",
-    services: onMac ? ALLOWED_SERVICES : [],
-    sysctls: onMac ? SEATBELT_SYSCTLS : { names: [], prefixes: [] },
     user: "65534:65534",
     limits: LIMITS,
   };
   const why = layoutProblem(paths, policy, inContainer ? [] : paths.path);
   return why === null ? { ok: true, policy } : { ok: false, why };
+}
+
+type Folders = Pick<SandboxPolicy, "system" | "reads" | "writes">;
+
+/** The system folders, the read-only toolchain and tree, and the scratch home and temp. */
+function folders(backend: SandboxedBackend, paths: SandboxPaths): Folders {
+  const inContainer = backend === "container";
+  return {
+    system: SYSTEM[backend],
+    reads: inContainer ? [paths.tree] : [...paths.toolchain, paths.tree],
+    writes: [`${paths.scratch}/home`, `${paths.scratch}/tmp`],
+  };
+}
+
+/** The whole environment: a container keeps its pinned image's PATH, a host gets a fixed one. */
+function environment(
+  inContainer: boolean,
+  path: readonly string[],
+  writes: readonly string[],
+): Record<string, string> {
+  const [home, tmp] = writes;
+  if (inContainer) return { HOME: home, TMPDIR: tmp };
+  return { PATH: [...path, ...SYSTEM_PATH].join(":"), HOME: home, TMPDIR: tmp };
 }
 
 /** The first reason `policy` would expose the home, the checkout or a read-only folder. */
