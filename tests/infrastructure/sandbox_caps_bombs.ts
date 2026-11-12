@@ -57,6 +57,9 @@ export const HANG = STOP_BY + 30;
 const HOLD = "(x=$(head -c 33554432 /dev/zero | tr '\\0' a) || exit $?; " +
   '[ "${#x}" -eq 33554432 ] || exit 3; sleep 3) & pids="$pids $!";';
 
+/** What `head` prints when its write to a full scratch file fails, in GNU and in busybox. */
+const FULL = /No space left on device|^head: standard output: I\/O error$/;
+
 export const BOMBS: Readonly<Record<Cap, Bomb>> = {
   memoryBytes: {
     what: "a multi-process memory bomb (4 x 32 MiB held at once, cap 64 MiB)",
@@ -78,8 +81,8 @@ export const BOMBS: Readonly<Record<Cap, Bomb>> = {
     what: "a multi-file scratch fill (4 x 4 MiB, cap 8 MiB)",
     limits: { scratchBytes: 8 * MIB },
     command: times(4, 'head -c 4194304 /dev/zero > "$TMPDIR/f$i" && echo "wrote $i";'),
-    verdict: (_, out) =>
-      judged(out, { units: 4, done: /^wrote \d+$/, capped: /No space left on device/ }),
+    // A write refused for want of space: GNU head names it, busybox's says only "I/O error".
+    verdict: (_, out) => judged(out, { units: 4, done: /^wrote \d+$/, capped: FULL }),
   },
   wallClockSeconds: {
     what: `a detaching hang (${HANG} s, wall clock ${WALL} s)`,

@@ -40,6 +40,9 @@ Deno.test("scratch fill: a full scratch is the cap; a write refused otherwise is
   assertEquals(verdict("scratchBytes", lines(...range(4, (i) => `wrote ${i}`))), "finished");
   const full = lines("wrote 0", "wrote 1", "head: write error: No space left on device");
   assertEquals(verdict("scratchBytes", full), "stopped");
+  const busybox = lines("wrote 0", "wrote 1", "head: standard output: I/O error");
+  assertEquals(verdict("scratchBytes", busybox), "stopped");
+  assertMatch(verdict("scratchBytes", lines("head: /dev/zero: I/O error")), /^unexplained: /);
   const denied = lines("sh: can't create /tmp/f0: Permission denied");
   assertMatch(verdict("scratchBytes", denied), /^unexplained: /);
 });
