@@ -70,7 +70,7 @@ export async function startSession(
   if (outcome.kind !== "taken" && outcome.kind !== "existing") {
     throw new Error(`no record: ${JSON.stringify(outcome)}`);
   }
-  records.set(dir, outcome.path);
+  sessionIds.set(dir, sessionId);
   return outcome.path;
 }
 
@@ -91,7 +91,7 @@ export async function onBase(root: string, change: () => Promise<void>) {
 /** The check, run in `root` by the session that started there last, or by the one `session.id` names. */
 export async function check(
   root: string,
-  head: string,
+  head: string | null,
   session: { id: string } = { id: sessionIds.get(root) ?? "" },
 ): Promise<CheckoutOutcome> {
   return await verifyCheckout({

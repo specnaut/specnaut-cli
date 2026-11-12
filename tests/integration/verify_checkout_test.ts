@@ -31,6 +31,17 @@ Deno.test("a checkout holding a commit of the outside branch fails, naming it", 
   if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(tip));
 });
 
+Deno.test("before the branch is fetched, no head: a clean checkout holds, a branch's commit still fails", async () => {
+  const { root, head } = await setUp();
+  const tip = (await git(root, "rev-parse", "main")).trim();
+  assertEquals(await check(root, null), { kind: "trusted", baseTip: tip });
+  await git(root, "merge", "-q", "--ff-only", "outside");
+  assertEquals(reasons(await check(root, null)), [{
+    path: head,
+    reason: CHECKOUT_REASON.headAhead,
+  }]);
+});
+
 Deno.test("a checkout with a commit of its own fails, even leaving every checked file alone", async () => {
   const { root, head } = await setUp();
   await write(root, { "src/b.ts": "export const b = 2;\n" });

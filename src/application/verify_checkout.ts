@@ -46,15 +46,17 @@ export type CheckoutOutcome =
 
 export async function verifyCheckout(
   deps: VerifyCheckoutDeps,
-  untrustedHead: string,
+  untrustedHead: string | null,
 ): Promise<CheckoutOutcome> {
-  if (!isFullSha(untrustedHead)) return restart("head", "not a full commit sha", null);
+  if (untrustedHead !== null && !isFullSha(untrustedHead)) {
+    return restart("head", "not a full commit sha", null);
+  }
   const scripts = await verifyScripts(deps);
   if (scripts.kind === "base_unknown") {
     return restart("base", `the base is unknown: ${scripts.why}`, null);
   }
   const tip = scripts.baseTip;
-  if (await deps.git.commitOf(untrustedHead) !== untrustedHead) {
+  if (untrustedHead !== null && await deps.git.commitOf(untrustedHead) !== untrustedHead) {
     return restart("head", "names no commit in this repository: fetch it first", tip);
   }
   const record = await startRecord(deps);
@@ -65,7 +67,7 @@ export async function verifyCheckout(
 /** The checkout judged as it is now, then its start record's reasons the folder does not give. */
 async function judged(
   deps: VerifyCheckoutDeps,
-  run: { tip: string; untrustedHead: string; scripts: ScriptVerdict },
+  run: { tip: string; untrustedHead: string | null; scripts: ScriptVerdict },
   record: SessionRecord,
 ): Promise<CheckoutOutcome> {
   const facts = await gather(deps, run.tip, run.untrustedHead);
@@ -79,11 +81,11 @@ async function judged(
 type Facts = Awaited<ReturnType<typeof gather>>;
 
 /** What the rule reads besides the scripts: each side's commits, the checked files on both sides. */
-async function gather(deps: VerifyCheckoutDeps, tip: string, untrustedHead: string) {
+async function gather(deps: VerifyCheckoutDeps, tip: string, untrustedHead: string | null) {
   const { git, checkout } = deps;
   const [headCommits, untrustedCommits, tree, atTip] = await Promise.all([
     git.commitsAhead(tip, "HEAD"),
-    git.commitsAhead(tip, untrustedHead),
+    untrustedHead === null ? [] : git.commitsAhead(tip, untrustedHead),
     Promise.all(CHECKOUT_SCOPE.map((root) => checkout.walk(root))),
     Promise.all(CHECKOUT_SCOPE.map((root) => git.listRoot(tip, root))),
   ]);
