@@ -21,7 +21,7 @@ import {
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
 import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
-import { ancestors, overlaps, pathProblem, type SandboxPaths, within } from "./sandbox_paths.ts";
+import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
 
 export type Engine = "podman" | "docker";
 
@@ -152,7 +152,8 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
     user: "65534:65534",
     limits: LIMITS,
   };
-  const why = layoutProblem(paths, policy, inContainer ? [] : paths.path);
+  const readOnly = [...policy.system, ...policy.reads];
+  const why = layoutProblem(paths, readOnly, inContainer ? [] : paths.path);
   return why === null ? { ok: true, policy } : { ok: false, why };
 }
 
@@ -177,22 +178,4 @@ function environment(
   const [home, tmp] = writes;
   if (inContainer) return { HOME: home, TMPDIR: tmp };
   return { PATH: [...path, ...SYSTEM_PATH].join(":"), HOME: home, TMPDIR: tmp };
-}
-
-/** The first reason `policy` would expose the home, the checkout or a read-only folder. */
-function layoutProblem(paths: SandboxPaths, policy: SandboxPolicy, path: readonly string[]) {
-  const given = [paths.tree, paths.scratch, paths.home, paths.checkout, ...policy.reads, ...path];
-  for (const p of given) {
-    const problem = pathProblem(p);
-    if (problem !== null) return `${JSON.stringify(p)} ${problem}`;
-  }
-  const readOnly = [...policy.system, ...policy.reads];
-  for (const p of [...readOnly, paths.scratch]) {
-    if (within(paths.home, p)) return `${p} is or holds the home folder`;
-    if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
-  }
-  const shared = readOnly.find((p) => overlaps(p, paths.scratch));
-  if (shared) return `the scratch folder overlaps ${shared}, which is only read`;
-  const stray = path.find((p) => !readOnly.some((r) => within(p, r)));
-  return stray ? `PATH entry ${stray} is in no folder the sandbox reads` : null;
 }

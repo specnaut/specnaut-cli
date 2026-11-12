@@ -68,3 +68,27 @@ export function ancestors(paths: readonly string[]): string[] {
   }
   return [...above].sort();
 }
+
+/**
+ * The first reason a layout would expose the home, the checkout or a read-only folder: `readOnly`
+ * is every folder the sandbox only reads, `path` the PATH entries searched before the system's.
+ */
+export function layoutProblem(
+  paths: SandboxPaths,
+  readOnly: readonly string[],
+  path: readonly string[],
+): string | null {
+  const given = [paths.tree, paths.scratch, paths.home, paths.checkout, ...readOnly, ...path];
+  for (const p of given) {
+    const problem = pathProblem(p);
+    if (problem !== null) return `${JSON.stringify(p)} ${problem}`;
+  }
+  for (const p of [...readOnly, paths.scratch]) {
+    if (within(paths.home, p)) return `${p} is or holds the home folder`;
+    if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
+  }
+  const shared = readOnly.find((p) => overlaps(p, paths.scratch));
+  if (shared) return `the scratch folder overlaps ${shared}, which is only read`;
+  const stray = path.find((p) => !readOnly.some((r) => within(p, r)));
+  return stray ? `PATH entry ${stray} is in no folder the sandbox reads` : null;
+}
