@@ -253,8 +253,13 @@ Deno.test("mergeClaudeSettings: the approval hooks leave, the user's hooks stay"
       DEST,
     ).content,
   );
-  const bash = merged.hooks.PreToolUse.find((g: { matcher?: string }) => g.matcher === "Bash");
-  assertEquals(bash.hooks.map((h: { command: string }) => h.command), ["./my-check.sh"]);
+  type Group = { matcher?: string; hooks: { command: string }[] };
+  const commands = (groups: Group[]) =>
+    groups.find((g) => g.matcher === "Bash")?.hooks.map((h) => h.command) ?? [];
+  // The Bash group keeps the user's hook and gains the ones Specnaut ships there;
+  // the retired approval hooks are the only ones that leave.
+  const shippedBash = commands(JSON.parse(SHIPPED).hooks.PreToolUse);
+  assertEquals(commands(merged.hooks.PreToolUse), ["./my-check.sh", ...shippedBash]);
   assertEquals(merged.hooks.UserPromptSubmit, undefined);
   assertEquals(merged.hooks.Stop, undefined);
 });
