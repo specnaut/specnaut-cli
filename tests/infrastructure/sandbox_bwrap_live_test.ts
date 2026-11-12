@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { userBus } from "../../src/domain/sandbox_args.ts";
 import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_seccomp.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
@@ -71,12 +72,15 @@ Deno.test({
   fn: () =>
     withLayout("bwrap", async ({ policy }) => {
       const small = { ...policy, limits: { ...policy.limits, memoryBytes: 64 * 1024 ** 2 } };
+      const bus = userBus((name) => Deno.env.get(name));
       const scoped = (l: DenoProcessLauncher) =>
-        new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!, true);
-      // 256 MiB held in one shell variable: four times the cap.
-      const script = "x=$(head -c 268435456 /dev/zero | tr '\\0' a); echo survived";
+        new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!, true, bus);
+      // 256 MiB held in one shell variable: four times the cap. The marker says the allocation
+      // began; the cap's kill (SIGKILL) leaves 137. A run that failed any other way has neither.
+      const script =
+        "echo allocating; x=$(head -c 268435456 /dev/zero | tr '\\0' a); echo survived";
       const { outcome, out } = await runIn(scoped, small, ["/bin/sh", "-c", script]);
-      assertEquals(outcome.kind === "exited" && outcome.code !== 0, true, JSON.stringify(outcome));
-      assertEquals(out.includes("survived"), false);
+      assertEquals(outcome, { kind: "exited", code: 137 });
+      assertEquals(out, "allocating\n");
     }),
 });

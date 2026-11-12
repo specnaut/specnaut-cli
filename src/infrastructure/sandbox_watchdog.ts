@@ -7,25 +7,28 @@ import type { ProcessSpec } from "./sandbox_process.ts";
  *
  * It is a process group of its own, so a kill of ours spares it, and its output is /dev/null from
  * its first line, so a pipe to a dead launcher cannot end it with SIGPIPE. Once a second it checks
- * that the run's process group is still there, and leaves as soon as it is gone, before its id
- * can be reused. Past its deadline it runs the removal it was given, if any, then kills the group.
- * Our normal end stops it.
+ * that the run's process group is still there; past its deadline it kills the group. Either way,
+ * it then runs the removal it was given, if any, and leaves. The removal runs on the group's own
+ * end too: a container client whose launcher was killed ends on its closed output, and its
+ * container would otherwise outlive it. The group is killed first, so nothing of the run is left
+ * to act while it is removed. The removal is keyed by name, never by the group's id, which may be
+ * reused once the group is gone. Our normal end stops it.
  */
 const WATCHDOG = [
   "exec </dev/null >/dev/null 2>&1",
   "end=$(( $(date +%s) + $1 )); group=$2; shift 2",
   'while kill -0 -"$group"; do',
-  '  if [ "$(date +%s)" -ge "$end" ]; then',
-  '    if [ "$#" -gt 0 ]; then "$@"; fi',
-  '    kill -KILL -"$group"; exit 0',
-  "  fi",
+  '  if [ "$(date +%s)" -ge "$end" ]; then kill -KILL -"$group"; break; fi',
   "  sleep 1",
   "done",
+  'if [ "$#" -gt 0 ]; then "$@"; fi',
+  "exit 0",
 ].join("\n");
 
 /**
- * The watchdog of process group `group`: past `seconds` (rounded up) it runs `removal`, then
- * kills the group. It runs in our environment, which a container engine's client needs.
+ * The watchdog of process group `group`: past `seconds` (rounded up) it kills the group; once the
+ * group is gone, by its kill or its own end, it runs `removal`. It runs in our environment, which
+ * a container engine's client needs.
  */
 export function watchdogSpec(
   group: number,

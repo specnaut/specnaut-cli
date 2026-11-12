@@ -127,6 +127,21 @@ export function scopeArgs(policy: SandboxPolicy): string[] {
   ];
 }
 
+/**
+ * What `systemd-run --user` needs of the caller's environment to reach the user manager: its
+ * runtime folder and session bus. Without them the scope is refused on a real host. Nothing else
+ * of the caller's is passed, and bubblewrap's `--clearenv` keeps even these from the sandbox.
+ */
+const USER_BUS = ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"];
+
+/** The user-bus variables `env` sets, by name; one it does not set is left out. */
+export function userBus(env: (name: string) => string | undefined): Record<string, string> {
+  return Object.fromEntries(USER_BUS.flatMap((name) => {
+    const value = env(name);
+    return value === undefined ? [] : [[name, value]];
+  }));
+}
+
 /** The container's network: with `none` it has its own loopback only, never the host's. */
 function containerNetwork(network: SandboxPolicy["network"]): string[] {
   switch (network) {

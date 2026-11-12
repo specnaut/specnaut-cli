@@ -5,8 +5,8 @@ import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";
 import { capture, exists } from "./sandbox_live_fixture.ts";
 
 /**
- * The host watchdog, run for real against a real process group: past its deadline it runs the
- * removal and kills the group; once the group is gone it leaves, running nothing.
+ * The host watchdog, run for real against a real process group: past its deadline it kills the
+ * group, then runs the removal; once the group is gone it runs the removal too, and leaves.
  */
 
 const POSIX = Deno.build.os !== "windows";
@@ -28,7 +28,7 @@ async function withMarker(fn: (marker: string) => Promise<void>): Promise<void> 
 const launcher = () => new DenoProcessLauncher(capture().stream, capture().stream);
 
 Deno.test({
-  name: "watchdog: past its deadline it runs the removal, then kills the run's process group",
+  name: "watchdog: past its deadline it kills the run's process group and runs the removal",
   ignore: !POSIX,
   fn: () =>
     withMarker(async (marker) => {
@@ -42,7 +42,23 @@ Deno.test({
 });
 
 Deno.test({
-  name: "watchdog: once the run's group is gone it leaves, running nothing",
+  name: "watchdog: past its deadline it kills the run's process group before the removal",
+  ignore: !POSIX,
+  fn: () =>
+    withMarker(async (marker) => {
+      const l = launcher();
+      const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 30.614; :"], env: {} });
+      const slow = ["/bin/sh", "-c", 'sleep 1; touch "$0"', marker];
+      const dog = l.start(watchdogSpec(run.pid, 1, slow));
+      assertEquals(await Promise.race([run.ended, later(5000, "still running")]), 137);
+      assertEquals(exists(marker), false, "the removal ran before the group was killed");
+      assertEquals(await Promise.race([dog.exited, later(4000, "still watching")]), 0);
+      assertEquals(exists(marker), true);
+    }),
+});
+
+Deno.test({
+  name: "watchdog: once the run's group is gone it runs the removal and leaves",
   ignore: !POSIX,
   fn: () =>
     withMarker(async (marker) => {
@@ -51,7 +67,7 @@ Deno.test({
       const dog = l.start(watchdogSpec(run.pid, 30, ["/usr/bin/touch", marker]));
       assertEquals(await run.exited, 0);
       assertEquals(await Promise.race([dog.exited, later(4000, "still watching")]), 0);
-      assertEquals(exists(marker), false);
+      assertEquals(exists(marker), true);
     }),
 });
 

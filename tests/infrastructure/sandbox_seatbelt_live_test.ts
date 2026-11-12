@@ -137,7 +137,7 @@ Deno.test({
     const child = fromFileUrl(new URL("./sandbox_killed_runner.ts", import.meta.url));
     const flags = ["--allow-read", "--allow-write", "--allow-run", "--allow-env"];
     const cli = new Deno.Command(Deno.execPath(), {
-      args: ["run", ...flags, child, base, marker.split(" ")[1]],
+      args: ["run", ...flags, child, base, "seatbelt", marker.split(" ")[1]],
       stdin: "null",
       stdout: "null",
       stderr: "null",

@@ -17,6 +17,7 @@ import {
   type SandboxLimits,
   STOP_LIMIT,
 } from "../../domain/sandbox_limits.ts";
+import { userBus } from "../../domain/sandbox_args.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
@@ -38,7 +39,8 @@ import type { SandboxIntent } from "../intent.ts";
  *          use. Exit 0 when a backend is available, 1 when a run would be static.
  *   exec   the command's own exit code, whatever caps it ran without; after a run, its backend's
  *          `UNCAPPED` and `LIMIT` lines on stderr, prefixed `notice: specnaut sandbox exec: `, so
- *          stdout stays the command's. 124: the wall clock ran out and the run was stopped.
+ *          stdout stays the command's. 124: the wall clock ran out and the run was stopped;
+ *          a stop that failed (a container left behind) is said on a second line.
  *          125: nothing ran (static only, no such export, a layout the policy refuses, or a
  *          launcher that could not start). Every 124 and 125 says why on stderr; the command's own
  *          output is passed through unchanged.
@@ -97,8 +99,12 @@ function answer(outcome: ExecOutcome, deps: SandboxDeps): number {
     deps.err(`notice: specnaut sandbox exec: ${line}`);
   }
   if (outcome.outcome.kind === "exited") return outcome.outcome.code;
-  const seconds = outcome.outcome.seconds;
+  const { seconds, haltFailed } = outcome.outcome;
   deps.err(red(`error: specnaut sandbox exec: the wall clock ran out after ${seconds} s`));
+  if (haltFailed !== undefined) {
+    const why = terminalText(haltFailed);
+    deps.err(red(`error: specnaut sandbox exec: the run was not stopped cleanly: ${why}`));
+  }
   return EXIT.timedOut;
 }
 
@@ -129,7 +135,8 @@ function execDeps(prober: HostBackendProber, checkout: () => Promise<string>): E
   return {
     prober,
     host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
-    runnerFor: (backend) => runnerFor(backend, new DenoProcessLauncher(), { arch, path }),
+    runnerFor: (backend) =>
+      runnerFor(backend, new DenoProcessLauncher(), { arch, path, bus: userBus(env) }),
   };
 }
 

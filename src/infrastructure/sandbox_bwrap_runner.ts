@@ -28,13 +28,15 @@ export class BwrapRunner implements SandboxRunner {
 
   /**
    * `path` finds `bwrap` and `systemd-run` as the probe found them; the sandbox's own PATH is the
-   * policy's. `scope`: run in a systemd user scope, which caps memory, processes and CPU.
+   * policy's. `scope`: run in a systemd user scope, which caps memory, processes and CPU, reached
+   * through `bus` (`userBus`), which is given to `systemd-run` alone.
    */
   constructor(
     arch: string,
     readonly launcher: ProcessLauncher,
     readonly path: string,
     readonly scope = false,
+    readonly bus: Readonly<Record<string, string>> = {},
   ) {
     if (!isFilterArch(arch)) throw new Error(`no syscall filter for ${arch}`);
     this.#filter = seccompFilter(arch);
@@ -59,7 +61,8 @@ export class BwrapRunner implements SandboxRunner {
       const marker = join(folder, "started");
       const [cmd, ...prefix] = scopeArgs(policy);
       const line = ["/bin/sh", "-c", SCOPED_MOVE_FILTER, "sh", marker, ...bwrap];
-      const outcome = await untilWallClock(this.#start(cmd, [...prefix, ...line]), wall(policy));
+      const started = this.#start(cmd, [...prefix, ...line], this.bus);
+      const outcome = await untilWallClock(started, wall(policy));
       if (outcome.kind === "exited" && !(await present(marker))) {
         throw new SandboxRefused(`the systemd user scope did not start (exit ${outcome.code})`);
       }
@@ -69,8 +72,14 @@ export class BwrapRunner implements SandboxRunner {
     }
   }
 
-  #start(cmd: string, args: readonly string[]): Started {
-    return this.launcher.start({ cmd, args, env: { PATH: this.path }, stdin: this.#filter });
+  /** `cmd` with PATH and `extra` as its whole environment, the filter on its input. */
+  #start(
+    cmd: string,
+    args: readonly string[],
+    extra: Readonly<Record<string, string>> = {},
+  ): Started {
+    const env = { ...extra, PATH: this.path };
+    return this.launcher.start({ cmd, args, env, stdin: this.#filter });
   }
 }
 

@@ -59,6 +59,20 @@ Deno.test("sandbox exec: the wall clock running out is 124, and said", async () 
   assertEquals(err.join("\n").includes("the wall clock ran out after 1800 s"), true);
 });
 
+Deno.test("sandbox exec: a stop that failed at the wall clock is said after the timeout", async () => {
+  const late: ExecOutcome = {
+    kind: "ran",
+    backend: "container",
+    outcome: { kind: "timed_out", seconds: 60, haltFailed: "docker rm --force n exited 1" },
+    unenforced: [],
+  };
+  const { d, err } = deps(MAC, () => Promise.resolve(late));
+  assertEquals(await runSandbox(EXEC, d), 124);
+  const said = err.join("\n");
+  assertEquals(said.includes("the wall clock ran out after 60 s"), true);
+  assertEquals(said.includes("not stopped cleanly: docker rm --force n exited 1"), true, said);
+});
+
 Deno.test("sandbox exec: nothing ran is 125, with the reason", async () => {
   const notRun: ExecOutcome = { kind: "not_run", why: "no backend: no sandbox on Windows" };
   const { d, err } = deps(MAC, () => Promise.resolve(notRun));

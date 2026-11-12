@@ -1,10 +1,12 @@
 import { join } from "@std/path";
 import type { SandboxRunner } from "../../src/application/sandbox_ports.ts";
 import {
+  type Engine,
   type SandboxedBackend,
   type SandboxPolicy,
   sandboxPolicy,
 } from "../../src/domain/sandbox.ts";
+import { isPinned } from "../../src/domain/sandbox_image.ts";
 import { DenoSubprocessRunner } from "../../src/infrastructure/deno_subprocess.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
@@ -22,6 +24,26 @@ export const probed = await new HostBackendProber(
   host,
   () => Promise.resolve({ kind: "none", why: "not read here" }),
 ).probe();
+
+/** The engine a live container test runs on: docker when its daemon answers, else podman. */
+export const ENGINE: Engine | null = probed.docker
+  ? "docker"
+  : probed.podman !== "absent"
+  ? "podman"
+  : null;
+
+/**
+ * The image a live container test runs: a digest-pinned one already on the host (a run never
+ * pulls) with `/bin/sh`, named by `SPECNAUT_LIVE_IMAGE`, as none can be assumed present.
+ */
+export const LIVE_IMAGE = Deno.env.get("SPECNAUT_LIVE_IMAGE") ?? "";
+
+/** What a live container test lacks here, or `null`. */
+export const NO_CONTAINER = ENGINE === null
+  ? "podman or docker"
+  : isPinned(LIVE_IMAGE)
+  ? null
+  : "a digest-pinned image with /bin/sh, named in SPECNAUT_LIVE_IMAGE";
 
 /** A live test's name: what it shows, then why it is skipped when `missing` names what is absent. */
 export function live(title: string, missing: string | null): string {

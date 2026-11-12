@@ -28,7 +28,10 @@ export type Started = {
   readonly ended: Promise<number>;
   /** The exit code, once the process has ended and its output is copied, or let go by `release`. */
   readonly exited: Promise<number>;
-  /** Kills it and its process group; a process already gone is not an error. */
+  /**
+   * Kills it and its process group; a process already gone is not an error. Once `ended` has
+   * settled it signals nothing: the group was killed then, and its id may since be another's.
+   */
   stop(): void;
   /**
    * Stops copying its output. A process that left the group holds the pipes open for as long as
@@ -55,13 +58,18 @@ export class DenoProcessLauncher implements ProcessLauncher {
 
   start(spec: ProcessSpec): Started {
     const child = command(spec, spec.stdin ? "piped" : "null").spawn();
-    const stop = () => killGroup(child);
+    // Once the group's last kill is sent, its id may be reused by a stranger's group: never again.
+    let gone = false;
+    const stop = () => {
+      if (!gone) killGroup(child);
+    };
     const disarm = armExitTrap(stop);
     const released = new AbortController();
     const copied = this.#copy(child, spec, released.signal);
     if (spec.stdin) feed(child.stdin, spec.stdin, spec.cmd);
     const ended = child.status.then(({ code }) => {
       stop();
+      gone = true;
       disarm();
       return code;
     });

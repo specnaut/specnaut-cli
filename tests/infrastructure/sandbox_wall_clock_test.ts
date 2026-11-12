@@ -47,10 +47,21 @@ Deno.test("untilWallClock: past the clock the halt runs, then the stop", async (
   const order: string[] = [];
   const halt = () => {
     order.push(`halt, ${seen.stops} stops`);
-    return Promise.resolve();
+    return Promise.resolve(null);
   };
   assertEquals(await untilWallClock(started, 0.01, halt), { kind: "timed_out", seconds: 0.01 });
   assertEquals([order, seen.stops], [["halt, 0 stops"], 1]);
+});
+
+Deno.test("untilWallClock: a halt that reports a failure still stops the process, and names it", async () => {
+  const { started, seen } = fakeProcess(null);
+  const halt = () => Promise.resolve("podman rm --force x exited 125");
+  assertEquals(await untilWallClock(started, 0.01, halt), {
+    kind: "timed_out",
+    seconds: 0.01,
+    haltFailed: "podman rm --force x exited 125",
+  });
+  assertEquals(seen.stops, 1);
 });
 
 Deno.test("untilWallClock: a halt that fails still stops the process, and the failure is raised", async () => {

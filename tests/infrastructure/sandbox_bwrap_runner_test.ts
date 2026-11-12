@@ -56,6 +56,22 @@ Deno.test({
   },
 });
 
+const BUS = { XDG_RUNTIME_DIR: "/run/user/1000", DBUS_SESSION_BUS_ADDRESS: "unix:path=/b" };
+
+Deno.test({
+  name: "BwrapRunner in a scope: systemd-run gets PATH and the user bus, bwrap alone PATH only",
+  ignore: !POSIX,
+  fn: async () => {
+    const policy = policyOf("bwrap");
+    const scoped = startingScope(0);
+    await new BwrapRunner("x86_64", scoped.launcher, "/usr/bin", true, BUS).run(policy, COMMAND);
+    assertEquals(scoped.launches[0].spec.env, { PATH: "/usr/bin", ...BUS });
+    const bare = fakeLauncher(0);
+    await new BwrapRunner("x86_64", bare.launcher, "/usr/bin", false, BUS).run(policy, COMMAND);
+    assertEquals(bare.launches[0].spec.env, { PATH: "/usr/bin" });
+  },
+});
+
 Deno.test({
   name: "BwrapRunner in a scope: a scope that did not start is not run, with its cause",
   ignore: !POSIX,
@@ -81,8 +97,9 @@ Deno.test({
 
 Deno.test("runnerFor: bubblewrap runs in a scope exactly when the backend says so", () => {
   const { launcher } = fakeLauncher(0);
-  const host = { arch: "x86_64", path: "/usr/bin" };
+  const host = { arch: "x86_64", path: "/usr/bin", bus: BUS };
   const scoped = runnerFor({ kind: "bwrap", scope: true }, launcher, host);
   const bare = runnerFor({ kind: "bwrap", scope: false }, launcher, host);
   assertEquals([(scoped as BwrapRunner).scope, (bare as BwrapRunner).scope], [true, false]);
+  assertEquals((scoped as BwrapRunner).bus, BUS);
 });

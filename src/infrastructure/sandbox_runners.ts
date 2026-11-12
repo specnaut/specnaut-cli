@@ -6,7 +6,7 @@ import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
-import { DRAIN_GRACE_SECONDS, untilWallClock } from "./sandbox_wall_clock.ts";
+import { DRAIN_GRACE_SECONDS, type Halt, untilWallClock } from "./sandbox_wall_clock.ts";
 import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
@@ -27,28 +27,55 @@ export class ContainerRunner implements SandboxRunner {
     readonly name: () => string = containerName,
   ) {}
 
+  /**
+   * A container outlives its client, so it is removed however the run ends: at the wall clock, on
+   * an interrupt, and once the run is over, which covers a client that ended early and a watchdog
+   * that never started. A removal that fails at the wall clock is named in the outcome.
+   */
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const args = containerArgs(policy, { image: this.image, name }, command);
     const remove = removalOf(this.engine, name);
-    // A container outlives its client: an interrupt removes it rather than leave it running.
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
       const started = this.launcher.start({ cmd: this.engine, args, env: "host" });
       const removal = [remove.cmd, ...remove.args];
-      const halt = async () => {
-        await this.launcher.start(remove).exited;
-      };
+      const halt = () => removed(this.launcher, remove);
       return await watched(this.launcher, started, policy.limits.wallClockSeconds, removal, halt);
     } finally {
+      const failed = await removed(this.launcher, remove);
+      if (failed !== null) console.error(`warning: the sandbox's container may be left: ${failed}`);
       disarm();
     }
   }
 }
 
-/** Removes the named container; what the engine prints (the name) never passes for the run's. */
+/**
+ * Removes the named container; what the engine prints (the name) never passes for the run's.
+ * Podman, unlike docker, fails on a container already gone, as a `--rm` one is once it ended.
+ */
 function removalOf(engine: Engine, name: string): ProcessSpec {
-  return { cmd: engine, args: ["rm", "--force", name], env: "host", stdout: "discarded" };
+  const ignore = engine === "podman" ? ["--ignore"] : [];
+  return {
+    cmd: engine,
+    args: ["rm", "--force", ...ignore, name],
+    env: "host",
+    stdout: "discarded",
+  };
+}
+
+/**
+ * Runs `remove` to its end: `null` once done, else what failed. A removal that cannot start is a
+ * failure reported to the caller, not raised: the run it follows has already ended.
+ */
+async function removed(launcher: ProcessLauncher, remove: ProcessSpec): Promise<string | null> {
+  const what = [remove.cmd, ...remove.args].join(" ");
+  try {
+    const code = await launcher.start(remove).exited;
+    return code === 0 ? null : `${what} exited ${code}`;
+  } catch (err) {
+    return `${what} could not start: ${(err as Error).message}`;
+  }
 }
 
 function containerName(): string {
@@ -83,7 +110,7 @@ async function watched(
   started: Started,
   seconds: number,
   removal: readonly string[],
-  halt?: () => Promise<void>,
+  halt?: Halt,
 ): Promise<RunOutcome> {
   const watchdog = startWatchdog(launcher, started, seconds, removal);
   try {
@@ -112,8 +139,15 @@ function startWatchdog(
   }
 }
 
-/** The host facts a runner needs: the architecture its filter is for, the PATH that finds bwrap. */
-export type RunnerHost = { readonly arch: string; readonly path: string };
+/**
+ * The host facts a runner needs: the architecture its filter is for, the PATH that finds bwrap,
+ * and the user bus (`userBus`) a systemd user scope is reached through.
+ */
+export type RunnerHost = {
+  readonly arch: string;
+  readonly path: string;
+  readonly bus: Readonly<Record<string, string>>;
+};
 
 export function runnerFor(
   backend: RunnableBackend,
@@ -124,7 +158,7 @@ export function runnerFor(
     case "container":
       return new ContainerRunner(backend.engine, backend.image, launcher);
     case "bwrap":
-      return new BwrapRunner(host.arch, launcher, host.path, backend.scope);
+      return new BwrapRunner(host.arch, launcher, host.path, backend.scope, host.bus);
     case "seatbelt":
       return new SeatbeltRunner(launcher);
   }

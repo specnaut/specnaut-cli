@@ -14,14 +14,20 @@ import type { Started } from "./sandbox_process.ts";
 export const DRAIN_GRACE_SECONDS = 5;
 
 /**
- * The command's outcome, or `timed_out` once `seconds` pass: then `halt` runs (what stops a run
- * the launcher alone cannot, such as a container) and the process is stopped, even when `halt`
- * fails. Either way its output is then copied for at most `grace` seconds more.
+ * What stops a run the launcher alone cannot, such as a container: `null` once done, else what
+ * failed, which the outcome then names. A halt that throws is raised, after the stop.
+ */
+export type Halt = () => Promise<string | null>;
+
+/**
+ * The command's outcome, or `timed_out` once `seconds` pass: then `halt` runs and the process is
+ * stopped, even when `halt` fails. Either way its output is then copied for at most `grace`
+ * seconds more.
  */
 export async function untilWallClock(
   started: Started,
   seconds: number,
-  halt: () => Promise<void> = () => Promise.resolve(),
+  halt: Halt = () => Promise.resolve(null),
   grace = DRAIN_GRACE_SECONDS,
 ): Promise<RunOutcome> {
   const outcome = await endOf(started, seconds, halt);
@@ -47,26 +53,33 @@ function letGo(started: Started, grace: number): void {
 async function endOf(
   started: Started,
   seconds: number,
-  halt: () => Promise<void>,
+  halt: Halt,
 ): Promise<RunOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<"late">((ok) => (timer = setTimeout(() => ok("late"), seconds * 1000)));
   try {
     const first = await Promise.race([started.ended, late]);
     if (first !== "late") return { kind: "exited", code: first };
-    await haltThenStop(started, halt);
-    return { kind: "timed_out", seconds };
+    const haltFailed = await haltThenStop(started, halt);
+    return haltFailed === null
+      ? { kind: "timed_out", seconds }
+      : { kind: "timed_out", seconds, haltFailed };
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** Runs `halt`, then stops the process even when `halt` failed, and awaits its end. */
-async function haltThenStop(started: Started, halt: () => Promise<void>): Promise<void> {
+/**
+ * Runs `halt`, then stops the process even when `halt` failed, awaits its end, and returns what
+ * `halt` says failed.
+ */
+async function haltThenStop(started: Started, halt: Halt): Promise<string | null> {
+  let failed: string | null;
   try {
-    await halt();
+    failed = await halt();
   } finally {
     started.stop();
   }
   await started.ended;
+  return failed;
 }

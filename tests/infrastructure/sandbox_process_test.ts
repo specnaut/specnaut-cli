@@ -66,3 +66,37 @@ Deno.test({
     assertEquals(await started.exited, 0);
   },
 });
+
+/** Runs `fn` with every `Deno.kill` recorded and passed through, then restores it. */
+async function recordingKills(fn: (kills: number[]) => Promise<void>): Promise<void> {
+  const original = Object.getOwnPropertyDescriptor(Deno, "kill")!;
+  const real = Deno.kill;
+  const kills: number[] = [];
+  Object.defineProperty(Deno, "kill", {
+    configurable: true,
+    get: () => (pid: number, signal?: Deno.Signal) => {
+      kills.push(pid);
+      real(pid, signal);
+    },
+  });
+  try {
+    await fn(kills);
+  } finally {
+    Object.defineProperty(Deno, "kill", original);
+  }
+}
+
+Deno.test({
+  name: "DenoProcessLauncher: once its process is reaped, stopping it signals nothing",
+  ignore: !POSIX,
+  fn: () =>
+    recordingKills(async (kills) => {
+      const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
+      const started = launcher.start({ cmd: "/bin/sh", args: ["-c", "exit 0"], env: {} });
+      assertEquals(await started.exited, 0);
+      const before = kills.length;
+      // Its id may belong to another process group by now: a signal could reach a stranger.
+      started.stop();
+      assertEquals(kills.slice(before), []);
+    }),
+});

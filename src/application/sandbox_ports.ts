@@ -42,10 +42,14 @@ export interface SandboxHost {
   scratch(): Promise<ScratchFolder>;
 }
 
-/** How a run ended: the command's exit code, or the wall clock ran out and it was stopped. */
+/**
+ * How a run ended: the command's exit code, or the wall clock ran out and it was stopped. A stop
+ * that needed more than the launcher (a container's removal) and failed is named in `haltFailed`:
+ * part of the run may still be going.
+ */
 export type RunOutcome =
   | { readonly kind: "exited"; readonly code: number }
-  | { readonly kind: "timed_out"; readonly seconds: number };
+  | { readonly kind: "timed_out"; readonly seconds: number; readonly haltFailed?: string };
 
 /** A backend that runs something. */
 export type RunnableBackend = Exclude<Backend, { kind: "static" }>;

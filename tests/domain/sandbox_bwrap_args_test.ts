@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { bwrapArgs, scopeArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs, userBus } from "../../src/domain/sandbox_args.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
@@ -85,4 +85,18 @@ Deno.test("scopeArgs: a systemd user scope carrying the policy's memory, process
     "-p",
     `CPUQuota=${LIMITS.cpus * 100}%`,
   ]);
+});
+
+Deno.test("userBus: the two variables systemd-run needs to reach the user manager, and no other", () => {
+  const host: Record<string, string> = {
+    XDG_RUNTIME_DIR: "/run/user/1000",
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/1000/bus",
+    HOME: "/home/dev",
+    GH_TOKEN: "t0k3n",
+  };
+  assertEquals(userBus((name) => host[name]), {
+    XDG_RUNTIME_DIR: "/run/user/1000",
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/1000/bus",
+  });
+  assertEquals(userBus(() => undefined), {});
 });
