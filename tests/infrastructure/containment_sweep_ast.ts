@@ -31,16 +31,36 @@ const isFunction = (node: { type: string } | null) =>
 const nameOf = (key: Deno.lint.Node) =>
   key.type === "Identifier" || key.type === "PrivateIdentifier" ? key.name : null;
 
+/**
+ * The oldest Deno this walk runs on (cli#776): the experimental
+ * `Deno.lint.runPlugin` arrived in 2.2.0, `sourceCode.getAllComments` in 2.3.2,
+ * both probed on those releases. CI keeps tracking `v2.x` rather than pinning:
+ * a pin would hide the experimental API's removal, which `requireLintApi` turns
+ * into a red run naming this requirement instead of a TypeError or a pass.
+ */
+export const MIN_DENO_FOR_SWEEP = "2.3.2";
+
+/** Throws, naming the floor, when `what` is missing from this Deno's lint API. */
+function requireLintApi(present: boolean, what: string): void {
+  if (present) return;
+  throw new Error(
+    `the containment sweep needs Deno ${MIN_DENO_FOR_SWEEP} or later for the experimental ` +
+      `${what}, which this Deno (${Deno.version.deno}) does not provide`,
+  );
+}
+
 /** The owners, function spans, mutating calls, guard calls and comments of `src`. */
 export function walkAst(src: string): Walked {
   const walked: Walked = { owners: [], fns: [], calls: [], guards: [], comments: [] };
   const create = (ctx: Deno.lint.RuleContext) => {
+    requireLintApi(typeof ctx.sourceCode?.getAllComments === "function", "getAllComments");
     for (const { range } of ctx.sourceCode.getAllComments()) {
       walked.comments.push({ start: range[0], end: range[1] });
     }
     return visitor(walked);
   };
   // `runPlugin` exists only under `deno test`, the only caller.
+  requireLintApi(typeof Deno.lint?.runPlugin === "function", "Deno.lint.runPlugin");
   Deno.lint.runPlugin({ name: "containment-sweep", rules: { scan: { create } } }, "scan.ts", src);
   return walked;
 }

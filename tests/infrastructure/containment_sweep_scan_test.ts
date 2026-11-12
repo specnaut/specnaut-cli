@@ -1,4 +1,10 @@
-import { assert, assertEquals, assertGreaterOrEqual } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertGreaterOrEqual,
+  assertStringIncludes,
+  assertThrows,
+} from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
   mutatingModules,
@@ -7,6 +13,7 @@ import {
   unguardedSinks,
 } from "./containment_sweep_scan.ts";
 import { readExclusions } from "./containment_exclusions.ts";
+import { MIN_DENO_FOR_SWEEP } from "./containment_sweep_ast.ts";
 
 /**
  * The containment sweep's scanner, tested on its own (cli#766): which function
@@ -137,4 +144,33 @@ Deno.test("readExclusions ignores comments and blank lines", () => {
   assertEquals(parsed.length, 1);
   assertEquals(parsed[0].path, "src/x.ts");
   assert(parsed[0].reason.includes("because reasons"));
+});
+
+/** Runs `fn` with `Deno.lint.runPlugin` replaced, as an older Deno would have it. */
+function withRunPlugin(stand: unknown, fn: () => void): void {
+  const lint = Deno.lint as { runPlugin: unknown };
+  const real = lint.runPlugin;
+  lint.runPlugin = stand;
+  try {
+    fn();
+  } finally {
+    lint.runPlugin = real;
+  }
+}
+
+Deno.test("on a Deno without Deno.lint.runPlugin the sweep fails naming the floor (cli#776)", () => {
+  withRunPlugin(undefined, () => {
+    const err = assertThrows(() => parseSinks("Deno.remove(x);"));
+    assertStringIncludes(String(err), `Deno ${MIN_DENO_FOR_SWEEP}`);
+    assertStringIncludes(String(err), "Deno.lint.runPlugin");
+  });
+});
+
+Deno.test("on a Deno whose lint API lacks getAllComments the sweep fails naming the floor", () => {
+  // Deno 2.2.0 to 2.3.1 had `runPlugin` but not this: the sweep would crash on a TypeError.
+  const older = (p: Deno.lint.Plugin) => p.rules.scan.create({ sourceCode: {} } as never);
+  withRunPlugin(older, () => {
+    const err = assertThrows(() => parseSinks("Deno.remove(x);"));
+    assertStringIncludes(String(err), `Deno ${MIN_DENO_FOR_SWEEP}`);
+  });
 });
