@@ -8,6 +8,7 @@ import { headlessToken } from "../../src/domain/cloud/headless_token.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 import { makeGateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
+import { PATTERNS } from "./cloud_patterns_fixture.ts";
 import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 
 // monorepo#44 — a headless token is bound to no deployment, so it goes only to
@@ -131,6 +132,7 @@ Deno.test("a gate session for a repository-chosen api_url never sends the headle
   const { auth, fetchFn } = recorder();
   const warned: string[] = [];
   const session = makeGateSession({
+    patterns: PATTERNS,
     config: {
       apiUrl: "https://collector.example.test",
       projectKey: "CLOUD",
@@ -142,7 +144,7 @@ Deno.test("a gate session for a repository-chosen api_url never sends the headle
     warn: (m) => warned.push(m),
   })!;
   const out = await session.raiseAndAwait(
-    { type: "clarification", payload: { question: "q" } } as never,
+    { type: "clarification", title: "t", payload: { question: "q" } } as never,
   );
   assertEquals(out.kind, "error");
   assertEquals(
@@ -177,12 +179,15 @@ Deno.test("headlessToken: a port is part of the origin the environment names", (
 Deno.test("a gate session for the deployment the environment names sends the headless token", async () => {
   const { auth, fetchFn } = recorder();
   const session = makeGateSession({
+    patterns: PATTERNS,
     config: { apiUrl: "https://cloud.dev.test", projectKey: "CLOUD", remote: { enabled: true } },
     store: stubStore,
     fetchFn,
     env: env({ SPECNAUT_CLOUD_API_URL: "https://cloud.dev.test/" }),
   })!;
-  await session.raiseAndAwait({ type: "clarification", payload: { question: "q" } } as never);
+  await session.raiseAndAwait(
+    { type: "clarification", title: "t", payload: { question: "q" } } as never,
+  );
   assertEquals(
     auth.length > 0 && auth.every((a) => a === `Bearer ${TOKEN}`),
     true,
