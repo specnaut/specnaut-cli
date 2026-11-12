@@ -62,6 +62,27 @@ for (const input of CONFIG_INPUTS) {
   });
 }
 
+for (
+  const [what, edited] of [
+    ["project_number", 'repo: "acme/my-app"\nproject_number: 2\n'],
+    ["api_url", 'repo: "acme/my-app"\nproject_number: 1\napi_url: https://other.example.com\n'],
+    ["remote", 'repo: "acme/my-app"\nproject_number: 1\nremote:\n  enabled: false\n'],
+  ]
+) {
+  Deno.test(`a branch that edits backlog-config.yml's ${what} makes backlog-config untrusted`, async () => {
+    const { root } = await fixture({ files: base() });
+    await write(root, { ".specnaut/backlog-config.yml": edited });
+    await commitAll(root, `edit ${what}`);
+    const line = verdicts((await verify(root)).lines).find((l) =>
+      l.startsWith("VERDICT backlog-config ")
+    );
+    assertEquals(
+      line,
+      "VERDICT backlog-config untrusted .specnaut/backlog-config.yml differs from base",
+    );
+  });
+}
+
 Deno.test("an uncommitted edit counts: the work tree is what the phases would read", async () => {
   const { root } = await fixture({ files: base() });
   await write(root, { ".specnaut/gates.yml": EDITED[".specnaut/gates.yml"] });

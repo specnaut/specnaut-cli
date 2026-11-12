@@ -38,13 +38,13 @@ none, means the tree's value is never read, and the row below applies:
 
 | Class | Read by | Not trusted |
 | :--- | :--- | :--- |
-| `workflow` | the merge mode (`phases/auto-chain.md`) | the mode is `manual`, the reading that asks |
-| `size-limits` | `size-ratchet.sh`, and `specnaut scan`'s map | not run: report `NOT RUN: <the line>`, never a pass |
-| `boundaries` | `boundary-check.sh` | not run: report `NOT RUN: <the line>`, never a pass |
-| `backlog-repo` | every backlog script: they address the tracker through `repo:` | none runs: stop and say so (at merge, step 5 says what stands) |
-| `linked-issue` | `.specnaut/feature.json`'s `linked_issue` (`resume.md`, `phases/merge.md` step 5) | as the doc reading it says |
-| `gates` | `run-gate.sh` | `phases/merge.md` and `phases/review-seats.md` say |
+| `workflow` | `merge-mode.sh`: `phases/auto-chain.md`, `phases/merge.md` step 0 | the mode is `manual`, the reading that asks |
+| `size-limits` | `size-ratchet.sh`: `phases/review-seats.md`, `phases/quality-gates.md`; `specnaut scan`: `phases/audit.md` | not run: report `NOT RUN: <the line>`, never a pass; `merge` asks (its **The full tier**) |
+| `boundaries` | `boundary-check.sh`: `phases/review-seats.md`, `phases/quality-gates.md`, `phases/audit.md` | as `size-limits` |
+| `backlog-config` | every backlog script, and remote mode: `backlog.md`, `groom.md`, `resume.md`, `phases/auto-chain.md`, `phases/merge.md` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is `manual`, and remote mode keeps the base tip's setting |
+| `linked-issue` | `.specnaut/feature.json`'s link: `resume.md`, `phases/plan-reentry.md`, `phases/merge.md` step 5 (whose item `phases/merge-close.md` takes) | the link is not read; `phases/merge.md` step 5 names its one exception |
+| `gates` | `run-gate.sh`: `phases/merge.md` **The full tier**, `phases/review-seats.md`, `phases/quality-gates.md` | `merge` asks; the review's fast tier is skipped |
 
-Under `merge`, a `size-limits` or `boundaries` check left unrun is handled as a changed
-`.specnaut/gates.yml` is (`phases/merge.md`, **The full tier**): the mode is `manual`, and the
-user's yes is what lands it.
+`backlog-config` judges every line of `.specnaut/backlog-config.yml` but the columns grooming
+writes (`intake_column`, `ready_column`): the tracker's address on any backend, and the `remote:`
+block. `linked-issue` judges the parsed link, and refuses a file its readers could read two ways.

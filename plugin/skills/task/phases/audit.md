@@ -38,7 +38,7 @@ the tree: `--scan` goes on, since it runs none; any other audit stops there. The
 
 ## Before Step 2 — Map the repository
 
-Run the scan once, before any scope or seat, and keep its JSON:
+Run the scan once, before any scope or seat, under `VERDICT size-limits trusted`, and keep its JSON:
 
 ```bash
 specnaut scan --format json [--path <subtree>]

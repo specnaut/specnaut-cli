@@ -1,4 +1,4 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CONFIG_INPUTS } from "../../src/domain/config_trust.ts";
 import { flat } from "./task_docs.ts";
 
@@ -68,26 +68,72 @@ Deno.test("every config class has a row in the gate doc", () => {
   for (const input of CONFIG_INPUTS) assertStringIncludes(g, `| \`${input.class}\` |`);
 });
 
-Deno.test("each class is consulted where its input is read", () => {
-  const where: Record<string, [string, string][]> = {
-    "workflow": [["phases/auto-chain.md", "VERDICT workflow trusted"], [
-      "phases/merge.md",
-      "VERDICT workflow trusted",
-    ]],
-    "size-limits": [["phases/review-seats.md", "`size-limits` and `boundaries` lines trusted"]],
-    "boundaries": [["phases/audit.md", "its `boundaries` line for the boundary check"]],
-    "backlog-repo": [["phases/merge.md", "VERDICT backlog-repo trusted"], [
-      "resume.md",
-      "VERDICT backlog-repo trusted",
-    ]],
-    "linked-issue": [["phases/merge.md", "VERDICT linked-issue trusted"]],
-    "gates": [["phases/merge.md", "VERDICT gates trusted"], [
-      "phases/review-seats.md",
-      "VERDICT gates trusted",
-    ]],
-  };
-  for (const input of CONFIG_INPUTS) {
-    assert(where[input.class], `no reader pinned for ${input.class}`);
-    for (const [doc, text] of where[input.class]) assertStringIncludes(flat(read(doc)), text, doc);
+/** What names a class's input or its reader in a task doc. */
+const NAMED_BY: Record<string, readonly string[]> = {
+  "workflow": ["workflow.yml", "merge-mode.sh"],
+  "size-limits": ["size-limits.yml", "size-ratchet.sh", "specnaut scan"],
+  "boundaries": ["boundaries.yml", "boundary-check.sh"],
+  "backlog-config": ["backlog-config.yml"],
+  "linked-issue": ["linked_issue", "feature.json` links"],
+  "gates": ["gates.yml", "run-gate.sh"],
+};
+
+/**
+ * Where a task doc names an input and need not name its verdict, and why. Every entry is a doc and a
+ * class; a section of any other doc that names the input must name `VERDICT <class> trusted`.
+ */
+const NOT_A_GATED_READER: Record<string, string> = {
+  "SKILL.md workflow": "the router describes the merge mode; auto-chain.md reads it",
+  "backlog.md backlog-config": "setting the file up; the router gates the verbs that read it",
+  "phases/constitution.md size-limits": "the verb that edits the gate configs, never reads them",
+  "phases/constitution.md boundaries": "the verb that edits the gate configs, never reads them",
+  "phases/plan.md linked-issue": "plan writes the link",
+  "phases/plan.md gates": "plan names the gate a requirement maps to, and runs none",
+  "phases/implement.md linked-issue": "implement writes the link, under no gate",
+  "phases/epic-loop.md gates": "implement's loop, under no gate",
+  "phases/script-gate.md workflow": "the table that defines the rule",
+  "phases/script-gate.md size-limits": "the table that defines the rule",
+  "phases/script-gate.md boundaries": "the table that defines the rule",
+  "phases/script-gate.md backlog-config": "the table that defines the rule",
+  "phases/script-gate.md linked-issue": "the table that defines the rule",
+  "phases/script-gate.md gates": "the table that defines the rule",
+  "phases/quality-gates.md gates": "its header holds the rule for every section on gates.yml",
+  "resume.md linked-issue": "§ 3 reads a branch's committed link, from git, not the tree",
+  "phases/auto-chain.md backlog-config": "the intake gate's fence question names the file",
+};
+
+/** A doc split at its `##` and `###` headings. */
+const sections = (text: string) => text.split(/^#{2,3} /m);
+
+Deno.test("every section of a task doc that reads a class's input names its trusted line", () => {
+  const docs = [...Deno.readDirSync(new URL("../../templates/core/skills/task/", import.meta.url))]
+    .filter((e) => e.isFile && e.name.endsWith(".md")).map((e) => e.name)
+    .concat(
+      [...Deno.readDirSync(new URL("../../templates/core/skills/task/phases/", import.meta.url))]
+        .filter((e) => e.name.endsWith(".md")).map((e) => `phases/${e.name}`),
+    );
+  const misses: string[] = [];
+  for (const doc of docs) {
+    for (const input of CONFIG_INPUTS) {
+      if (NOT_A_GATED_READER[`${doc} ${input.class}`]) continue;
+      for (const section of sections(read(doc))) {
+        const names = NAMED_BY[input.class].some((t) => section.includes(t));
+        const verdict = flat(section).includes(`VERDICT ${input.class} trusted`);
+        if (names && !verdict) misses.push(`${doc} ${input.class}: ${section.split("\n")[0]}`);
+      }
+    }
   }
+  assertEquals(misses, []);
+});
+
+Deno.test("a backlog-config line not trusted makes the merge manual, and keeps remote mode on", () => {
+  const a = flat(read("phases/auto-chain.md"));
+  assertStringIncludes(a, "or a `backlog-config` line other than `VERDICT backlog-config trusted`");
+  assertStringIncludes(a, "a branch never turns remote mode off");
+});
+
+Deno.test("merge settles a link the branch wrote only for the id the run was given", () => {
+  const m = flat(read("phases/merge.md"));
+  assertStringIncludes(m, "the id the chain started with, or the one `/task merge <id>` names");
+  assertStringIncludes(m, "With no such id, or any other `linked-issue` line, it settles nothing");
 });

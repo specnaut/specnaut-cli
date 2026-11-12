@@ -86,7 +86,9 @@ under `--no-close`, once more after the push: there the item's line must read `O
    non-zero, or step 0's last run printed a `gates` line other than `VERDICT gates trusted`, the
    branch edited the list that judges it, handled as step 0 handles a changed helper script: this run's merge mode is `manual`; show that diff (the same call without `--quiet`) and
    ask once: *"This branch changes `.specnaut/gates.yml`. Yes runs the branch's list as the full
-   tier."* A no stops on the branch, nothing landed. The yes covers that diff, and a later one asks
+   tier."* A `size-limits` or `boundaries` line other than `VERDICT size-limits trusted` or
+   `VERDICT boundaries trusted` is asked the same way, in the same question, naming its file: *"Yes
+   runs the size ratchet / the boundary check with the branch's copy."* A no stops on the branch, nothing landed. The yes covers that diff, and a later one asks
    again; under it the report names that run as the branch's list, never the base's. Then run
    `.specnaut/scripts/bash/run-gate.sh full --base "$(git merge-base HEAD <base>)"`. A failure is
    fixed on the branch (on an epic, as a `--fixup` of the child at fault; on a standalone item, as
@@ -137,13 +139,14 @@ under `--no-close`, once more after the push: there the item's line must read `O
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
    the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its
-   `backlog-repo` line is not `VERDICT backlog-repo trusted`, no backlog script runs — not
+   `backlog-config` line is not `VERDICT backlog-config trusted`, no backlog script runs — not
    `move.sh`, not `phases/merge-close.md`. Say so, naming the file: the branch chose which board
    they write to. The merge itself stands. Otherwise, the item is `.specnaut/feature.json`'s
    `linked_issue`, a positive whole number; none, or anything else, means nothing to settle. It
    is read under the `VERDICT linked-issue trusted` of step 0's last run before step 3, or its
-   `untrusted … not on base` when the link names the item this run was started for (the branch
-   wrote the first link); any other `linked-issue` line settles nothing: say so, quoting it. The
+   `untrusted … not on base` when the link names the item this run was started for: the id the
+   chain started with, or the one `/task merge <id>` names (the branch wrote the first link). With
+   no such id, or any other `linked-issue` line, it settles nothing: say so, quoting the line. The
    first row that matches decides:
 
    | How the phase ends | The card |

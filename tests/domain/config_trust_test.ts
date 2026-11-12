@@ -28,7 +28,7 @@ Deno.test("the classes are the six inputs a branch controls, each at its path", 
     "workflow .specnaut/workflow.yml",
     "size-limits .specnaut/size-limits.yml",
     "boundaries .specnaut/boundaries.yml",
-    "backlog-repo .specnaut/backlog-config.yml",
+    "backlog-config .specnaut/backlog-config.yml",
     "linked-issue .specnaut/feature.json",
     "gates .specnaut/gates.yml",
   ]);
@@ -42,15 +42,52 @@ for (const cls of ["workflow", "size-limits", "boundaries", "gates"]) {
   });
 }
 
-Deno.test("backlog-repo: only the repo: line is judged, so a column written beside it holds", () => {
+Deno.test("backlog-config: the columns grooming writes are the only lines not judged, so a column written beside it holds", () => {
   const base = file('repo: "acme/my-app"\nproject_number: 1\n');
   const sides = { tip: base, mergeBase: base };
-  const columned = file('repo: "acme/my-app"\nproject_number: 1\nready_column: Ready\n');
-  assertEquals(judge("backlog-repo", { ...sides, tree: columned }), "trusted");
+  const columned = file(
+    'repo: "acme/my-app"\nproject_number: 1\nintake_column: Inbox\nready_column: Ready\n',
+  );
+  assertEquals(judge("backlog-config", { ...sides, tree: columned }), "trusted");
   const moved = file('repo: "acme/other"\nproject_number: 1\n');
-  assertEquals(judge("backlog-repo", { ...sides, tree: moved }), REASON.differs);
+  assertEquals(judge("backlog-config", { ...sides, tree: moved }), REASON.differs);
   const twice = file('repo: "acme/my-app"\nrepo: "acme/other"\nproject_number: 1\n');
-  assertEquals(judge("backlog-repo", { ...sides, tree: twice }), REASON.differs);
+  assertEquals(judge("backlog-config", { ...sides, tree: twice }), REASON.differs);
+});
+
+Deno.test("backlog-config: a remote block turned off is judged, like any line grooming does not write", () => {
+  const on = file('repo: "acme/my-app"\nremote:\n  enabled: true\n');
+  const off = file('repo: "acme/my-app"\nremote:\n  enabled: false\n');
+  assertEquals(judge("backlog-config", { tip: on, mergeBase: on, tree: off }), REASON.differs);
+  const gone = file('repo: "acme/my-app"\n');
+  assertEquals(judge("backlog-config", { tip: on, mergeBase: on, tree: gone }), REASON.differs);
+});
+
+Deno.test("backlog-config: every key that names the tracker is judged, on every backend", () => {
+  const github = file('repo: "acme/my-app"\nproject_number: 1\n');
+  const renumbered = file('repo: "acme/my-app"\nproject_number: 2\n');
+  assertEquals(
+    judge("backlog-config", { tip: github, mergeBase: github, tree: renumbered }),
+    REASON.differs,
+  );
+  const cloud = file("api_url: https://api.example.com\nproject_key: acme\n");
+  const elsewhere = file("api_url: https://other.example.com\nproject_key: acme\n");
+  assertEquals(
+    judge("backlog-config", { tip: cloud, mergeBase: cloud, tree: elsewhere }),
+    REASON.differs,
+  );
+  const gitlab = file("host: https://gitlab.example.com\nproject_id: 7\n");
+  for (
+    const edited of [
+      "host: https://other.example.com\nproject_id: 7\n",
+      "host: https://gitlab.example.com\nproject_id: 8\n",
+    ]
+  ) {
+    assertEquals(
+      judge("backlog-config", { tip: gitlab, mergeBase: gitlab, tree: file(edited) }),
+      REASON.differs,
+    );
+  }
 });
 
 Deno.test("linked-issue: only the link is judged, so a delivery marked partial holds", () => {
@@ -63,7 +100,24 @@ Deno.test("linked-issue: only the link is judged, so a delivery marked partial h
   const other = file('{ "feature_directory": "specs/001-x", "linked_issue": 7 }\n');
   assertEquals(judge("linked-issue", { ...sides, tree: other }), REASON.differs);
   const twice = file('{ "linked_issue": 42, "linked_issue": 7 }\n');
-  assertEquals(judge("linked-issue", { ...sides, tree: twice }), REASON.differs);
+  assertEquals(judge("linked-issue", { ...sides, tree: twice }), "linked_issue is given twice");
+});
+
+Deno.test("linked-issue: a file its readers could read two ways is refused, never compared", () => {
+  const base = file('{ "linked_issue": 42 }\n');
+  const sides = { tip: base, mergeBase: base };
+  const escaped = file('{ "linked_issue": 42, "linked\\u005fissue": 7 }\n');
+  assertEquals(
+    judge("linked-issue", { ...sides, tree: escaped }),
+    "linked_issue is written escaped",
+  );
+  const vtab = file('{ "linked_issue":\v42 }\n');
+  assertEquals(
+    String(judge("linked-issue", { ...sides, tree: vtab })).startsWith("does not parse"),
+    true,
+  );
+  const spaced = file('{\n  "linked_issue" :  42\n}\n');
+  assertEquals(judge("linked-issue", { ...sides, tree: spaced }), "trusted");
 });
 
 Deno.test("absent on both sides is trusted; on one side only, the side is named", () => {

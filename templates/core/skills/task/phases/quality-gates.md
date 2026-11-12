@@ -1,8 +1,9 @@
 # Quality gates — two tiers, declared by the project
 
-Loaded by `phases/implement.md` after each child commit on an epic branch, by
-`phases/review.md` for the unit suite on the frozen tree, and by
-`phases/merge.md` once before the merge to the default branch.
+Loaded by `phases/implement.md` after each child commit on an epic branch, by `phases/review.md`
+for the unit suite on the frozen tree, and by `phases/merge.md` once before the merge to the
+default branch. Under `review` and `merge`, `.specnaut/gates.yml` is read only under `VERDICT gates
+trusted`, and the two checks below under their own lines (`phases/script-gate.md`).
 
 Looping over an epic's children is only affordable if the per-child check is
 cheap. Running a project's whole suite once per child would cost more than the
@@ -20,11 +21,10 @@ child on an epic. What is checked has to follow how often it runs:
 | **Work done** — `implement` freezes the tree and invokes `review` | The unit suite, on the frozen tree — `review`'s test command | **Once** per item; on an epic, at the last child's review |
 | **Merge** to the default branch | Unit plus functional / end-to-end. The `full` tier. | **Once** |
 
-The middle row needs no declaration: `phases/review.md` detects the project's
-test command and runs it there. On an epic it skips it for every child but the
-last, and reports the skip as its own state — a skipped suite never reads as a
-pass. If `full` is not declared, the merge runs nothing, and that last review's
-run is the latest the suite ran.
+The middle row needs no declaration: `phases/review.md` detects the project's test command and runs
+it there. On an epic it skips it for every child but the last, and reports the skip as its own
+state — a skipped suite never reads as a pass. If `full` is not declared, the merge runs nothing,
+and that last review's run is the latest the suite ran.
 
 **A commit hook is the first row.** Specnaut installs no git hook and edits
 none, and nothing here asks an agent to get past one. But if the project has a
@@ -209,8 +209,8 @@ A failing full gate, on an epic or on a standalone item, is fixed as
 
 ## The size ratchet — with every tier
 
-When `.specnaut/scripts/bash/size-ratchet.sh` is present, run it after each tier,
-on what the branch has committed:
+When `.specnaut/scripts/bash/size-ratchet.sh` is present, run it after each tier, on what the
+branch has committed; under `review` or `merge`, only under `VERDICT size-limits trusted`:
 
 ```
 bash .specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
@@ -231,8 +231,8 @@ no git hook: wiring it into one is the project's choice.
 
 ## The import boundary — with every tier
 
-When `.specnaut/scripts/bash/boundary-check.sh` is present, run it after each
-tier, beside the size ratchet:
+When `.specnaut/scripts/bash/boundary-check.sh` is present, run it after each tier, beside the
+ratchet; under `review` or `merge`, only under `VERDICT boundaries trusted`:
 
 ```
 bash .specnaut/scripts/bash/boundary-check.sh

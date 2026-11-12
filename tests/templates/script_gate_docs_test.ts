@@ -69,7 +69,7 @@ Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one
 
 Deno.test("the board fence is stated once, before any backlog script of the merge", () => {
   const merge = phase("merge").content;
-  const fence = merge.indexOf("`VERDICT backlog-repo trusted`, no backlog script runs");
+  const fence = merge.indexOf("`VERDICT backlog-config trusted`, no backlog script runs");
   assert(fence >= 0, "merge.md has no board fence");
   assert(fence < merge.indexOf("move.sh"), "move.sh is named before the fence");
   const close = flat(phase("merge-close").content);

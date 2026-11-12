@@ -13,7 +13,7 @@ import { REASON } from "./script_trust.ts";
  */
 
 /** The value a class is judged on: the file's raw bytes, or what its readers take from it. */
-type Value = "bytes" | "repo" | "linked_issue";
+type Value = "bytes" | "tracker" | "linked_issue";
 
 /** One config input a branch controls: its class, the file under the project's root, its value. */
 export type ConfigInput = {
@@ -27,7 +27,7 @@ export const CONFIG_INPUTS: readonly ConfigInput[] = [
   { class: "workflow", path: ".specnaut/workflow.yml", value: "bytes" },
   { class: "size-limits", path: ".specnaut/size-limits.yml", value: "bytes" },
   { class: "boundaries", path: ".specnaut/boundaries.yml", value: "bytes" },
-  { class: "backlog-repo", path: ".specnaut/backlog-config.yml", value: "repo" },
+  { class: "backlog-config", path: ".specnaut/backlog-config.yml", value: "tracker" },
   { class: "linked-issue", path: ".specnaut/feature.json", value: "linked_issue" },
   { class: "gates", path: ".specnaut/gates.yml", value: "bytes" },
 ];
@@ -67,30 +67,68 @@ function configReason(input: ConfigInput, sides: ConfigSides): string | null {
   if (tree.kind === "refused") return tree.why;
   if (tip.kind === "refused") return REASON.baseNotRegular;
   if (tree.kind === "absent") return tip.kind === "absent" ? null : REASON.missing;
+  const mine = valueOf(input, tree.bytes);
+  if (!(mine instanceof Uint8Array)) return mine.why;
   if (tip.kind === "absent") {
-    return isBehind(input, tree, sides.mergeBase) ? REASON.behind : REASON.notOnBase;
+    return isBehind(input, mine, sides.mergeBase) ? REASON.behind : REASON.notOnBase;
   }
-  if (sameBytes(valueOf(input, tree.bytes), valueOf(input, tip.bytes))) return null;
-  return isBehind(input, tree, sides.mergeBase) ? REASON.behind : REASON.differs;
+  const theirs = valueOf(input, tip.bytes);
+  if (!(theirs instanceof Uint8Array)) return `at base: ${theirs.why}`;
+  if (sameBytes(mine, theirs)) return null;
+  return isBehind(input, mine, sides.mergeBase) ? REASON.behind : REASON.differs;
 }
 
 /** The tree's value is the merge base's: only the base moved since the branch left it. */
-function isBehind(input: ConfigInput, tree: { bytes: Uint8Array }, mergeBase: ConfigFile) {
+function isBehind(input: ConfigInput, mine: Uint8Array, mergeBase: ConfigFile) {
   if (mergeBase.kind !== "file") return false;
-  return sameBytes(valueOf(input, tree.bytes), valueOf(input, mergeBase.bytes));
+  const theirs = valueOf(input, mergeBase.bytes);
+  return theirs instanceof Uint8Array && sameBytes(mine, theirs);
 }
 
+type Refusal = { readonly why: string };
+
+/** The keys grooming writes into `backlog-config.yml` on any branch: the only lines not judged. */
+const GROOMING_KEYS = /^(?:intake_column|ready_column):/;
+
 /**
- * What a class's readers take from the file, as bytes to compare. `repo`: every line starting
- * `repo:`, as written (the backlog scripts read the first). `linked_issue`: every
- * `"linked_issue": <token>` as written (the sed readers take the first, jq the last), so two
- * files a reader could tell apart never compare equal.
+ * What a class's readers take from the file, as bytes to compare, or why it cannot be read.
+ * `tracker`: every line but the ones grooming writes, so a key added later (a backend's address, a
+ * `remote:` block) is judged without anyone listing it. `linked_issue`: the parsed link.
  */
-function valueOf(input: ConfigInput, bytes: Uint8Array): Uint8Array {
+function valueOf(input: ConfigInput, bytes: Uint8Array): Uint8Array | Refusal {
   if (input.value === "bytes") return bytes;
   const text = new TextDecoder().decode(bytes);
-  const pattern = input.value === "repo"
-    ? /^repo:.*$/gm
-    : /"linked_issue"[ \t\r\n]*:[ \t\r\n]*[^,}\s]*/g;
-  return new TextEncoder().encode((text.match(pattern) ?? []).join("\n"));
+  if (input.value === "linked_issue") return linkOf(text);
+  const kept = text.split("\n").filter((line) => !GROOMING_KEYS.test(line));
+  return new TextEncoder().encode(kept.join("\n"));
+}
+
+/** A key literal in JSON text, as written, with what follows it up to its colon. */
+const JSON_KEY = /"((?:[^"\\]|\\.)*)"\s*:/g;
+
+/**
+ * `feature.json`'s `linked_issue`, parsed. Its readers are a line-wise sed (the first key) and jq
+ * (the last, with escapes decoded): a file they could read two ways is refused, never compared.
+ */
+function linkOf(text: string): Uint8Array | Refusal {
+  const keys = [...text.matchAll(JSON_KEY)].filter((m) => decodedKey(m[1]) === "linked_issue");
+  if (keys.some((m) => m[1] !== "linked_issue")) return { why: "linked_issue is written escaped" };
+  if (keys.length > 1) return { why: "linked_issue is given twice" };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    // Not swallowed: the parse failure is the reason the verdict reports.
+    return { why: `does not parse: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  const link = typeof parsed === "object" && parsed !== null && "linked_issue" in parsed
+    ? JSON.stringify((parsed as Record<string, unknown>).linked_issue)
+    : "";
+  return new TextEncoder().encode(link);
+}
+
+/** A key literal's text with its escapes decoded: `\uXXXX` to its character, `\x` to `x`. */
+function decodedKey(raw: string): string {
+  return raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\(.)/g, "$1");
 }

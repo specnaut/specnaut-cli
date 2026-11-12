@@ -17,8 +17,9 @@ The scripts below are the ones `phases/merge.md` step 0 verified, or the user ap
 `land-feature.sh` ran: run them only while `HEAD` is the commit `LANDED` ends at, and only past
 the board fence of `phases/merge.md` step 5. Re-entry differs only where it says.
 
-1. **What shipped.** Standalone: `linked_issue` from `.specnaut/feature.json` (absent → skip this
-   file; a tree from before the field existed). Epic: the children are the `CHILD` lines, and the
+1. **What shipped.** Standalone: the item `phases/merge.md` step 5 settled, read there under its
+   `VERDICT linked-issue trusted` rule, never `linked_issue` again from the tree (none → skip this
+   file). Epic: the children are the `CHILD` lines, and the
    epic the `EPIC` line, that `epic-status.sh` printed at `phases/merge.md` step 1, before the landing
    — or at its re-run after a clean rebase (step 4, exit 5), whose lines replace the first. Never
    re-run it now: its range is empty after the landing. A child whose commit is not on the

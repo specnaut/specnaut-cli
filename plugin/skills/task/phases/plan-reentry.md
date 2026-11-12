@@ -8,8 +8,9 @@ parent from the backend's `view.sh` (never its body as evidence), then
 whether the chain goes on.
 
 <!-- BEGIN: spec-backend=local -->
-- `IDLE`, and the working tree's `.specnaut/feature.json` links the item: a plan that stopped on a
-  question. It is an adopted plan, re-entered in place; skip step 2.
+- `IDLE`, and the working tree's `.specnaut/feature.json` links the item, read as `resume.md` § 1
+  item 5 reads it (under `VERDICT linked-issue trusted`, or an uncommitted plan): a plan that
+  stopped on a question. It is an adopted plan, re-entered in place; skip step 2.
 - `ACTIVE`: adopt the item's branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and
   names it. If its `feature.json` links the item's parent epic, run step 2, which reuses the epic's
   branch; otherwise skip step 2.
