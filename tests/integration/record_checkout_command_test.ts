@@ -11,7 +11,8 @@ import { git, LOCK, write } from "./verify_scripts_fixture.ts";
 
 /**
  * `specnaut record-checkout`, black-box, as the `SessionStart` hook runs it: the hook's input on
- * stdin, `CLAUDE_ENV_FILE` naming the file the harness sources before the session's commands.
+ * stdin, `CLAUDE_ENV_FILE` naming the file the harness sources before the session's commands. The
+ * record is found by the session id alone, so nothing is ever written to that file.
  */
 
 const ID = "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f";
@@ -68,7 +69,7 @@ Deno.test("a session's start records HEAD and every checked file, untracked and 
   assertEquals(files.get(".claude/settings.local.json"), await digest("{}\n"), "ignored");
   assertEquals(files.get(".mise.toml"), await digest("x\n"), "untracked");
   assertEquals(files.has(".specnaut/scripts/bash/git-read.sh"), false, "the script check's own");
-  assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`);
+  assertEquals(run.env, "", "nothing exported to the session");
   const status = await git(root, "status", "--porcelain", "--ignored", "--untracked-files=all");
   assertEquals(status.includes("session"), false, "nothing written in the work tree");
 });
@@ -85,7 +86,7 @@ Deno.test("startup takes the record; resume and fork only find it; clear and com
   const run = await session(root, "startup");
   assertEquals(run.code, 0);
   assert(await exists(path), "startup takes a record");
-  assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`);
+  assertEquals(run.env, "", "nothing exported to the session");
   const taken = await Deno.readTextFile(path);
   await write(root, { "AGENTS.md": "switched inside the session\n" });
   for (const source of ["clear", "compact", "other"]) {
@@ -105,7 +106,7 @@ Deno.test("startup takes the record; resume and fork only find it; clear and com
     const run = await session(root, source);
     assertEquals(run.code, 0, source);
     assertEquals(await Deno.readTextFile(path), first, `${source} never replaces the first record`);
-    assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`, `${source} finds it`);
+    assertEquals(run.env, "", `${source} exports nothing`);
   }
 });
 
@@ -142,24 +143,27 @@ Deno.test({
   },
 });
 
-Deno.test("an input that is not a SessionStart hook's, or no CLAUDE_ENV_FILE, is a usage error", async () => {
+Deno.test("an input that is not a SessionStart hook's is a usage error; CLAUDE_ENV_FILE is not needed", async () => {
   const { root } = await setUp();
-  const cases: [string, Record<string, string>, string][] = [
-    ["{not json", { CLAUDE_ENV_FILE: "/dev/null" }, "names no session id and source"],
-    [JSON.stringify({ source: "startup" }), { CLAUDE_ENV_FILE: "/dev/null" }, "no session id"],
-    [JSON.stringify({ session_id: "../x", source: "startup" }), {}, "no session id"],
-    [
-      JSON.stringify({ session_id: ID, source: "startup" }),
-      { CLAUDE_ENV_FILE: "" },
-      "CLAUDE_ENV_FILE",
-    ],
+  const cases: [string, string][] = [
+    ["{not json", "names no session id and source"],
+    [JSON.stringify({ source: "startup" }), "no session id"],
+    [JSON.stringify({ session_id: "../x", source: "startup" }), "no session id"],
   ];
-  for (const [stdin, env, says] of cases) {
-    const run = await runSpecnaut(["record-checkout"], { cwd: root, stdin, env });
+  for (const [stdin, says] of cases) {
+    const run = await runSpecnaut(["record-checkout"], { cwd: root, stdin, env: {} });
     assertEquals([run.code, run.stdout], [2, ""], stdin);
     assertStringIncludes(run.stderr, says);
   }
   assertEquals(await exists(await recordPath(root)), false);
+  const stdin = JSON.stringify({ session_id: ID, source: "startup" });
+  const run = await runSpecnaut(["record-checkout"], {
+    cwd: root,
+    stdin,
+    env: { CLAUDE_ENV_FILE: "" },
+  });
+  assertEquals([run.code, said(run.stderr)], [0, false]);
+  assert(await exists(await recordPath(root)), "taken with no CLAUDE_ENV_FILE");
 });
 
 Deno.test("a checkout whose HEAD has no reflog takes no record, saying why", async () => {

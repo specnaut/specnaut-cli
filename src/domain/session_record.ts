@@ -53,9 +53,6 @@ export function isSessionId(id: string): boolean {
 export const RECORD_RETENTION_DAYS = 30;
 export const RECORD_RETENTION_MS = RECORD_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-/** The variable that names the record to the session's later commands, set through `CLAUDE_ENV_FILE`. */
-export const SESSION_RECORD_VAR = "SPECNAUT_SESSION_RECORD";
-
 /**
  * The reasons the record adds to the check's. Every one about the record itself is filed under
  * `path`. The record is the one of the session id the harness gave the checking hook on its stdin,

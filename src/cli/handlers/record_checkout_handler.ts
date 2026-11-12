@@ -1,9 +1,7 @@
 import { red, yellow } from "@std/fmt/colors";
 import { recordCheckout, type RecordCheckoutDeps } from "../../application/record_checkout.ts";
-import { SESSION_RECORD_VAR } from "../../domain/session_record.ts";
 import { type SessionStart, sessionStartOf } from "../../domain/session_record_json.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
-import { exportToSession } from "../../infrastructure/claude_env_file.ts";
 import { FsHeadReflog } from "../../infrastructure/fs_head_reflog.ts";
 import { FsSessionRecords } from "../../infrastructure/fs_session_records.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
@@ -13,14 +11,15 @@ import { parsedInput, readHookInput } from "./hook_input.ts";
 /**
  * `specnaut record-checkout`: what the Claude Code `SessionStart` hook
  * (`.claude/hooks/record-checkout.sh`) runs, the hook's input on stdin. It records the checkout the
- * session started on (`record_checkout.ts`) and appends `export SPECNAUT_SESSION_RECORD=<path>` to
- * the file `CLAUDE_ENV_FILE` names, so the session's later commands find its record:
+ * session started on (`record_checkout.ts`), under the session id the hook's input names: a later
+ * check finds the record by the id its own hook input names, so nothing is exported to the session,
+ * whose commands could set any variable they like:
  *
- *   0  taken, or the session's first record kept and its path exported again, or nothing to
- *      take: a source that keeps the record (`clear`, `compact`), or a folder in no git repository;
- *      old records of other sessions that could not be removed are a warning on stderr
+ *   0  taken, or the session's first record kept, or nothing to take: a source that keeps the
+ *      record (`clear`, `compact`), or a folder in no git repository; old records of other sessions
+ *      that could not be removed are a warning on stderr
  *   1  the record could not be taken, or a resumed or forked session has none, the reason on stderr
- *   2  usage: stdin is a terminal or not a `SessionStart` hook's input, or `CLAUDE_ENV_FILE` is unset
+ *   2  usage: stdin is a terminal or not a `SessionStart` hook's input
  *
  * Nothing is printed on stdout: a `SessionStart` hook's stdout is added to the session's context.
  */
@@ -30,17 +29,14 @@ export type RecordCheckoutHandlerDeps = {
   readonly cwd: string;
   /** The hook's input, or `null` when stdin is a terminal. */
   readonly input: () => Promise<string | null>;
-  readonly env: (name: string) => string | undefined;
   readonly err: (s: string) => void;
   readonly open: (cwd: string) => Promise<RecordCheckoutDeps | null>;
-  readonly exportToSession: (envFile: string, name: string, value: string) => Promise<void>;
 };
 
 function defaultDeps(): RecordCheckoutHandlerDeps {
   return {
     cwd: Deno.cwd(),
     input: readHookInput,
-    env: (name) => Deno.env.get(name),
     err: (s) => console.error(s),
     open: async (cwd) => {
       const records = await FsSessionRecords.open(cwd);
@@ -52,7 +48,6 @@ function defaultDeps(): RecordCheckoutHandlerDeps {
         records,
       };
     },
-    exportToSession,
   };
 }
 
@@ -75,27 +70,18 @@ async function fromHook(deps: RecordCheckoutHandlerDeps): Promise<number> {
   if (start === null) {
     return fail(deps, EXIT.usage, "the input names no session id and source of a SessionStart");
   }
-  const envFile = deps.env("CLAUDE_ENV_FILE");
-  if (!envFile) return fail(deps, EXIT.usage, "CLAUDE_ENV_FILE is not set: run it from the hook");
-  return await take(deps, start, envFile);
+  return await take(deps, start);
 }
 
-/** The record taken in the repository the folder is in, and its path exported to the session. */
-async function take(
-  deps: RecordCheckoutHandlerDeps,
-  start: SessionStart,
-  envFile: string,
-): Promise<number> {
+/** The record taken in the repository the folder is in. */
+async function take(deps: RecordCheckoutHandlerDeps, start: SessionStart): Promise<number> {
   const opened = await deps.open(deps.cwd);
   if (opened === null) return EXIT.done;
   const outcome = await recordCheckout(opened, start);
   if (outcome.kind === "refused") return fail(deps, EXIT.failed, outcome.why);
-  if (outcome.kind === "taken" || outcome.kind === "existing") {
-    await deps.exportToSession(envFile, SESSION_RECORD_VAR, outcome.path);
-    if (outcome.pruneFailure !== undefined) {
-      const why = `old session records could not all be removed: ${outcome.pruneFailure}`;
-      deps.err(yellow(`warning: specnaut record-checkout: ${terminalText(why)}`));
-    }
+  if (outcome.kind !== "kept" && outcome.pruneFailure !== undefined) {
+    const why = `old session records could not all be removed: ${outcome.pruneFailure}`;
+    deps.err(yellow(`warning: specnaut record-checkout: ${terminalText(why)}`));
   }
   return EXIT.done;
 }

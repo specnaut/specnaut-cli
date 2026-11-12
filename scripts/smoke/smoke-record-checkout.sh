@@ -3,8 +3,9 @@
 # Claude Code fires it, a SessionStart payload on stdin: it is registered and
 # executable; with no `specnaut` on PATH it exits 0, prints nothing and records
 # nothing; with the CLI from source on PATH it exits 0 with nothing on stdout,
-# writes the record under the git directory and exports its path through
-# CLAUDE_ENV_FILE. Its own script: smoke-hooks.sh is at its size limit.
+# writes the record under the git directory and exports nothing through
+# CLAUDE_ENV_FILE: a check finds the record by the session id alone. Its own
+# script: smoke-hooks.sh is at its size limit.
 #
 # Usage: smoke-record-checkout.sh <name>
 set -euo pipefail
@@ -58,8 +59,7 @@ rmdir "$bin"
   || fail "the hook failed or printed to the session's context" "$stdout"
 [ -f "$record" ] && pass "the record is taken in the git directory" \
   || fail "no record at the git directory" "$record"
-grep -qxF "export SPECNAUT_SESSION_RECORD='$record'" "$env_file" \
-  && pass "its path reaches the session through CLAUDE_ENV_FILE" \
-  || fail "CLAUDE_ENV_FILE does not export the record" "$(cat "$env_file" 2>/dev/null)"
+[ ! -s "$env_file" ] && pass "nothing is exported to the session through CLAUDE_ENV_FILE" \
+  || fail "CLAUDE_ENV_FILE was written" "$(cat "$env_file" 2>/dev/null)"
 
 finish "RECORD-CHECKOUT"

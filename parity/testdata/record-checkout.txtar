@@ -1,5 +1,5 @@
 # record-checkout: a SessionStart hook's input on stdin takes the record and
-# appends its path to CLAUDE_ENV_FILE; clear keeps it, taking none; an input
+# exports nothing to CLAUDE_ENV_FILE; clear keeps it, taking none; an input
 # that is not a hook's is refused. Compared TypeScript against TypeScript: the
 # Go port answers "not ported" (excluded.go, PortedToGo). The record holds each
 # file's inode, so it is checked here and removed before the tree is captured.
@@ -13,9 +13,8 @@ env CLAUDE_ENV_FILE=$WORK/env.sh
 stdin $WORK/startup.json
 specnaut record-checkout
 exists .git/specnaut/session/session-1.json
-grep 'export SPECNAUT_SESSION_RECORD=.*session-1.json' $WORK/env.sh
+! exists $WORK/env.sh
 rm .git/specnaut
-rm $WORK/env.sh
 stdin $WORK/clear.json
 specnaut record-checkout
 ! exists .git/specnaut/session/session-1.json
