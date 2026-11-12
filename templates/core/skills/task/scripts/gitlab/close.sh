@@ -12,6 +12,8 @@
 # other glab's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "$(dirname "$0")/_backlog_args.sh"
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
@@ -24,14 +26,10 @@ case "${1:-}" in
   --body-file | '') ;;
   *) echo "close.sh: GitLab records no close reason; only 'completed'" >&2; exit 2 ;;
 esac
-BODY=""
-if [ "${1:-}" = --body-file ]; then
-  [ "$#" -eq 2 ] && [ -f "$2" ] || { echo "close.sh: --body-file needs a file" >&2; exit 2; }
-  BODY=$2
-  shift 2
-fi
+BODY_FILE=""
+if [ "${1:-}" = --body-file ]; then body_file_arg "$@"; shift 2; fi
 [ "$#" -eq 0 ] || usage
 
-[ -z "$BODY" ] || bash "$(dirname "$0")/clarify-comment.sh" "$NUM" --body-file "$BODY" >/dev/null
+[ -z "$BODY_FILE" ] || bash "$(dirname "$0")/clarify-comment.sh" "$NUM" --body-file "$BODY_FILE" >/dev/null
 glab issue close "$NUM" --repo "$PROJECT_ID" >/dev/null
 echo "closed #$NUM"

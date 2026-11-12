@@ -45,6 +45,7 @@ SURFACES=(
   # installed by all four backends and run end to end by smoke-backlog-plan.sh.
   'templates/core/skills/task/scripts/_apply_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_backlog_plan.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_backlog_args.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_backlog_scope.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_clean_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_issue_text.sh|smoke-backlog-plan.sh|backlog-shared-body'

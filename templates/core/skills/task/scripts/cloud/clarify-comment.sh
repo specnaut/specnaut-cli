@@ -9,20 +9,19 @@
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "$(dirname "$0")/_backlog_args.sh"
+parse_comment_args "$@"
+
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "$(dirname "$0")/_backlog_plan.sh"
 
-if [ "$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
-  exit 2
-fi
-NUM=$(require_issue_number "$1") || exit 2
-QUESTION="$2"
-if [ "$2" = "--body-file" ]; then
-  [ "$#" -eq 3 ] && [ -f "$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "$3"
+NUM=$(require_issue_number "$NUM_ARG") || exit 2
+QUESTION=$BODY
+if [ -n "$BODY_FILE" ]; then
+  require_clean_file body "$BODY_FILE"
   QUESTION=$(cat -- "$CLEAN_FILE")
 else
   require_clean_text body "$QUESTION"

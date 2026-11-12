@@ -6943,56 +6943,9 @@ printf '%s' "\$RECORDS"
 # its secret check refused (require_clean_text, _clean_text.sh), nothing written
 set -euo pipefail
 
-USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
-PARENT=""
-BODY_FILE=""
-ARGS=()
-while [ \$# -gt 0 ]; do
-  case "\$1" in
-    -h|--help)
-      echo "\$USAGE"
-      exit 0
-      ;;
-    --parent)
-      if [ \$# -lt 2 ]; then
-        echo "\$USAGE" >&2
-        exit 2
-      fi
-      PARENT="\$2"
-      shift 2
-      ;;
-    --body-file)
-      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
-      BODY_FILE="\$2"
-      shift 2
-      ;;
-    --*)
-      echo "add.sh: unknown flag '\$1'" >&2
-      echo "\$USAGE" >&2
-      exit 2
-      ;;
-    *)
-      ARGS+=("\$1")
-      shift
-      ;;
-  esac
-done
-
-if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo "\$USAGE" >&2
-  exit 2
-fi
-if [ "\${#ARGS[@]}" -gt 2 ]; then
-  echo "add.sh: the local backlog has no labels field; '\${ARGS[2]}' would not be recorded" >&2
-  echo "\$USAGE" >&2
-  exit 2
-fi
-TITLE="\${ARGS[0]}"
-BODY="\${ARGS[1]:-}"
-if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
-  echo "add.sh: give a body or --body-file, not both" >&2
-  exit 2
-fi
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]' 0 "\$@"
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
@@ -7187,21 +7140,20 @@ fi
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_comment_args "\$@"
+
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
-if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
-  exit 2
-fi
-NUM=\$(require_issue_number "\$1") || exit 2
+NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
 NUM=\$(printf "%03d" "\$NUM")
-QUESTION="\$2"
-if [ "\$2" = "--body-file" ]; then
-  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "\$3"
+QUESTION=\$BODY
+if [ -n "\$BODY_FILE" ]; then
+  require_clean_file body "\$BODY_FILE"
   QUESTION=\$(cat -- "\$CLEAN_FILE")
 else
   require_clean_text body "\$QUESTION"
@@ -8398,6 +8350,89 @@ require_title() {
   },
   {
     category: "backlog-script",
+    name: "_backlog_args",
+    suffix: "_backlog_args.sh",
+    content: `# shellcheck shell=bash
+# The one home of how a backlog writer reads the arguments every backend's
+# add.sh, clarify-comment.sh and close.sh share: a positional body, or
+# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
+# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
+# installed beside it. A usage error ends the calling script with status 2.
+#
+# An argument a writer would not record is refused, never dropped: a caller
+# that passed it must not believe it reached the tracker.
+
+# args_refuse [<message>] -- the message, when there is one, then the usage
+# (ARGS_USAGE) on stderr; ends the script with status 2.
+args_refuse() {
+  [ -z "\${1:-}" ] || echo "\${0##*/}: \$1" >&2
+  echo "\$ARGS_USAGE" >&2
+  exit 2
+}
+
+# body_file_arg --body-file <path> -- BODY_FILE set to <path>, which must be a
+# file; the writer reads it, so the text never stands on a command line.
+body_file_arg() {
+  [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "\${0##*/}: --body-file needs a file" >&2; exit 2; }
+  BODY_FILE=\$2
+}
+
+# parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
+# optional body, then at most <extra> more positionals (a backend's labels), and
+# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+parse_add_args() {
+  ARGS_USAGE=\$1
+  local extra=\$2 pos=()
+  shift 2
+  PARENT="" BODY_FILE=""
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
+      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --*) args_refuse "unknown flag '\$1'" ;;
+      *) pos+=("\$1"); shift ;;
+    esac
+  done
+  [ "\${#pos[@]}" -ge 1 ] || args_refuse
+  _positionals_fit "\$extra" "\${pos[@]}"
+  TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
+  [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
+# a title, a body and <extra> positionals were given. Labels are the only extra
+# positional any backend takes, so a backend that takes none says so.
+_positionals_fit() {
+  local extra=\$1
+  shift
+  [ "\$#" -gt \$((extra + 2)) ] || return 0
+  [ "\$extra" -gt 0 ] || args_refuse "this backlog has no labels field; '\$3' would not be recorded"
+  shift \$((extra + 2))
+  args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
+# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+parse_comment_args() {
+  ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
+  [ "\$#" -ge 2 ] || args_refuse
+  NUM_ARG=\$1 BODY="" BODY_FILE=""
+  case "\$#:\$2" in
+    3:--body-file) body_file_arg "\$2" "\$3" ;;
+    *:--body-file) body_file_arg "\$2" ;;
+    2:*) BODY=\$2 ;;
+    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  esac
+}
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_clean_text",
     suffix: "_clean_text.sh",
     content: `# shellcheck shell=bash
@@ -9404,52 +9439,10 @@ set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
 # handling work regardless of whether the backlog backend is configured.
-USAGE='usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]'
-PARENT=""
-BODY_FILE=""
-ARGS=()
-while [ \$# -gt 0 ]; do
-  case "\$1" in
-    -h|--help)
-      echo "\$USAGE"
-      exit 0
-      ;;
-    --parent)
-      if [ \$# -lt 2 ]; then
-        echo "\$USAGE" >&2
-        exit 2
-      fi
-      PARENT="\$2"
-      shift 2
-      ;;
-    --body-file)
-      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
-      BODY_FILE="\$2"
-      shift 2
-      ;;
-    --*)
-      echo "add.sh: unknown flag '\$1'" >&2
-      echo "\$USAGE" >&2
-      exit 2
-      ;;
-    *)
-      ARGS+=("\$1")
-      shift
-      ;;
-  esac
-done
-
-if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo "\$USAGE" >&2
-  exit 2
-fi
-TITLE="\${ARGS[0]}"
-BODY="\${ARGS[1]:-}"
-LABELS="\${ARGS[2]:-}"
-if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
-  echo "add.sh: give a body or --body-file, not both" >&2
-  exit 2
-fi
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_add_args 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]' 1 "\$@"
+LABELS="\${EXTRA[0]:-}"
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
@@ -10108,25 +10101,23 @@ fi
 # (require_clean_text, _clean_text.sh), nothing sent · other gh's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_comment_args "\$@"
+
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
-USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
-if [ "\$#" -lt 2 ]; then
-  echo "\$USAGE" >&2
-  exit 2
-fi
-NUM=\$(require_issue_number "\$1") || exit 2
+NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
 
-if [ "\$2" = "--body-file" ]; then
-  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "\$3"
+if [ -n "\$BODY_FILE" ]; then
+  require_clean_file body "\$BODY_FILE"
   gh issue comment "\$NUM" --repo "\$REPO" --body-file "\$CLEAN_FILE"
 else
-  require_clean_text body "\$2"
-  gh issue comment "\$NUM" --repo "\$REPO" --body "\$2"
+  require_clean_text body "\$BODY"
+  gh issue comment "\$NUM" --repo "\$REPO" --body "\$BODY"
 fi
 `,
     executable: true,
@@ -11363,6 +11354,8 @@ echo "edited #\$NUM"
 # secret check, nothing posted or closed · other gh's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
@@ -11372,16 +11365,12 @@ NUM=\$(require_issue_number "\$1") || exit 2
 shift
 REASON=completed
 case "\${1:-}" in completed | not_planned) REASON=\$1; shift ;; esac
-BODY=""
-if [ "\${1:-}" = --body-file ]; then
-  [ "\$#" -eq 2 ] && [ -f "\$2" ] || { echo "close.sh: --body-file needs a file" >&2; exit 2; }
-  BODY=\$2
-  shift 2
-fi
+BODY_FILE=""
+if [ "\${1:-}" = --body-file ]; then body_file_arg "\$@"; shift 2; fi
 [ "\$#" -eq 0 ] || usage
 [ "\$REASON" = completed ] || REASON="not planned"
 
-[ -z "\$BODY" ] || bash "\$(dirname "\$0")/clarify-comment.sh" "\$NUM" --body-file "\$BODY" >/dev/null
+[ -z "\$BODY_FILE" ] || bash "\$(dirname "\$0")/clarify-comment.sh" "\$NUM" --body-file "\$BODY_FILE" >/dev/null
 gh issue close "\$NUM" --repo "\$REPO" --reason "\$REASON" >/dev/null
 echo "closed #\$NUM"
 `,
@@ -11628,6 +11617,89 @@ require_title() {
   jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
+}
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_args",
+    suffix: "_backlog_args.sh",
+    content: `# shellcheck shell=bash
+# The one home of how a backlog writer reads the arguments every backend's
+# add.sh, clarify-comment.sh and close.sh share: a positional body, or
+# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
+# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
+# installed beside it. A usage error ends the calling script with status 2.
+#
+# An argument a writer would not record is refused, never dropped: a caller
+# that passed it must not believe it reached the tracker.
+
+# args_refuse [<message>] -- the message, when there is one, then the usage
+# (ARGS_USAGE) on stderr; ends the script with status 2.
+args_refuse() {
+  [ -z "\${1:-}" ] || echo "\${0##*/}: \$1" >&2
+  echo "\$ARGS_USAGE" >&2
+  exit 2
+}
+
+# body_file_arg --body-file <path> -- BODY_FILE set to <path>, which must be a
+# file; the writer reads it, so the text never stands on a command line.
+body_file_arg() {
+  [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "\${0##*/}: --body-file needs a file" >&2; exit 2; }
+  BODY_FILE=\$2
+}
+
+# parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
+# optional body, then at most <extra> more positionals (a backend's labels), and
+# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+parse_add_args() {
+  ARGS_USAGE=\$1
+  local extra=\$2 pos=()
+  shift 2
+  PARENT="" BODY_FILE=""
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
+      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --*) args_refuse "unknown flag '\$1'" ;;
+      *) pos+=("\$1"); shift ;;
+    esac
+  done
+  [ "\${#pos[@]}" -ge 1 ] || args_refuse
+  _positionals_fit "\$extra" "\${pos[@]}"
+  TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
+  [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
+# a title, a body and <extra> positionals were given. Labels are the only extra
+# positional any backend takes, so a backend that takes none says so.
+_positionals_fit() {
+  local extra=\$1
+  shift
+  [ "\$#" -gt \$((extra + 2)) ] || return 0
+  [ "\$extra" -gt 0 ] || args_refuse "this backlog has no labels field; '\$3' would not be recorded"
+  shift \$((extra + 2))
+  args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
+# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+parse_comment_args() {
+  ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
+  [ "\$#" -ge 2 ] || args_refuse
+  NUM_ARG=\$1 BODY="" BODY_FILE=""
+  case "\$#:\$2" in
+    3:--body-file) body_file_arg "\$2" "\$3" ;;
+    *:--body-file) body_file_arg "\$2" ;;
+    2:*) BODY=\$2 ;;
+    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  esac
 }
 `,
     executable: true,
@@ -12798,52 +12870,10 @@ set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
 # handling work regardless of whether the backlog backend is configured.
-USAGE='usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]'
-PARENT=""
-BODY_FILE=""
-ARGS=()
-while [ \$# -gt 0 ]; do
-  case "\$1" in
-    -h|--help)
-      echo "\$USAGE"
-      exit 0
-      ;;
-    --parent)
-      if [ \$# -lt 2 ]; then
-        echo "\$USAGE" >&2
-        exit 2
-      fi
-      PARENT="\$2"
-      shift 2
-      ;;
-    --body-file)
-      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
-      BODY_FILE="\$2"
-      shift 2
-      ;;
-    --*)
-      echo "add.sh: unknown flag '\$1'" >&2
-      echo "\$USAGE" >&2
-      exit 2
-      ;;
-    *)
-      ARGS+=("\$1")
-      shift
-      ;;
-  esac
-done
-
-if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo "\$USAGE" >&2
-  exit 2
-fi
-TITLE="\${ARGS[0]}"
-BODY="\${ARGS[1]:-}"
-EXTRA_LABELS="\${ARGS[2]:-}"
-if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
-  echo "add.sh: give a body or --body-file, not both" >&2
-  exit 2
-fi
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_add_args 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]' 1 "\$@"
+EXTRA_LABELS="\${EXTRA[0]:-}"
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
@@ -13081,20 +13111,19 @@ fi
 # (require_clean_text, _clean_text.sh), nothing sent · other glab's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_comment_args "\$@"
+
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
-if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
-  exit 2
-fi
-NUM=\$(require_issue_number "\$1") || exit 2
-QUESTION="\$2"
-if [ "\$2" = "--body-file" ]; then
-  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "\$3"
+NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
+QUESTION=\$BODY
+if [ -n "\$BODY_FILE" ]; then
+  require_clean_file body "\$BODY_FILE"
   QUESTION=\$(cat -- "\$CLEAN_FILE")
 else
   require_clean_text body "\$QUESTION"
@@ -13806,6 +13835,8 @@ echo "edited #\$NUM"
 # other glab's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
@@ -13818,15 +13849,11 @@ case "\${1:-}" in
   --body-file | '') ;;
   *) echo "close.sh: GitLab records no close reason; only 'completed'" >&2; exit 2 ;;
 esac
-BODY=""
-if [ "\${1:-}" = --body-file ]; then
-  [ "\$#" -eq 2 ] && [ -f "\$2" ] || { echo "close.sh: --body-file needs a file" >&2; exit 2; }
-  BODY=\$2
-  shift 2
-fi
+BODY_FILE=""
+if [ "\${1:-}" = --body-file ]; then body_file_arg "\$@"; shift 2; fi
 [ "\$#" -eq 0 ] || usage
 
-[ -z "\$BODY" ] || bash "\$(dirname "\$0")/clarify-comment.sh" "\$NUM" --body-file "\$BODY" >/dev/null
+[ -z "\$BODY_FILE" ] || bash "\$(dirname "\$0")/clarify-comment.sh" "\$NUM" --body-file "\$BODY_FILE" >/dev/null
 glab issue close "\$NUM" --repo "\$PROJECT_ID" >/dev/null
 echo "closed #\$NUM"
 `,
@@ -14104,6 +14131,89 @@ require_title() {
   jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
   printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
   return 2
+}
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_args",
+    suffix: "_backlog_args.sh",
+    content: `# shellcheck shell=bash
+# The one home of how a backlog writer reads the arguments every backend's
+# add.sh, clarify-comment.sh and close.sh share: a positional body, or
+# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
+# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
+# installed beside it. A usage error ends the calling script with status 2.
+#
+# An argument a writer would not record is refused, never dropped: a caller
+# that passed it must not believe it reached the tracker.
+
+# args_refuse [<message>] -- the message, when there is one, then the usage
+# (ARGS_USAGE) on stderr; ends the script with status 2.
+args_refuse() {
+  [ -z "\${1:-}" ] || echo "\${0##*/}: \$1" >&2
+  echo "\$ARGS_USAGE" >&2
+  exit 2
+}
+
+# body_file_arg --body-file <path> -- BODY_FILE set to <path>, which must be a
+# file; the writer reads it, so the text never stands on a command line.
+body_file_arg() {
+  [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "\${0##*/}: --body-file needs a file" >&2; exit 2; }
+  BODY_FILE=\$2
+}
+
+# parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
+# optional body, then at most <extra> more positionals (a backend's labels), and
+# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+parse_add_args() {
+  ARGS_USAGE=\$1
+  local extra=\$2 pos=()
+  shift 2
+  PARENT="" BODY_FILE=""
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
+      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --*) args_refuse "unknown flag '\$1'" ;;
+      *) pos+=("\$1"); shift ;;
+    esac
+  done
+  [ "\${#pos[@]}" -ge 1 ] || args_refuse
+  _positionals_fit "\$extra" "\${pos[@]}"
+  TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
+  [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
+# a title, a body and <extra> positionals were given. Labels are the only extra
+# positional any backend takes, so a backend that takes none says so.
+_positionals_fit() {
+  local extra=\$1
+  shift
+  [ "\$#" -gt \$((extra + 2)) ] || return 0
+  [ "\$extra" -gt 0 ] || args_refuse "this backlog has no labels field; '\$3' would not be recorded"
+  shift \$((extra + 2))
+  args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
+# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+parse_comment_args() {
+  ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
+  [ "\$#" -ge 2 ] || args_refuse
+  NUM_ARG=\$1 BODY="" BODY_FILE=""
+  case "\$#:\$2" in
+    3:--body-file) body_file_arg "\$2" "\$3" ;;
+    *:--body-file) body_file_arg "\$2" ;;
+    2:*) BODY=\$2 ;;
+    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  esac
 }
 `,
     executable: true,
@@ -15023,47 +15133,9 @@ printf '%s' "\$RECORDS"
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
-USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
-PARENT=""
-BODY_FILE=""
-ARGS=()
-while [ \$# -gt 0 ]; do
-  case "\$1" in
-    -h | --help)
-      echo "\$USAGE"
-      exit 0
-      ;;
-    --parent)
-      if [ "\$#" -lt 2 ]; then
-        echo "\$USAGE" >&2
-        exit 2
-      fi
-      PARENT="\$2"
-      shift 2
-      ;;
-    --body-file)
-      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
-      BODY_FILE="\$2"
-      shift 2
-      ;;
-    *)
-      ARGS+=("\$1")
-      shift
-      ;;
-  esac
-done
-set -- \${ARGS[@]+"\${ARGS[@]}"}
-
-if [ "\$#" -lt 1 ]; then
-  echo "\$USAGE" >&2
-  exit 2
-fi
-TITLE="\$1"
-BODY="\${2:-}"
-if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
-  echo "add.sh: give a body or --body-file, not both" >&2
-  exit 2
-fi
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]' 0 "\$@"
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
@@ -15854,6 +15926,89 @@ require_title() {
   },
   {
     category: "backlog-script",
+    name: "_backlog_args",
+    suffix: "_backlog_args.sh",
+    content: `# shellcheck shell=bash
+# The one home of how a backlog writer reads the arguments every backend's
+# add.sh, clarify-comment.sh and close.sh share: a positional body, or
+# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
+# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
+# installed beside it. A usage error ends the calling script with status 2.
+#
+# An argument a writer would not record is refused, never dropped: a caller
+# that passed it must not believe it reached the tracker.
+
+# args_refuse [<message>] -- the message, when there is one, then the usage
+# (ARGS_USAGE) on stderr; ends the script with status 2.
+args_refuse() {
+  [ -z "\${1:-}" ] || echo "\${0##*/}: \$1" >&2
+  echo "\$ARGS_USAGE" >&2
+  exit 2
+}
+
+# body_file_arg --body-file <path> -- BODY_FILE set to <path>, which must be a
+# file; the writer reads it, so the text never stands on a command line.
+body_file_arg() {
+  [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "\${0##*/}: --body-file needs a file" >&2; exit 2; }
+  BODY_FILE=\$2
+}
+
+# parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
+# optional body, then at most <extra> more positionals (a backend's labels), and
+# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+parse_add_args() {
+  ARGS_USAGE=\$1
+  local extra=\$2 pos=()
+  shift 2
+  PARENT="" BODY_FILE=""
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
+      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --*) args_refuse "unknown flag '\$1'" ;;
+      *) pos+=("\$1"); shift ;;
+    esac
+  done
+  [ "\${#pos[@]}" -ge 1 ] || args_refuse
+  _positionals_fit "\$extra" "\${pos[@]}"
+  TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
+  [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
+# a title, a body and <extra> positionals were given. Labels are the only extra
+# positional any backend takes, so a backend that takes none says so.
+_positionals_fit() {
+  local extra=\$1
+  shift
+  [ "\$#" -gt \$((extra + 2)) ] || return 0
+  [ "\$extra" -gt 0 ] || args_refuse "this backlog has no labels field; '\$3' would not be recorded"
+  shift \$((extra + 2))
+  args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
+# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+parse_comment_args() {
+  ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
+  [ "\$#" -ge 2 ] || args_refuse
+  NUM_ARG=\$1 BODY="" BODY_FILE=""
+  case "\$#:\$2" in
+    3:--body-file) body_file_arg "\$2" "\$3" ;;
+    *:--body-file) body_file_arg "\$2" ;;
+    2:*) BODY=\$2 ;;
+    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  esac
+}
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_clean_text",
     suffix: "_clean_text.sh",
     content: `# shellcheck shell=bash
@@ -16344,20 +16499,19 @@ exit 0
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
+parse_comment_args "\$@"
+
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
-if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
-  exit 2
-fi
-NUM=\$(require_issue_number "\$1") || exit 2
-QUESTION="\$2"
-if [ "\$2" = "--body-file" ]; then
-  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "\$3"
+NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
+QUESTION=\$BODY
+if [ -n "\$BODY_FILE" ]; then
+  require_clean_file body "\$BODY_FILE"
   QUESTION=\$(cat -- "\$CLEAN_FILE")
 else
   require_clean_text body "\$QUESTION"

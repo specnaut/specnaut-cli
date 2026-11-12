@@ -152,12 +152,12 @@ export async function project(backend: Backend): Promise<Project> {
 /**
  * Installs what every backlog writer needs beside its own scripts: the shared
  * write rules (`_backlog_plan.sh`, and the `_issue_text.sh` and
- * `_clean_text.sh` it sources) in `scriptsDir`, and the secret scan they run,
+ * `_clean_text.sh` it sources) and the argument parser (`_backlog_args.sh`) in `scriptsDir`, and the secret scan they run,
  * `_report_text.sh` and its patterns, in the `../bash` directory where
  * `_clean_text.sh` looks for them.
  */
 export async function installWriterDeps(scriptsDir: string): Promise<void> {
-  for (const name of ["_backlog_plan.sh", "_issue_text.sh", "_clean_text.sh"]) {
+  for (const name of ["_backlog_args.sh", "_backlog_plan.sh", "_issue_text.sh", "_clean_text.sh"]) {
     await Deno.copyFile(join(SCRIPTS, name), join(scriptsDir, name));
   }
   const bash = join(scriptsDir, "..", "bash");

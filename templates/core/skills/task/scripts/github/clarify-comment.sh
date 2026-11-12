@@ -9,23 +9,21 @@
 # (require_clean_text, _clean_text.sh), nothing sent · other gh's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "$(dirname "$0")/_backlog_args.sh"
+parse_comment_args "$@"
+
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
 . "$(dirname "$0")/_backlog_plan.sh"
 
-USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
-if [ "$#" -lt 2 ]; then
-  echo "$USAGE" >&2
-  exit 2
-fi
-NUM=$(require_issue_number "$1") || exit 2
+NUM=$(require_issue_number "$NUM_ARG") || exit 2
 
-if [ "$2" = "--body-file" ]; then
-  [ "$#" -eq 3 ] && [ -f "$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
-  require_clean_file body "$3"
+if [ -n "$BODY_FILE" ]; then
+  require_clean_file body "$BODY_FILE"
   gh issue comment "$NUM" --repo "$REPO" --body-file "$CLEAN_FILE"
 else
-  require_clean_text body "$2"
-  gh issue comment "$NUM" --repo "$REPO" --body "$2"
+  require_clean_text body "$BODY"
+  gh issue comment "$NUM" --repo "$REPO" --body "$BODY"
 fi

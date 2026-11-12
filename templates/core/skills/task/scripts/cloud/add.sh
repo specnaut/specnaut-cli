@@ -13,47 +13,9 @@
 # (require_clean_text, _clean_text.sh), nothing sent
 set -euo pipefail
 
-USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
-PARENT=""
-BODY_FILE=""
-ARGS=()
-while [ $# -gt 0 ]; do
-  case "$1" in
-    -h | --help)
-      echo "$USAGE"
-      exit 0
-      ;;
-    --parent)
-      if [ "$#" -lt 2 ]; then
-        echo "$USAGE" >&2
-        exit 2
-      fi
-      PARENT="$2"
-      shift 2
-      ;;
-    --body-file)
-      [ $# -ge 2 ] && [ -f "$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
-      BODY_FILE="$2"
-      shift 2
-      ;;
-    *)
-      ARGS+=("$1")
-      shift
-      ;;
-  esac
-done
-set -- ${ARGS[@]+"${ARGS[@]}"}
-
-if [ "$#" -lt 1 ]; then
-  echo "$USAGE" >&2
-  exit 2
-fi
-TITLE="$1"
-BODY="${2:-}"
-if [ -n "$BODY_FILE" ] && [ -n "$BODY" ]; then
-  echo "add.sh: give a body or --body-file, not both" >&2
-  exit 2
-fi
+# shellcheck source=../_backlog_args.sh
+. "$(dirname "$0")/_backlog_args.sh"
+parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]' 0 "$@"
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
