@@ -17,11 +17,17 @@ _TEXT_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 #              GitLab's forms: an @ after anything but a letter, digit or `_`,
 #              the login running on through . _ / -, a closing dot dropped,
 #              lower-cased (a login is case-blind on both)
+#   text_refusals($who)
+#              the classes a text is refused under: `entity` for a character
+#              reference (`&#64;`, `&#x40;`, `&commat;`), which the tracker
+#              decodes after this check, and `mention` for a login not in $who
 # shellcheck disable=SC2016  # jq program.
 CLEAN_TEXT_JQ='
   def unquoted: gsub("(?:^|(?<=\n))[ \t]*```[^\n]*\n(?:[^\n]*\n)*?[ \t]*```[^\n]*"; "\n") | gsub("`[^`\n]+`"; " ");
   def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
     | .captures[0].string | sub("[./]+$"; "") | ascii_downcase];
+  def text_refusals($who): (if test("&[#A-Za-z0-9]+;") then "entity" else empty end),
+    (if any(mentions[]; . as $m | $who | index([$m]) == null) then "mention" else empty end);
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret

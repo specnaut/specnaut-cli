@@ -89,3 +89,21 @@ Deno.test("apply-plan: an @ inside closed code is no mention; an unclosed backti
     await p.cleanup();
   }
 });
+
+// A tracker decodes a character reference when it renders, after the mention check has read it.
+Deno.test("apply-plan: a character reference in plan text is refused, whatever it encodes", async () => {
+  const p = await ghProject(issues);
+  try {
+    for (const body of ["cc &#64;victim", "cc &#x40;victim", "cc &commat;victim", "a &amp; b"]) {
+      const out = await readThenApply(p, ["edit", "--id", "7"], comment(body));
+      assertEquals([out.code, out.lines], [3, ["REFUSED entity 1.body", "RECEIPT: none"]], body);
+    }
+    const title = jsonl({ op: "edit", target: 7, title: "Fix &#64;victim" });
+    const out = await readThenApply(p, ["edit", "--id", "7"], title);
+    assertEquals([out.code, out.lines], [3, ["REFUSED entity 1.title", "RECEIPT: none"]]);
+    const plain = await readThenApply(p, ["edit", "--id", "7"], comment("R&D, then Q&A, done"));
+    assertEquals(plain.code, 0, plain.stdout);
+  } finally {
+    await p.cleanup();
+  }
+});

@@ -41,7 +41,9 @@
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
 #   @-mentions      in any text, only of the target item's author, case-blind; none
-#                   new. What counts as one: `mentions`, CLEAN_TEXT_JQ, _clean_text.sh
+#                   new. What counts as one: `mentions`, CLEAN_TEXT_JQ, _clean_text.sh.
+#   & references    in no text (`&#64;`, `&commat;`): a tracker decodes one after
+#                   the check has read it (`text_refusals`, beside `mentions`)
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -141,8 +143,7 @@ PLAN_JQ='
              + (if $o.op == "edit" and ($o | has("title") or has("append") | not) then [["missing-key", "\($at).append"]] else [] end)
              + [("title", "body", "append") as $k | select($o[$k] | type == "string")
                  | (if $o.op == "create" then [] else [$authors[$o.target | tostring]? // empty | ascii_downcase] end) as $who
-                 | select([$o[$k] | mentions[] | select(. as $m | $who | index([$m]) == null)] | length > 0)
-                 | ["mention", "\($at).\($k)"]]) as $bad
+                 | $o[$k] | text_refusals($who) | [., "\($at).\($k)"]]) as $bad
           | if ($bad | length) > 0 then .refused += $bad
             else ($o
                    | (if has("target") then .target = resolve(.target; $st; $targets) else . end)

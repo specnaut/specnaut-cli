@@ -8263,7 +8263,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
 #   @-mentions      in any text, only of the target item's author, case-blind; none
-#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh.
+#   & references    in no text (\`&#64;\`, \`&commat;\`): a tracker decodes one after
+#                   the check has read it (\`text_refusals\`, beside \`mentions\`)
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -8363,8 +8365,7 @@ PLAN_JQ='
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
                  | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
-                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
-                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+                 | \$o[\$k] | text_refusals(\$who) | [., "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
             else (\$o
                    | (if has("target") then .target = resolve(.target; \$st; \$targets) else . end)
@@ -8416,11 +8417,17 @@ _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
 #              the login running on through . _ / -, a closing dot dropped,
 #              lower-cased (a login is case-blind on both)
+#   text_refusals(\$who)
+#              the classes a text is refused under: \`entity\` for a character
+#              reference (\`&#64;\`, \`&#x40;\`, \`&commat;\`), which the tracker
+#              decodes after this check, and \`mention\` for a login not in \$who
 # shellcheck disable=SC2016  # jq program.
 CLEAN_TEXT_JQ='
   def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
   def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
     | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+  def text_refusals(\$who): (if test("&[#A-Za-z0-9]+;") then "entity" else empty end),
+    (if any(mentions[]; . as \$m | \$who | index([\$m]) == null) then "mention" else empty end);
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
@@ -11477,7 +11484,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
 #   @-mentions      in any text, only of the target item's author, case-blind; none
-#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh.
+#   & references    in no text (\`&#64;\`, \`&commat;\`): a tracker decodes one after
+#                   the check has read it (\`text_refusals\`, beside \`mentions\`)
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -11577,8 +11586,7 @@ PLAN_JQ='
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
                  | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
-                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
-                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+                 | \$o[\$k] | text_refusals(\$who) | [., "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
             else (\$o
                    | (if has("target") then .target = resolve(.target; \$st; \$targets) else . end)
@@ -11630,11 +11638,17 @@ _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
 #              the login running on through . _ / -, a closing dot dropped,
 #              lower-cased (a login is case-blind on both)
+#   text_refusals(\$who)
+#              the classes a text is refused under: \`entity\` for a character
+#              reference (\`&#64;\`, \`&#x40;\`, \`&commat;\`), which the tracker
+#              decodes after this check, and \`mention\` for a login not in \$who
 # shellcheck disable=SC2016  # jq program.
 CLEAN_TEXT_JQ='
   def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
   def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
     | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+  def text_refusals(\$who): (if test("&[#A-Za-z0-9]+;") then "entity" else empty end),
+    (if any(mentions[]; . as \$m | \$who | index([\$m]) == null) then "mention" else empty end);
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
@@ -13920,7 +13934,9 @@ echo "linked #\$CHILD under #\$PARENT"
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
 #   @-mentions      in any text, only of the target item's author, case-blind; none
-#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh.
+#   & references    in no text (\`&#64;\`, \`&commat;\`): a tracker decodes one after
+#                   the check has read it (\`text_refusals\`, beside \`mentions\`)
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -14020,8 +14036,7 @@ PLAN_JQ='
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
                  | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
-                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
-                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+                 | \$o[\$k] | text_refusals(\$who) | [., "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
             else (\$o
                    | (if has("target") then .target = resolve(.target; \$st; \$targets) else . end)
@@ -14073,11 +14088,17 @@ _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
 #              the login running on through . _ / -, a closing dot dropped,
 #              lower-cased (a login is case-blind on both)
+#   text_refusals(\$who)
+#              the classes a text is refused under: \`entity\` for a character
+#              reference (\`&#64;\`, \`&#x40;\`, \`&commat;\`), which the tracker
+#              decodes after this check, and \`mention\` for a login not in \$who
 # shellcheck disable=SC2016  # jq program.
 CLEAN_TEXT_JQ='
   def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
   def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
     | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+  def text_refusals(\$who): (if test("&[#A-Za-z0-9]+;") then "entity" else empty end),
+    (if any(mentions[]; . as \$m | \$who | index([\$m]) == null) then "mention" else empty end);
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
@@ -15638,7 +15659,9 @@ receipt_snapshot() { :; }
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
 #   @-mentions      in any text, only of the target item's author, case-blind; none
-#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh
+#                   new. What counts as one: \`mentions\`, CLEAN_TEXT_JQ, _clean_text.sh.
+#   & references    in no text (\`&#64;\`, \`&commat;\`): a tracker decodes one after
+#                   the check has read it (\`text_refusals\`, beside \`mentions\`)
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -15738,8 +15761,7 @@ PLAN_JQ='
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
                  | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
-                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
-                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+                 | \$o[\$k] | text_refusals(\$who) | [., "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
             else (\$o
                    | (if has("target") then .target = resolve(.target; \$st; \$targets) else . end)
@@ -15791,11 +15813,17 @@ _TEXT_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 #              GitLab's forms: an @ after anything but a letter, digit or \`_\`,
 #              the login running on through . _ / -, a closing dot dropped,
 #              lower-cased (a login is case-blind on both)
+#   text_refusals(\$who)
+#              the classes a text is refused under: \`entity\` for a character
+#              reference (\`&#64;\`, \`&#x40;\`, \`&commat;\`), which the tracker
+#              decodes after this check, and \`mention\` for a login not in \$who
 # shellcheck disable=SC2016  # jq program.
 CLEAN_TEXT_JQ='
   def unquoted: gsub("(?:^|(?<=\\n))[ \\t]*\`\`\`[^\\n]*\\n(?:[^\\n]*\\n)*?[ \\t]*\`\`\`[^\\n]*"; "\\n") | gsub("\`[^\`\\n]+\`"; " ");
   def mentions: [unquoted | match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g")
     | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
+  def text_refusals(\$who): (if test("&[#A-Za-z0-9]+;") then "entity" else empty end),
+    (if any(mentions[]; . as \$m | \$who | index([\$m]) == null) then "mention" else empty end);
 '
 
 # text_refusal < text -- the rule every backlog write meets: no text the secret
