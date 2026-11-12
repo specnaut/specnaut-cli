@@ -1,0 +1,58 @@
+package cli
+
+import (
+	"regexp"
+	"strings"
+)
+
+// fullSha is commit_sha.ts's isFullSha: 40 or 64 lower-case hex digits.
+var fullSha = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+
+func sandboxRefused(why string) Intent { return unknown("sandbox " + why) }
+
+// parseSandbox is sandbox_parser.ts's parseSandbox: the same refusals, in its order. The command
+// is every word after the first `--`; the commit id and --toolchain come before it.
+func parseSandbox(a Args, rest []string) Intent {
+	after := len(a.AfterDash)
+	sub, words := "", []string{}
+	if len(rest) > 0 {
+		sub, words = rest[0], rest[1:]
+	}
+	if after > len(words) {
+		return sandboxRefused("takes its sub-command before --")
+	}
+	before := words[:len(words)-after]
+	switch sub {
+	case "probe":
+		if len(before) > 0 || a.AfterDash != nil {
+			return sandboxRefused("probe takes no argument")
+		}
+		return Intent{Kind: "sandbox"}
+	case "exec":
+	default:
+		return unknown(strings.TrimSpace("sandbox " + sub))
+	}
+	if len(before) != 1 || !fullSha.MatchString(before[0]) {
+		return sandboxRefused("exec takes one full commit id before --")
+	}
+	if after == 0 {
+		return sandboxRefused("exec needs a command after --")
+	}
+	if v, ok := a.Flag("toolchain"); ok && !isToolchain(v) {
+		return sandboxRefused("exec --toolchain takes absolute folders separated by :")
+	}
+	return Intent{Kind: "sandbox"}
+}
+
+// isToolchain is sandbox_parser.ts's toolchainOf: a string of absolute folders joined by `:`.
+func isToolchain(v Value) bool {
+	if v.Kind != String {
+		return false
+	}
+	for _, f := range strings.Split(v.S, ":") {
+		if !strings.HasPrefix(f, "/") {
+			return false
+		}
+	}
+	return true
+}

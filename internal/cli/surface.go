@@ -22,6 +22,7 @@ var Surface = FlagTable{
 	Strings: []string{
 		"ai", "backlog", "backlog-url", "backlog-repo", "scheme", "spec-backend",
 		"api-url", "type", "title", "payload", "task", "path", "format", "top",
+		"toolchain",
 	},
 	Aliases: map[string]string{"v": "version", "h": "help"},
 }
@@ -42,6 +43,7 @@ var Commands = map[string]func(Args, []string) Intent{
 	"gate":           subcommand("gate", GateSubs),
 	"spec":           subcommand("spec", SpecSubs),
 	"scan":           parseScan,
+	"sandbox":        parseSandbox,
 	"verify-scripts": parseVerifyScripts,
 }
 

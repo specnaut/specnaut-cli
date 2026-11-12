@@ -25,6 +25,13 @@ const helpTemplate = `{bold:specnaut} — AI project scaffolding CLI with auto-c
   specnaut verify-scripts             Check .specnaut/scripts/ against a copy the branch does not carry,
                                       before a review or a merge runs them (read-only). Exit 0 trusted,
                                       1 untrusted, 3 no base
+  specnaut sandbox probe              Report which sandbox would run a branch's gates, and why each other
+                                      one cannot (read-only). Exit 0 one is available, 1 none: static only
+  specnaut sandbox exec <sha> [--toolchain <dir>[:<dir>...]] -- <command> [<arg>...]
+                                      Run <command> on the exported tree of commit <sha> in that sandbox:
+                                      the tree read-only, no network, no home, the --toolchain folders
+                                      read-only and on its PATH. Exit: the command's; 124 out of time;
+                                      125 not run
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade

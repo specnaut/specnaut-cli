@@ -37,6 +37,9 @@ var (
 type Args struct {
 	Flags      map[string]Value
 	Positional []Value
+	// AfterDash is every word after the first `--`, as given, or nil with no `--`: what
+	// sandbox_parser.ts reads from the raw argument list.
+	AfterDash []string
 }
 
 type tokeniser struct {
@@ -64,6 +67,9 @@ func Tokenise(args []string, table FlagTable) (Args, error) {
 	t.defaultBooleans()
 	for _, a := range notFlags {
 		t.out.Positional = append(t.out.Positional, stringValue(a))
+	}
+	if notFlags != nil {
+		t.out.AfterDash = append([]string{}, notFlags...)
 	}
 	return t.out, nil
 }

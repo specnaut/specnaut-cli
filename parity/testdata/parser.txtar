@@ -42,3 +42,12 @@ specnaut scan --path /etc
 # verify-scripts refusals: it takes no argument.
 specnaut verify-scripts extra
 specnaut verify-scripts a b
+# sandbox refusals: a sub-command, one full commit id, and a command after --.
+specnaut sandbox
+specnaut sandbox bogus
+specnaut sandbox probe extra
+specnaut sandbox exec
+specnaut sandbox exec abc -- make
+specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567
+specnaut sandbox -- exec 0123456789abcdef0123456789abcdef01234567 make
+specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567 --toolchain rel -- make

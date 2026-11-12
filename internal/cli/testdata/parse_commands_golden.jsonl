@@ -64,3 +64,36 @@
 {"args":["verify-scripts","--help"],"intent":{"kind":"help"}}
 {"args":["verify-scripts","a","b"],"intent":{"kind":"unknown","received":"verify-scripts takes no argument"}}
 {"args":["--force","verify-scripts"],"intent":{"kind":"verify-scripts"}}
+{"args":["sandbox"],"intent":{"kind":"unknown","received":"sandbox"}}
+{"args":["sandbox","bogus"],"intent":{"kind":"unknown","received":"sandbox bogus"}}
+{"args":["sandbox","probe"],"intent":{"kind":"sandbox","sub":"probe"}}
+{"args":["sandbox","probe","x"],"intent":{"kind":"unknown","received":"sandbox probe takes no argument"}}
+{"args":["sandbox","probe","--"],"intent":{"kind":"unknown","received":"sandbox probe takes no argument"}}
+{"args":["sandbox","probe","--","x"],"intent":{"kind":"unknown","received":"sandbox probe takes no argument"}}
+{"args":["sandbox","--","probe"],"intent":{"kind":"unknown","received":"sandbox takes its sub-command before --"}}
+{"args":["sandbox","exec"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567"],"intent":{"kind":"unknown","received":"sandbox exec needs a command after --"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--"],"intent":{"kind":"unknown","received":"sandbox exec needs a command after --"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--","make"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":[],"command":["make"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--","make","--","-h","007"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":[],"command":["make","--","-h","007"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","x","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","--","0123456789abcdef0123456789abcdef01234567","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","--","exec","0123456789abcdef0123456789abcdef01234567","make"],"intent":{"kind":"unknown","received":"sandbox takes its sub-command before --"}}
+{"args":["sandbox","exec","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","abc","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","0123456789ABCDEF0123456789ABCDEF01234567","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","1111111111111111111111111111111111111111","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567bbbbbbbbbbbbbbbbbbbbbbbb","--","m"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567bbbbbbbbbbbbbbbbbbbbbbbb","toolchain":[],"command":["m"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","/a:/b","--","make"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":["/a","/b"],"command":["make"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain=/a","--","make"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":["/a"],"command":["make"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","rel","--","make"],"intent":{"kind":"unknown","received":"sandbox exec --toolchain takes absolute folders separated by :"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","/a::/b","--","make"],"intent":{"kind":"unknown","received":"sandbox exec --toolchain takes absolute folders separated by :"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","","--","make"],"intent":{"kind":"unknown","received":"sandbox exec takes one full commit id before --"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","--","make"],"intent":{"kind":"unknown","received":"sandbox exec --toolchain takes absolute folders separated by :"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--no-toolchain","--","m"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":[],"command":["m"]}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain.x","/a","--","make"],"intent":{"kind":"unknown","received":"sandbox exec --toolchain takes absolute folders separated by :"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--toolchain","/a","--toolchain","b","--","make"],"intent":{"kind":"unknown","received":"sandbox exec --toolchain takes absolute folders separated by :"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--help","--","make"],"intent":{"kind":"help"}}
+{"args":["sandbox","exec","0123456789abcdef0123456789abcdef01234567","--","make","--help"],"intent":{"kind":"sandbox","sub":"exec","sha":"0123456789abcdef0123456789abcdef01234567","toolchain":[],"command":["make","--help"]}}
+{"args":["--toolchain","/a","sandbox","probe"],"intent":{"kind":"sandbox","sub":"probe"}}
+{"args":["init","--toolchain","x"],"intent":{"kind":"init","projectName":null,"here":false,"noGit":false,"ai":null,"backlog":null,"backlogUrl":null,"backlogRepo":null,"scheme":null,"specBackend":null,"force":false,"dryRun":false,"resetPreserved":false}}

@@ -43,6 +43,8 @@ async function dispatch(argv: string[]): Promise<number> {
       return (await import("./cli/handlers/diff_handler.ts")).runDiff(intent);
     case "scan":
       return (await import("./cli/handlers/scan_handler.ts")).runScan(intent);
+    case "sandbox":
+      return (await import("./cli/handlers/sandbox_handler.ts")).runSandbox(intent);
     case "verify-scripts":
       return (await import("./cli/handlers/verify_scripts_handler.ts")).runVerifyScripts();
     case "reconcile-status":

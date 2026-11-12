@@ -1,11 +1,13 @@
 // The parse golden's cases for the commands added after golden.ts reached its size target
-// (`specnaut scan`, cli#747, and `specnaut verify-scripts`): parser.ts's own answer for each
+// (`specnaut scan`, cli#747, `specnaut verify-scripts` and `specnaut sandbox`): parser.ts's own answer for each
 // command line, which internal/cli/parse_test.go holds the Go parser to. A later command's cases
 // go here too, never into golden.ts.
 //
 // Regenerate after changing a case or the TypeScript side (CI regenerates it and fails on a diff):
 //   deno run --allow-read --allow-write internal/testdata/golden_commands.ts
 import { parseArgs } from "../../src/cli/parser.ts";
+
+const SHA = "0123456789abcdef0123456789abcdef01234567";
 
 // deno-fmt-ignore
 const argv: string[][] = [
@@ -32,6 +34,25 @@ const argv: string[][] = [
   // `specnaut verify-scripts`: no argument, and the global flags ignored as every command ignores them.
   ["verify-scripts"], ["verify-scripts", "x"], ["verify-scripts", "--path", "x"],
   ["verify-scripts", "--help"], ["verify-scripts", "a", "b"], ["--force", "verify-scripts"],
+  // `specnaut sandbox probe|exec`: the command is every word after the first `--`.
+  ["sandbox"], ["sandbox", "bogus"], ["sandbox", "probe"], ["sandbox", "probe", "x"],
+  ["sandbox", "probe", "--"], ["sandbox", "probe", "--", "x"], ["sandbox", "--", "probe"],
+  ["sandbox", "exec"], ["sandbox", "exec", SHA], ["sandbox", "exec", SHA, "--"],
+  ["sandbox", "exec", SHA, "--", "make"], ["sandbox", "exec", SHA, "--", "make", "--", "-h", "007"],
+  ["sandbox", "exec", SHA, "x", "--", "make"], ["sandbox", "exec", "--", SHA, "make"],
+  ["sandbox", "--", "exec", SHA, "make"], ["sandbox", "exec", "--", "make"],
+  ["sandbox", "exec", "abc", "--", "make"], ["sandbox", "exec", SHA.toUpperCase(), "--", "make"],
+  ["sandbox", "exec", "1".repeat(40), "--", "make"], ["sandbox", "exec", `${SHA}${"b".repeat(24)}`, "--", "m"],
+  ["sandbox", "exec", SHA, "--toolchain", "/a:/b", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain=/a", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain", "rel", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain", "/a::/b", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain", "", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain", "--", "make"], ["sandbox", "exec", SHA, "--no-toolchain", "--", "m"],
+  ["sandbox", "exec", SHA, "--toolchain.x", "/a", "--", "make"],
+  ["sandbox", "exec", SHA, "--toolchain", "/a", "--toolchain", "b", "--", "make"],
+  ["sandbox", "exec", SHA, "--help", "--", "make"], ["sandbox", "exec", SHA, "--", "make", "--help"],
+  ["--toolchain", "/a", "sandbox", "probe"], ["init", "--toolchain", "x"],
 ];
 
 function intentOf(args: string[]): unknown {

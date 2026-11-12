@@ -17,6 +17,14 @@ export type ScanIntent = {
   top: number | "all";
 };
 
+/**
+ * `specnaut sandbox`: `probe` reports which backend would run a branch's gates; `exec` runs
+ * `command` on the export of `sha` in it, the `toolchain` folders read-only and on its PATH.
+ */
+export type SandboxIntent =
+  | { kind: "sandbox"; sub: "probe" }
+  | { kind: "sandbox"; sub: "exec"; sha: string; toolchain: string[]; command: string[] };
+
 export type Intent =
   | { kind: "version" }
   | { kind: "help" }
@@ -162,5 +170,6 @@ export type Intent =
     apiUrl: string | null;
   }
   | ScanIntent
+  | SandboxIntent
   /** `specnaut verify-scripts`: whether `.specnaut/scripts/` matches the base (verify_scripts_handler.ts). */
   | { kind: "verify-scripts" };

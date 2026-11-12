@@ -5,6 +5,7 @@ import type { Intent } from "./intent.ts";
 import { parseInit } from "./init_parser.ts";
 import { validateKnownArg } from "./known_value.ts";
 import { parseReconcile } from "./reconcile_parser.ts";
+import { parseSandbox } from "./sandbox_parser.ts";
 import { parseScan } from "./scan_parser.ts";
 
 export type { Intent } from "./intent.ts";
@@ -42,6 +43,7 @@ const PARSE_OPTIONS = {
     "path",
     "format",
     "top",
+    "toolchain",
   ],
   alias: { v: "version", h: "help" },
 } as const;
@@ -58,6 +60,8 @@ export function parseArgs(argv: string[]): Intent {
   if (command === "init") return parseInit(parsed, rest);
 
   if (command === "scan") return parseScan(parsed, rest);
+
+  if (command === "sandbox") return parseSandbox(parsed, rest, argv);
 
   if (command === "verify-scripts") {
     if (rest.length > 0) return { kind: "unknown", received: "verify-scripts takes no argument" };
