@@ -8,20 +8,34 @@
 
 # scope_read <form> <args...> - the form's output. A refusal by the library stops
 # the audit with its message: an argument it refuses is an error, not an empty
-# scope. Any other failure (an unknown revision) reads as empty, as before. With no
-# temporary file to hold the form's errors, a refusal could not be told from an
-# empty answer, so the audit stops too.
-scope_read() {
-  local out rc=0 err
+# scope. Any other failure (an unknown revision) reads as empty, as before.
+scope_read() { _scope_run "" "$@"; }
+
+# scope_strict <none> <form> <args...> - the form's output, for a read whose revisions
+# are already proved: exit <none> means "nothing" (merge-base's 1 for no common
+# ancestor), and any other failure is a broken repository, never an empty answer, so
+# it stops the audit with git's own message.
+scope_strict() { _scope_run "$@"; }
+
+# _scope_run <none or ""> <form> <args...> - both readers. Without a temporary file to
+# hold the form's errors, a refusal could not be told from an empty answer: it stops.
+_scope_run() {
+  local none="$1" out rc=0 err
+  shift
   err="$(mktemp)" && [ -n "$err" ] || { echo "error: cannot create a temporary file" >&2; exit 2; }
   out="$("$@" 2>"$err")" || rc=$?
   if [ "$rc" -eq 2 ] && grep -q '^git-read: refused' "$err"; then
-    cat "$err" >&2
+    :
+  elif [ -z "$none" ] || [ "$rc" -eq 0 ] || [ "$rc" -eq "$none" ]; then
     rm -f "$err"
-    exit 2
+    printf '%s' "$out"
+    return 0
+  else
+    echo "error: git failed (exit $rc):" >&2
   fi
+  cat "$err" >&2
   rm -f "$err"
-  printf '%s' "$out"
+  exit 2
 }
 
 # scope_base - the head's scope against the base's tip, never HEAD: its commits since the
@@ -34,13 +48,13 @@ scope_base() {
   # The base is proved by the repository's own objects, never through the head's folder.
   [ "$(EXPLICIT_OBJECTS="" _gu_git rev-parse --verify --quiet --end-of-options "$BASE_ARG^{commit}" 2>/dev/null)" = "$BASE_ARG" ] ||
     { echo "error: --base: no commit $BASE_ARG in reach" >&2; exit 2; }
-  forks="$(scope_read _gu_git merge-base --all --end-of-options "$EXPLICIT_HEAD" "$BASE_ARG")"
+  forks="$(scope_strict 1 _gu_git merge-base --all --end-of-options "$EXPLICIT_HEAD" "$BASE_ARG")"
   [ -n "$forks" ] || { echo "error: --base: $BASE_ARG and the head share no history" >&2; exit 2; }
   SCOPE="range"
   SCOPE_LABEL="$BASE_ARG..$EXPLICIT_HEAD"
   COMMITS="$(scope_read gu_log "$BASE_ARG..$EXPLICIT_HEAD")"
   for fork in $forks; do
-    files+="$(scope_read gu_names "$fork" "$EXPLICIT_HEAD")"$'\n'
+    files+="$(scope_strict 0 gu_names "$fork" "$EXPLICIT_HEAD")"$'\n'
   done
   FILES="$(printf '%s' "$files" | LC_ALL=C sort -u)"
 }

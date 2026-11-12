@@ -4,6 +4,7 @@
 // base: a scope taken from that base alone would leave it out.
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
+import { join } from "@std/path";
 import { git, writeFiles } from "../scripts/explicit_head_fixture.ts";
 import { scope, section } from "./collect_audit_scope_fixture.ts";
 
@@ -37,7 +38,7 @@ async function crissCross() {
   const base = await commit(root, { "k.ts": "edited on main later\n" }, "main edits k");
   const bases = (await git(root, "merge-base", "--all", base, head)).split("\n").sort();
   assertEquals(bases, [onMain, onTopic].sort(), "the fixture has two merge bases");
-  return { root, base, head };
+  return { root, base, head, onTopic };
 }
 
 Deno.test("audit scope --base: FILES are the union of the diffs from every merge base", async () => {
@@ -57,4 +58,18 @@ Deno.test("audit scope --base: a base and a head that share no history are refus
   assertEquals(r.code, 2, r.stdout);
   assertStringIncludes(r.stderr, `error: --base: ${other} and the head share no history`);
   assertEquals(r.stdout, "");
+});
+
+Deno.test({
+  name: "audit scope --base: a merge base whose tree git cannot read stops the scope",
+  ignore: Deno.build.os === "windows", // git's objects are read-only there; removing one needs more
+  fn: async () => {
+    const repo = await crissCross();
+    const tree = await git(repo.root, "rev-parse", `${repo.onTopic}^{tree}`);
+    await Deno.remove(join(repo.root, ".git", "objects", tree.slice(0, 2), tree.slice(2)));
+    const r = await scope(repo.root, ["--base", repo.base, "--head", repo.head]);
+    assertEquals(r.code, 2, r.stdout);
+    assertStringIncludes(r.stderr, "error: git failed (exit 128):");
+    assertEquals(r.stdout, "");
+  },
 });
