@@ -73,8 +73,11 @@ export const SESSION_RECORD_VAR = "SPECNAUT_SESSION_RECORD";
 /** The reasons the record adds to the check's. Every one about the record itself is filed under `path`. */
 export const SESSION_REASON = {
   path: SESSION_RECORD_VAR,
-  none: "this harness took no session-start record: only a Claude Code session whose " +
-    "SessionStart hook ran `specnaut record-checkout` has one",
+  // `/clear` runs the hook with a source that takes no record, and may drop the variable the start
+  // set: the session then names none, and only a new one, which takes its own, can be checked.
+  none: "this session names no session-start record: only a Claude Code session whose " +
+    "SessionStart hook ran `specnaut record-checkout` has one, and a `/clear` may drop it; " +
+    "start a new session",
   outside: "names a file outside this checkout's session records",
   missing: "the session-start record is missing",
   unreadable: "the session-start record cannot be read",

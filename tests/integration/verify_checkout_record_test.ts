@@ -78,14 +78,17 @@ Deno.test("a session still on the branch is told each cause once, as the checkou
   ]);
 });
 
-Deno.test("a harness that took no record is refused, saying so, before the checkout is judged", async () => {
+Deno.test("a session naming no record is refused, told what drops it and to restart, before the checkout is judged", async () => {
   const { root, head } = await setUp();
   // Codex, Copilot, Cursor, OpenCode and Antigravity register no SessionStart record: the variable
-  // is never set there. The checkout itself is clean, so only the missing record can refuse it.
+  // is never set there, and a Claude Code `/clear` may drop it. The checkout itself is clean, so
+  // only the missing record can refuse it.
   for (const named of [undefined, ""]) {
     const outcome = await check(root, head, { named });
     assertEquals(reasons(outcome), [{ path: RECORD, reason: SESSION_REASON.none }]);
-    assertStringIncludes(SESSION_REASON.none, "this harness took no session-start record");
+    for (const told of ["no session-start record", "`/clear`", "start a new session"]) {
+      assertStringIncludes(SESSION_REASON.none, told);
+    }
     const tip = (await git(root, "rev-parse", "main")).trim();
     if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(tip));
   }
