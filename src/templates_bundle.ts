@@ -6732,6 +6732,8 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | \`phases/remote-gates.md\` | \`auto-chain\`, in remote mode |
 | \`phases/orphan-specs.md\` | \`groom\`, when specs are kept locally |
 | \`phases/review-seats.md\` | \`review\`, before its first seat brief |
+| \`phases/review-gates.md\` | \`review\`, at its quality gates |
+| \`phases/review-untrusted.md\` | \`review\`, of a PR or a remote branch |
 | \`phases/script-gate.md\` | \`resume\`, \`groom\`, \`audit\` and the backlog verbs, before their first script; its config verdicts by every verb that runs a gate |
 
 Unknown verb → look it up first in the \`specnaut\` skill's **Retired addresses** table: a verb

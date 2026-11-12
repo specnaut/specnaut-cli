@@ -72,6 +72,9 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "orphan-specs", parents: [tk("groom")] },
   // The review aggregation, loaded by review before its first seat brief (#678).
   { skill: "task", doc: "review-seats", parents: [tk("review")] },
+  // Review Phase 2's gate table, and the mode review follows for a PR or a remote branch.
+  { skill: "task", doc: "review-gates", parents: [tk("review")] },
+  { skill: "task", doc: "review-untrusted", parents: [tk("review")] },
   { skill: "task", doc: "plan-reentry", parents: [tk("plan")] },
   // The helper-script gate: of the verbs that load it, groom and audit read an addendum.
   { skill: "task", doc: "script-gate", parents: [tk("groom"), tk("audit")] },
