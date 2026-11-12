@@ -8262,8 +8262,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, only of the target item's author, as the items
-#                   file records it; a new item's text mentions nobody
+#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
+#                   item's author (case-blind, as the items file records it); none new
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -8320,7 +8320,7 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$targets[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -8363,7 +8363,7 @@ PLAN_JQ='
                  | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
-                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
                  | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
                  | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
@@ -11456,8 +11456,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, only of the target item's author, as the items
-#                   file records it; a new item's text mentions nobody
+#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
+#                   item's author (case-blind, as the items file records it); none new
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -11514,7 +11514,7 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$targets[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -11557,7 +11557,7 @@ PLAN_JQ='
                  | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
-                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
                  | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
                  | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
@@ -13879,8 +13879,8 @@ echo "linked #\$CHILD under #\$PARENT"
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, only of the target item's author, as the items
-#                   file records it; a new item's text mentions nobody
+#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
+#                   item's author (case-blind, as the items file records it); none new
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -13937,7 +13937,7 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$targets[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -13980,7 +13980,7 @@ PLAN_JQ='
                  | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
-                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
                  | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
                  | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
@@ -15569,8 +15569,8 @@ receipt_snapshot() { :; }
 #   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
 #   body, append    up to 65536 characters (a comment's body: 16384), inert,
 #                   tabs and newlines kept. An edit only appends to a body.
-#   @-mentions      in any text, only of the target item's author, as the items
-#                   file records it; a new item's text mentions nobody
+#   @-mentions      in any text, in GitHub's and GitLab's forms, only of the target
+#                   item's author (case-blind, as the items file records it); none new
 # Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
 # operation for memory, files or raw tracker calls, and no key that is a path:
 # the executor writes every body file itself.
@@ -15627,7 +15627,7 @@ PLAN_JQ='
   def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
   def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
   def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
-  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def mentions: [match("(?<![A-Za-z0-9_])@([A-Za-z0-9_][A-Za-z0-9_./-]*)"; "g") | .captures[0].string | sub("[./]+\$"; "") | ascii_downcase];
   def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
       | (if any(\$targets[]; . == \$n) then \$n else null end)
     elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
@@ -15670,7 +15670,7 @@ PLAN_JQ='
                  | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
              + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
              + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
-                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty | ascii_downcase] end) as \$who
                  | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
                  | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
           | if (\$bad | length) > 0 then .refused += \$bad
