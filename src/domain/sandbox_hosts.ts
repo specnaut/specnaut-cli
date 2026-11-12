@@ -34,9 +34,13 @@ export const SYSTEM = {
     "/Library/Developer/CommandLineTools",
     "/private/etc",
     "/private/var/db/timezone",
+    "/private/var/select",
   ],
   container: [],
 } as const;
 
 export const SYSTEM_PATH = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
 export const DEVICES = ["/dev/null", "/dev/zero", "/dev/random", "/dev/urandom"];
+
+/** On macOS the loader reads the root folder's own listing (its names, nothing beneath it). */
+export const SEATBELT_LISTINGS: readonly string[] = ["/"];

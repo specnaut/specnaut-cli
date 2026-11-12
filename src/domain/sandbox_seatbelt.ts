@@ -24,10 +24,8 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
     "(allow signal (target same-sandbox))",
     "(allow process-info* (target same-sandbox))",
     "(allow sysctl-read)",
-    // Resolving a path stats every folder on the way; this reveals that a file exists, not
-    // what it holds. The loader also lists the root folder itself (its names, nothing beneath).
-    "(allow file-read-metadata)",
-    '(allow file-read-data (literal "/"))',
+    `(allow file-read-metadata ${rules("literal", policy.lookups)})`,
+    `(allow file-read-data ${rules("literal", policy.listings)})`,
     `(allow file-read* ${rules("subpath", folders)})`,
     `(allow file-read* file-write* ${rules("literal", policy.devices)})`,
     `(allow file-write* ${rules("subpath", policy.writes)})`,
@@ -41,8 +39,14 @@ export function seatbeltProfile(policy: SandboxPolicy): string {
   ].join("\n");
 }
 
+/**
+ * The filters of one rule. An allow with no filter would apply to every path, so an empty list
+ * throws rather than widen it. Only a `literal` may name the root folder: it means that one entry.
+ */
 function rules(kind: "subpath" | "literal", paths: readonly string[]): string {
-  return paths.map((p) => `(${kind} "${safePath(p)}")`).join(" ");
+  if (paths.length === 0) throw new Error(`a seatbelt rule needs at least one ${kind}`);
+  const quoted = (p: string) => (kind === "literal" && p === "/" ? p : safePath(p));
+  return paths.map((p) => `(${kind} "${quoted(p)}")`).join(" ");
 }
 
 function service(name: string): string {

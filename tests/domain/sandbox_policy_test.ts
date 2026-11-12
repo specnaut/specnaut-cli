@@ -128,3 +128,17 @@ Deno.test("sandboxPolicy: the allowed macOS services exclude every forbidden one
     "pasteboard",
   ]);
 });
+
+Deno.test("sandboxPolicy: on macOS only the folders above a visible one may be looked up", () => {
+  const policy = policyOf("seatbelt");
+  const visible = [...policy.system, ...policy.reads, ...policy.writes];
+  for (const lookup of policy.lookups) {
+    assert(visible.some((v) => v.startsWith(lookup === "/" ? "/" : `${lookup}/`)), lookup);
+  }
+  for (const above of ["/", "/home", PATHS.home, "/home/dev/.cache", "/private/var"]) {
+    assert(policy.lookups.includes(above), above);
+  }
+  assert(!policy.lookups.includes(`${PATHS.home}/.ssh`));
+  assertEquals(policy.listings, ["/"]);
+  assertEquals([policyOf("bwrap").lookups, policyOf("container").listings], [[], []]);
+});

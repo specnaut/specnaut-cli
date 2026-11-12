@@ -12,8 +12,14 @@
  */
 
 import type { ImageSource } from "./sandbox_image.ts";
-import { ALLOWED_SERVICES, DEVICES, SYSTEM, SYSTEM_PATH } from "./sandbox_hosts.ts";
-import { overlaps, pathProblem, within } from "./sandbox_paths.ts";
+import {
+  ALLOWED_SERVICES,
+  DEVICES,
+  SEATBELT_LISTINGS,
+  SYSTEM,
+  SYSTEM_PATH,
+} from "./sandbox_hosts.ts";
+import { ancestors, overlaps, pathProblem, within } from "./sandbox_paths.ts";
 
 export type Engine = "podman" | "docker";
 export type SandboxedBackend = "container" | "bwrap" | "seatbelt";
@@ -108,6 +114,13 @@ export type SandboxPolicy = {
   readonly reads: readonly string[];
   /** The only writable folders, empty at the start and discarded after. */
   readonly writes: readonly string[];
+  /**
+   * Folders whose own entry may be stat'ed, on macOS: those above a visible folder, which
+   * resolving its path walks through. A file's existence elsewhere stays hidden too.
+   */
+  readonly lookups: readonly string[];
+  /** Folders whose names (not what lies beneath) may be listed, on macOS. */
+  readonly listings: readonly string[];
   /** Device files read and written (bubblewrap and a container provide their own `/dev`). */
   readonly devices: readonly string[];
   /** No network at all: loopback, unix sockets and dependency installs included. */
@@ -127,17 +140,23 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
   const inContainer = backend === "container";
   const home = `${paths.scratch}/home`;
   const tmp = `${paths.scratch}/tmp`;
+  const system = SYSTEM[backend];
+  const reads = inContainer ? [paths.tree] : [...paths.toolchain, paths.tree];
+  const writes = [home, tmp];
+  const onMac = backend === "seatbelt";
   const policy: SandboxPolicy = {
     workdir: paths.tree,
     env: inContainer
       ? { HOME: home, TMPDIR: tmp }
       : { PATH: [...paths.path, ...SYSTEM_PATH].join(":"), HOME: home, TMPDIR: tmp },
-    system: SYSTEM[backend],
-    reads: inContainer ? [paths.tree] : [...paths.toolchain, paths.tree],
-    writes: [home, tmp],
+    system,
+    reads,
+    writes,
+    lookups: onMac ? ancestors([...system, ...reads, ...writes]) : [],
+    listings: onMac ? SEATBELT_LISTINGS : [],
     devices: DEVICES,
     network: "none",
-    services: backend === "seatbelt" ? ALLOWED_SERVICES : [],
+    services: onMac ? ALLOWED_SERVICES : [],
     user: "65534:65534",
     limits: LIMITS,
   };

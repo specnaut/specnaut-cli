@@ -66,11 +66,21 @@ Deno.test("seatbeltProfile: writes are the scratch folders and the devices only"
   ]);
 });
 
-Deno.test("seatbeltProfile: the real home and the checkout appear in no rule", () => {
+Deno.test("seatbeltProfile: the home is only looked up on the way; the checkout appears nowhere", () => {
   const text = profile();
-  assert(!text.includes(`"${PATHS.home}"`));
+  const metadata = `(allow file-read-metadata ${
+    policyOf("seatbelt").lookups.map((p) => `(literal "${p}")`).join(" ")
+  })`;
+  const others = lines().filter((l) => l !== metadata).join("\n");
+  assert(lines().includes(metadata));
+  assert(!others.includes(`"${PATHS.home}"`));
   assert(!text.includes(PATHS.checkout));
   assert(!text.includes('(subpath "/")'));
+});
+
+Deno.test("seatbeltProfile: only the root folder's own listing is read, nothing beneath it", () => {
+  const listings = allowLines().filter((l) => l.startsWith("(allow file-read-data"));
+  assertEquals(listings, ['(allow file-read-data (literal "/"))']);
 });
 
 Deno.test("seatbeltProfile: other processes cannot be signalled or inspected", () => {
@@ -84,4 +94,16 @@ Deno.test("seatbeltProfile: a path that could break out of its quotes is refused
   const forged: SandboxPolicy = { ...policyOf("seatbelt"), reads: ['/a") (allow default) ("'] };
   assertThrows(() => seatbeltProfile(forged));
   assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), writes: ["/a\\"] }));
+});
+
+Deno.test("seatbeltProfile: every file allow carries a filter; an empty list never widens to all", () => {
+  for (const line of allowLines().filter((l) => l.startsWith("(allow file-"))) {
+    assert(/\((subpath|literal) "/.test(line), line);
+  }
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), writes: [] }));
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), devices: [] }));
+  assertThrows(() =>
+    seatbeltProfile({ ...policyOf("seatbelt"), system: [], reads: [], writes: [] })
+  );
+  assertThrows(() => seatbeltProfile({ ...policyOf("seatbelt"), reads: ["/"] }));
 });

@@ -8,7 +8,7 @@
  * characters. Pure — no IO; POSIX paths only, the one form every backend reads.
  */
 
-import { normalize } from "@std/path/posix";
+import { dirname, normalize } from "@std/path/posix";
 
 /** A character one of the backends' syntaxes would read as structure, or a control character. */
 // deno-lint-ignore no-control-regex
@@ -38,4 +38,16 @@ export function within(inner: string, outer: string): boolean {
 /** Whether either path is, or holds, the other. */
 export function overlaps(a: string, b: string): boolean {
   return within(a, b) || within(b, a);
+}
+
+/** Every folder above one of `paths`, the root included, sorted: what resolving them stats. */
+export function ancestors(paths: readonly string[]): string[] {
+  const above = new Set<string>();
+  for (const path of paths) {
+    for (let dir = dirname(path); !above.has(dir); dir = dirname(dir)) {
+      above.add(dir);
+      if (dir === "/") break;
+    }
+  }
+  return [...above].sort();
 }
