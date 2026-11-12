@@ -1,3 +1,5 @@
+import { isAbsolute, join } from "@std/path";
+
 /**
  * git with hardened defaults, for reading a repository whose configuration nobody vetted: the one
  * home, in TypeScript, of how the binary runs git against such a repository. The shell scripts'
@@ -18,7 +20,7 @@ export const UNTRUSTED_GIT_FLAGS: readonly string[] = [
   "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "log.showSignature=false",
   "-c", "gpg.program=/dev/null/none", "-c", "gpg.openpgp.program=/dev/null/none",
   "-c", "gpg.ssh.program=/dev/null/none", "-c", "gpg.x509.program=/dev/null/none",
-  "-c", "submodule.recurse=false", "-c", "diff.submodule=short",
+  "-c", "submodule.recurse=false", "-c", "diff.submodule=short", "--no-replace-objects",
 ];
 
 /** Passed only to a git that knows it (2.44 or later); below it, a promisor remote is refused. */
@@ -32,6 +34,8 @@ export const UNTRUSTED_GIT_ENV: Readonly<Record<string, string>> = {
   GIT_OPTIONAL_LOCKS: "0",
   GIT_TERMINAL_PROMPT: "0",
   GIT_NO_LAZY_FETCH: "1",
+  GIT_NO_REPLACE_OBJECTS: "1",
+  GIT_GRAFT_FILE: "/dev/null/none",
   GIT_CONFIG_NOSYSTEM: "1",
 };
 
@@ -76,7 +80,7 @@ let lazySupport: Promise<boolean> | undefined;
 
 /** git, run in one repository under the hardened defaults. */
 export class UntrustedGit {
-  #lazy: Promise<readonly string[]> | undefined;
+  #ready: Promise<readonly string[]> | undefined;
 
   constructor(readonly cwd: string) {}
 
@@ -89,12 +93,18 @@ export class UntrustedGit {
 
   /** The exit code and stdout, never a throw for a non-zero exit. */
   async call(sub: GitSubcommand, args: readonly string[], input?: Uint8Array): Promise<GitResult> {
-    const lazy = await (this.#lazy ??= this.#lazyFlags());
+    const lazy = await (this.#ready ??= this.#preflight());
     return spawnGit(
       this.cwd,
       [...UNTRUSTED_GIT_FLAGS, ...lazy, ...READ_CONFIG, sub, ...args],
       input,
     );
+  }
+
+  /** What every call needs first: no grafts file, and the lazy-fetch flags. */
+  async #preflight(): Promise<readonly string[]> {
+    await refuseGrafts(this.cwd);
+    return await this.#lazyFlags();
   }
 
   /** `--no-lazy-fetch` when git knows it; below 2.44 a promisor remote is refused, not read. */
@@ -109,6 +119,25 @@ export class UntrustedGit {
     }
     return [];
   }
+}
+
+/**
+ * `GIT_GRAFT_FILE` already keeps git from reading `info/grafts`; a repository that holds one is
+ * refused anyway, so a history someone rewrote is named rather than silently read around. Outside
+ * a repository nothing is refused here: the call itself says so.
+ */
+async function refuseGrafts(cwd: string): Promise<void> {
+  // The common dir, not `--git-path info/grafts`: that one answers with GIT_GRAFT_FILE itself.
+  const out = await spawnGit(cwd, [...UNTRUSTED_GIT_FLAGS, "rev-parse", "--git-common-dir"]);
+  if (out.code !== 0) return;
+  const common = new TextDecoder().decode(out.stdout).trim();
+  try {
+    await Deno.lstat(join(isAbsolute(common) ? common : join(cwd, common), "info", "grafts"));
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return;
+    throw err;
+  }
+  throw new GitRefused("an info/grafts file rewrites this repository's history: remove it first");
 }
 
 /** Names as git stores them, never C-quoted: every caller reads a NUL-separated or raw list. */

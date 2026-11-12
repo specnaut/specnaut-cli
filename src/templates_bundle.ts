@@ -16741,7 +16741,7 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 # environment and runs with these defaults, each turning off a program or a
 # redirection the repository's own configuration could otherwise name:
 #
-#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch
+#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch --no-replace-objects
 #   -c core.fsmonitor=false           no fsmonitor program
 #   -c core.hooksPath=/dev/null       no hook
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
@@ -16749,11 +16749,12 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
 #
-# Three defaults are deliberate pairs, so dropping one leaves the other in force:
+# Four defaults are deliberate pairs, so dropping one leaves the other in force:
 # --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and GIT_NO_LAZY_FETCH=1;
-# gpg.program and gpg.openpgp.program, two names for one program. --no-lazy-fetch
-# needs git 2.44; below it, a repository naming a promisor remote is refused rather
-# than read, since reading a missing object would fetch it.
+# --no-replace-objects and GIT_NO_REPLACE_OBJECTS=1; gpg.program and gpg.openpgp.program,
+# two names for one program. GIT_GRAFT_FILE names no file: info/grafts is never read.
+# --no-lazy-fetch needs git 2.44; below it, a repository naming a promisor remote is
+# refused rather than read, since reading a missing object would fetch it.
 #
 # The forms (gu_<form>) take data only - revisions, paths, a fixed-string pattern,
 # a count - never a git option; each runs one fixed command line. They read objects
@@ -16822,13 +16823,14 @@ _gu_lazy_flag() {
   [ "\$_GU_LAZY" = yes ]
 }
 
-# git with no GIT_* variable from the caller, and the three this file sets.
+# git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
   local name
   for name in \$(compgen -e); do
     case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
   done
   export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   command git "\$@"
 )
 
@@ -16844,7 +16846,7 @@ _gu_git() {
     -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
     -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
     -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
-    -c submodule.recurse=false -c diff.submodule=short "\$@"
+    -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "\$@"
 }
 
 # The flags every form that diffs carries: no textconv, no external diff, no color.
@@ -32296,7 +32298,7 @@ exit 0
 # environment and runs with these defaults, each turning off a program or a
 # redirection the repository's own configuration could otherwise name:
 #
-#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch
+#   --no-pager --no-optional-locks --literal-pathspecs --no-lazy-fetch --no-replace-objects
 #   -c core.fsmonitor=false           no fsmonitor program
 #   -c core.hooksPath=/dev/null       no hook
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
@@ -32304,11 +32306,12 @@ exit 0
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
 #
-# Three defaults are deliberate pairs, so dropping one leaves the other in force:
+# Four defaults are deliberate pairs, so dropping one leaves the other in force:
 # --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and GIT_NO_LAZY_FETCH=1;
-# gpg.program and gpg.openpgp.program, two names for one program. --no-lazy-fetch
-# needs git 2.44; below it, a repository naming a promisor remote is refused rather
-# than read, since reading a missing object would fetch it.
+# --no-replace-objects and GIT_NO_REPLACE_OBJECTS=1; gpg.program and gpg.openpgp.program,
+# two names for one program. GIT_GRAFT_FILE names no file: info/grafts is never read.
+# --no-lazy-fetch needs git 2.44; below it, a repository naming a promisor remote is
+# refused rather than read, since reading a missing object would fetch it.
 #
 # The forms (gu_<form>) take data only - revisions, paths, a fixed-string pattern,
 # a count - never a git option; each runs one fixed command line. They read objects
@@ -32377,13 +32380,14 @@ _gu_lazy_flag() {
   [ "\$_GU_LAZY" = yes ]
 }
 
-# git with no GIT_* variable from the caller, and the three this file sets.
+# git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
   local name
   for name in \$(compgen -e); do
     case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
   done
   export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
+  export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   command git "\$@"
 )
 
@@ -32399,7 +32403,7 @@ _gu_git() {
     -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
     -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
     -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
-    -c submodule.recurse=false -c diff.submodule=short "\$@"
+    -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "\$@"
 }
 
 # The flags every form that diffs carries: no textconv, no external diff, no color.
