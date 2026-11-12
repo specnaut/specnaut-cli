@@ -9,8 +9,8 @@
 package main
 
 import (
-	"io/fs"
 	"os"
+	"syscall"
 
 	"github.com/specnaut/specnaut-cli/internal/cli"
 	"github.com/specnaut/specnaut-cli/internal/lockfile"
@@ -32,14 +32,19 @@ func main() {
 // openProject is the current directory: plain (links followed anywhere, as
 // Deno.readTextFile follows them) and contained (lockfile.OpenContained,
 // opened on first use, as resolveProjectRoot runs lazily).
+//
+// syscall.Getwd, not os.Getwd: os.Getwd answers $PWD when it names the same
+// directory, which keeps a link the shell went through, while Deno.cwd() is
+// getcwd's answer, every link resolved on Unix. A refusal prints this path.
 func openProject() (reconcile.Project, error) {
-	cwd, err := os.Getwd()
+	cwd, err := syscall.Getwd()
 	if err != nil {
 		return reconcile.Project{}, err
 	}
 	return reconcile.Project{
+		Dir:       cwd,
 		Plain:     os.DirFS(cwd),
-		Contained: func() (fs.FS, error) { return lockfile.OpenContained(cwd, home()) },
+		Contained: func() (lockfile.Contained, error) { return lockfile.OpenContained(cwd, home()) },
 	}, nil
 }
 

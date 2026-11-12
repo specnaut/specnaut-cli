@@ -2,12 +2,18 @@ package reconcile
 
 import (
 	"errors"
-	"io/fs"
 	"testing"
 	"testing/fstest"
 
 	"github.com/specnaut/specnaut-cli/internal/lockfile"
 )
+
+// contained serves tree as the contained view of a project at /p.
+func contained(tree fstest.MapFS) Files {
+	return newFiles("/p", func() (lockfile.Contained, error) {
+		return lockfile.Contained{Root: "/p", FS: tree}, nil
+	})
+}
 
 func TestPreflightReasonsInOrder(t *testing.T) {
 	lock := &lockfile.Lock{Entries: map[string]lockfile.Entry{"a.md": {}, "b.md": {}, "c.md": {}}}
@@ -17,7 +23,7 @@ func TestPreflightReasonsInOrder(t *testing.T) {
 		".specnaut/upgrade-staging/b.md": file("up"),
 		"c.md":                           file("local"),
 	}
-	files := newFiles(func() (fs.FS, error) { return tree, nil })
+	files := contained(tree)
 	for _, c := range []struct {
 		lock *lockfile.Lock
 		path string
@@ -43,7 +49,7 @@ func TestPreflightReasonsInOrder(t *testing.T) {
 func TestPreflightReadsNormalisedPaths(t *testing.T) {
 	lock := &lockfile.Lock{Entries: map[string]lockfile.Entry{"a//b.md": {}}}
 	tree := fstest.MapFS{".specnaut/upgrade-staging/a/b.md": file("up"), "a/b.md": file("local")}
-	got, err := Preflight(lock, newFiles(func() (fs.FS, error) { return tree, nil }), "a//b.md")
+	got, err := Preflight(lock, contained(tree), "a//b.md")
 	if err != nil || got.Refusal != Ready {
 		t.Errorf("a//b.md resolves to a/b.md as @std/path resolve does; got %q, %v", got.Refusal, err)
 	}
@@ -52,7 +58,7 @@ func TestPreflightReadsNormalisedPaths(t *testing.T) {
 func TestPreflightPropagatesAContainmentRefusal(t *testing.T) {
 	lock := &lockfile.Lock{Entries: map[string]lockfile.Entry{"a.md": {}}}
 	refused := errors.New("refusing to operate with the filesystem root as the project: /")
-	_, err := Preflight(lock, newFiles(func() (fs.FS, error) { return nil, refused }), "a.md")
+	_, err := Preflight(lock, newFiles("/p", func() (lockfile.Contained, error) { return lockfile.Contained{}, refused }), "a.md")
 	if !errors.Is(err, refused) {
 		t.Errorf("err = %v, want the root refusal", err)
 	}
@@ -60,7 +66,7 @@ func TestPreflightPropagatesAContainmentRefusal(t *testing.T) {
 
 func TestPreflightRefusesAnUnsafePath(t *testing.T) {
 	lock := &lockfile.Lock{Entries: map[string]lockfile.Entry{"../x": {}}} // parseLock forbids it; the read checks again
-	_, err := Preflight(lock, newFiles(func() (fs.FS, error) { return fstest.MapFS{}, nil }), "../x")
+	_, err := Preflight(lock, contained(fstest.MapFS{}), "../x")
 	if err == nil {
 		t.Error("an escaping path was read")
 	}

@@ -21,8 +21,12 @@ func TestOpenContainedRefusesALinkLeadingOut(t *testing.T) {
 	must(os.WriteFile(filepath.Join(project, "a.md"), []byte("inside"), 0o600))
 	must(os.Symlink(filepath.Join(outside, "secret"), filepath.Join(project, "escape")))
 
-	fsys, err := OpenContained(project, "")
+	c, err := OpenContained(project, "")
 	must(err)
+	if real, _ := filepath.EvalSymlinks(project); c.Root != real {
+		t.Errorf("Root = %q, want the project resolved through links, %q", c.Root, real)
+	}
+	fsys := c.FS
 	if data, err := fs.ReadFile(fsys, "a.md"); err != nil || string(data) != "inside" {
 		t.Errorf("a.md = %q, %v", data, err)
 	}

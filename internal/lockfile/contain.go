@@ -83,24 +83,32 @@ func RefuseRoot(root, home string) error {
 	return nil
 }
 
+// Contained is a project opened for contained reads: Root is the directory
+// resolved through links, the root `resolveProjectRoot` answers and a refusal
+// names as the project, and FS is its *os.Root's view.
+type Contained struct {
+	Root string
+	FS   fs.FS
+}
+
 // OpenContained opens dir for contained reads (`resolveProjectRoot` in
 // fs_containment.ts): dir resolved through links, vetted by RefuseRoot against
 // home, then opened as an *os.Root, whose FS refuses any path — a symlink
 // included — that leads outside it. home is HOME as the environment gives it,
 // "" when unset; it is resolved here, as TypeScript resolves it.
-func OpenContained(dir, home string) (fs.FS, error) {
+func OpenContained(dir, home string) (Contained, error) {
 	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
-		return nil, err
+		return Contained{}, err
 	}
 	if err := RefuseRoot(root, resolveHome(home)); err != nil {
-		return nil, err
+		return Contained{}, err
 	}
 	r, err := os.OpenRoot(root)
 	if err != nil {
-		return nil, err
+		return Contained{}, err
 	}
-	return r.FS(), nil
+	return Contained{Root: root, FS: r.FS()}, nil
 }
 
 // resolveHome is fs_containment.ts's home: resolved through links when it

@@ -9,6 +9,7 @@ import (
 	"testing/fstest"
 
 	specnaut "github.com/specnaut/specnaut-cli"
+	"github.com/specnaut/specnaut-cli/internal/lockfile"
 	"github.com/specnaut/specnaut-cli/internal/reconcile"
 )
 
@@ -24,7 +25,9 @@ func run(t *testing.T, tree fstest.MapFS, args ...string) (int, string, string) 
 		LookupEnv: func(k string) (string, bool) { return map[string]string{"NO_COLOR": "1"}[k], k == "NO_COLOR" },
 		ExecPath:  "/usr/local/bin/specnaut",
 		Project: func() (reconcile.Project, error) {
-			return reconcile.Project{Plain: tree, Contained: func() (fs.FS, error) { return tree, nil }}, nil
+			return reconcile.Project{Dir: "/p", Plain: tree, Contained: func() (lockfile.Contained, error) {
+				return lockfile.Contained{Root: "/p", FS: tree}, nil
+			}}, nil
 		},
 	})
 	return code, stdout.String(), stderr.String()
@@ -39,6 +42,11 @@ func TestRunExitPaths(t *testing.T) {
 		return fstest.MapFS{".specnaut/installed.lock": {Data: []byte(
 			"version: 2\nharness: " + harness + "\ntemplates_version: 0.0.1\nentries: {}\n")}}
 	}
+	stagedLink, linkedStaging := lock("claude"), lock("claude")
+	stagedLink[".specnaut/installed.lock"] = &fstest.MapFile{Data: []byte("version: 2\nharness: claude\n" +
+		"templates_version: 0.0.1\nentries:\n  a.md:\n    sha256: x\n    installed_at: y\n    templates_version: z\n")}
+	stagedLink[".specnaut/upgrade-staging/a.md"] = &fstest.MapFile{Data: []byte("../../a.md"), Mode: fs.ModeSymlink}
+	linkedStaging[".specnaut/upgrade-staging"] = &fstest.MapFile{Data: []byte("../src"), Mode: fs.ModeSymlink}
 	for _, c := range []struct {
 		name           string
 		tree           fstest.MapFS
@@ -57,7 +65,12 @@ func TestRunExitPaths(t *testing.T) {
 		{"not ported", nil, []string{"upgrade"}, 3, "",
 			"error: `specnaut upgrade` is not ported to this Go build yet; use the released binary for it\n"},
 		{"reconcile --status", lock("claude"), []string{"reconcile", "--status"}, 0,
-			"{\n  \"pending\": [],\n  \"stagingDir\": null\n}\n", ""},
+			"{\n  \"pending\": [],\n  \"stagingDir\": null,\n  \"refused\": []\n}\n", ""},
+		{"reconcile --status, a staged link", stagedLink, []string{"reconcile", "--status"}, 0,
+			"{\n  \"pending\": [],\n  \"stagingDir\": null,\n  \"refused\": [\n    {\n      \"path\": \"a.md\",\n" +
+				"      \"reason\": \"left .specnaut/upgrade-staging/a.md in place — refusing to read a staged path…", ""},
+		{"reconcile --status, a linked staging folder", linkedStaging, []string{"reconcile", "--status"}, 1, "",
+			"error: Uncaught (in promise) ContainmentRefusal: refusing to use a staging directory reached through a symlink:\n…"},
 		{"malformed lock", fstest.MapFS{".specnaut/installed.lock": {Data: []byte("version: [")}},
 			[]string{"reconcile", "--status"}, 1, "", "error: Uncaught (in promise) SyntaxError: …"},
 	} {

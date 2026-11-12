@@ -84,11 +84,11 @@ func reconcileStatus(env Env) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	pending, err := reconcile.Status(project)
+	queue, err := reconcile.Status(project)
 	if err != nil {
 		return 0, err
 	}
-	fmt.Fprintln(env.Stdout, reconcile.RenderStatus(pending))
+	fmt.Fprintln(env.Stdout, reconcile.RenderStatus(queue))
 	return 0, nil
 }
 

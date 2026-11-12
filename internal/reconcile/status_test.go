@@ -20,11 +20,12 @@ func lockWith(harness string, keys ...string) *fstest.MapFile {
 func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
 // project serves one in-memory tree as both views, and counts how often the
-// contained view is opened.
+// contained view is opened. The directory as the process reports it and the
+// one resolved through links differ, so a refusal shows which it names where.
 func project(tree fstest.MapFS, opened *int) Project {
-	return Project{Plain: tree, Contained: func() (fs.FS, error) {
+	return Project{Dir: "/cwd/p", Plain: tree, Contained: func() (lockfile.Contained, error) {
 		*opened++
-		return tree, nil
+		return lockfile.Contained{Root: "/real/p", FS: tree}, nil
 	}}
 }
 
@@ -46,8 +47,8 @@ func TestStatusListsOnlyWhatReconcileWouldResolve(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"a/one.md", "a/two.md", "b/r&d.md"} // MapFS lists sorted; the OS does not
-	if !equal(got, want) {
-		t.Errorf("Status = %q, want %q", got, want)
+	if !equal(got.Pending, want) || got.Refused == nil || len(got.Refused) != 0 {
+		t.Errorf("Status = %q, refused %q; want %q and none refused", got.Pending, got.Refused, want)
 	}
 	if opened != 1 {
 		t.Errorf("the contained view was opened %d times, want once", opened)
@@ -63,12 +64,12 @@ func TestStatusWithNothingStagedNeverOpensTheContainedView(t *testing.T) {
 		"staged, not tracked": {".specnaut/installed.lock": lockWith("claude"), ".specnaut/upgrade-staging/a.md": file("x")},
 	} {
 		var opened int
-		got, err := Status(Project{Plain: tree, Contained: func() (fs.FS, error) {
+		got, err := Status(Project{Plain: tree, Contained: func() (lockfile.Contained, error) {
 			opened++
-			return nil, errors.New("refusing to operate with the home directory as the project")
+			return lockfile.Contained{}, errors.New("refusing to operate with the home directory as the project")
 		}})
-		if err != nil || got == nil || len(got) != 0 || opened != 0 {
-			t.Errorf("%s: Status = %q (nil=%v), %v; contained opened %d times", name, got, got == nil, err, opened)
+		if err != nil || got.Pending == nil || len(got.Pending) != 0 || got.Refused == nil || len(got.Refused) != 0 || opened != 0 {
+			t.Errorf("%s: Status = %q, %v; contained opened %d times", name, got, err, opened)
 		}
 	}
 }
@@ -89,7 +90,7 @@ func TestStatusYieldsASymlinkAsAnEntry(t *testing.T) {
 		".specnaut/upgrade-staging/sub/a":  file("x"),
 		".specnaut/upgrade-staging/dirlnk": &fstest.MapFile{Data: []byte("sub"), Mode: fs.ModeSymlink},
 	}
-	got, err := listStaged(tree)
+	got, err := listStaged(tree, "/p")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,13 +100,23 @@ func TestStatusYieldsASymlinkAsAnEntry(t *testing.T) {
 }
 
 func TestRenderStatus(t *testing.T) {
-	if got, want := RenderStatus([]string{}), "{\n  \"pending\": [],\n  \"stagingDir\": null\n}"; got != want {
+	empty := Queue{Pending: []string{}, Refused: []Refused{}}
+	if got, want := RenderStatus(empty), "{\n  \"pending\": [],\n  \"stagingDir\": null,\n  \"refused\": []\n}"; got != want {
 		t.Errorf("empty:\n%s\nwant\n%s", got, want)
 	}
-	got := RenderStatus([]string{"a/one.md", "b/r&d.md"})
-	want := "{\n  \"pending\": [\n    \"a/one.md\",\n    \"b/r&d.md\"\n  ],\n  \"stagingDir\": \".specnaut/upgrade-staging\"\n}"
+	got := RenderStatus(Queue{Pending: []string{"a/one.md", "b/r&d.md"}, Refused: []Refused{}})
+	want := "{\n  \"pending\": [\n    \"a/one.md\",\n    \"b/r&d.md\"\n  ],\n" +
+		"  \"stagingDir\": \".specnaut/upgrade-staging\",\n  \"refused\": []\n}"
 	if got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	// stagingDir follows pending alone: a queue of refusals has nothing to reconcile.
+	got = RenderStatus(Queue{Pending: []string{}, Refused: []Refused{{"a", "left it\n— why"}, {"b", "r"}}})
+	want = "{\n  \"pending\": [],\n  \"stagingDir\": null,\n  \"refused\": [\n" +
+		"    {\n      \"path\": \"a\",\n      \"reason\": \"left it\\n— why\"\n    },\n" +
+		"    {\n      \"path\": \"b\",\n      \"reason\": \"r\"\n    }\n  ]\n}"
+	if got != want {
+		t.Errorf("refused:\n%s\nwant\n%s", got, want)
 	}
 }
 

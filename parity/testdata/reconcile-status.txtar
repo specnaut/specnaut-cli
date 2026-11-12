@@ -1,6 +1,11 @@
 # reconcile --status: no project, an empty queue, three files across two
 # directories plus a path holding `&`, and every refusal that hides a staged
-# copy (not in the lock, no project file, no lock, a removed harness).
+# copy (not in the lock, no project file, no lock, a removed harness). Then a
+# staged copy the store refuses to read (cli#765): a link to a project file, to
+# a folder, out of the project and to nothing, each reported in `refused`,
+# while an untracked link stays hidden and a plain copy stays pending. Run a
+# second time from a link to that project: the refusals name the directory as
+# getcwd reports it, every link resolved, never the $PWD the shell went through.
 specnaut reconcile --status
 cd project
 specnaut reconcile --status
@@ -9,6 +14,17 @@ specnaut reconcile --status
 cd $WORK/removed
 specnaut reconcile --status
 cd $WORK/empty-queue
+specnaut reconcile --status
+mkdir $WORK/linked/.specnaut/upgrade-staging/b
+symlink $WORK/linked/.specnaut/upgrade-staging/a/tool -> ../../../src/tool.ts
+symlink $WORK/linked/.specnaut/upgrade-staging/a/dir -> ../../../src
+symlink $WORK/linked/.specnaut/upgrade-staging/b/out.md -> $WORK/outside.md
+symlink $WORK/linked/.specnaut/upgrade-staging/b/dangling.md -> nowhere.md
+symlink $WORK/linked/.specnaut/upgrade-staging/b/untracked -> ../../../src/tool.ts
+cd $WORK/linked
+specnaut reconcile --status
+symlink $WORK/via -> linked
+cd $WORK/via
 specnaut reconcile --status
 
 -- project/.specnaut/installed.lock --
@@ -93,3 +109,47 @@ entries:
     templates_version: 0.0.1
 -- empty-queue/a/one.md --
 local one
+-- linked/.specnaut/installed.lock --
+version: 2
+harness: claude
+backlog_backend: local
+version_scheme: semver
+spec_backend: local
+templates_version: 0.0.1
+entries:
+  a/plain.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/tool:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/dir:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  b/out.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  b/dangling.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- linked/a/plain.md --
+local plain
+-- linked/a/tool --
+local tool
+-- linked/a/dir --
+local dir
+-- linked/b/out.md --
+local out
+-- linked/b/dangling.md --
+local dangling
+-- linked/src/tool.ts --
+the user's own file, which a staged link points at
+-- linked/.specnaut/upgrade-staging/a/plain.md --
+upstream plain
+-- outside.md --
+a file outside the project
