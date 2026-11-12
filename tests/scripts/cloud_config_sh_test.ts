@@ -134,3 +134,21 @@ Deno.test("cloud _config.sh adds nothing to the reason `cloud token` gave for fa
   assertEquals(r.code, 2, r.out);
   assertEquals(r.out.trim(), "the CLI says why");
 });
+
+// The key reaches every request's query string and the name of reconcile.sh's cursor file.
+Deno.test("cloud _config.sh refuses a project_key that is more than a plain key", async () => {
+  for (const key of ["K&number=1", "../../outside", "K#x", "K Y", "-K", "K".repeat(65)]) {
+    const r = await source(
+      `backend: cloud\napi_url: "https://api.specnaut.com"\nproject_key: "${key}"\n`,
+    );
+    assertEquals(r.code, 2, `${key}\n${r.out}`);
+    assertStringIncludes(r.out, "project_key is not a plain key", key);
+    assertEquals(r.calls, "", `the CLI was never asked for a token for ${key}`);
+  }
+  for (const key of ["K", "CLOUD", "ACME2", "my_app-1"]) {
+    const r = await source(
+      `backend: cloud\napi_url: "https://api.specnaut.com"\nproject_key: ${key}\n`,
+    );
+    assertEquals(r.code, 0, `${key}\n${r.out}`);
+  }
+});

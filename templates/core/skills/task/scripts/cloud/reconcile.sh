@@ -33,6 +33,8 @@ while [ "$#" -gt 0 ]; do
     *) echo "usage: reconcile.sh [--reset] [--seek-end] [--limit N]" >&2; exit 2 ;;
   esac
 done
+# The limit is a page size, and it reaches the query string: digits only.
+[[ $LIMIT =~ ^[1-9][0-9]{0,2}$ ]] || { echo "reconcile.sh: --limit is a page size, 1 to 999" >&2; exit 2; }
 
 STATE="$ROOT/.specnaut/.cloud-cursor-$PROJECT_KEY"
 [ "$RESET" = "1" ] && rm -f "$STATE"

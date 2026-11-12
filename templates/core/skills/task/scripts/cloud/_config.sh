@@ -61,6 +61,14 @@ if [ -z "$API_URL" ] || [ -z "$PROJECT_KEY" ]; then
   exit 2
 fi
 
+# The key reaches every request's query string and the name of reconcile.sh's
+# cursor file: letters, digits, `_` and `-`, nothing a URL or a path reads
+# as more than a name.
+if ! printf '%s\n' "$PROJECT_KEY" | LC_ALL=C grep -Eq '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'; then
+  echo "error: backlog-config.yml project_key is not a plain key." >&2
+  exit 2
+fi
+
 # curl is handed this string, and is not the parser `specnaut cloud token` judged
 # it with: only a plain http(s) base passes, the grammar normalizeApiUrl holds
 # (tests/scripts/cloud_config_sh_test.ts keeps the two equal). LC_ALL=C keeps the
