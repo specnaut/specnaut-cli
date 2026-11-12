@@ -1,5 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { assertSafeDestination, isInside } from "../../src/domain/destination.ts";
+import { hasControl } from "../../src/domain/terminal_text.ts";
 
 Deno.test("assertSafeDestination accepts normal relative paths", () => {
   assertSafeDestination(".claude/commands/hello.md");
@@ -70,4 +71,24 @@ Deno.test("isInside answers on the host's separator", () => {
   const root = Deno.build.os === "windows" ? "C:\\p" : "/p";
   const out = Deno.build.os === "windows" ? "C:\\outside\\x.md" : "/outside/x.md";
   assertEquals(isInside(root, out), false);
+});
+
+Deno.test("assertSafeDestination refuses a control character, and names it escaped", () => {
+  // A lock key is repository-supplied (cli#574); a control character in it is no
+  // file name anyone meant, and its refusal reaches a terminal.
+  for (const dest of ["a\x1b[2Jb.md", "a\0b", "a\nb.md", "a\x7fb", "a\x9bb", "dir\x07/c.md"]) {
+    const err = assertThrows(() => assertSafeDestination(dest), Error, "control character", dest);
+    assertEquals(hasControl(err.message), false, `raw control in: ${JSON.stringify(err.message)}`);
+  }
+  assertThrows(() => assertSafeDestination("a\x1bb"), Error, "a\\u001bb");
+});
+
+Deno.test("assertSafeDestination shows the destination through terminalText in every refusal", () => {
+  // A format character is no control and passes the rule above, so each other
+  // refusal must still render the name escaped.
+  for (const dest of ["/‮.md", "‮/..", "../‮", "‮. "]) {
+    const err = assertThrows(() => assertSafeDestination(dest), Error, "Unsafe destination");
+    assertEquals(err.message.includes("‮"), false, JSON.stringify(err.message));
+    assertEquals(err.message.includes("\\u202e"), true, JSON.stringify(err.message));
+  }
 });

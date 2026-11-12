@@ -1,6 +1,10 @@
 package reconcile
 
-import "path/filepath"
+import (
+	"path/filepath"
+
+	"github.com/specnaut/specnaut-cli/internal/lockfile"
+)
 
 // PathRefusal is src/application/path_refusal.ts's PathRefusal: a path the
 // staging store refused because of where it leads, which a caller may report
@@ -20,9 +24,9 @@ func (e *PathRefusal) Name() string { return e.class }
 func stagedEntryRefusal(root, abs, resolved, action string) error {
 	return &PathRefusal{"ContainmentRefusal", "refusing to " + action +
 		" a staged path that is a link or lies behind one:\n" +
-		"  path:     " + abs + "\n" +
-		"  resolves: " + resolved + "\n" +
-		"  project:  " + root + "\n" +
+		"  path:     " + lockfile.TerminalText(abs) + "\n" +
+		"  resolves: " + lockfile.TerminalText(resolved) + "\n" +
+		"  project:  " + lockfile.TerminalText(root) + "\n" +
 		"Specnaut reads and deletes only the plain copies it staged inside the staging folder."}
 }
 
@@ -32,8 +36,8 @@ func stagedEntryRefusal(root, abs, resolved, action string) error {
 func linkedStagingRefusal(dir, rel string) error {
 	return &PathRefusal{"ContainmentRefusal",
 		"refusing to use a staging directory reached through a symlink:\n" +
-			"  path:    " + filepath.Join(dir, filepath.FromSlash(rel)) + "\n" +
-			"  project: " + dir + "\n" +
+			"  path:    " + lockfile.TerminalText(filepath.Join(dir, filepath.FromSlash(rel))) + "\n" +
+			"  project: " + lockfile.TerminalText(dir) + "\n" +
 			"Specnaut stages its own copies there and deletes them; through a link, it would " +
 			"delete whatever the link points at."}
 }

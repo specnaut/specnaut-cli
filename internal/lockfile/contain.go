@@ -29,19 +29,25 @@ var trailingName = regexp.MustCompile(`[. ]$`)
 
 // SafeDestination refuses a destination that is absolute, escapes with `..`,
 // names the project itself, or ends in a name the filesystem may read as
-// something else (a trailing separator, dot or space). Pure: no I/O.
+// something else (a trailing separator, dot or space). A control character is
+// refused first, and every refusal shows dest through TerminalText (cli#776).
+// Pure: no I/O.
 func SafeDestination(dest string) error {
+	shown := TerminalText(dest)
+	if hasControl(dest) {
+		return errors.New("Unsafe destination (a control character): " + shown)
+	}
 	n := normalize(dest)
 	switch {
 	case strings.HasPrefix(n, "/"):
-		return errors.New("Unsafe destination (absolute path): " + dest)
+		return errors.New("Unsafe destination (absolute path): " + shown)
 	case strings.TrimRight(n, `\/`) == ".":
-		return errors.New("Unsafe destination (the target directory itself): " + dest)
+		return errors.New("Unsafe destination (the target directory itself): " + shown)
 	case n == ".." || strings.HasPrefix(n, "../") || strings.Contains(n, "/../") || strings.HasSuffix(n, "/.."):
-		return errors.New("Unsafe destination (escape attempt): " + dest)
+		return errors.New("Unsafe destination (escape attempt): " + shown)
 	}
 	if strings.HasSuffix(n, "/") || strings.HasSuffix(n, `\`) || anySegment(n, trailingName) {
-		return errors.New("Unsafe destination (a name the filesystem may read differently): " + dest)
+		return errors.New("Unsafe destination (a name the filesystem may read differently): " + shown)
 	}
 	return nil
 }

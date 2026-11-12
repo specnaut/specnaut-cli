@@ -1,10 +1,16 @@
 import { PathRefusal } from "../application/path_refusal.ts";
+import { terminalText } from "../domain/terminal_text.ts";
 import type { Containment } from "./fs_containment.ts";
 
 /**
  * The refusals the containment checks throw (`fs_containment.ts`, and the
  * staging store's own bounds), each naming the path it refused and the project
  * it was judged against. Their own module so the checks read as checks.
+ *
+ * Every path a refusal names goes through `terminalText` (cli#776): it comes
+ * from the repository — a lock key, a link's target — and the refusal reaches
+ * the user's terminal, where a raw escape sequence would be the repository
+ * writing to it.
  */
 
 /** A path refused because it loops or leaves the project: a reader may report it instead of aborting. */
@@ -62,17 +68,17 @@ export function refusalFor(
 const loopRefusal = (root: string, abs: string) =>
   new LoopRefusal(
     `refusing to touch a path whose symlinks form a cycle:\n` +
-      `  path:    ${abs}\n` +
-      `  project: ${root}\n` +
+      `  path:    ${terminalText(abs)}\n` +
+      `  project: ${terminalText(root)}\n` +
       `Follow the links from that path and break the loop.`,
   );
 
 const unwalkableRefusal = (root: string, abs: string, missing: string) =>
   new UnwalkableRefusal(
     `refusing to touch a path whose symlink passes through a directory that does not exist:\n` +
-      `  path:    ${abs}\n` +
-      `  missing: ${missing}\n` +
-      `  project: ${root}\n` +
+      `  path:    ${terminalText(abs)}\n` +
+      `  missing: ${terminalText(missing)}\n` +
+      `  project: ${terminalText(root)}\n` +
       `Where it lands would depend on directories created later, so Specnaut ` +
       `cannot tell whether it stays inside the project. Fix or remove that link.`,
   );
@@ -80,9 +86,9 @@ const unwalkableRefusal = (root: string, abs: string, missing: string) =>
 const leavesRefusal = (root: string, abs: string, resolved: string) =>
   new ContainmentRefusal(
     `refusing to touch a path that leaves the project:\n` +
-      `  path:     ${abs}\n` +
-      `  resolves: ${resolved}\n` +
-      `  project:  ${root}\n` +
+      `  path:     ${terminalText(abs)}\n` +
+      `  resolves: ${terminalText(resolved)}\n` +
+      `  project:  ${terminalText(root)}\n` +
       `A symlink in the project points outside it. Specnaut will not write, ` +
       `move, delete or read through it.`,
   );
@@ -98,7 +104,7 @@ const leavesRefusal = (root: string, abs: string, resolved: string) =>
 export const projectDirectoryRefusal = (root: string, abs: string) =>
   new PathRefusal(
     `refusing to treat the project directory itself as a file in it:\n` +
-      `  path:    ${abs}\n  project: ${root}`,
+      `  path:    ${terminalText(abs)}\n  project: ${terminalText(root)}`,
   );
 
 /**
@@ -109,8 +115,8 @@ export const projectDirectoryRefusal = (root: string, abs: string) =>
 export const linkedStagingRefusal = (root: string, abs: string) =>
   new ContainmentRefusal(
     `refusing to use a staging directory reached through a symlink:\n` +
-      `  path:    ${abs}\n` +
-      `  project: ${root}\n` +
+      `  path:    ${terminalText(abs)}\n` +
+      `  project: ${terminalText(root)}\n` +
       `Specnaut stages its own copies there and deletes them; through a link, it would ` +
       `delete whatever the link points at.`,
   );
@@ -131,8 +137,8 @@ export const stagedEntryRefusal = (
 ) =>
   new ContainmentRefusal(
     `refusing to ${action} a staged path that is a link or lies behind one:\n` +
-      `  path:     ${abs}\n` +
-      `  resolves: ${resolved}\n` +
-      `  project:  ${root}\n` +
+      `  path:     ${terminalText(abs)}\n` +
+      `  resolves: ${terminalText(resolved)}\n` +
+      `  project:  ${terminalText(root)}\n` +
       `Specnaut reads and deletes only the plain copies it staged inside the staging folder.`,
   );

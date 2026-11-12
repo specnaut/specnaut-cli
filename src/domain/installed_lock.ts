@@ -1,5 +1,6 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
 import { assertSafeDestination } from "./destination.ts";
+import { terminalText } from "./terminal_text.ts";
 
 /**
  * Every harness the CLI can install *and* read back.
@@ -220,26 +221,21 @@ export function parseLock(yaml: string): InstalledLock {
     //
     // In the domain, beside the rule it uses, because "which destination
     // strings are legal" already lives there and a lock key IS a destination.
+    // Shown through `terminalText`: the key reaches the terminal (cli#776).
+    const at = `entries[${terminalText(path)}]`;
     try {
       assertSafeDestination(path);
     } catch (err) {
-      throw new Error(
-        `entries[${path}] is not a legal destination: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      const why = err instanceof Error ? err.message : String(err);
+      throw new Error(`${at} is not a legal destination: ${why}`);
     }
-    const entry = asObject(value, `entries[${path}]`);
+    const entry = asObject(value, at);
     const sha256 = entry.sha256;
     const installedAt = entry.installed_at;
     const ver = entry.templates_version;
-    if (typeof sha256 !== "string") throw new Error(`entries[${path}].sha256 must be string`);
-    if (typeof installedAt !== "string") {
-      throw new Error(`entries[${path}].installed_at must be string`);
-    }
-    if (typeof ver !== "string") {
-      throw new Error(`entries[${path}].templates_version must be string`);
-    }
+    if (typeof sha256 !== "string") throw new Error(`${at}.sha256 must be string`);
+    if (typeof installedAt !== "string") throw new Error(`${at}.installed_at must be string`);
+    if (typeof ver !== "string") throw new Error(`${at}.templates_version must be string`);
     entries.set(path, { sha256, installedAt, templatesVersion: ver });
   }
   // `parent_managed` only ever stores the truthy decision; any other value

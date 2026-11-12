@@ -1,0 +1,11 @@
+{"text":"plain/a.md","shown":"plain/a.md"}
+{"text":"a\\b","shown":"a\\\\b"}
+{"text":"\u0000\u001b","shown":"\\u0000\\u001b\\u007f\\u0085\\u009f"}
+{"text":"­​‍‮⁦﻿","shown":"\\u00ad\\u200b\\u200d\\u202e\\u2066\\ufeff"}
+{"text":"  ","shown":"\\u2028\\u2029"}
+{"text":"󰀀","shown":"\\ue000\\u{f0000}"}
+{"text":"͸","shown":"\\u0378"}
+{"text":"͏ᅟㅤﾠ᠎","shown":"\\u034f\\u115f\\u3164\\uffa0\\u180e"}
+{"text":"️󠄀󠁁󠇰","shown":"\\ufe0f\\u{e0100}\\u{e0041}\\u{e01f0}"}
+{"text":"é中😀�","shown":"é中😀�"}
+{"text":"a\\u001bb","shown":"a\\\\u001bb"}

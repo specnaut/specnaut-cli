@@ -1,4 +1,5 @@
 import { isAbsolute, normalize, relative, SEPARATOR } from "@std/path";
+import { hasControl, terminalText } from "./terminal_text.ts";
 
 /**
  * The string half of containment: which destination a project-relative path may
@@ -41,14 +42,23 @@ export function isInside(root: string, target: string): boolean {
  * the whole project folder aside on one. A trailing separator makes the kernel
  * follow a leaf link the containment check took as is, and Windows drops a
  * segment's trailing dots and spaces, so `...` names the project there too.
+ *
+ * A control character first (cli#776): no file Specnaut ships has one, and a
+ * lock key is repository-supplied, so its refusal would put the bytes on the
+ * user's terminal. Every refusal shows `dest` through `terminalText` for the
+ * characters that are no control but still act on a terminal (bidi, zero-width).
  */
 export function assertSafeDestination(dest: string): void {
+  const shown = terminalText(dest);
+  if (hasControl(dest)) {
+    throw new Error(`Unsafe destination (a control character): ${shown}`);
+  }
   const normalized = normalize(dest);
   if (isAbsolute(normalized)) {
-    throw new Error(`Unsafe destination (absolute path): ${dest}`);
+    throw new Error(`Unsafe destination (absolute path): ${shown}`);
   }
   if (normalized.replace(/[\\/]+$/, "") === ".") {
-    throw new Error(`Unsafe destination (the target directory itself): ${dest}`);
+    throw new Error(`Unsafe destination (the target directory itself): ${shown}`);
   }
   if (
     normalized === ".." ||
@@ -56,9 +66,9 @@ export function assertSafeDestination(dest: string): void {
     normalized.includes(`${SEPARATOR}..${SEPARATOR}`) ||
     normalized.endsWith(`${SEPARATOR}..`)
   ) {
-    throw new Error(`Unsafe destination (escape attempt): ${dest}`);
+    throw new Error(`Unsafe destination (escape attempt): ${shown}`);
   }
   if (/[\\/]$/.test(normalized) || normalized.split(/[\\/]/).some((s) => /[. ]$/.test(s))) {
-    throw new Error(`Unsafe destination (a name the filesystem may read differently): ${dest}`);
+    throw new Error(`Unsafe destination (a name the filesystem may read differently): ${shown}`);
   }
 }

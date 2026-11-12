@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/specnaut/specnaut-cli/internal/golden"
 )
 
 // OpenContained is the filesystem half of cli#574: a read through it stays
@@ -46,5 +48,18 @@ func TestOpenContainedRefusesHomeThroughALink(t *testing.T) {
 	}
 	if _, err := OpenContained(home, link); err == nil {
 		t.Error("HOME given as a link to the project was not resolved before the comparison")
+	}
+}
+
+type textCase struct {
+	Text  string `json:"text"`
+	Shown string `json:"shown"`
+}
+
+func TestTerminalTextMatchesTypeScript(t *testing.T) {
+	for _, c := range golden.Load[textCase](t, "testdata/terminal_text_golden.jsonl", 10) {
+		if got := TerminalText(c.Text); got != c.Shown {
+			t.Errorf("TerminalText(%q) = %q; terminalText: %q", c.Text, got, c.Shown)
+		}
 	}
 }

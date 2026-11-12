@@ -11,6 +11,7 @@
 import { parseArgs } from "../../src/cli/parser.ts";
 import { parseLock, RemovedHarnessError } from "../../src/domain/installed_lock.ts";
 import { assertSafeDestination } from "../../src/domain/destination.ts";
+import { terminalText } from "../../src/domain/terminal_text.ts";
 import { retiredConfigNotices } from "../../src/application/upgrade_retired_notices.ts";
 import type { FsReader } from "../../src/application/ports.ts";
 import { AGENT_FOLDERS } from "../../src/domain/agent_folders.ts";
@@ -185,6 +186,13 @@ const destinations = [
   "C:\\x",
   "\\\\srv\\x",
   "a\0b",
+  // Control and format characters (cli#776): refused, or shown escaped.
+  "a\x1b[2Jb.md",
+  "a\x9bb",
+  "a\x7fb",
+  "/\u202e.md",
+  "../\u202e",
+  "\u202e. ",
 ];
 
 function destinationOf(d: string): string {
@@ -237,6 +245,8 @@ const locks: Record<string, string> = {
   "two-documents": head("2", "claude") + "---\n" + head("2", "claude"),
   "malformed": "version: [unterminated\n",
   "bool-yes": head("2", "claude") + "spec_autogen: yes\n",
+  "entry-control-key": head("2", "claude") + "entries:\n" + entry('"a\\u001b]0;x\\u0007b.md"'),
+  "entry-format-key": head("2", "claude") + 'entries:\n  "a\\u202eb.md": 7\n',
 };
 
 function lockOf(yaml: string): unknown {
@@ -320,6 +330,24 @@ await writeLines(
 await writeLines(
   "../lockfile/testdata/destination_golden.jsonl",
   destinations.map((d) => ({ dest: d, result: destinationOf(d) })),
+);
+/** terminalText's inputs (cli#776): each Unicode property it escapes, and what it leaves. */
+const texts = [
+  "plain/a.md",
+  "a\\b",
+  "\x00\x1b\x7f\x85\x9f",
+  "\u00ad\u200b\u200d\u202e\u2066\ufeff",
+  "\u2028\u2029",
+  "\ue000\u{f0000}",
+  "\u0378",
+  "\u034f\u115f\u3164\uffa0\u180e",
+  "\ufe0f\u{e0100}\u{e0041}\u{e01f0}",
+  "é中😀\ufffd",
+  "a\\u001bb",
+];
+await writeLines(
+  "../lockfile/testdata/terminal_text_golden.jsonl",
+  texts.map((text) => ({ text, shown: terminalText(text) })),
 );
 await writeLines(
   "../lockfile/testdata/lock_golden.jsonl",

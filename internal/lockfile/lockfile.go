@@ -149,9 +149,9 @@ func parseEntries(v any) (map[string]Entry, error) {
 	out := make(map[string]Entry, len(raw))
 	for path, value := range raw {
 		if err := SafeDestination(path); err != nil {
-			return nil, fmt.Errorf("entries[%s] is not a legal destination: %w", path, err)
+			return nil, fmt.Errorf("entries[%s] is not a legal destination: %w", TerminalText(path), err)
 		}
-		e, err := asObject(value, "entries["+path+"]")
+		e, err := asObject(value, "entries["+TerminalText(path)+"]")
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func parseEntry(path string, e map[string]any) (Entry, error) {
 	for i, name := range []string{"sha256", "installed_at", "templates_version"} {
 		s, ok := e[name].(string)
 		if !ok {
-			return Entry{}, fmt.Errorf("entries[%s].%s must be string", path, name)
+			return Entry{}, fmt.Errorf("entries[%s].%s must be string", TerminalText(path), name)
 		}
 		fields[i] = s
 	}

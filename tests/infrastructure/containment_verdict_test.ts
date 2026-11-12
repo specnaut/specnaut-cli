@@ -13,6 +13,7 @@ import {
   UnwalkableRefusal,
 } from "../../src/infrastructure/fs_refusals.ts";
 import { symlinkTest } from "../helpers/link_text.ts";
+import { terminalText } from "../../src/domain/terminal_text.ts";
 
 /**
  * Containment's one answer (cli#692): `locate` tags a path `inside`, `leaves`,
@@ -111,12 +112,15 @@ symlinkTest(
         () => assertRemovableInProject(real, join(proj, "dangling/x.md")),
         UnwalkableRefusal,
       );
-      assert(unwalkable.message.includes(`missing: ${join(proj, "dangling")}`), unwalkable.message);
+      assert(
+        unwalkable.message.includes(`missing: ${terminalText(join(proj, "dangling"))}`),
+        unwalkable.message,
+      );
       const loop = await assertRejects(
         () => assertRemovableInProject(real, join(proj, "cyc-a/x.md")),
         LoopRefusal,
       );
-      assert(loop.message.includes(join(proj, "cyc-a/x.md")), loop.message);
+      assert(loop.message.includes(terminalText(join(proj, "cyc-a/x.md"))), loop.message);
     }),
 );
 

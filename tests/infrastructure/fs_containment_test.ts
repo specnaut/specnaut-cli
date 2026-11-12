@@ -6,6 +6,7 @@ import {
   resolveTarget,
 } from "../../src/infrastructure/fs_containment.ts";
 import { symlinkTest } from "../helpers/link_text.ts";
+import { terminalText } from "../../src/domain/terminal_text.ts";
 
 /** A project directory beside an `outside/` sibling, both under one temp root. */
 async function box(): Promise<{ root: string; proj: string; outside: string }> {
@@ -200,8 +201,7 @@ symlinkTest(
   async () => {
     // Not an escape — the kernel refuses a cycle too — but it surfaced as a raw
     // `FilesystemLoop` naming `realpath`, which tells a user nothing about their
-    // own tree. Narrow on purpose: every other error still propagates, so a
-    // permission problem is never reported as a bad layout.
+    // tree. Narrow on purpose: any other error propagates, never a bad layout.
     const { root, proj } = await box();
     try {
       await Deno.symlink(join(proj, "b"), join(proj, "a"));
@@ -210,7 +210,7 @@ symlinkTest(
       const err = await assertRejects(() => assertInsideProject(r, join(proj, "a")));
       assert(err instanceof Error);
       assert(err.message.includes("cycle"), err.message);
-      assert(err.message.includes(join(proj, "a")), "and names the path");
+      assert(err.message.includes(terminalText(join(proj, "a"))), "and names the path");
     } finally {
       await Deno.remove(root, { recursive: true });
     }
