@@ -118,14 +118,14 @@ jobs:
       - name: Unit tests (no binary — the parity tests skip here, by design)
         run: go test ./...
       - name: The Go goldens are what the TypeScript side answers today
-        # internal/testdata/golden.ts (and golden_scan.ts) run parser.ts, parseLock and
+        # internal/testdata/golden.ts (and golden_commands.ts) run parser.ts, parseLock and
         # assertSafeDestination; a stale golden would judge the port against
         # an answer TypeScript no longer gives.
         run: |
           deno run --allow-read --allow-write internal/testdata/golden.ts
-          deno run --allow-read --allow-write internal/testdata/golden_scan.ts
+          deno run --allow-read --allow-write internal/testdata/golden_commands.ts
           if [ -n "$(git status --porcelain -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata)" ]; then
-            echo "::error::the Go goldens are stale; run internal/testdata/golden.ts and internal/testdata/golden_scan.ts and commit them"
+            echo "::error::the Go goldens are stale; run internal/testdata/golden.ts and internal/testdata/golden_commands.ts and commit them"
             git status --short -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata
             git diff --stat -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata
             exit 1

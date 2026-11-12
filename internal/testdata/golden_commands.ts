@@ -1,9 +1,10 @@
-// The `specnaut scan` (cli#747) and `specnaut verify-scripts` cases of the parse golden: parser.ts's
-// own answer for each command line, which internal/cli/parse_test.go holds the Go parser to. A file of its own because
-// golden.ts is over its size target and must not grow.
+// The parse golden's cases for the commands added after golden.ts reached its size target
+// (`specnaut scan`, cli#747, and `specnaut verify-scripts`): parser.ts's own answer for each
+// command line, which internal/cli/parse_test.go holds the Go parser to. A later command's cases
+// go here too, never into golden.ts.
 //
 // Regenerate after changing a case or the TypeScript side (CI regenerates it and fails on a diff):
-//   deno run --allow-read --allow-write internal/testdata/golden_scan.ts
+//   deno run --allow-read --allow-write internal/testdata/golden_commands.ts
 import { parseArgs } from "../../src/cli/parser.ts";
 
 // deno-fmt-ignore
@@ -42,6 +43,6 @@ function intentOf(args: string[]): unknown {
 }
 
 await Deno.writeTextFile(
-  new URL("../cli/testdata/parse_scan_golden.jsonl", import.meta.url),
+  new URL("../cli/testdata/parse_commands_golden.jsonl", import.meta.url),
   argv.map((args) => JSON.stringify({ args, intent: intentOf(args) })).join("\n") + "\n",
 );
