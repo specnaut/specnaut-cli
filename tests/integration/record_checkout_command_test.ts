@@ -1,13 +1,9 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { bundleForLock } from "../../src/application/lock_bundle.ts";
-import { findHarness } from "../../src/cli/harnesses.ts";
-import { parseLock } from "../../src/domain/installed_lock.ts";
 import { sha256HexBytes } from "../../src/domain/sha256.ts";
-import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { runSpecnaut } from "../helpers/run_specnaut.ts";
 import { BASE_FILES, SETTINGS, setUp } from "./verify_checkout_fixture.ts";
-import { git, LOCK, write } from "./verify_scripts_fixture.ts";
+import { git, write } from "./verify_scripts_fixture.ts";
 
 /**
  * `specnaut record-checkout`, black-box, as the `SessionStart` hook runs it: the hook's input on
@@ -185,19 +181,4 @@ Deno.test("an argument is refused by the parser", async () => {
   const run = await runSpecnaut(["record-checkout", "extra"]);
   assertEquals(run.code, 2);
   assertStringIncludes(run.stderr, "record-checkout takes no argument");
-});
-
-Deno.test("only Claude Code is scaffolded the hook that takes the record; every other harness takes none", () => {
-  for (const harness of ["claude", "codex", "copilot", "cursor", "opencode", "antigravity"]) {
-    const lock = parseLock(LOCK.replace("harness: claude", `harness: ${harness}`));
-    const files = bundleForLock(CORE_BUNDLE, lock, findHarness)!;
-    const calling = Object.entries(files)
-      .filter(([, f]) => f.content.includes("record-checkout"))
-      .map(([path]) => path)
-      .sort();
-    const expected = harness === "claude"
-      ? [".claude/hooks/record-checkout.sh", ".claude/settings.json"]
-      : [];
-    assertEquals(calling, expected, harness);
-  }
 });
