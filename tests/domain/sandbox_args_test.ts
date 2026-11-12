@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
-import { LIMITS } from "../../src/domain/sandbox_limits.ts";
+import { CAP_ENFORCEMENT, LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
@@ -193,5 +193,39 @@ Deno.test("containerArgs: a named run, an init reaping its children, and no engi
       "",
       name,
     );
+  }
+});
+
+Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and no other", () => {
+  const ctr = container();
+  const wall = (args: readonly string[]) => args.some((a) => a.includes("timeout"));
+  const carried = {
+    container: {
+      processes: after(ctr, "--pids-limit").includes(String(LIMITS.processes)),
+      memoryBytes: after(ctr, "--memory").includes(String(LIMITS.memoryBytes)),
+      cpus: after(ctr, "--cpus").includes(String(LIMITS.cpus)),
+      wallClockSeconds: wall(ctr),
+      scratchBytes: after(ctr, "--tmpfs").every((t) => t.includes(`size=${LIMITS.scratchBytes}`)),
+    },
+    bwrap: {
+      processes: false,
+      memoryBytes: false,
+      cpus: false,
+      wallClockSeconds: wall(bwrap()),
+      scratchBytes: after(bwrap(), "--size").length === after(bwrap(), "--tmpfs").length,
+    },
+    seatbelt: {
+      processes: false,
+      memoryBytes: false,
+      cpus: false,
+      wallClockSeconds: false,
+      scratchBytes: false,
+    },
+  };
+  for (const [backend, caps] of Object.entries(carried)) {
+    const expected = Object.fromEntries(
+      Object.entries(caps).map(([cap, inArgs]) => [cap, inArgs ? "arguments" : "launcher"]),
+    );
+    assertEquals(CAP_ENFORCEMENT[backend as keyof typeof CAP_ENFORCEMENT], expected, backend);
   }
 });
