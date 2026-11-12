@@ -14,8 +14,8 @@ import { GitObjects } from "../../infrastructure/git_object_reader.ts";
  * session started on (`record_checkout.ts`) and appends `export SPECNAUT_SESSION_RECORD=<path>` to
  * the file `CLAUDE_ENV_FILE` names, so the session's later commands find its record:
  *
- *   0  taken, or nothing to take: a source that keeps the record (`clear`, `compact`), or a folder
- *      in no git repository
+ *   0  taken, or the session's first record kept and its path exported again, or nothing to
+ *      take: a source that keeps the record (`clear`, `compact`), or a folder in no git repository
  *   1  the record could not be taken, the reason on stderr
  *   2  usage: stdin is a terminal or not a `SessionStart` hook's input, or `CLAUDE_ENV_FILE` is unset
  *
@@ -85,7 +85,7 @@ async function take(
   if (opened === null) return EXIT.done;
   const outcome = await recordCheckout(opened, start);
   if (outcome.kind === "refused") return fail(deps, EXIT.failed, outcome.why);
-  if (outcome.kind === "taken") {
+  if (outcome.kind === "taken" || outcome.kind === "existing") {
     await deps.exportToSession(envFile, SESSION_RECORD_VAR, outcome.path);
   }
   return EXIT.done;

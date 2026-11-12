@@ -30,11 +30,12 @@ import { LINK_REASON, type LinkEnd, linkReason } from "./checkout_link.ts";
  *
  * The harness loaded the checkout as it was when the session started, so the check judges that too:
  * the record a `SessionStart` hook took (`session_record.ts`), by rules 1 and 3. A checkout switched
- * to the base after the session started passes on disk and fails there. Its limit: a session that
- * started on a branch changing the harness settings, or putting another `specnaut` first on the
- * PATH, ran that branch's hooks instead, as the same user, and they can write any record. That
- * session is already lost, as {@link restartAdvice} says; the record covers the session whose
- * settings were the user's own and whose checkout was switched afterwards.
+ * to the base after the session started passes on disk and fails there. Its limit: the record
+ * vouches only for a session whose start was the user's own. What the session loaded at start, its
+ * hooks, settings or any instruction file, or a version-manager file putting another `specnaut`
+ * first on the PATH, can defeat it, since the record is written as the same user. That session is
+ * already lost, as {@link restartAdvice} says; the record covers the one whose checkout was
+ * switched afterwards.
  */
 
 /** A tree entry as the checkout walk reads it: a file with its identity, a link with its end. */

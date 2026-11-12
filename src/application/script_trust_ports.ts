@@ -72,7 +72,10 @@ export interface SessionRecordReader {
   read(): Promise<RecordRead>;
 }
 
-/** Stores the record of the session `sessionId`, replacing an earlier one; its path. */
+/** Where the session's record is: taken now, or the one it already had, which is never replaced. */
+export type RecordWrite = { readonly kind: "taken" | "existing"; readonly path: string };
+
+/** Stores the first record of the session `sessionId`. */
 export interface SessionRecordWriter {
-  write(sessionId: string, text: string): Promise<string>;
+  write(sessionId: string, text: string): Promise<RecordWrite>;
 }

@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "@std/path";
 import type {
   RecordRead,
+  RecordWrite,
   SessionRecordReader,
   SessionRecordWriter,
 } from "../application/script_trust_ports.ts";
@@ -28,22 +29,25 @@ export class FsSessionRecords implements SessionRecordWriter {
   }
 
   /**
-   * Written to a file created new beside it, then renamed onto `<id>.json`: no file or link already
-   * there is ever opened for writing, and a resumed session's record replaces its earlier one.
+   * Written to a file created new beside it, then hard-linked to `<id>.json`, which fails when
+   * anything is already there: no file or link is ever opened for writing, and a session's first
+   * record is never replaced. A resumed session finds that one, whatever it resumed on.
    */
-  async write(sessionId: string, text: string): Promise<string> {
+  async write(sessionId: string, text: string): Promise<RecordWrite> {
     if (!isSessionId(sessionId)) throw new Error(`not a session id: ${sessionId}`);
     await this.#folder();
     const path = join(this.dir, `${sessionId}.json`);
     const temp = join(this.dir, `.${sessionId}.${crypto.randomUUID()}.tmp`);
     await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
     try {
-      await Deno.rename(temp, path);
+      await Deno.link(temp, path);
+      return { kind: "taken", path };
     } catch (err) {
+      if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
+      return { kind: "existing", path };
+    } finally {
       await Deno.remove(temp);
-      throw err;
     }
-    return path;
   }
 
   /** The record `named` names (`SPECNAUT_SESSION_RECORD`), read only from this folder. */
@@ -54,6 +58,12 @@ export class FsSessionRecords implements SessionRecordWriter {
   async #read(named: string | undefined): Promise<RecordRead> {
     if (named === undefined || named === "") return refused(SESSION_REASON.none);
     if (!this.#holds(named)) return refused(`${SESSION_REASON.outside}: ${named}`);
+    for (const dir of [dirname(this.dir), this.dir]) {
+      const folder = await lstatOrNull(dir);
+      if (folder !== null && !folder.isDirectory) {
+        return refused(`${SESSION_REASON.unreadable}: ${dir} is not a folder`);
+      }
+    }
     const info = await lstatOrNull(named);
     if (info === null) return refused(SESSION_REASON.missing);
     if (!info.isFile) return refused(`${SESSION_REASON.unreadable}: not a regular file`);

@@ -91,8 +91,15 @@ Deno.test("startup, resume and fork take the record; clear and compact keep it a
     await session(root, source);
     assertEquals(await exists(path), false, `${source} never takes one either`);
   }
-  await session(root, "resume");
-  assert((await Deno.readTextFile(path)) !== taken, "a resumed session's process retakes its own");
+  await session(root, "startup");
+  const first = await Deno.readTextFile(path);
+  await write(root, { "AGENTS.md": "switched before resuming\n" });
+  for (const source of ["resume", "fork", "startup"]) {
+    const run = await session(root, source);
+    assertEquals(run.code, 0, source);
+    assertEquals(await Deno.readTextFile(path), first, `${source} never replaces the first record`);
+    assertEquals(run.env, `export SPECNAUT_SESSION_RECORD='${path}'\n`, `${source} finds it`);
+  }
 });
 
 Deno.test({
@@ -108,7 +115,7 @@ Deno.test({
     await Deno.symlink(target, path);
     assertEquals((await session(root, "startup")).code, 0);
     assertEquals(await Deno.readTextFile(target), "untouched\n");
-    assertEquals((await Deno.lstat(path)).isFile, true);
+    assertEquals((await Deno.lstat(path)).isSymlink, true, "kept, and refused when read");
   },
 });
 

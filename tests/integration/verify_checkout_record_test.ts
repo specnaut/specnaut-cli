@@ -22,7 +22,7 @@ async function startedOnTheBranch(root: string) {
   await commitAll(root, "outside settings");
   const head = (await git(root, "rev-parse", "HEAD")).trim();
   const first = (await git(root, "rev-parse", "HEAD~1")).trim();
-  const record = await startSession(root);
+  const record = await startSession(root, "startup", "fixture-session-branch");
   return { head, first, record };
 }
 
@@ -40,6 +40,32 @@ Deno.test("a checkout switched to the base after its session started on the bran
   if (outcome.kind === "restart") assertEquals(outcome.advice, restartAdvice(tip));
   await startSession(root);
   assertEquals((await check(root, head)).kind, "trusted", "a session started on the base holds");
+});
+
+Deno.test("a session started on the branch and resumed on the base keeps its first record, and fails", async () => {
+  const { root } = await setUp();
+  const { head } = await startedOnTheBranch(root);
+  await git(root, "checkout", "-q", "feature");
+  await startSession(root, "resume", "fixture-session-branch");
+  const found = reasons(await check(root, head));
+  assertEquals(found.at(-1), { path: SETTINGS, reason: atStart(REASON.differs) });
+});
+
+Deno.test({
+  name: "a record read through a linked record folder is refused, as the writer refuses one",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const { root, head } = await setUp();
+    const own = await startSession(root);
+    const specnaut = join(root, ".git", "specnaut");
+    const elsewhere = join(root, "..", "elsewhere");
+    await Deno.rename(specnaut, elsewhere);
+    await Deno.symlink(elsewhere, specnaut);
+    assertEquals(reasons(await check(root, head, { named: own })), [{
+      path: RECORD,
+      reason: `${SESSION_REASON.unreadable}: ${specnaut} is not a folder`,
+    }]);
+  },
 });
 
 Deno.test("a session still on the branch is told each cause once, as the checkout shows it now", async () => {

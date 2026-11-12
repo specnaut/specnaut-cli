@@ -49,15 +49,26 @@ export async function setUp(files: Record<string, string> = BASE_FILES, prefix?:
 /** The session's record path, by the folder it started in, as `SPECNAUT_SESSION_RECORD` holds it. */
 const records = new Map<string, string>();
 
-/** A session starts in `dir`: its record is taken of the checkout as it is now. */
-export async function startSession(dir: string, source = "startup"): Promise<string> {
+let sessions = 0;
+
+/**
+ * A session starts in `dir`, a new one each call unless `sessionId` names one: its record is taken
+ * of the checkout as it is now, or, for a session that has one, kept. It becomes `dir`'s session.
+ */
+export async function startSession(
+  dir: string,
+  source = "startup",
+  sessionId = `fixture-session-${++sessions}`,
+): Promise<string> {
   const store = (await FsSessionRecords.open(dir))!;
   const git = await GitObjects.open(dir);
   const outcome = await recordCheckout(
     { git, checkout: new FsTreeWalker(dir), records: store },
-    { sessionId: "fixture-session", source },
+    { sessionId, source },
   );
-  if (outcome.kind !== "taken") throw new Error(`no record taken: ${JSON.stringify(outcome)}`);
+  if (outcome.kind !== "taken" && outcome.kind !== "existing") {
+    throw new Error(`no record: ${JSON.stringify(outcome)}`);
+  }
   records.set(dir, outcome.path);
   return outcome.path;
 }

@@ -24,7 +24,9 @@ export type SessionRecord = { readonly head: string; readonly tree: readonly Rec
  * The `SessionStart` sources that take the record: each one is a harness process that has just
  * loaded the checkout. `clear` and `compact` load nothing anew, and a record retaken there would
  * describe a checkout switched inside the session, the case the record exists for. Any other
- * source takes none: a missing record refuses, where a wrong one would pass.
+ * source takes none: a missing record refuses, where a wrong one would pass. A session keeps its
+ * first record: `resume` or `fork` under an id that has one takes none, so a session started on a
+ * branch cannot pass by switching to the base and resuming.
  */
 export const RECORDED_SOURCES: ReadonlySet<string> = new Set(["startup", "resume", "fork"]);
 
