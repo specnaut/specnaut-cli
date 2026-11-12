@@ -1,4 +1,4 @@
-import { isCommitSha, parseBranchSource } from "../domain/branch_source.ts";
+import { type BranchSource, isCommitSha, parseBranchSource } from "../domain/branch_source.ts";
 import {
   DEFAULT_TREE_CAPS,
   type ExportPlan,
@@ -53,18 +53,37 @@ export async function exportBranchTree(
   if (source.kind === "refused") throw new ExportRefused(source.why);
   const store = deps.store();
   try {
-    const staged = await store.stage();
-    const sha = checkedHead(await deps.fetcher.fetch(source, staged), request.expectedSha);
-    const home = await store.claim(sha, staged);
-    const objects = deps.objects(home.gitDir);
-    const caps = request.caps ?? DEFAULT_TREE_CAPS;
-    const plan = await planTree(objects, await objects.treeOf(sha), caps, deps.windows);
-    await store.write(plan, objects);
-    await store.verify(plan);
-    return { ...home, sha, listed: plan.listed, remove: () => store.remove() };
+    return await exportInto(store, deps, source, request);
   } catch (err) {
-    await store.remove();
+    await removeAfter(store, err);
     throw err;
+  }
+}
+
+async function exportInto(
+  store: ExportStore,
+  deps: ExportDeps,
+  source: BranchSource,
+  request: ExportRequest,
+): Promise<BranchExport> {
+  const staged = await store.stage();
+  const sha = checkedHead(await deps.fetcher.fetch(source, staged), request.expectedSha);
+  const home = await store.claim(sha, staged);
+  const objects = deps.objects(home.gitDir);
+  const caps = request.caps ?? DEFAULT_TREE_CAPS;
+  const plan = await planTree(objects, await objects.treeOf(sha), caps, deps.windows);
+  await store.write(plan, objects);
+  await store.verify(plan);
+  return { ...home, sha, listed: plan.listed, remove: () => store.remove() };
+}
+
+/** Removes a failed export; a cleanup that fails too keeps the first failure as its cause. */
+async function removeAfter(store: ExportStore, failure: unknown): Promise<void> {
+  try {
+    await store.remove();
+  } catch (cleanup) {
+    const why = cleanup instanceof Error ? cleanup.message : String(cleanup);
+    throw new Error(`the export failed, and removing it failed too: ${why}`, { cause: failure });
   }
 }
 

@@ -67,9 +67,7 @@ export class FsExportStore implements ExportStore {
     if (!this.#made.includes(staging)) throw new Error("claim takes the path stage handed out");
     // The staging check above proves `stage` ran, so the root it resolved is set.
     const root = join(this.#root!, sha);
-    // A folder left by an export that could not clean up is not trusted to be what it was.
-    await Deno.remove(root, { recursive: true }).catch(ignoreNotFound);
-    await Deno.mkdir(root, { mode: 0o700 });
+    await claimNew(root);
     this.#made.push(root);
     const home = { root, gitDir: join(root, "git"), seats: join(root, "seats") };
     this.#home = { ...home, scratch: join(root, "scratch") };
@@ -119,12 +117,19 @@ export class FsExportStore implements ExportStore {
     if (found.length !== expected.size) throw new ExportRefused("a planned file is missing");
   }
 
+  /** Tries every folder this store made, then reports each one it could not remove. */
   async remove(): Promise<void> {
+    const failed: unknown[] = [];
     for (const path of this.#made.splice(0).reverse()) {
-      await Deno.remove(path, { recursive: true }).catch(ignoreNotFound);
+      await Deno.remove(path, { recursive: true }).catch(ignoreNotFound).catch((e) =>
+        failed.push(e)
+      );
     }
     this.#disarm?.();
     this.#disarm = undefined;
+    if (failed.length > 0) {
+      throw new AggregateError(failed, `could not remove ${failed.length} folder(s) of the export`);
+    }
   }
 
   /** The trap's cleanup: synchronous, since `unload` waits for nothing. */
@@ -196,6 +201,22 @@ async function walkFiles(dir: string): Promise<string[]> {
     else throw new ExportRefused(`${path} is not a regular file`);
   }
   return files;
+}
+
+/**
+ * Makes the commit's folder, or refuses: a folder already there belongs to another export of the
+ * same commit, still in use or left by one that could not clean up, and is never reused or removed.
+ */
+async function claimNew(root: string): Promise<void> {
+  try {
+    await Deno.mkdir(root, { mode: 0o700 });
+  } catch (err) {
+    if (!(err instanceof Deno.errors.AlreadyExists)) throw err;
+    throw new ExportRefused(
+      `an export of this commit is already at ${root}: another one uses it, or one was interrupted`,
+      { cause: err },
+    );
+  }
 }
 
 function ignoreNotFound(err: unknown): void {

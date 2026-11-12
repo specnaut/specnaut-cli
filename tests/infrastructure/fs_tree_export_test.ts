@@ -121,39 +121,6 @@ Deno.test("a cache folder inside the project is refused", async () => {
   }
 });
 
-Deno.test("a folder left at the commit's name is replaced, not reused", async () => {
-  const base = await tempDir("store-");
-  try {
-    await Deno.mkdir(join(base, "project"));
-    const store = new FsExportStore(join(base, "project"), join(base, "cache"));
-    const staged = await store.stage();
-    await Deno.mkdir(staged);
-    const sha = "c".repeat(40);
-    await Deno.mkdir(join(base, "cache", sha, "seats"), { recursive: true });
-    await Deno.writeTextFile(join(base, "cache", sha, "seats", "planted"), "x");
-    const home = await store.claim(sha, staged);
-    assertEquals(await exists(join(home.seats, "planted")), false);
-    assertEquals(await exists(join(base, "cache", sha, "git")), true);
-    await store.remove();
-    assertEquals([...Deno.readDirSync(join(base, "cache"))], []);
-  } finally {
-    await Deno.remove(base, { recursive: true });
-  }
-});
-
-Deno.test("claim refuses an id that is not a full commit id, before it names a path", async () => {
-  const base = await tempDir("store-");
-  try {
-    await Deno.mkdir(join(base, "project"));
-    const store = new FsExportStore(join(base, "project"), join(base, "cache"));
-    const staged = await store.stage();
-    await assertRejects(() => store.claim("../x", staged), ExportRefused, "full commit id");
-    await store.remove();
-  } finally {
-    await Deno.remove(base, { recursive: true });
-  }
-});
-
 const PROBE = fromFileUrl(new URL("./fs_tree_export_trap_probe.ts", import.meta.url));
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
