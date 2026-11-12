@@ -71,3 +71,46 @@ Deno.test("cloud: a move's request body is a file, gone once the script ends", a
     await p.cleanup();
   }
 });
+
+/** A jq that fails building a request body (`-Rs`), and is the real one otherwise. */
+async function jqFailingOnBodies(dir: string) {
+  const real = new TextDecoder().decode(
+    (await new Deno.Command("bash", { args: ["-c", "command -v jq"], stdout: "piped" }).output())
+      .stdout,
+  ).trim();
+  await Deno.writeTextFile(
+    join(dir, "bin", "jq"),
+    `#!/usr/bin/env bash\ncase " $* " in *" -Rs "*) exit 5 ;; esac\nexec "${real}" "$@"\n`,
+  );
+}
+
+for (const backend of ["gitlab", "cloud"] as const) {
+  Deno.test(`${backend}: a request body that could not be built is never sent`, async () => {
+    const p = await project(backend);
+    try {
+      await jqFailingOnBodies(p.dir);
+      await p.write("text.md", "Appended text.");
+      const runs: string[][] = backend === "gitlab"
+        ? [["add.sh", "A title", "Body."], ["clarify-comment.sh", "7", "A question"], [
+          "edit.sh",
+          "7",
+          "--append-file",
+          "text.md",
+        ]]
+        : [["add.sh", "A title", "Body."], ["clarify-comment.sh", "7", "A question"], [
+          "move.sh",
+          "7",
+          "Done",
+        ]];
+      for (const [script, ...args] of runs) {
+        const r = await p.run(script, args);
+        const seen = `${script}\n${r.stderr}\n${r.calls}`;
+        assertEquals(r.code, 2, seen);
+        assertStringIncludes(r.stderr, "no request body to send", seen);
+        assert(!/^glab\tapi\t-X|^curl/m.test(r.calls), seen);
+      }
+    } finally {
+      await p.cleanup();
+    }
+  });
+}

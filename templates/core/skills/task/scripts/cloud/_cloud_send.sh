@@ -12,6 +12,8 @@ cloud_send() (
   trap 'rm -rf -- "$dir"' EXIT
   chmod 700 "$dir"
   cat >"$dir/body.json" || { echo "${0##*/}: could not write the request body" >&2; exit 2; }
+  # An empty body is one that could not be built: send nothing rather than it.
+  [ -s "$dir/body.json" ] || { echo "${0##*/}: no request body to send; nothing was sent" >&2; exit 2; }
   file=$dir/body.json
   # A native Windows curl opens a Windows path, not the one MSYS shows bash.
   if command -v cygpath >/dev/null 2>&1; then file=$(cygpath -m "$file"); fi

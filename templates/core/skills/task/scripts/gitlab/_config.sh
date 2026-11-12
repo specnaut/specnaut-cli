@@ -83,10 +83,13 @@ project_path() { jq_lf -jn --arg p "$PROJECT_ID" '$p | @uri'; }
 # glab_send <method> <path under the project> -- a write whose JSON request body
 # glab reads on stdin. Never an argument: there it is visible to every process
 # on the host, and a long text passes the limit on one command's arguments.
+# An empty body is one that could not be built: nothing is sent then (status 2).
 glab_send() {
-  local p
+  local p body
+  body=$(cat) && [ -n "$body" ] ||
+    { echo "${0##*/}: no request body to send; nothing was sent" >&2; return 2; }
   p=$(project_path) || return 2
-  glab api -X "$1" "projects/$p/$2" -H "Content-Type: application/json" --input -
+  printf '%s\n' "$body" | glab api -X "$1" "projects/$p/$2" -H "Content-Type: application/json" --input -
 }
 
 # require_issue_number <id> — <id> as a bare decimal issue number on stdout, or

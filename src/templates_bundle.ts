@@ -12569,10 +12569,13 @@ project_path() { jq_lf -jn --arg p "\$PROJECT_ID" '\$p | @uri'; }
 # glab_send <method> <path under the project> -- a write whose JSON request body
 # glab reads on stdin. Never an argument: there it is visible to every process
 # on the host, and a long text passes the limit on one command's arguments.
+# An empty body is one that could not be built: nothing is sent then (status 2).
 glab_send() {
-  local p
+  local p body
+  body=\$(cat) && [ -n "\$body" ] ||
+    { echo "\${0##*/}: no request body to send; nothing was sent" >&2; return 2; }
   p=\$(project_path) || return 2
-  glab api -X "\$1" "projects/\$p/\$2" -H "Content-Type: application/json" --input -
+  printf '%s\\n' "\$body" | glab api -X "\$1" "projects/\$p/\$2" -H "Content-Type: application/json" --input -
 }
 
 # require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
@@ -14794,9 +14797,9 @@ if ! printf '%s\\n' "\$PROJECT_KEY" | LC_ALL=C grep -Eq '^[A-Za-z0-9][A-Za-z0-9_
 fi
 
 # curl is handed this string, and is not the parser \`specnaut cloud token\` judged
-# it with: only a plain http(s) base passes, the grammar normalizeApiUrl holds
-# (tests/scripts/cloud_config_sh_test.ts keeps the two equal). LC_ALL=C keeps the
-# classes ASCII whatever the locale.
+# it with: only a plain http(s) base passes, and plain http only to a loopback
+# host -- the rule normalizeApiUrl holds (tests/scripts/cloud_config_sh_test.ts
+# keeps the two equal). LC_ALL=C keeps the classes ASCII whatever the locale.
 if ! printf '%s\\n' "\$API_URL" |
   LC_ALL=C grep -Eq '^https?://([A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*|\\[::1\\])(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?\$'; then
   echo "error: backlog-config.yml api_url is not a plain http(s) URL." >&2
@@ -14943,6 +14946,8 @@ cloud_send() (
   trap 'rm -rf -- "\$dir"' EXIT
   chmod 700 "\$dir"
   cat >"\$dir/body.json" || { echo "\${0##*/}: could not write the request body" >&2; exit 2; }
+  # An empty body is one that could not be built: send nothing rather than it.
+  [ -s "\$dir/body.json" ] || { echo "\${0##*/}: no request body to send; nothing was sent" >&2; exit 2; }
   file=\$dir/body.json
   # A native Windows curl opens a Windows path, not the one MSYS shows bash.
   if command -v cygpath >/dev/null 2>&1; then file=\$(cygpath -m "\$file"); fi
