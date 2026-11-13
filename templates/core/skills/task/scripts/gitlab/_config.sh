@@ -39,7 +39,7 @@ extract() {
       sub("^"key":[[:space:]]*", "")
       if ($0 ~ /^"/) { sub(/^"/, ""); sub(/".*$/, "") }
       else if ($0 ~ /^'"'"'/) { sub(/^'"'"'/, ""); sub(/'"'"'.*$/, "") }
-      else { sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, "") }
+      else { sub(/(^|[[:space:]]+)#.*$/, ""); sub(/[[:space:]]+$/, "") }
       print
       exit
     }
@@ -71,6 +71,17 @@ case $HOST in http://*)
     exit 2
   } ;;
 esac
+
+# glab is handed project_id as --repo, which also reads a URL, a Git URL or
+# HOST/GROUP/PROJECT, any of them naming a host of its own. So it is a numeric
+# id or a group/project path and nothing else, and a path of three segments or
+# more does not open with a dotted one, which glab may take for a host.
+if ! printf '%s\n' "$PROJECT_ID" | LC_ALL=C grep -Eq \
+  '^([1-9][0-9]{0,18}|[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+)$' ||
+  printf '%s\n' "$PROJECT_ID" | LC_ALL=C grep -Eq '^[^/]*\.[^/]*/[^/]+/'; then
+  echo "error: backlog-config.yml project_id is not a numeric id or a group/project path." >&2
+  exit 2
+fi
 
 # No `require_project` guard here, and that is deliberate — do not add one to
 # "restore parity" with the GitHub backend.
@@ -153,10 +164,13 @@ item_url() {
       fi
       ;;
   esac
-  # A bare host is reached over https, glab's default scheme.
-  local base=${HOST%/}
-  case $base in http://* | https://*) ;; *) base="https://$base" ;; esac
-  echo "$base/$path/-/issues/$1"
+  echo "$(host_base)/$path/-/issues/$1"
+}
+
+# host_base -- the host's web address: a bare host is reached over https,
+# glab's default scheme.
+host_base() {
+  case ${HOST%/} in http://* | https://*) echo "${HOST%/}" ;; *) echo "https://${HOST%/}" ;; esac
 }
 
 # Every issue a `glab issue list` query matches, across pages.

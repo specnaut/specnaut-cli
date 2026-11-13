@@ -17,8 +17,14 @@ const CONFIG_SH = fromFileUrl(
 /** Sources `_config.sh`, then prints the host glab would be given. */
 const PROBE = 'printf "GITLAB_HOST=%s|\\n" "$GITLAB_HOST"';
 
+/** A stand-in glab that logs its arguments, one call a line. */
+const GLAB = '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$(dirname "$0")/../calls.log"\n';
+
 /** Source the installed `_config.sh` in a project holding `config`, then run `probe`. */
-async function source(config: string, probe = PROBE): Promise<{ code: number; out: string }> {
+async function source(
+  config: string,
+  probe = PROBE,
+): Promise<{ code: number; out: string; calls: string }> {
   const dir = await Deno.makeTempDir({ prefix: "gitlab-config-sh-" });
   try {
     const scripts = join(dir, ".specnaut", "scripts", "backlog");
@@ -27,14 +33,22 @@ async function source(config: string, probe = PROBE): Promise<{ code: number; ou
     await Deno.copyFile(CONFIG_SH, join(scripts, "_config.sh"));
     const script = ["#!/usr/bin/env bash", 'source "$(dirname "$0")/_config.sh"', probe, ""];
     await Deno.writeTextFile(join(scripts, "probe.sh"), script.join("\n"));
+    await Deno.mkdir(join(dir, "bin"));
+    await Deno.writeTextFile(join(dir, "bin", "glab"), GLAB, { mode: 0o755 });
     const { code, stdout, stderr } = await new Deno.Command("bash", {
       args: [".specnaut/scripts/backlog/probe.sh"],
       cwd: dir,
+      // PATH through the environment: bash converts an inherited one on Windows.
+      env: { PATH: `${join(dir, "bin")}:${Deno.env.get("PATH")}` },
       stdout: "piped",
       stderr: "piped",
     }).output();
     const dec = new TextDecoder();
-    return { code, out: dec.decode(stdout) + dec.decode(stderr) };
+    const calls = await Deno.readTextFile(join(dir, "calls.log")).catch((e) => {
+      if (e instanceof Deno.errors.NotFound) return ""; // glab was never called
+      throw e;
+    });
+    return { code, out: dec.decode(stdout) + dec.decode(stderr), calls };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -113,4 +127,41 @@ Deno.test("gitlab item_url links a bare host over https, the scheme glab reaches
     const r = await source(withHost(host), "item_url 42");
     assertEquals([r.code, r.out], [0, `${base}/acme/my-app/-/issues/42\n`]);
   }
+});
+
+const withProject = (id: string) => `host: gitlab.example.com\nproject_id: ${id}\n`;
+const LIST = 'glab issue list --repo "$PROJECT_ID"';
+
+Deno.test("gitlab _config.sh hands glab a numeric id or a group/project path", async () => {
+  for (const id of ["7", "1234567", "acme/my-app", "acme/sub.group/my_app", "my.group/app"]) {
+    const r = await source(withProject(`"${id}"`), LIST);
+    assertEquals([r.code, r.calls], [0, `issue list --repo ${id}\n`], r.out);
+  }
+});
+
+Deno.test("gitlab _config.sh refuses a project_id glab could read as another host", async () => {
+  for (
+    const id of [
+      "https://other.example.com/acme/my-app",
+      "git@other.example.com:acme/my-app.git",
+      "ssh://git@other.example.com/acme/my-app",
+      "other.example.com/acme/my-app",
+      "localhost:3000/acme/my-app",
+      "/acme/my-app",
+      "acme//my-app",
+      "my-app",
+      "07",
+      "acme/my-app?x=1",
+    ]
+  ) {
+    const r = await source(withProject(`"${id}"`), LIST);
+    assertEquals([r.code, r.calls], [2, ""], `${id}: ${r.out}`);
+    assertStringIncludes(r.out, "error: backlog-config.yml project_id", id);
+  }
+});
+
+Deno.test("gitlab _config.sh reads a value that is only a comment as missing", async () => {
+  const r = await source("host: gitlab.example.com\nproject_id: # fill in\n", LIST);
+  assertEquals([r.code, r.calls], [2, ""], r.out);
+  assertStringIncludes(r.out, "missing 'host' or 'project_id'");
 });
