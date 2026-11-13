@@ -98,7 +98,7 @@
       "source": {
         "source": "github",
         "repo": "specnaut/specnaut-cli",
-        "ref": "v9.3.0",
+        "ref": "v9.4.0",
         "path": "packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
