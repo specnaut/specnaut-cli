@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { loginNeedsTrustConfirm, urlSourceLabel } from "../../src/cli/handlers/cloud_handler.ts";
+import { urlSourceLabel } from "../../src/cli/handlers/cloud_api_url.ts";
+import { loginNeedsTrustConfirm } from "../../src/cli/handlers/cloud_login_trust.ts";
 
 Deno.test("urlSourceLabel maps each source to a human label (#400)", () => {
   assertEquals(urlSourceLabel("flag"), "--api-url flag");
