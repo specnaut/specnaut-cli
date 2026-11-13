@@ -104,3 +104,14 @@ Deno.test("container: docker that is a podman service is not offered, and says w
   );
   assertEquals(chooseBackend(probe(service)), ON_PODMAN);
 });
+
+const UNCAPPED_WHY =
+  "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
+
+for (const controller of ["memory", "pids", "cpuQuota"] as const) {
+  Deno.test(`container: rootless podman without ${controller} alone is passed over for docker, else uncapped`, () => {
+    const lacking = probe({ podmanLimits: { ...ALL, [controller]: false } });
+    assertEquals(chooseBackend({ ...lacking, docker: true }), ON_DOCKER);
+    assertEquals(firstWhy(lacking), UNCAPPED_WHY);
+  });
+}
