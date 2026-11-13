@@ -1597,8 +1597,12 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "\$BASE_TIP" --head "
 
 Under the lock \`sandbox exec\` takes exactly that shape: the start's \`\$HEAD\`, a \`--log\` file
 inside \`\$LOGS\`, then \`--\`. The hook refuses any other commit, a log anywhere else and a
-\`--toolchain\`; the hook alone pins the commit, while \`sandbox exec\` itself judges only the \`--log\`
-and the \`--toolchain\`. A command whose tools are not on the sandbox's PATH is NOT RUN.
+\`--toolchain\` folder the start did not record; the hook alone pins the commit, while \`sandbox
+exec\` itself judges only the \`--log\` and the \`--toolchain\`. A sandboxed gate finds its tools in
+the folders the base commit's \`gates.yml\` declares under \`toolchain:\` (absolute, or \`~/\` and a
+folder under the home), which the start records and \`run-gate.sh\` passes as \`--toolchain\`; each
+still passes the sandbox's layout check, so the home and its credential folders are never read. A
+command whose tools are on none of them, nor the sandbox's system PATH, exits 127: NOT RUN.
 
 \`run-gate.sh\` runs only under \`VERDICT gates trusted\`, else the tiers are NOT RUN: <the line>. It
 reads \`gates.yml\` from the \`--base\` commit, never from the work tree, runs each command through
@@ -30008,7 +30012,9 @@ generate_branch_name() {
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # \`specnaut sandbox exec\` (_gate_sandbox.sh), its output to a new file under the
 # --evidence folder, judged by its exit code alone. It needs --base, and reads the tier
-# from that commit's gates.yml, never from the work tree. --head and --objects are only for it,
+# from that commit's gates.yml, never from the work tree, and the folders its
+# \`toolchain:\` list declares, passed as \`--toolchain\`. \`--parse-toolchain <file>\`
+# prints those folders, one a line, as the run passes them. --head and --objects are only for it,
 # and reach gate-impact.sh as given; the evidence goes to that folder.
 #
 # Bare, it never reads \`.specnaut/impact.json\` and is the manual full override.
@@ -30039,11 +30045,15 @@ GATES="\$SPECNAUT_DIR/gates.yml"
 REPO_ROOT="\$(cd -- "\$SPECNAUT_DIR/.." && pwd)"
 
 # Read one flat list. The format is narrow on purpose (see gates.yml): a
-# top-level \`<tier>_gate:\` key, then \`  - \` items until the next top-level key.
-# Quotes around an item are optional and are stripped as a matched pair only,
-# so a command containing a quote is not silently mangled.
-parse_tier() {
-  awk -v key="\${TIER}_gate:" '
+# top-level key (\`<tier>_gate:\`, \`toolchain:\`), then \`  - \` items until the next
+# top-level key. Quotes around an item are optional and are stripped as a matched
+# pair only, so a command containing a quote is not silently mangled.
+# src/domain/gates_toolchain.ts reads \`toolchain:\` the same way; a test runs both.
+parse_tier() { parse_list "\${TIER}_gate:" "\$1"; }
+
+# parse_list <key> <file> - the items under the top-level <key>, one a line.
+parse_list() {
+  awk -v key="\$1" '
     # A top-level key is a line starting in column 1 with a non-space,
     # non-comment character. Reaching one ends the section we are in.
     /^[^ \\t#]/ {
@@ -30064,7 +30074,7 @@ parse_tier() {
       }
       print line
     }
-  ' < "\$1"
+  ' < "\$2"
 }
 
 FLAG="" BASE_VALUE=""
@@ -30092,6 +30102,11 @@ parse_flags() {
       --parse-gates)
         [ "\$#" -eq 2 ] || flag_usage
         parse_tier "\$2"
+        exit 0
+        ;;
+      --parse-toolchain)
+        [ "\$#" -eq 2 ] || flag_usage
+        gate_toolchain_of "\$2"
         exit 0
         ;;
       *) gate_sandbox_option "\$@" && shift "\$GATE_WORDS" ;;
@@ -31151,7 +31166,8 @@ run_selected() {
     content: `# shellcheck shell=bash
 # Sourced by run-gate.sh behind --sandbox: the tier's commands, read from the --base
 # commit's gates.yml (never the work tree's, which the branch under review can edit), run
-# on the exported copy of a head commit through \`specnaut sandbox exec\`, never in this shell. Sourced before the options are read; gate_sandbox_start requires
+# on the exported copy of a head commit through \`specnaut sandbox exec\`, never in this shell,
+# with the folders that file's \`toolchain:\` list declares as its \`--toolchain\`. Sourced before the options are read; gate_sandbox_start requires
 # TIER and _gate_selected.sh.
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
@@ -31162,7 +31178,7 @@ run_selected() {
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
 # shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
-GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TOOLCHAIN=""
 
 # gate_sandbox_option <option> [<value>...] - takes --head, --objects, --evidence or
 # --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
@@ -31228,6 +31244,27 @@ gate_sandbox_gates() {
   esac
   gate_base_git cat-file blob "\$commit:./\$path" >"\$GATES" ||
     refuse_candidate "base-refused: \$path at \$commit cannot be read"
+  GATE_TOOLCHAIN="\$(gate_toolchain_of "\$GATES" | tr '\\n' ':')"
+  GATE_TOOLCHAIN="\${GATE_TOOLCHAIN%:}"
+}
+
+# gate_toolchain_of <gates file> - the folders its \`toolchain:\` list declares, one a
+# line: \`~/\` expanded against HOME, and an item that is not then an absolute folder free
+# of \`:\` dropped. The rule of declaredToolchain (src/domain/gates_toolchain.ts), which
+# \`review start\` records in the review lock: the lock lets \`sandbox exec\` read these
+# folders and no other.
+gate_toolchain_of() {
+  local item folder
+  while IFS= read -r item; do
+    item="\${item%\$'\\r'}"
+    case "\$item" in
+      "~/"*) [ -n "\${HOME:-}" ] || continue; folder="\$HOME\${item#\\~}" ;;
+      *) folder="\$item" ;;
+    esac
+    case "\$folder" in /*) ;; *) continue ;; esac
+    case "\$folder" in *:*) continue ;; "") continue ;; esac
+    printf '%s\\n' "\$folder"
+  done < <(parse_list toolchain: "\$1")
 }
 
 # gate_base_git <git...> - git in the project's repository, with no GIT_* variable, so with
@@ -31242,13 +31279,14 @@ gate_base_git() {
 # gate_run_sandboxed <command> - runs it on the head in the sandbox, its output to the
 # next log file, and returns its exit code. Prints where the log is.
 gate_run_sandboxed() {
-  local log
+  local log toolchain=()
   GATE_RUNS=\$((GATE_RUNS + 1))
   log="\$GATE_LOGS/\$GATE_RUNS.log"
   echo "log: \$(gate_ascii "\$log")"
+  [ -z "\$GATE_TOOLCHAIN" ] || toolchain=(--toolchain "\$GATE_TOOLCHAIN")
   (
     cd "\$REPO_ROOT" || exit 125
-    exec specnaut sandbox exec "\$EXPLICIT_HEAD" --log "\$log" -- sh -c "\$1"
+    exec specnaut sandbox exec "\$EXPLICIT_HEAD" \${toolchain[@]+"\${toolchain[@]}"} --log "\$log" -- sh -c "\$1"
   ) </dev/null
 }
 
@@ -37044,6 +37082,16 @@ function Invoke-SelectedRun(\$Answer) {
 # The format is deliberately narrow so a shell script can read it without a
 # YAML library: a top-level key, then \`  - \` items, one command per line. No
 # nesting, no anchors, no multi-line scalars.
+#
+# An optional \`toolchain:\` list names the folders a gate run in a sandbox (a
+# review of a branch this session cannot trust) reads its tools from: each an
+# absolute folder, or \`~/\` and a folder under your home. They are read from
+# the base branch, not the branch under review, put on the sandbox's PATH
+# read-only, and refused when one is or holds the home or a credential folder.
+#
+#   toolchain:
+#     - ~/.deno/bin
+#     - /usr/local/go/bin
 #
 # Leaving a list empty is a valid choice, not a broken configuration —
 # Specnaut reports that the tier is not declared and carries on exactly as it

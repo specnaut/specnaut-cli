@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # Sourced by run-gate.sh behind --sandbox: the tier's commands, read from the --base
 # commit's gates.yml (never the work tree's, which the branch under review can edit), run
-# on the exported copy of a head commit through `specnaut sandbox exec`, never in this shell. Sourced before the options are read; gate_sandbox_start requires
+# on the exported copy of a head commit through `specnaut sandbox exec`, never in this shell,
+# with the folders that file's `toolchain:` list declares as its `--toolchain`. Sourced before the options are read; gate_sandbox_start requires
 # TIER and _gate_selected.sh.
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
@@ -12,7 +13,7 @@
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
 # shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
-GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=()
+GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TOOLCHAIN=""
 
 # gate_sandbox_option <option> [<value>...] - takes --head, --objects, --evidence or
 # --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
@@ -78,6 +79,27 @@ gate_sandbox_gates() {
   esac
   gate_base_git cat-file blob "$commit:./$path" >"$GATES" ||
     refuse_candidate "base-refused: $path at $commit cannot be read"
+  GATE_TOOLCHAIN="$(gate_toolchain_of "$GATES" | tr '\n' ':')"
+  GATE_TOOLCHAIN="${GATE_TOOLCHAIN%:}"
+}
+
+# gate_toolchain_of <gates file> - the folders its `toolchain:` list declares, one a
+# line: `~/` expanded against HOME, and an item that is not then an absolute folder free
+# of `:` dropped. The rule of declaredToolchain (src/domain/gates_toolchain.ts), which
+# `review start` records in the review lock: the lock lets `sandbox exec` read these
+# folders and no other.
+gate_toolchain_of() {
+  local item folder
+  while IFS= read -r item; do
+    item="${item%$'\r'}"
+    case "$item" in
+      "~/"*) [ -n "${HOME:-}" ] || continue; folder="$HOME${item#\~}" ;;
+      *) folder="$item" ;;
+    esac
+    case "$folder" in /*) ;; *) continue ;; esac
+    case "$folder" in *:*) continue ;; "") continue ;; esac
+    printf '%s\n' "$folder"
+  done < <(parse_list toolchain: "$1")
 }
 
 # gate_base_git <git...> - git in the project's repository, with no GIT_* variable, so with
@@ -92,13 +114,14 @@ gate_base_git() {
 # gate_run_sandboxed <command> - runs it on the head in the sandbox, its output to the
 # next log file, and returns its exit code. Prints where the log is.
 gate_run_sandboxed() {
-  local log
+  local log toolchain=()
   GATE_RUNS=$((GATE_RUNS + 1))
   log="$GATE_LOGS/$GATE_RUNS.log"
   echo "log: $(gate_ascii "$log")"
+  [ -z "$GATE_TOOLCHAIN" ] || toolchain=(--toolchain "$GATE_TOOLCHAIN")
   (
     cd "$REPO_ROOT" || exit 125
-    exec specnaut sandbox exec "$EXPLICIT_HEAD" --log "$log" -- sh -c "$1"
+    exec specnaut sandbox exec "$EXPLICIT_HEAD" ${toolchain[@]+"${toolchain[@]}"} --log "$log" -- sh -c "$1"
   ) </dev/null
 }
 

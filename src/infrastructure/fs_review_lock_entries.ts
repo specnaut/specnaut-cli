@@ -48,7 +48,7 @@ function entryOf(text: string): LockEntry {
   try {
     const parsed: unknown = JSON.parse(text);
     if (typeof parsed !== "object" || parsed === null) return UNKNOWN_ENTRY;
-    const { head, logs, base, state } = parsed as Record<string, unknown>;
+    const { head, logs, base, toolchain, state } = parsed as Record<string, unknown>;
     const review = {
       head: typeof head === "string" && isFullSha(head) ? head : null,
       logs: typeof logs === "string" && isAbsolute(logs) ? logs : null,
@@ -56,6 +56,8 @@ function entryOf(text: string): LockEntry {
       ...(base === undefined
         ? {}
         : { base: typeof base === "string" && isFullSha(base) ? base : null }),
+      // A toolchain is folders, each absolute: one entry of any other kind records none.
+      ...(toolchain === undefined ? {} : { toolchain: foldersOf(toolchain) }),
     };
     return { review, state: typeof state === "string" ? state : null };
   } catch (err) {
@@ -63,6 +65,14 @@ function entryOf(text: string): LockEntry {
     if (!(err instanceof SyntaxError)) throw err;
     return UNKNOWN_ENTRY;
   }
+}
+
+/** `value` as a list of absolute folders, or none when any item is not one. */
+function foldersOf(value: unknown): string[] {
+  const folders = Array.isArray(value) ? value : [];
+  return folders.every((f) => typeof f === "string" && f.startsWith("/") && !f.includes(":"))
+    ? folders
+    : [];
 }
 
 export async function entryNames(dir: string): Promise<string[]> {

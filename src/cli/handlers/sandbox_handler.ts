@@ -36,7 +36,8 @@ type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
  *          launcher that could not start, a `--log` whose folder does not resolve, or a run the
  *          checkout's review lock refuses: under it,
  *          a `--log` below the folder `review start` made, the session's own where
- *          `CLAUDE_CODE_SESSION_ID` names it, and no `--toolchain`). Every 124 and 125
+ *          `CLAUDE_CODE_SESSION_ID` names it, and only `--toolchain` folders that review
+ *          recorded from the base's `gates.yml`). Every 124 and 125
  *          says why on stderr; the command's own
  *          output is passed through unchanged, or, with `--log <file>`, written to that new file
  *          with every control but tab and line feed dropped, every invisible format character and

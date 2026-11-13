@@ -1,5 +1,5 @@
 import { plainWords } from "./plain_command.ts";
-import { isLockedExec } from "./review_lock_exec.ts";
+import { execOptions, isLockedExec } from "./review_lock_exec.ts";
 import { isReviewScript } from "./review_lock_scripts.ts";
 
 export { isInsideFolder, lockedExecRefusal } from "./review_lock_exec.ts";
@@ -47,14 +47,16 @@ export const LOCKED =
 /**
  * What a session's lock entry records of its review, each `null` (or absent) where the entry does
  * not say: the head `specnaut review start` exported, the folder it made for the review's logs (its
- * real path), and the base branch's tip the start was judged against, the one `--base` a review
- * script may name. An entry written before the export, or one that cannot be read, says none, and
- * then no command that needs them runs.
+ * real path), the base branch's tip the start was judged against, the one `--base` a review
+ * script may name, and the toolchain folders that tip's `gates.yml` declares, the only ones a
+ * sandboxed run may name. An entry written before the export, or one that cannot be read, says
+ * none, and then no command that needs them runs.
  */
 export type LockedReview = {
   readonly head: string | null;
   readonly logs: string | null;
   readonly base?: string | null;
+  readonly toolchain?: readonly string[];
 };
 
 export const UNKNOWN_REVIEW: LockedReview = { head: null, logs: null };
@@ -117,7 +119,7 @@ export function lockedLogOf(tool: string | null, input: unknown): string | null 
   const command = tool === "Bash" ? field(input, "command") : undefined;
   const words = typeof command === "string" ? plainWords(command) : null;
   if (words === null || words.slice(0, 3).join(" ") !== "specnaut sandbox exec") return null;
-  return words[4] === "--log" && words[6] === "--" ? words[5] ?? null : null;
+  return execOptions(words)?.log ?? null;
 }
 
 function field(v: unknown, key: string): unknown {

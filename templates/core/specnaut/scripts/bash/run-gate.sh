@@ -28,7 +28,9 @@
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # `specnaut sandbox exec` (_gate_sandbox.sh), its output to a new file under the
 # --evidence folder, judged by its exit code alone. It needs --base, and reads the tier
-# from that commit's gates.yml, never from the work tree. --head and --objects are only for it,
+# from that commit's gates.yml, never from the work tree, and the folders its
+# `toolchain:` list declares, passed as `--toolchain`. `--parse-toolchain <file>`
+# prints those folders, one a line, as the run passes them. --head and --objects are only for it,
 # and reach gate-impact.sh as given; the evidence goes to that folder.
 #
 # Bare, it never reads `.specnaut/impact.json` and is the manual full override.
@@ -59,11 +61,15 @@ GATES="$SPECNAUT_DIR/gates.yml"
 REPO_ROOT="$(cd -- "$SPECNAUT_DIR/.." && pwd)"
 
 # Read one flat list. The format is narrow on purpose (see gates.yml): a
-# top-level `<tier>_gate:` key, then `  - ` items until the next top-level key.
-# Quotes around an item are optional and are stripped as a matched pair only,
-# so a command containing a quote is not silently mangled.
-parse_tier() {
-  awk -v key="${TIER}_gate:" '
+# top-level key (`<tier>_gate:`, `toolchain:`), then `  - ` items until the next
+# top-level key. Quotes around an item are optional and are stripped as a matched
+# pair only, so a command containing a quote is not silently mangled.
+# src/domain/gates_toolchain.ts reads `toolchain:` the same way; a test runs both.
+parse_tier() { parse_list "${TIER}_gate:" "$1"; }
+
+# parse_list <key> <file> - the items under the top-level <key>, one a line.
+parse_list() {
+  awk -v key="$1" '
     # A top-level key is a line starting in column 1 with a non-space,
     # non-comment character. Reaching one ends the section we are in.
     /^[^ \t#]/ {
@@ -84,7 +90,7 @@ parse_tier() {
       }
       print line
     }
-  ' < "$1"
+  ' < "$2"
 }
 
 FLAG="" BASE_VALUE=""
@@ -112,6 +118,11 @@ parse_flags() {
       --parse-gates)
         [ "$#" -eq 2 ] || flag_usage
         parse_tier "$2"
+        exit 0
+        ;;
+      --parse-toolchain)
+        [ "$#" -eq 2 ] || flag_usage
+        gate_toolchain_of "$2"
         exit 0
         ;;
       *) gate_sandbox_option "$@" && shift "$GATE_WORDS" ;;

@@ -6,7 +6,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { dirname } from "@std/path";
-import { ALWAYS, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
+import { ALWAYS, GATES, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
 import { evidenceOf, sandboxed } from "./run_gate_sandbox_fixture.ts";
 import { blob, commit, mktree } from "../helpers/git_fixture.ts";
 
@@ -133,4 +133,18 @@ Deno.test("run-gate --sandbox: a base git cannot list is refused with git's reas
   assertEquals([r.code, r.calls], [3, []], r.stdout + r.stderr);
   assertStringIncludes(r.stderr, `base-refused: git ls-tree ${base} failed: `);
   assertStringIncludes(r.stderr, "not a tree object");
+});
+
+Deno.test("run-gate --sandbox: the base's toolchain folders are each run's --toolchain; the work tree's are not", async () => {
+  const gates = `${GATES}toolchain:\n  - /opt/go/bin\n  - ~/.deno/bin\n`;
+  const { repo, head, run, full } = await sandboxed({ declaration: null, gates });
+  await Deno.writeTextFile(`${repo.root}/.specnaut/gates.yml`, `${GATES}toolchain:\n  - /etc\n`);
+  const r = await run(["fast", "--base", repo.main, ...full]);
+  assertEquals(r.code, 0, r.stdout + r.stderr);
+  const folders = `/opt/go/bin:${Deno.env.get("HOME")}/.deno/bin`;
+  for (const call of r.calls) {
+    assertEquals(call.slice(0, 5), ["sandbox", "exec", head, "--toolchain", folders]);
+    assertEquals(call[5], "--log");
+  }
+  assertEquals(r.calls.length, 3);
 });

@@ -98,3 +98,37 @@ Deno.test("sandbox exec itself, under any lock of its checkout, logs only in a r
     assertStringIncludes(lockedExecRefusal(held, toolchain, log) ?? "ran", "review lock", name);
   }
 });
+
+const TOOLS: LockedReview = { ...REVIEW, toolchain: ["/opt/go/bin", "/home/u/.deno/bin"] };
+
+Deno.test("under the review lock, sandbox exec names only toolchain folders the start recorded", () => {
+  const exec = (toolchain: string) =>
+    `specnaut sandbox exec ${SHA} --toolchain ${toolchain} --log ${LOG} -- make`;
+  assertEquals(bash(exec("/opt/go/bin"), TOOLS), null);
+  assertEquals(bash(exec("/home/u/.deno/bin:/opt/go/bin"), TOOLS), null, "both, in any order");
+  assertEquals(lockedLogOf("Bash", { command: exec("/opt/go/bin") }), LOG);
+  for (
+    const [toolchain, review, name] of [
+      ["/opt/go/bin", REVIEW, "a lock recording none"],
+      ["/opt/go", TOOLS, "the folder above one"],
+      ["/opt/go/bin/x", TOOLS, "a folder below one"],
+      ["/opt/go/bin:/home/u", TOOLS, "one recorded, one not"],
+      ["/opt/go/bin:", TOOLS, "an empty folder"],
+    ] as const
+  ) assertStringIncludes(bash(exec(toolchain), review) ?? "allowed", "review lock", name);
+});
+
+Deno.test("sandbox exec itself, under a lock, takes only the toolchain that review recorded", () => {
+  const other: LockedReview = { head: OTHER, logs: "/c/other", toolchain: ["/opt/x"] };
+  assertEquals(lockedExecRefusal([TOOLS], ["/opt/go/bin"], LOG), null);
+  assertEquals(lockedExecRefusal([TOOLS], [], LOG), null, "no toolchain is always one");
+  for (
+    const [held, toolchain, name] of [
+      [[TOOLS], ["/opt/other"], "a folder not recorded"],
+      [[other, REVIEW], ["/opt/x"], "another review's folder, logged in this one's"],
+    ] as const
+  ) {
+    const why = lockedExecRefusal(held, toolchain, LOG) ?? "ran";
+    assertStringIncludes(why, "does not declare", name);
+  }
+});

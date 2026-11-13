@@ -61,4 +61,6 @@ export type RecordedReview = {
   readonly logs: string;
   /** The base branch's tip the start was judged against: the one `--base` a script may name. */
   readonly base?: string;
+  /** The toolchain folders the base's `gates.yml` declares: the only ones a run may name. */
+  readonly toolchain?: readonly string[];
 };

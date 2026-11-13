@@ -57,6 +57,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
         lock: () => Promise.reject(new Error("locked")),
         record: () => Promise.reject(new Error("recorded")),
         exportBranch: () => Promise.reject(new Error("fetched")),
+        toolchain: () => Promise.reject(new Error("read")),
       }),
   };
   assertEquals(await runReview({ kind: "review", sub: "start", source: "12" }, deps), 1);
@@ -163,6 +164,7 @@ async function startOver(argv: string[], exportBranch: ReturnType<typeof branchE
         lock: () => Promise.resolve(),
         record: () => Promise.resolve(),
         exportBranch,
+        toolchain: () => Promise.resolve([]),
       }),
   });
   return { code, said: said.join("\n") };

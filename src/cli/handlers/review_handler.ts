@@ -19,6 +19,8 @@ import { keptExport } from "../../infrastructure/fs_kept_export.ts";
 import { closeExport, type CloseOutcome } from "../../application/untrusted_review_close.ts";
 import { GitBranchFetcher } from "../../infrastructure/git_branch_fetch.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
+import type { GitObjectReader } from "../../application/script_trust_ports.ts";
+import { declaredToolchain } from "../../domain/gates_toolchain.ts";
 import { GitTreeObjects } from "../../infrastructure/git_tree_objects.ts";
 import type { ReviewIntent } from "../intent.ts";
 import { FsReviewLock } from "../../infrastructure/fs_review_lock.ts";
@@ -156,6 +158,8 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
   };
   const exportBranch = branchExporter(exportDeps);
   const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
+  const home = Deno.env.get("HOME") ?? null;
+  const toolchain = async (base: string) => baseToolchain(await GitObjects.open(cwd), base, home);
   const checkout = () => checkoutState(cwd);
   return {
     pass,
@@ -166,5 +170,20 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
     lock: (id) => lock.lock(id),
     record: (id, review) => lock.record(id, review),
     exportBranch,
+    toolchain,
   };
+}
+
+/**
+ * The toolchain folders `.specnaut/gates.yml` at the commit `base` declares, `~/` against `home`:
+ * the base's file, never the work tree's, which the branch under review can edit. None without a
+ * regular file there.
+ */
+export async function baseToolchain(
+  git: Pick<GitObjectReader, "readFile">,
+  base: string,
+  home: string | null,
+): Promise<string[]> {
+  const file = await git.readFile(base, ".specnaut/gates.yml");
+  return file.kind === "blob" ? declaredToolchain(new TextDecoder().decode(file.bytes), home) : [];
 }

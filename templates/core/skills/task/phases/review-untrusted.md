@@ -88,8 +88,12 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "$BASE_TIP" --head "$
 
 Under the lock `sandbox exec` takes exactly that shape: the start's `$HEAD`, a `--log` file
 inside `$LOGS`, then `--`. The hook refuses any other commit, a log anywhere else and a
-`--toolchain`; the hook alone pins the commit, while `sandbox exec` itself judges only the `--log`
-and the `--toolchain`. A command whose tools are not on the sandbox's PATH is NOT RUN.
+`--toolchain` folder the start did not record; the hook alone pins the commit, while `sandbox
+exec` itself judges only the `--log` and the `--toolchain`. A sandboxed gate finds its tools in
+the folders the base commit's `gates.yml` declares under `toolchain:` (absolute, or `~/` and a
+folder under the home), which the start records and `run-gate.sh` passes as `--toolchain`; each
+still passes the sandbox's layout check, so the home and its credential folders are never read. A
+command whose tools are on none of them, nor the sandbox's system PATH, exits 127: NOT RUN.
 
 `run-gate.sh` runs only under `VERDICT gates trusted`, else the tiers are NOT RUN: <the line>. It
 reads `gates.yml` from the `--base` commit, never from the work tree, runs each command through

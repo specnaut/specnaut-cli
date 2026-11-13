@@ -53,6 +53,7 @@ async function start(root: string, nonce: string | null = passed) {
     lock: (id) => lock.lock(id),
     record: (id, review) => lock.record(id, review),
     exportBranch: () => Promise.resolve(exported),
+    toolchain: () => Promise.resolve([]),
   }, "12");
 }
 
@@ -71,7 +72,7 @@ Deno.test("a start in the checkout its gate judged starts; one after the checkou
   assertEquals((await start(root)).kind, "started", "the control: an unchanged checkout starts");
   const lock = await FsReviewLock.open(root, { state: join(root, ".state") });
   const base = await baseTipOf(await GitObjects.open(root));
-  const recorded = { head: "a".repeat(40), logs: "/cache/logs", base };
+  const recorded = { head: "a".repeat(40), logs: "/cache/logs", base, toolchain: [] };
   assertEquals(await lock.held("control-session"), recorded, "the start locks the session judged");
   assertEquals(await lock.held("moved-session-0"), null, "and no other");
 

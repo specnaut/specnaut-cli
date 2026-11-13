@@ -12,9 +12,10 @@ import { UnexpectedHead } from "./untrusted_review_ports.ts";
  * longer the base's, or for a checkout that no longer reads the same, starts nothing and fetches
  * nothing: the verdict was taken on that checkout, against that tip. The session the gate judged
  * is locked before the branch is fetched (`review_lock.ts` in the domain), so nothing of the branch
- * reaches a session the lock does not hold; once it is exported, the lock records its head and
- * logs folder, the one head and the one folder the session's sandboxed runs may then name. An
- * export the lock could not record is not kept.
+ * reaches a session the lock does not hold; once it is exported, the lock records its head, its
+ * logs folder, the base tip the pass was judged against and the toolchain folders that tip's
+ * `gates.yml` declares: the one head, folder and base, and the only toolchain, the session's
+ * sandboxed runs may then name. An export the lock could not record is not kept.
  */
 
 export type StartDeps = {
@@ -32,6 +33,8 @@ export type StartDeps = {
   readonly record: (sessionId: string, review: RecordedReview) => Promise<void>;
   /** Exports `source`; a fetched head other than `expectedSha`, when given, is refused. */
   readonly exportBranch: (source: string, expectedSha?: string) => Promise<BranchExport>;
+  /** The toolchain folders `gates.yml` at the commit `base` declares (`gates_toolchain.ts`). */
+  readonly toolchain: (base: string) => Promise<readonly string[]>;
 };
 
 export type StartOutcome =
@@ -82,8 +85,8 @@ export async function startReview(
   await deps.lock(granted.session);
   const exported = await exportOrRefusal(deps, source, expectedSha);
   if (typeof exported === "string") return { kind: "refused", why: exported };
-  const review = { head: exported.sha, logs: exported.logs, base: granted.baseTip };
-  await deps.record(granted.session, review);
+  const toolchain = await deps.toolchain(granted.baseTip);
+  await deps.record(granted.session, { ...recorded(exported), base: granted.baseTip, toolchain });
   exported.keep();
   return { kind: "started", exported };
 }
@@ -101,3 +104,5 @@ async function exportOrRefusal(
     return `${err.message}; ${LOCKED_AFTER_MISMATCH}`;
   }
 }
+
+const recorded = (exported: BranchExport) => ({ head: exported.sha, logs: exported.logs });

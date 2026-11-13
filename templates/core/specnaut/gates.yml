@@ -30,6 +30,16 @@
 # YAML library: a top-level key, then `  - ` items, one command per line. No
 # nesting, no anchors, no multi-line scalars.
 #
+# An optional `toolchain:` list names the folders a gate run in a sandbox (a
+# review of a branch this session cannot trust) reads its tools from: each an
+# absolute folder, or `~/` and a folder under your home. They are read from
+# the base branch, not the branch under review, put on the sandbox's PATH
+# read-only, and refused when one is or holds the home or a credential folder.
+#
+#   toolchain:
+#     - ~/.deno/bin
+#     - /usr/local/go/bin
+#
 # Leaving a list empty is a valid choice, not a broken configuration —
 # Specnaut reports that the tier is not declared and carries on exactly as it
 # did before this file existed.
