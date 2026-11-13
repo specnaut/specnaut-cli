@@ -1,10 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { containerEngine } from "../../src/domain/sandbox_container.ts";
-import { isPinned } from "../../src/domain/sandbox_image.ts";
 import { engineEnv } from "../../src/infrastructure/sandbox_engine_env.ts";
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
-import { live, LIVE_IMAGE, probed, runIn, withEnv, withLayout } from "./sandbox_live_fixture.ts";
+import { live, LIVE_IMAGE, runIn, withEnv, withLayout } from "./sandbox_live_fixture.ts";
+import { NO_LOCAL_PODMAN } from "./sandbox_podman_live.ts";
 
 /**
  * A podman whose containers.conf adds a variable, a volume, a mount and a device to every
@@ -12,8 +11,7 @@ import { live, LIVE_IMAGE, probed, runIn, withEnv, withLayout } from "./sandbox_
  * and copies its client's environment into it (`env_host`), starts the sandbox's container with
  * none of them: the configuration it loads last is the CLI's, and it resets each list. The same
  * file sets a umask the CLI's leaves alone, and the run seeing it shows that file was read. A
- * remote podman client (macOS, Windows) applies its machine's containers.conf, not this one:
- * Linux only.
+ * remote podman client applies its machine's containers.conf, not this one: Linux only.
  */
 
 const VARIABLE = "SPECNAUT_CONF_ENV=from-containers-conf";
@@ -23,13 +21,7 @@ const MOUNT = "/specnaut-conf-mount";
 const DEVICE = "/dev/specnaut-conf-device";
 const UMASK = "0027";
 
-const MISSING = Deno.build.os !== "linux"
-  ? "a local podman on Linux, as a remote client applies its machine's containers.conf"
-  : containerEngine(probed) !== "podman"
-  ? "a local rootless podman 4.8 or later, with seccomp and the pids, memory and cpu controllers"
-  : isPinned(LIVE_IMAGE)
-  ? null
-  : "a digest-pinned image with /bin/sh, named in SPECNAUT_LIVE_IMAGE";
+const MISSING = NO_LOCAL_PODMAN;
 
 /** `entry` as a containers.conf list that every file loaded after it adds to. */
 const appended = (entry: string) => `[${JSON.stringify(entry)}, {append=true}]`;
