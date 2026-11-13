@@ -23,7 +23,7 @@ const PODMAN: BackendProbe = {
   dockerOnPodman: false,
   dockerLimits: ALL,
   bwrap: "absent",
-  bwrapVersion: null,
+  bwrapVersion: "bubblewrap 0.8.0",
   bwrapScope: false,
   sandboxExec: false,
 };
@@ -43,6 +43,27 @@ function firstWhy(host: BackendProbe): string | false {
 
 Deno.test("container: a local rootless podman that can apply every cap runs it", () => {
   assertEquals(chooseBackend(PODMAN), ON_PODMAN);
+});
+
+Deno.test("container: rootless podman comes first, ahead of docker and bubblewrap", () => {
+  assertEquals(chooseBackend(probe({ docker: true, bwrap: "usable" })), ON_PODMAN);
+});
+
+Deno.test("container: podman running as root is passed over for docker", () => {
+  assertEquals(chooseBackend(probe({ podman: "root", docker: true, bwrap: "usable" })), ON_DOCKER);
+});
+
+Deno.test("container: rootless podman without delegated cgroups leaves the run to the next", () => {
+  const uncapped = probe({ podmanLimits: NONE });
+  assertEquals(chooseBackend({ ...uncapped, docker: true }), ON_DOCKER);
+  assertEquals(chooseBackend({ ...uncapped, bwrap: "usable" }), { kind: "bwrap", scope: false });
+});
+
+Deno.test("container: docker carries the caps its host cannot apply; podman runs only capped", () => {
+  const lacking = { memory: true, swap: false, pids: false, cpuQuota: true };
+  const docker = chooseBackend(probe({ podman: "absent", docker: true, dockerLimits: lacking }));
+  assertEquals(docker, { ...ON_DOCKER, dropped: ["memorySwap", "processes"] });
+  assertEquals(chooseBackend(probe({ docker: true, dockerLimits: lacking })), ON_PODMAN);
 });
 
 Deno.test("container: a remote podman is passed over for docker, else says why there is none", () => {
