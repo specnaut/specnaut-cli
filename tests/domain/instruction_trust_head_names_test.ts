@@ -52,7 +52,11 @@ Deno.test("a committed override that differs from the tip's only in line endings
 });
 
 Deno.test("the committed overrides are the ones a session loads beside the instruction files", () => {
-  assertEquals(COMMITTED_INSTRUCTIONS, ["AGENTS.override.md", "CLAUDE.local.md"]);
+  assertEquals(COMMITTED_INSTRUCTIONS, [
+    "AGENTS.override.md",
+    "CLAUDE.local.md",
+    ".claude/settings.local.json",
+  ]);
 });
 
 Deno.test("an override HEAD holds under another letter case is named", () => {
@@ -100,7 +104,6 @@ Deno.test("HEAD's listing keeps the instruction paths, overrides and folders in 
       "src/a.ts",
       ".specnaut/workflow.yml",
       "docs/other.md",
-      ".claude/settings.json",
     ]
   ) {
     assert(!keptAtHead(dropped), dropped);

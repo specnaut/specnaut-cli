@@ -22,9 +22,11 @@ export { INSTRUCTION_REASON } from "./instruction_head.ts";
 export { COMMITTED_INSTRUCTIONS, INSTRUCTION_SCOPE } from "./instruction_scope.ts";
 
 /**
- * Whether the instruction files a session takes as its rules hold, in the work tree, what the base
- * branch's tip holds. A branch that edits them steers its own review and merge more than any
- * config input does: `AGENTS.md` is read on every turn, an addendum whenever its phase runs. One
+ * Whether the instruction files a session takes as its rules, and every other surface its harness
+ * loads (`INSTRUCTION_SCOPE`: skills, agents, hooks, settings, MCP servers), hold, in the work tree,
+ * what the base branch's tip holds. A branch that edits them steers its own review and merge more
+ * than any config input does: `AGENTS.md` is read on every turn, an addendum whenever its phase
+ * runs, a hook whenever its event fires. One
  * class, judged by bytes with the checkout check's walk (`configReasons` in `checkout_trust.ts`):
  * a link that is not the tip's own or leads out of `.specnaut/addenda/`'s compared files, a file
  * the tip lacks, a name that differs in case, a hard link, a tip file the tree lacks: each is one

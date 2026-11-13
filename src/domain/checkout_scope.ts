@@ -11,8 +11,9 @@ export type ScopeRoot = {
 };
 
 /**
- * The instruction and config files a session or a review reads, and the version-manager files that
- * could put another `specnaut`, `git` or `gh` first on the PATH. `.specnaut/scripts/` is not here:
+ * The instruction and config files a session or a review reads, `.gitattributes` (how git shows and
+ * checks out the rest), and the version-manager files that could put another `specnaut`, `git` or
+ * `gh` first on the PATH. `.specnaut/scripts/` is not here:
  * the script check judges it, with the bundle as a second copy.
  */
 // deno-fmt-ignore
@@ -20,7 +21,7 @@ export const CHECKOUT_SCOPE: readonly ScopeRoot[] = [
   { dir: ".", deep: false, names: [
     "CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "AGENTS.override.md", ".mcp.json",
     ".tool-versions", "mise.toml", ".mise.toml", "mise.local.toml", ".mise.local.toml",
-    ".rtx.toml", ".envrc", ".prototools", "devbox.json",
+    ".rtx.toml", ".envrc", ".prototools", "devbox.json", ".gitattributes",
   ] },
   { dir: ".claude", deep: true },
   { dir: ".codex", deep: true },

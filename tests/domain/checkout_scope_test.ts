@@ -29,6 +29,7 @@ Deno.test("the checked files: harness settings, instructions, Specnaut config, v
     ".mise.toml",
     ".config/mise/config.toml",
     ".envrc",
+    ".gitattributes",
   ];
   const outside = [
     ".specnaut/scripts/bash/git-read.sh",

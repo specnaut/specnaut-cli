@@ -10,11 +10,24 @@ import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./scri
  * to lower case, and a path in scope only when folded is named.
  */
 
-/** The instruction files, as roots of the checked files (`checkout_scope.ts` holds them all). */
+/**
+ * The instruction files, and every other surface a harness loads from the checkout and acts on:
+ * skills, agents and their memory, hooks and the settings that name them, slash commands, MCP
+ * servers, Codex's config, Specnaut's own hooks. `.gitattributes` too: it decides how git shows
+ * and checks out every other file. Each is a root of the checked files (`checkout_scope.ts` holds
+ * them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files there.
+ */
 // deno-fmt-ignore
 export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
-  { dir: ".", deep: false, names: ["AGENTS.md", "CLAUDE.md"] },
-  { dir: ".claude", deep: false, names: ["CLAUDE.md"] },
+  { dir: ".", deep: false, names: ["AGENTS.md", "CLAUDE.md", ".mcp.json", ".gitattributes"] },
+  { dir: ".claude", deep: false, names: ["CLAUDE.md", "settings.json"] },
+  { dir: ".claude/skills", deep: true },
+  { dir: ".claude/agents", deep: true },
+  { dir: ".claude/hooks", deep: true },
+  { dir: ".claude/commands", deep: true },
+  { dir: ".codex", deep: true },
+  { dir: ".agents", deep: true },
+  { dir: ".specnaut/hooks", deep: true },
   { dir: ".specnaut/addenda", deep: true },
   { dir: "docs", deep: false, names: ["constitution.md"] },
 ];
@@ -24,7 +37,11 @@ export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
  * untracked copy. They are judged from git objects, HEAD's against the tip's, so a copy only the
  * work tree holds stays silent and a committed one counts.
  */
-export const COMMITTED_INSTRUCTIONS = ["AGENTS.override.md", "CLAUDE.local.md"] as const;
+export const COMMITTED_INSTRUCTIONS = [
+  "AGENTS.override.md",
+  "CLAUDE.local.md",
+  ".claude/settings.local.json",
+] as const;
 
 /** The reason a folder holding instruction files gets when HEAD has something else there. */
 export const NOT_A_FOLDER = "not a folder at HEAD";

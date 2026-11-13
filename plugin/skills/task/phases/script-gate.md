@@ -44,7 +44,7 @@ none, means the tree's value is never read, and the row below applies:
 | `backlog-config` | every backlog script, and remote mode: `backlog.md`, `groom.md`, `resume.md`, `phases/auto-chain.md`, `phases/merge.md` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is `manual`; remote mode is on if either copy turns it on, and then nothing lands (`phases/auto-chain.md`) |
 | `linked-issue` | `.specnaut/feature.json`'s link: `resume.md`, `phases/plan-reentry.md`, `phases/merge.md` step 5 (whose item `phases/merge-close.md` takes) | the link is not read; `phases/merge.md` step 5 names its one exception |
 | `gates` | `run-gate.sh`: `phases/merge.md` **The full tier**, `phases/review-seats.md`, `phases/quality-gates.md` | `merge` asks; the review's fast tier is skipped |
-| `instructions` | the session itself: `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` every turn, `docs/constitution.md` and a phase's project additions as it runs, judged in the work tree and at HEAD; `AGENTS.override.md` and `CLAUDE.local.md` judged as committed at HEAD | the read already happened: `phases/merge.md` step 0 makes the mode `manual` and asks, as **The instructions verdict** below says; one line per path |
+| `instructions` | the session itself: `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` every turn, `docs/constitution.md` and a phase's project additions as it runs; and the harness: `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/commands/`, `.claude/settings.json`, `.mcp.json`, `.codex/`, `.agents/`, `.specnaut/hooks/`, with `.gitattributes`, judged in the work tree and at HEAD; `AGENTS.override.md`, `CLAUDE.local.md` and `.claude/settings.local.json` judged as committed at HEAD | the read already happened: `phases/merge.md` step 0 makes the mode `manual` and asks, as **The instructions verdict** below says; one line per path |
 
 `backlog-config` judges every line of `.specnaut/backlog-config.yml` but the columns grooming
 writes (`intake_column`, `ready_column`), each held to the one quoted value grooming writes: the
@@ -64,7 +64,7 @@ lacks, show the work tree's file and say it does not land. A `line endings diffe
 diff can be empty, is shown as its reason says: the same text, a CR before LF on one side only. A
 `holds invisible characters` reason names each code point and its line: say so with the diff,
 which does not show them. Then ask once, as the one question before step 3: *"This branch changes
-the instructions this session follows. Yes lands them."* A no stops on the branch. The yes covers
+the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops on the branch. The yes covers
 that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them) and nothing else: a later run
 with another digest asks again, even naming the same paths, and a run with no such line asks. The
 session read `AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.

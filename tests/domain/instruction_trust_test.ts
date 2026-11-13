@@ -33,8 +33,27 @@ Deno.test("the class covers the instruction files a session reads, and only chec
     assert(INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path)), path);
     assert(inCheckoutScope(path), `${path} is outside the checked files`);
   }
-  assert(!INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, ".claude/settings.json")));
+  assert(!INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, ".claude/worktrees/x/AGENTS.md")));
   assertEquals(INSTRUCTION_CLASS, "instructions");
+});
+
+Deno.test("the class covers every surface a harness loads from the checkout, and .gitattributes", () => {
+  const loaded = [
+    ".claude/skills/task/SKILL.md",
+    ".claude/agents/developer.md",
+    ".claude/agents/developer/memory/MEMORY.md",
+    ".claude/hooks/review-gate.sh",
+    ".claude/commands/ship.md",
+    ".claude/settings.json",
+    ".mcp.json",
+    ".codex/config.toml",
+    ".agents/skills/specnaut-task/SKILL.md",
+    ".specnaut/hooks/protect-generated.sh",
+    ".gitattributes",
+  ];
+  const outside = (path: string) =>
+    !INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path)) || !inCheckoutScope(path);
+  assertEquals(loaded.filter(outside), []);
 });
 
 Deno.test("files equal to the tip's, byte for byte, are one trusted line", () => {
