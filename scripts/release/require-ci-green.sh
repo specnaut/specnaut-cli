@@ -23,30 +23,50 @@
 #     workflow, so the fix is to repair `main` and re-run this run; nothing
 #     needs deleting and re-tagging.
 #   concluded success                     → proceed.
-#   no run for this SHA at all            → warn and proceed. A repository or
-#     ref where `ci` does not run must not be unable to release.
-#   still running after the window        → warn and proceed. Blocking a
-#     release on a stuck runner trades one failure mode for a worse one; the
-#     window is set well past `ci`'s historical duration so this is rare and
-#     worth reading when it happens.
+#   no run for this SHA at all            → warn and proceed, after a short
+#     wait for one to appear. A repository or ref where `ci` does not run must
+#     not be unable to release.
+#   the last call failed, no run read     → block. An API error is not an
+#     answer: a failed call never replaces the last answer read, and never
+#     reads as "no run".
+#   still running after the window        → block. The window covers the
+#     longest run `ci` can legitimately take, so a run still going past it is
+#     stuck, and an unverified commit is not published. Re-run this workflow
+#     once `ci` concludes; the tag stays valid.
 
 set -euo pipefail
 
-# 25 minutes at 20s. `ci` has historically concluded in 8-11 minutes,
-# the Windows cross-smoke job being the long pole.
-deadline=$(( SECONDS + 25 * 60 ))
+# The window is `ci`'s longest legitimate run: lint-test's timeout, then the
+# cross-smoke job's, which waits for it (both in ci.yml), plus a margin for a
+# queued runner. release_ci_gate_test.ts holds it to those two numbers, and
+# release.yml's ci-status job to a timeout above it.
+WAIT_MINUTES=180
+# A run for the SHA appears within seconds of the push. One that has not after
+# this long is not coming, and a ref without `ci` must not wait three hours.
+APPEAR_MINUTES=10
+deadline=$(( SECONDS + WAIT_MINUTES * 60 ))
+appear_deadline=$(( SECONDS + APPEAR_MINUTES * 60 ))
 status=""
 conclusion=""
+last_empty=""
 
 while :; do
-  # `--jq` on an empty result yields an empty string, not an error.
-  read -r status conclusion <<< "$(
+  # Only an answer moves the state: a failed call keeps the last one read, so an
+  # API error at the deadline can never read as "no run" and let a release pass.
+  if line="$(
     gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
-      --jq '.workflow_runs[0] | "\(.status) \(.conclusion // "-")"' 2>/dev/null || true
-  )"
+      --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion // "-")"' 2>/dev/null
+  )"; then
+    last_empty=""
+    if [ -n "$line" ]; then read -r status conclusion <<< "$line"; else last_empty=1; fi
+  else
+    last_empty=""
+  fi
 
   [ "$status" = "completed" ] && break
   if [ "$SECONDS" -ge "$deadline" ]; then break; fi
+  # "No run" only on a poll that answered empty, never across failed calls.
+  if [ -n "$last_empty" ] && [ -z "$status" ] && [ "$SECONDS" -ge "$appear_deadline" ]; then break; fi
   sleep 20
 done
 
@@ -60,14 +80,19 @@ done
   echo "| ci run conclusion | \`${conclusion:--}\` |"
 } >> "$GITHUB_STEP_SUMMARY"
 
+if [ -z "$status" ] && [ -z "$last_empty" ]; then
+  echo "::error::Could not read the ci.yml runs for ${SHA}: the last call failed. Refusing to publish an unverified commit. Re-run this workflow — the tag stays valid."
+  exit 1
+fi
+
 if [ -z "$status" ]; then
   echo "::warning::No ci.yml run found for ${SHA}. The release proceeds, but nothing has verified this commit."
   exit 0
 fi
 
 if [ "$status" != "completed" ]; then
-  echo "::warning::ci.yml on ${SHA} was still ${status} after the wait window. The release proceeds unverified — check the run before announcing it."
-  exit 0
+  echo "::error::ci.yml on ${SHA} was still ${status} after ${WAIT_MINUTES} minutes. Refusing to publish an unverified commit. Re-run this workflow once ci concludes — the tag stays valid."
+  exit 1
 fi
 
 if [ "$conclusion" != "success" ]; then

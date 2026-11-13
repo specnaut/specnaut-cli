@@ -47,11 +47,11 @@ jobs:
         run: bash scripts/release/security-preflight.sh
 
   # The tag is what publishes: this waits for `ci` on the tagged commit and
-  # blocks on a red one. The four outcomes and why only one blocks are written
+  # blocks on a red one or one still running past the wait. The outcomes are written
   # at the top of the script.
   ci-status:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 190
     permissions:
       actions: read
       contents: read
