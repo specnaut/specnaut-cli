@@ -95,3 +95,24 @@ Deno.test({
       assertEquals([cleared.code, cleared.err], [0, ""], "a session id the lock does not hold");
     }),
 });
+
+Deno.test({
+  name: "a locked session's sandbox run is refused when it unsets or sets its session id first",
+  ignore: !POSIX,
+  fn: () =>
+    inProject(async (project) => {
+      const logs = join(project, "logs");
+      await Deno.mkdir(logs);
+      const lock = await FsReviewLock.open(project, { state: COPIES });
+      await lock.lock("s-hp4");
+      await lock.record("s-hp4", { head: SHA, logs: await Deno.realPath(logs) });
+      const exec = `specnaut sandbox exec ${SHA} --log ${join(logs, "1.log")} -- make`;
+      const call = (command: string) => hook(project, payload("s-hp4", "Bash", { command }));
+      assertEquals((await call(exec)).code, 0, "the run's own shape");
+      for (const prefix of ["env -u CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_SESSION_ID=x"]) {
+        const run = await call(`${prefix} ${exec}`);
+        assertEquals(run.code, 2, prefix);
+        assertStringIncludes(run.err, "refused under the review lock", prefix);
+      }
+    }),
+});
