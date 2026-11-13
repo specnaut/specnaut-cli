@@ -23,7 +23,7 @@ import { HostBackendProber } from "../../src/infrastructure/sandbox_probe.ts";
 
 const host = { os: Deno.build.os, arch: Deno.build.arch };
 export const probed = await new HostBackendProber(
-  new DenoSubprocessRunner(),
+  new DenoSubprocessRunner({ wholeEnv: true }),
   host,
   () => Promise.resolve({ kind: "none", why: "not read here" }),
 ).probe();

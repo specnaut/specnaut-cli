@@ -16,8 +16,8 @@ const LEFT = "SPECNAUT_ENGINE_ENV_LEFT=from-the-host";
 
 const MISSING = Deno.build.os !== "linux"
   ? "a local podman on Linux, as a remote client has no env_host"
-  : probed.podman === "absent"
-  ? "podman"
+  : probed.podman !== "rootless" || !probed.podmanCgroups
+  ? "a rootless podman holding the pids, memory and cpu controllers, the podman a run is offered"
   : isPinned(LIVE_IMAGE)
   ? null
   : "a digest-pinned image with /bin/sh, named in SPECNAUT_LIVE_IMAGE";

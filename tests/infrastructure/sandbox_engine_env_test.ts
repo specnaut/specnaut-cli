@@ -15,6 +15,12 @@ const NEEDED = {
   TMPDIR: "/tmp",
   CONTAINERS_CONF: "/etc/containers/containers.conf",
   CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
+  CONTAINERS_STORAGE_CONF: "/home/dev/storage.conf",
+  CONTAINERS_REGISTRIES_CONF: "/home/dev/registries.conf",
+  XDG_CONFIG_HOME: "/home/dev/.config",
+  XDG_DATA_HOME: "/home/dev/.local/share",
+  CONTAINER_SSHKEY: "/home/dev/.ssh/podman",
+  CONTAINER_PASSPHRASE: "example",
   CONTAINER_HOST: "unix:///run/podman.sock",
   CONTAINER_CONNECTION: "dev",
   DOCKER_HOST: "unix:///var/run/docker.sock",
@@ -32,6 +38,7 @@ const OTHERS = {
   USER: "dev",
   DOCKER_HOSTNAME: "not-a-docker-variable",
   XCONTAINERS_CONF: "not-a-prefix-match",
+  CONTAINERS_CONF_EXTRA: "not-a-name-the-engine-reads",
 };
 
 Deno.test("engineEnv: keeps exactly the variables the engine needs, dropping every other", () => {

@@ -131,7 +131,12 @@ function defaultDeps(): SandboxDeps {
   const checkout = () => checkoutRoot(subprocess);
   const { os, arch } = Deno.build;
   const image = async () => readDevcontainerImage(await checkout());
-  const prober = new HostBackendProber(subprocess, { os, arch }, image);
+  // The engines are asked with the environment a run gives them, and nothing of ours beside it.
+  const prober = new HostBackendProber(
+    new DenoSubprocessRunner({ wholeEnv: true }),
+    { os, arch },
+    image,
+  );
   return {
     out: (s) => console.log(s),
     err: (s) => console.error(s),

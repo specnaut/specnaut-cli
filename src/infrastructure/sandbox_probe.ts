@@ -2,6 +2,7 @@ import type { SubprocessRunner } from "../application/ports.ts";
 import type { BackendProber } from "../application/sandbox_ports.ts";
 import type { BackendProbe } from "../domain/sandbox.ts";
 import type { ImageSource } from "../domain/sandbox_image.ts";
+import { engineEnv } from "./sandbox_engine_env.ts";
 
 /**
  * What the host offers a sandbox, asked of the tools themselves. Each answer is a fact the domain
@@ -45,6 +46,8 @@ export class HostBackendProber implements BackendProber {
     readonly runner: SubprocessRunner,
     readonly host: HostFacts,
     readonly image: () => Promise<ImageSource>,
+    /** The environment podman and docker are asked in: the one a run starts them with. */
+    readonly engineVars: () => Record<string, string> = () => engineEnv(Deno.env.toObject()),
   ) {}
 
   async probe(): Promise<BackendProbe> {
@@ -65,7 +68,8 @@ export class HostBackendProber implements BackendProber {
 
   /** Podman's own report: whether it runs as the user, and which cgroup controllers it holds. */
   async #podman(): Promise<Podman> {
-    const { code, stdout } = await this.runner.run("podman", ["info", "--format", "json"]);
+    const args = ["info", "--format", "json"];
+    const { code, stdout } = await this.runner.run("podman", args, { env: this.engineVars() });
     if (code !== 0) return NO_PODMAN;
     const host = parsed(stdout, "podman info")?.host;
     if (host === undefined) return NO_PODMAN;
@@ -83,7 +87,8 @@ export class HostBackendProber implements BackendProber {
    * on its host. A limit it does not say it can (false, or left out) counts as one it cannot.
    */
   async #docker(): Promise<Docker> {
-    const { code, stdout } = await this.runner.run("docker", ["info", "--format", "{{json .}}"]);
+    const args = ["info", "--format", "{{json .}}"];
+    const { code, stdout } = await this.runner.run("docker", args, { env: this.engineVars() });
     if (code !== 0) return NO_DOCKER;
     const info = parsed(stdout, "docker info");
     if (typeof info?.ServerVersion !== "string" || info.ServerVersion === "") return NO_DOCKER;

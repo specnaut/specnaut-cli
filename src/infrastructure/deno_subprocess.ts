@@ -5,11 +5,18 @@ import type {
 } from "../application/ports.ts";
 
 export class DenoSubprocessRunner implements SubprocessRunner {
+  /**
+   * `wholeEnv`: an `env` given is the child's whole environment, not additions to ours. A call
+   * that gives none keeps ours either way.
+   */
+  constructor(readonly options: { readonly wholeEnv?: boolean } = {}) {}
+
   async run(cmd: string, args: string[], opts?: SubprocessOptions): Promise<SubprocessResult> {
     const p = new Deno.Command(cmd, {
       args,
       cwd: opts?.cwd,
       env: opts?.env,
+      clearEnv: this.options.wholeEnv === true && opts?.env !== undefined,
       stdin: opts?.stdin ? "piped" : "null",
       stdout: "piped",
       stderr: "piped",

@@ -7,21 +7,29 @@ import { HostBackendProber } from "../../src/infrastructure/sandbox_probe.ts";
 export const IMAGE: ImageSource = { kind: "pinned", ref: `acme/dev@sha256:${"d".repeat(64)}` };
 const NOT_FOUND: SubprocessResult = { code: 127, stdout: "", stderr: "not found" };
 
-type Call = { cmd: string; args: string[] };
+type Call = { cmd: string; args: string[]; opts?: SubprocessOptions };
+
+/** The engine environment every probe of these tests is given. */
+export const ENGINE_ENV = { PATH: "/usr/bin:/bin", CONTAINER_HOST: "unix:///run/podman.sock" };
 
 /** A prober on `os` whose tools answer `answers` by `<cmd> <first arg>`, else by `<cmd>`. */
 export function prober(os: string, answers: Record<string, SubprocessResult>) {
   const calls: Call[] = [];
   const run = {
-    run(cmd: string, args: string[], _opts?: SubprocessOptions): Promise<SubprocessResult> {
-      calls.push({ cmd, args });
+    run(cmd: string, args: string[], opts?: SubprocessOptions): Promise<SubprocessResult> {
+      calls.push({ cmd, args, opts });
       const key = `${cmd} ${args[0]}`;
       return Promise.resolve(answers[key] ?? answers[cmd] ?? NOT_FOUND);
     },
   };
   return {
     calls,
-    prober: new HostBackendProber(run, { os, arch: "x86_64" }, () => Promise.resolve(IMAGE)),
+    prober: new HostBackendProber(
+      run,
+      { os, arch: "x86_64" },
+      () => Promise.resolve(IMAGE),
+      () => ENGINE_ENV,
+    ),
   };
 }
 

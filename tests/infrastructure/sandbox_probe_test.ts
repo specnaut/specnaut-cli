@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { IMAGE, ok, prober } from "./sandbox_probe_fixture.ts";
+import { ENGINE_ENV, IMAGE, ok, prober } from "./sandbox_probe_fixture.ts";
 
 /**
  * What the host offers a sandbox, read from the tools themselves: podman's own report of rootless
@@ -150,4 +150,14 @@ Deno.test("probe: no user scope is asked for without a usable bubblewrap", async
   const mac = prober("darwin", { "systemd-run --user": ok("cpu memory pids\n") });
   assertEquals((await mac.prober.probe()).bwrapScope, false);
   assertEquals(mac.calls.filter((c) => c.cmd === "systemd-run"), []);
+});
+
+Deno.test("probe: podman and docker are asked with the environment a run starts them with", async () => {
+  const { prober: p, calls } = prober("linux", {});
+  await p.probe();
+  const engines = calls.filter((c) => c.cmd === "podman" || c.cmd === "docker");
+  assertEquals(engines.map((c) => [c.cmd, c.opts]), [
+    ["podman", { env: ENGINE_ENV }],
+    ["docker", { env: ENGINE_ENV }],
+  ]);
 });
