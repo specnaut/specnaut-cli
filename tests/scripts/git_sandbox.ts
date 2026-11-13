@@ -1,5 +1,6 @@
 import { DELIMITER, fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { specnautOnPath, withSpecnaut } from "./specnaut_shim.ts";
 
 /**
  * A throwaway clone with a bare `origin` whose HEAD is `main`, and the merge
@@ -63,12 +64,11 @@ function home(): string {
 }
 
 /**
- * The environment a child starts from: the parent's, minus every `GIT_*`
- * variable (a `GIT_DIR`, a `GIT_CONFIG_COUNT` pair, a hook's `GIT_INDEX_FILE`),
- * with an isolated HOME, no global or system config, and the C locale — so an
- * assertion on git's own wording holds in any language (cli#711). Minus, too,
- * what a harness exports to its shell (spec 048): this suite runs inside one,
- * and its session id would let the landing hold decide a case no test set.
+ * The environment a child starts from: the parent's, minus every `GIT_*` variable (a `GIT_DIR`, a
+ * `GIT_CONFIG_COUNT` pair, a hook's `GIT_INDEX_FILE`), with an isolated HOME, no global or system
+ * config, and the C locale — so an assertion on git's own wording holds in any language (cli#711).
+ * Minus, too, what a harness exports to its shell (spec 048): this suite runs inside one, and its
+ * session id would let the landing hold decide a case no test set. `specnaut` is first on the PATH.
  */
 const HARNESS_ENV = /^(GIT_|CLAUDE_CODE_SESSION_ID$|CODEX_SESSION_ID$|CLAUDECODE$|CODEX_SANDBOX)/i;
 export function hermetic(): Record<string, string> {
@@ -76,7 +76,7 @@ export function hermetic(): Record<string, string> {
     Object.entries(Deno.env.toObject()).filter(([k]) => !HARNESS_ENV.test(k)),
   );
   const h = home();
-  return {
+  return specnautOnPath({
     ...base,
     HOME: h,
     USERPROFILE: h,
@@ -85,7 +85,7 @@ export function hermetic(): Record<string, string> {
     GIT_CONFIG_NOSYSTEM: "1",
     LC_ALL: "C",
     LANG: "C",
-  };
+  });
 }
 
 export async function run(
@@ -175,7 +175,7 @@ export async function sandbox(): Promise<Sandbox> {
       );
       await Deno.chmod(join(bin, "git"), 0o755);
       return run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work, {
-        PATH: `${bin}${DELIMITER}${Deno.env.get("PATH")}`,
+        PATH: `${bin}${DELIMITER}${withSpecnaut(Deno.env.get("PATH"))}`,
       });
     },
     async commit(file, content, ...message) {

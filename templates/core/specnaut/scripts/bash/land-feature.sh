@@ -31,10 +31,17 @@
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
 #   12 an unexpected git failure before the push, named on stderr
+#   13 HEAD's instructions are not trusted and no --instructions-digest
+#      matches the one `specnaut verify-scripts` computes, or it could not
+#      judge HEAD; its `VERDICT instructions` lines are printed. Nothing moved
 # (8 is retired: a branch that will not delete after the push is 11, never
 # read as a failed landing.)
 #
-# Usage: land-feature.sh
+# The instructions at HEAD are judged here, not taken from the phase: a stop
+# the phase skipped is still a stop. `--instructions-digest` is the
+# INSTRUCTIONS_DIGEST the user said yes to (phases/script-gate.md).
+#
+# Usage: land-feature.sh [--instructions-digest <sha256>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 # Every git call of the landing runs no hook: the branch being landed could commit hooks and a
@@ -47,7 +54,32 @@ here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 unexpected() { echo "land-feature: unexpected failure (exit $1) of: $2 — nothing was pushed" >&2; exit 12; }
 trap 'unexpected $? "$BASH_COMMAND"' ERR
 
-if [ $# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
+# HEAD's instructions verdict, from the binary: trusted, or the approved digest, or exit 13.
+judge_instructions() {
+  local out rc=0 names digest
+  out=$(specnaut verify-scripts) || rc=$?
+  names=$(sed -n 's/^NAMES_FILE //p' <<<"$out")
+  [ -z "$names" ] || rm -f "$names"
+  digest=$(sed -n 's/^INSTRUCTIONS_DIGEST \([0-9a-f]\{64\}\)$/\1/p' <<<"$out")
+  if [ "$rc" -gt 1 ] || [ -z "$digest" ] || ! grep -qx "BASE_BRANCH $base" <<<"$out"; then
+    echo "land-feature: specnaut verify-scripts could not judge HEAD (exit $rc) - nothing was landed" >&2
+    exit 13
+  fi
+  grep -qx 'VERDICT instructions trusted' <<<"$out" && return 0
+  [ "$approved" = "$digest" ] && return 0
+  grep '^VERDICT instructions ' <<<"$out" >&2 || true
+  echo "land-feature: HEAD changes what the session's harness loads, and no --instructions-digest matches $digest - ask, then land again with it. Nothing was landed" >&2
+  exit 13
+}
+
+usage="usage: land-feature.sh [--instructions-digest <sha256>]"
+approved=""
+if [ $# -eq 2 ] && [ "$1" = --instructions-digest ] && [[ $2 =~ ^[0-9a-f]{64}$ ]]; then
+  approved=$2
+elif [ $# -ne 0 ]; then
+  echo "$usage" >&2
+  exit 2
+fi
 base=$(bash "$here/base-branch.sh") || exit 3
 branch=$(git symbolic-ref --quiet --short HEAD) || {
   echo "land-feature: HEAD is detached — check out the feature branch" >&2
@@ -90,6 +122,7 @@ fi
 # sed, not head: head closing the pipe early would fail rev-list under pipefail.
 first=$(git rev-list --reverse "refs/remotes/origin/$base..HEAD" | sed -n 1p)
 last=$(git rev-parse HEAD)
+judge_instructions
 
 git checkout --quiet "$base"
 if ! git merge --quiet --ff-only "refs/heads/$branch"; then

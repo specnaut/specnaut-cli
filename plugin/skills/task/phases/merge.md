@@ -125,9 +125,11 @@ under `--no-close`, once more after the push: there the item's line must read `O
 3. **Land it** — after step 0 ran again on the history as it now stands:
 
    ```
-   bash .specnaut/scripts/bash/land-feature.sh
+   bash .specnaut/scripts/bash/land-feature.sh [--instructions-digest <INSTRUCTIONS_DIGEST>]
    ```
 
+   Pass `--instructions-digest` only with the digest the user said yes to at step 0. It judges
+   HEAD's instructions again itself and lands only when they are trusted or that digest matches.
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
    contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
@@ -151,6 +153,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
+   | 13 | HEAD's instructions are not trusted and no digest matches, or the check could not run | step 0 at once: its instructions question decides, then land again with that digest. "Could not judge": stop and say so |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
    the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its

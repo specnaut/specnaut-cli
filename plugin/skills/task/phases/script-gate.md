@@ -54,20 +54,21 @@ tracker's address on any backend, and the `remote:` block. `linked-issue` judges
 
 ### The instructions verdict
 
-`phases/merge.md` step 0 acts on it. Unless the last run printed `VERDICT instructions trusted`,
-or only `instructions` lines reading `behind base: rebase` (rebased as step 0 rebases a config
-line), the merge mode is `manual`: a missing `instructions` line is an untrusted one. Show each
-named path as it lands: `git diff --text --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD
--- <path>` (a file the base lacks, in full). A `work tree differs from HEAD` reason means the
-session read other bytes than those that land, whatever `git status` shows; for such a path HEAD
-lacks, show the work tree's file and say it does not land. A `line endings differ` reason, whose
-diff can be empty, is shown as its reason says: the same text, a CR before LF on one side only. A
-`holds invisible characters` reason names each code point and its line: say so with the diff,
-which does not show them. A `differs from the copy Specnaut ships` reason names a skill Specnaut
-ships whose bytes are not the shipped copy, even where the base holds the same edit: show `specnaut
-diff <path>`, which compares it with that copy. Then ask once, as the one question before step 3: *"This branch changes
-the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops on the branch. The yes covers
-that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them and the reasons shown) and
-nothing else: a later run with another digest asks again, even naming the same paths, or with a
-new reason, and a run with no such line asks. The
-session read `AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.
+`phases/merge.md` step 0 acts on it. Unless the last run printed `VERDICT instructions trusted`, or
+only `instructions` lines reading `behind base: rebase` (rebased as step 0 rebases a config line),
+the merge mode is `manual`: a missing `instructions` line is an untrusted one. Show each named path
+as it lands: `git diff --text --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD -- <path>` (a
+file the base lacks, in full). A `work tree differs from HEAD` reason means the session read other
+bytes than those that land, whatever `git status` shows; for such a path HEAD lacks, show the work
+tree's file and say it does not land. A `line endings differ` reason, whose diff can be empty, is
+shown as its reason says: the same text, a CR before LF on one side only. A `holds invisible
+characters` reason names each code point and its line: say so with the diff, which does not show
+them. A `differs from the copy Specnaut ships` reason names a skill Specnaut ships whose bytes are
+not the shipped copy, even where the base holds the same edit: show `specnaut diff <path>`, which
+compares it with that copy. Then ask once, as the one question before step 3: *"This branch changes
+the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no
+stops on the branch. The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them
+and the reasons shown) and nothing else: a later run with another digest asks again, even naming the
+same paths, or with a new reason, and a run with no such line asks. Step 3 passes that digest to
+`land-feature.sh` as `--instructions-digest`, which judges HEAD again and refuses (13) any other.
+The session read `AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.
