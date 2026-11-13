@@ -160,6 +160,11 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
   assertStringIncludes(said, "`git diff <BASE_TIP> HEAD -- <path>`");
   assertStringIncludes(said, "a `work tree differs from HEAD` reason");
   assertStringIncludes(said, "ask once");
+  assertStringIncludes(
+    said,
+    "The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them) and " +
+      "nothing else: a later run with another digest asks again, even naming the same paths",
+  );
   assertStringIncludes(said, "The session read `AGENTS.md` before this step ran");
   assert(m.indexOf(rule) < m.indexOf("1. **Shape the history.**"), "the rule is not in step 0");
   assertStringIncludes(flat(gate()), "| `instructions` |");

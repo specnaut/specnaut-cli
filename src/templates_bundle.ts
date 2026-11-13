@@ -1704,8 +1704,10 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    reason means the session read other bytes than those that land, whatever \`git status\` shows.
    Then ask once, as the one question before step 3:
    *"This branch changes the instructions this session follows. Yes lands them."* A no stops on
-   the branch; a later run naming another path asks again. The session read \`AGENTS.md\` before
-   this step ran: this stop is the control, not undoing that read.
+   the branch. The yes covers that run's \`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them)
+   and nothing else: a later run with another digest asks again, even naming the same paths, and
+   a run with no such line asks. The session read \`AGENTS.md\` before this step ran: this stop is
+   the control, not undoing that read.
    Every other config line acts where its input is read, per \`phases/script-gate.md\` § The config
    verdicts.
    Each run's \`NAMES_FILE\` is removed (\`rm -f\`) once the next run prints its own, and the last

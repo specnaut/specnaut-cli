@@ -1,5 +1,5 @@
 import { assertEquals, assertMatch, assertNotEquals } from "@std/assert";
-import { scriptsDigest } from "../../src/domain/script_digest.ts";
+import { headDigest, type HeadEntry, scriptsDigest } from "../../src/domain/script_digest.ts";
 import type { TreeEntry } from "../../src/domain/script_trust.ts";
 import { projectRelative } from "../../src/domain/project_names.ts";
 
@@ -28,6 +28,24 @@ Deno.test("the digest changes with any byte, and with bytes moved from one file 
 Deno.test("a walk stopped at a link has a digest of its own", async () => {
   const blocked = await scriptsDigest({ kind: "blocked", path: ".specnaut", why: "a link" });
   assertNotEquals(blocked, await digest([]));
+});
+
+const blob = (path: string, text: string): HeadEntry => ({ kind: "blob", path, bytes: enc(text) });
+
+Deno.test("HEAD's digest follows the bytes that land, not the paths named", async () => {
+  const base = await headDigest([blob("AGENTS.md", "a"), blob("CLAUDE.md", "b")]);
+  assertMatch(base, /^[0-9a-f]{64}$/);
+  assertEquals(base, await headDigest([blob("CLAUDE.md", "b"), blob("AGENTS.md", "a")]));
+  assertNotEquals(base, await headDigest([blob("AGENTS.md", "a2"), blob("CLAUDE.md", "b")]));
+  assertNotEquals(base, await headDigest([blob("AGENTS.md", "ab"), blob("CLAUDE.md", "")]));
+});
+
+Deno.test("HEAD's digest tells a link from a file of its target, and a path that is not a file", async () => {
+  const link: HeadEntry = { kind: "link", path: "CLAUDE.md", target: "AGENTS.md" };
+  const asFile = await headDigest([blob("CLAUDE.md", "AGENTS.md")]);
+  assertNotEquals(asFile, await headDigest([link]));
+  const other: HeadEntry = { kind: "not_regular", path: "CLAUDE.local.md" };
+  assertNotEquals(await headDigest([other]), await headDigest([]));
 });
 
 Deno.test("names become relative to the project's folder, and a path outside it climbs out", () => {

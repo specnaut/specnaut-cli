@@ -8,9 +8,11 @@ import {
 } from "../domain/config_trust.ts";
 import {
   COMMITTED_INSTRUCTIONS,
+  type CommittedInstruction,
   INSTRUCTION_SCOPE,
   judgeInstructions,
 } from "../domain/instruction_trust.ts";
+import { headDigest, type HeadEntry } from "../domain/script_digest.ts";
 import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 
@@ -56,6 +58,12 @@ export async function verifyConfig(
   return verdicts;
 }
 
+/** The instruction verdict, and the digest a yes to it covers: {@link headDigest} of HEAD's files. */
+export type InstructionOutcome = {
+  readonly verdicts: readonly ConfigVerdict[];
+  readonly digest: string;
+};
+
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
  * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class.
@@ -63,7 +71,7 @@ export async function verifyConfig(
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
   base: ConfigBase & { readonly head: string },
-): Promise<ConfigVerdict[]> {
+): Promise<InstructionOutcome> {
   const tree: CheckoutWalk[] = [];
   const tip: BaseEntry[] = [];
   const mergeBase: BaseEntry[] = [];
@@ -74,7 +82,7 @@ export async function verifyInstructions(
     mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
     head.push(...await deps.git.listRoot(base.head, root));
   }
-  const committed = [];
+  const committed: CommittedInstruction[] = [];
   for (const path of COMMITTED_INSTRUCTIONS) {
     const head = await deps.git.readFile(base.head, path);
     committed.push({
@@ -87,7 +95,15 @@ export async function verifyInstructions(
     });
   }
   const symlinks = await deps.git.symlinks();
-  return judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
+  const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
+  return { verdicts, digest: await headDigest([...head, ...committed.flatMap(atHead)]) };
+}
+
+/** An override as HEAD commits it, for the digest: none when HEAD has no such path. */
+function atHead(c: CommittedInstruction): HeadEntry[] {
+  if (c.head.kind === "absent") return [];
+  if (c.head.kind === "refused") return [{ kind: "not_regular", path: c.path }];
+  return [{ kind: "blob", path: c.path, bytes: c.head.bytes }];
 }
 
 /**

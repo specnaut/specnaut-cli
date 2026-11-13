@@ -1,5 +1,5 @@
 import { sha256HexBytes } from "./sha256.ts";
-import type { TreeEntry, TreeWalk } from "./script_trust.ts";
+import type { BaseEntry, TreeEntry, TreeWalk } from "./script_trust.ts";
 
 /**
  * One digest of the scripts folder as the walk found it: what a user's approval of an untrusted
@@ -16,6 +16,25 @@ export async function scriptsDigest(walk: TreeWalk): Promise<string> {
     const sorted = [...walk.entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
     for (const entry of sorted) parts.push(...frame(entry, enc));
   }
+  return await sha256HexBytes(concat(parts));
+}
+
+/** One path as HEAD commits it: an entry of its tree, or one that is not a file git reads. */
+export type HeadEntry = BaseEntry | { readonly kind: "not_regular"; readonly path: string };
+
+/**
+ * One digest of the instruction files as HEAD commits them: what a yes to their untrusted verdict
+ * covers. The yes is given to the bytes that land, never to the paths named, so a later commit to
+ * a path already approved digests otherwise and asks again. Framed as {@link scriptsDigest} frames
+ * a walk, a link by its target, so a link and a file of its target text differ.
+ */
+export async function headDigest(entries: readonly HeadEntry[]): Promise<string> {
+  const enc = new TextEncoder();
+  const sorted = [...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const parts = sorted.flatMap((e) => {
+    const bytes = e.kind === "blob" ? e.bytes : enc.encode(e.kind === "link" ? e.target ?? "" : "");
+    return [enc.encode(`${e.kind}\0${e.path}\0${bytes.length}\0`), bytes];
+  });
   return await sha256HexBytes(concat(parts));
 }
 

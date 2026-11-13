@@ -29,7 +29,9 @@ import { findHarness } from "../harnesses.ts";
  * `NAMES_FILE <path>` (the paths changed since BASE, one per line, in a new temp file outside the
  * repository, which the caller removes once read), `NAMES_RELATIVE_TO <folder>` (those paths are
  * relative to the project's folder, named from the repository's top, `.` at the top),
- * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers), one
+ * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers),
+ * `INSTRUCTIONS_DIGEST <sha256>` (the instruction files as HEAD commits them: what a yes to the
+ * `instructions` lines covers, `headDigest` in `script_digest.ts`), one
  * `VERDICT <class> trusted` or `VERDICT <class> untrusted <path> <reason>` per config input a
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
  * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`
@@ -80,20 +82,31 @@ export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()):
     const base = outcome.kind === "judged"
       ? { tip: outcome.baseTip, mergeBase: outcome.base, head: outcome.head }
       : null;
-    const verdicts = base === null ? [] : [
-      ...await verifyConfig({ git, tree: config }, base),
-      ...await verifyInstructions({ git, tree: config }, base),
-    ];
-    return await answer(outcome, verdicts, deps);
+    return await answer(outcome, await judgeInputs(git, config, base), deps);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
   }
 }
 
+/** The config and instruction lines, and the digest a yes to the instruction lines covers. */
+type Judged = { readonly verdicts: readonly ConfigVerdict[]; readonly digest: string | null };
+
+/** The config, then the instruction verdicts, measured from `base`; none when it is unknown. */
+async function judgeInputs(
+  git: GitObjectReader,
+  tree: CheckoutTreeWalker,
+  base: Parameters<typeof verifyInstructions>[1] | null,
+): Promise<Judged> {
+  if (base === null) return { verdicts: [], digest: null };
+  const config = await verifyConfig({ git, tree }, base);
+  const instructions = await verifyInstructions({ git, tree }, base);
+  return { verdicts: [...config, ...instructions.verdicts], digest: instructions.digest };
+}
+
 async function answer(
   outcome: VerifyOutcome,
-  config: readonly ConfigVerdict[],
+  config: Judged,
   deps: VerifyScriptsDeps,
 ): Promise<number> {
   if (outcome.kind === "base_unknown") {
@@ -107,7 +120,8 @@ async function answer(
     `NAMES_FILE ${terminalText(await deps.writeNames(names))}`,
     `NAMES_RELATIVE_TO ${terminalText(outcome.namesRelativeTo)}`,
     `SCRIPTS_DIGEST ${outcome.digest}`,
-    ...config.map(configLine),
+    ...config.digest === null ? [] : [`INSTRUCTIONS_DIGEST ${config.digest}`],
+    ...config.verdicts.map(configLine),
     ...outcome.verdict.untrusted.map((u) =>
       `UNTRUSTED ${terminalText(u.path)} ${terminalText(u.reason)}`
     ),
