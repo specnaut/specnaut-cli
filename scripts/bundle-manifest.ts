@@ -51,26 +51,30 @@ export async function readManifest(path: URL): Promise<Manifest> {
 
 /** Every source the manifest names, a link entry's excepted: it has no file behind it. */
 export function manifestSources(m: Manifest): string[] {
-  const linked = m.harness_static.filter((e) => e.link === undefined);
-  return [...m.core.map((e) => e.source), ...linked.map((e) => e.source ?? "(no source)")];
+  const fileEntries = m.harness_static.filter((e) => e.link === undefined);
+  return [...m.core.map((e) => e.source), ...fileEntries.map((e) => e.source ?? "(no source)")];
 }
 
 /** Fails the build on a source that is not a file under `templatesDir`, naming each. */
 export async function assertAllSourcesPresent(m: Manifest, templatesDir: URL): Promise<void> {
   const missing: string[] = [];
   for (const source of manifestSources(m)) {
-    if (!(await isFile(new URL(source, templatesDir)))) missing.push(source);
+    if (!(await isFile(new URL(source, templatesDir), source))) missing.push(source);
   }
   if (missing.length > 0) {
     throw new Error(`Missing template sources:\n  - ${missing.join("\n  - ")}`);
   }
 }
 
-/** Whether `path` is a file; a path that cannot be read is reported missing by the caller. */
-async function isFile(path: URL): Promise<boolean> {
+/**
+ * Whether `path` is a file. Only absence makes a source missing: a `stat` refused
+ * for another reason is thrown with the source it was for, never reported as missing.
+ */
+async function isFile(path: URL, source: string): Promise<boolean> {
   try {
     return (await Deno.stat(path)).isFile;
-  } catch {
-    return false;
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound || e instanceof Deno.errors.NotADirectory) return false;
+    throw new Error(`template source ${source} cannot be read: ${e}`, { cause: e });
   }
 }
