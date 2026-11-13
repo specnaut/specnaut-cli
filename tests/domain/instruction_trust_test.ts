@@ -80,10 +80,21 @@ Deno.test("a link the base does not hold as its own link is untrusted", () => {
   const link: CheckoutEntry = {
     kind: "link",
     path: "CLAUDE.md",
+    target: "AGENTS.md",
+    end: { kind: "inside", path: "AGENTS.md", id: "1:AGENTS.md" },
+  };
+  const tip = [blob("AGENTS.md"), blob("CLAUDE.md")];
+  assertEquals(judge(walked(file("AGENTS.md"), link), tip), [`CLAUDE.md ${REASON.differs}`]);
+});
+
+Deno.test("a committed link out of the files this class judges is named so", () => {
+  const link: CheckoutEntry = {
+    kind: "link",
+    path: "CLAUDE.md",
     target: "elsewhere.md",
     end: { kind: "inside", path: "elsewhere.md", id: "9:9" },
   };
-  assertEquals(judge(walked(link), [blob("CLAUDE.md")]), [`CLAUDE.md ${REASON.differs}`]);
+  assertEquals(judge(walked(link), [blob("CLAUDE.md")]), [`CLAUDE.md ${LINK_REASON.linkLeaves}`]);
 });
 
 Deno.test("a link the base holds as the same link to a checked file is trusted", () => {

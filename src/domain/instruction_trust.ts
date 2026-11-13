@@ -1,5 +1,5 @@
 import { sameBytes } from "./bytes.ts";
-import { inCheckoutScope, inScopeRoot } from "./checkout_scope.ts";
+import { inCheckoutScope } from "./checkout_scope.ts";
 import {
   type CheckoutEntry,
   type CheckoutWalk,
@@ -13,9 +13,10 @@ import { headReasons } from "./instruction_head.ts";
 import {
   type COMMITTED_INSTRUCTIONS,
   type HeadSplit,
-  INSTRUCTION_SCOPE,
+  inComparedRoot,
   splitHead,
 } from "./instruction_scope.ts";
+import { headLinkReasons } from "./head_link.ts";
 
 export { INSTRUCTION_REASON } from "./instruction_head.ts";
 export { COMMITTED_INSTRUCTIONS, INSTRUCTION_SCOPE } from "./instruction_scope.ts";
@@ -68,10 +69,6 @@ export function judgeInstructions(input: InstructionInput): ConfigVerdict[] {
   return found.map((u) => ({ class: INSTRUCTION_CLASS, ...u, trusted: false }));
 }
 
-/** A link counts only into a folder this class compares whole: `.specnaut/addenda/`. */
-const inComparedRoot = (path: string) =>
-  INSTRUCTION_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
-
 function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   const holds = holdsBytes(input.symlinks);
   const ctx = {
@@ -81,7 +78,8 @@ function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   };
   const found = configReasons(input.tree, input.tip, holds, inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
-  const reasons = new Map([...found, ...head.reasons].map((u) => [u.path, u.reason]));
+  const atHead = [...head.reasons, ...headLinkReasons(head.entries)];
+  const reasons = new Map([...found, ...atHead].map((u) => [u.path, u.reason]));
   const blocked = input.tree.flatMap((w) => w.kind === "blocked" ? [w.path] : []);
   headReasons(reasons, { ...ctx, blocked, head: byPath(head.entries) }, holds);
   return [...reasons].map(([path, reason]) => ({ path, reason }));

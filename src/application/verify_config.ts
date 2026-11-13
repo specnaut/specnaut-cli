@@ -13,6 +13,7 @@ import {
   judgeInstructions,
 } from "../domain/instruction_trust.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
+import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
 import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
@@ -78,7 +79,30 @@ export async function verifyInstructions(
   const committed = await readCommitted(deps.git, base);
   const symlinks = await deps.git.symlinks();
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
-  return { verdicts, digest: await headDigest(head.flatMap((e) => e.kind === "tree" ? [] : [e])) };
+  const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
+  return { verdicts, digest: await headDigest(files, await linkEnds(deps.git, base.head, files)) };
+}
+
+/**
+ * The bytes HEAD holds where each of its listed links leads (`linkEnd` in `head_link.ts`), read
+ * from HEAD's tree whether or not this class lists that path: what the digest frames a link by.
+ */
+async function linkEnds(
+  git: GitObjectReader,
+  head: string,
+  files: readonly BaseEntry[],
+): Promise<Map<string, Uint8Array>> {
+  const listed = new Map(files.map((e) => [e.path, e]));
+  const ends = new Map<string, Uint8Array>();
+  for (const e of files) {
+    const end = e.kind === "link" ? linkEnd(e.path, e.target ?? "") : null;
+    if (end === null) continue;
+    const at = listed.get(end);
+    const read = at === undefined ? await git.readFile(head, end) : null;
+    const bytes = at?.kind === "blob" ? at.bytes : read?.kind === "blob" ? read.bytes : undefined;
+    if (bytes !== undefined) ends.set(e.path, bytes);
+  }
+  return ends;
 }
 
 /** The commits the instruction class reads: the config's two, and HEAD, what lands. */

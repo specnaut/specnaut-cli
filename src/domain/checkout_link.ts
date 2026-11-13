@@ -40,10 +40,13 @@ export function linkReason(
   if (base.kind !== "link" || entry.target === undefined || entry.target !== base.target) {
     return REASON.differs;
   }
-  if (/\\|^[A-Za-z]:/.test(entry.target)) return LINK_REASON.linkForm;
+  if (badLinkForm(entry.target)) return LINK_REASON.linkForm;
   const end = entry.end;
   if (end === undefined || end.kind === "outside") return LINK_REASON.linkLeaves;
   if (end.kind === "unresolved") return `${LINK_REASON.linkUnresolved}: ${end.why}`;
   if (end.id !== null && ids.has(end.id)) return null;
   return deep(end.path) ? null : LINK_REASON.linkLeaves;
 }
+
+/** A target written with a backslash or a drive: read one way by git and another by Windows. */
+export const badLinkForm = (target: string): boolean => /\\|^[A-Za-z]:/.test(target);

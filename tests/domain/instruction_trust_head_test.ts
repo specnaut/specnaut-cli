@@ -1,4 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
+import { LINK_REASON } from "../../src/domain/checkout_link.ts";
 import { keptAtHead, NOT_A_FOLDER } from "../../src/domain/instruction_scope.ts";
 import type { CheckoutEntry, CheckoutWalk } from "../../src/domain/checkout_trust.ts";
 import type { ConfigFile } from "../../src/domain/config_trust.ts";
@@ -107,11 +108,10 @@ Deno.test("a reason about the tree's own shape stands over the HEAD one", () => 
 
 Deno.test("a HEAD entry that is not the tip's differs, though the tree holds both", () => {
   // Where links are off, git writes the tip's link and HEAD's file of its target alike.
-  const tip: BaseEntry[] = [{ kind: "link", path: "CLAUDE.md", target: A }];
-  const tree = walked(file("CLAUDE.md", enc(A)));
-  assertEquals(judge({ tip, tree, head: [blob("CLAUDE.md", enc(A))], symlinks: false }), [
-    `CLAUDE.md ${REASON.differs}`,
-  ]);
+  const tip: BaseEntry[] = [blob(A), { kind: "link", path: "CLAUDE.md", target: A }];
+  const tree = walked(file(A), file("CLAUDE.md", enc(A)));
+  const head = [blob(A), blob("CLAUDE.md", enc(A))];
+  assertEquals(judge({ tip, tree, head, symlinks: false }), [`CLAUDE.md ${REASON.differs}`]);
   assertEquals(judge({ tip, tree, head: tip, symlinks: false }), ["trusted"]);
 });
 
@@ -206,4 +206,13 @@ Deno.test("HEAD's listing keeps the instruction paths, overrides and folders in 
   ) {
     assert(!keptAtHead(dropped), dropped);
   }
+});
+
+Deno.test("a committed link out of the class is named where links are off, whatever the tree shows", () => {
+  // Where links are off, the tree holds the target's text, which the tip check takes as the link.
+  const link: BaseEntry = { kind: "link", path: "CLAUDE.md", target: "notes/rules.md" };
+  const tree = walked(file("CLAUDE.md", enc("notes/rules.md")));
+  assertEquals(judge({ tip: [link], tree, head: [link], symlinks: false }), [
+    `CLAUDE.md ${LINK_REASON.linkLeaves}`,
+  ]);
 });

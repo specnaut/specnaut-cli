@@ -43,7 +43,7 @@ export type TreeWalk =
 export type BaseEntry =
   | { readonly kind: "blob"; readonly path: string; readonly bytes: Uint8Array }
   | { readonly kind: "link"; readonly path: string; readonly target?: string }
-  | { readonly kind: "submodule"; readonly path: string };
+  | { readonly kind: "submodule"; readonly path: string; readonly commit?: string };
 
 /** One entry of a commit's whole tree, as `git ls-tree -r -t` lists it: a folder included. */
 export type CommitEntry = BaseEntry | { readonly kind: "tree"; readonly path: string };

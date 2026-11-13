@@ -44,7 +44,7 @@ Deno.test("HEAD's digest tells a link from a file of its target, and a path that
   const link: HeadEntry = { kind: "link", path: "CLAUDE.md", target: "AGENTS.md" };
   const asFile = await headDigest([blob("CLAUDE.md", "AGENTS.md")]);
   assertNotEquals(asFile, await headDigest([link]));
-  const other: HeadEntry = { kind: "not_regular", path: "CLAUDE.local.md" };
+  const other: HeadEntry = { kind: "submodule", path: "CLAUDE.local.md" };
   assertNotEquals(await headDigest([other]), await headDigest([]));
 });
 
@@ -59,4 +59,12 @@ Deno.test("names become relative to the project's folder, and a path outside it 
   ]);
   assertEquals(projectRelative(["a/b/c.txt", "a/d.txt"], "a/b/"), ["c.txt", "../d.txt"]);
   assertEquals(projectRelative(names, ""), names);
+});
+
+Deno.test("HEAD's digest frames a link with its end's bytes, and a submodule with its commit", async () => {
+  const link: HeadEntry = { kind: "link", path: "CLAUDE.md", target: "notes/rules.md" };
+  const ends = (text: string) => new Map([["CLAUDE.md", enc(text)]]);
+  assertNotEquals(await headDigest([link], ends("one")), await headDigest([link], ends("two")));
+  const sub = (commit: string): HeadEntry => ({ kind: "submodule", path: ".claude", commit });
+  assertNotEquals(await headDigest([sub("a".repeat(40))]), await headDigest([sub("b".repeat(40))]));
 });

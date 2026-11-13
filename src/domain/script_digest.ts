@@ -19,21 +19,29 @@ export async function scriptsDigest(walk: TreeWalk): Promise<string> {
   return await sha256HexBytes(concat(parts));
 }
 
-/** One path as HEAD commits it: an entry of its tree, or one that is not a file git reads. */
-export type HeadEntry = BaseEntry | { readonly kind: "not_regular"; readonly path: string };
+/** One path as HEAD commits it. */
+export type HeadEntry = BaseEntry;
 
 /**
  * One digest of the instruction files as HEAD commits them: what a yes to their untrusted verdict
  * covers. The yes is given to the bytes that land, never to the paths named, so a later commit to
  * a path already approved digests otherwise and asks again. Framed as {@link scriptsDigest} frames
- * a walk, a link by its target, so a link and a file of its target text differ.
+ * a walk: a link by its target and the bytes HEAD holds where it leads (`ends`, by the link's
+ * path; none when it leads to no file), so a commit to a file outside the class that a link
+ * reaches asks again too; a submodule by its commit.
  */
-export async function headDigest(entries: readonly HeadEntry[]): Promise<string> {
+export async function headDigest(
+  entries: readonly HeadEntry[],
+  ends: ReadonlyMap<string, Uint8Array> = new Map(),
+): Promise<string> {
   const enc = new TextEncoder();
   const sorted = [...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const parts = sorted.flatMap((e) => {
-    const bytes = e.kind === "blob" ? e.bytes : enc.encode(e.kind === "link" ? e.target ?? "" : "");
-    return [enc.encode(`${e.kind}\0${e.path}\0${bytes.length}\0`), bytes];
+    const end = ends.get(e.path);
+    const bytes = e.kind === "blob" ? e.bytes : end ?? new Uint8Array();
+    const what = e.kind === "link" ? e.target ?? "" : e.kind === "submodule" ? e.commit ?? "" : "";
+    const size = e.kind === "link" && end === undefined ? "-" : `${bytes.length}`;
+    return [enc.encode(`${e.kind}\0${e.path}\0${what}\0${size}\0`), bytes];
   });
   return await sha256HexBytes(concat(parts));
 }

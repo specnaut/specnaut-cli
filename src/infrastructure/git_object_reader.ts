@@ -120,7 +120,7 @@ export class GitObjects implements GitObjectReader {
 
 /** A blob `ls-tree -l` listed: a file's, or a link's, whose bytes are its target. */
 type BlobRecord = { kind: "blob" | "link"; path: string; sha: string; size: number };
-type FileRecord = BlobRecord | { kind: "submodule"; path: string };
+type FileRecord = BlobRecord | { kind: "submodule"; path: string; commit: string };
 type TreeRecord = FileRecord | { kind: "tree"; path: string };
 
 /** `ls-tree -z -l --full-tree`, paths made relative to `prefix`; a tree entry only on `trees`. */
@@ -138,7 +138,7 @@ async function lsTree(
     if (m === null || !m[5].startsWith(prefix)) continue;
     const path = m[5].slice(prefix.length);
     const blob = { path, sha: m[3], size: Number(m[4]) };
-    if (m[1] === "160000") records.push({ kind: "submodule", path });
+    if (m[1] === "160000") records.push({ kind: "submodule", path, commit: m[3] });
     else if (m[1] === "120000") records.push({ kind: "link", ...blob });
     else if (m[2] === "blob") records.push({ kind: "blob", ...blob });
     else if (trees && m[2] === "tree") records.push({ kind: "tree", path });

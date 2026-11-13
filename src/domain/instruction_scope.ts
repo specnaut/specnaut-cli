@@ -45,12 +45,16 @@ const foldedInScope = (path: string) =>
   INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path.toLowerCase()));
 
 /** Whether `path` is an instruction path as written: a root's own folder and a listed name. */
-function exactlyInScope(path: string): boolean {
+export function exactlyInScope(path: string): boolean {
   const name = path.slice(path.lastIndexOf("/") + 1);
   return INSTRUCTION_SCOPE.some((r) =>
     inScopeRoot(r, path) && (r.names === undefined || r.names.includes(name))
   );
 }
+
+/** A link counts only into a folder this class compares whole: `.specnaut/addenda/`. */
+export const inComparedRoot = (path: string): boolean =>
+  INSTRUCTION_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
 
 /** Whether HEAD's listing keeps `path`, folded: an instruction path, an override, or a folder. */
 export function keptAtHead(path: string): boolean {
