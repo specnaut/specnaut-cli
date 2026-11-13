@@ -1,14 +1,15 @@
 import type { SubprocessRunner } from "../application/ports.ts";
 import type { BackendProber } from "../application/sandbox_ports.ts";
 import type { BackendProbe } from "../domain/sandbox.ts";
-import type { EngineLimits } from "../domain/sandbox_hosts.ts";
 import type { ImageSource } from "../domain/sandbox_image.ts";
 import { engineEnv } from "./sandbox_engine_env.ts";
+import { NO_DOCKER, NO_PODMAN, probeDocker, probePodman } from "./sandbox_probe_engines.ts";
 
 /**
  * What the host offers a sandbox, asked of the tools themselves. Each answer is a fact the domain
  * judges (`chooseBackend`); nothing here decides which backend runs. A tool is asked only on an OS
  * where the domain could use it, and nothing is asked on Windows, which is always static only.
+ * Podman's and docker's own reports are `sandbox_probe_engines.ts`'s.
  */
 
 export type HostFacts = { readonly os: string; readonly arch: string };
@@ -23,28 +24,7 @@ const USERNS_REFUSED = /namespace|uid map|Permission denied|Operation not permit
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
-type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits">;
-type Docker = Pick<BackendProbe, "docker" | "dockerOnPodman" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
-const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
-const NO_PODMAN: Podman = {
-  podman: "absent",
-  podmanRemote: false,
-  podmanVersion: null,
-  podmanLimits: NO_LIMITS,
-};
-const NO_DOCKER: Docker = { docker: false, dockerOnPodman: false, dockerLimits: NO_LIMITS };
-
-/**
- * Whether this process's own cgroup (cgroup v2) has the file podman checks before it passes on the
- * memory cap's bound on what is paged out: without it podman drops that bound, warning, and runs.
- * A remote podman's cgroup (a podman machine's VM) is not this process's: it is not tried, and its
- * bound counts as missing.
- */
-const PAGING_TRIAL = [
-  "-c",
-  'read -r line < /proc/self/cgroup && test -e "/sys/fs/cgroup${line#0::}/memory.swap.max"',
-];
 const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null, bwrapScope: false };
 
 /**
@@ -76,88 +56,15 @@ export class HostBackendProber implements BackendProber {
       const image: ImageSource = { kind: "none", why: "no sandbox on Windows" };
       return { os, arch, image, ...NO_PODMAN, ...NO_DOCKER, ...NO_BWRAP, sandboxExec: false };
     }
+    const engines = { runner: this.runner, env: this.engineVars() };
     const [image, podman, docker, bwrap, sandboxExec] = await Promise.all([
       this.image(),
-      this.#podman(),
-      this.#docker(),
+      probePodman(engines),
+      probeDocker(engines),
       os === "linux" ? this.#bwrap() : NO_BWRAP,
       os === "darwin" && this.#sandboxExec(),
     ]);
     return { os, arch, image, ...podman, ...docker, ...bwrap, sandboxExec };
-  }
-
-  /**
-   * Podman's own report: whether it runs as the user, whether it answers from a service it does not
-   * run itself, its version, and what it can limit on its host. Only a report saying it is local
-   * is taken as local: one that does not say is counted remote.
-   */
-  async #podman(): Promise<Podman> {
-    const args = ["info", "--format", "json"];
-    const { code, stdout } = await this.runner.run("podman", args, { env: this.engineVars() });
-    if (code !== 0) return NO_PODMAN;
-    const info = parsed(stdout, "podman info");
-    const host = info?.host;
-    if (host === undefined) return NO_PODMAN;
-    const podmanRemote = host?.serviceIsRemote !== false;
-    const version: unknown = info?.version?.Version;
-    return {
-      podman: host?.security?.rootless === true ? "rootless" : "root",
-      podmanRemote,
-      podmanVersion: typeof version === "string" ? version : null,
-      podmanLimits: await this.#podmanLimits(host, podmanRemote),
-    };
-  }
-
-  /**
-   * The limits podman can apply, as docker reports its own: one per cgroup v2 controller it holds,
-   * and the memory cap's bound on what is paged out where the host has it ({@link PAGING_TRIAL}).
-   */
-  // deno-lint-ignore no-explicit-any
-  async #podmanLimits(host: any, remote: boolean): Promise<EngineLimits> {
-    const controllers: unknown = host?.cgroupControllers;
-    if (host?.cgroupVersion !== "v2" || !Array.isArray(controllers)) return NO_LIMITS;
-    const memory = controllers.includes("memory");
-    const tried = memory && !remote;
-    const paging = tried && (await this.runner.run("/bin/sh", PAGING_TRIAL)).code === 0;
-    const pids = controllers.includes("pids");
-    return { memory, swap: paging, pids, cpuQuota: controllers.includes("cpu") };
-  }
-
-  /**
-   * Docker's own report: whether its daemon answers with a version, and which limits it can apply
-   * on its host. A limit it does not say it can (false, or left out) counts as one it cannot.
-   */
-  async #docker(): Promise<Docker> {
-    const args = ["info", "--format", "{{json .}}"];
-    const { code, stdout } = await this.runner.run("docker", args, { env: this.engineVars() });
-    if (code !== 0) return NO_DOCKER;
-    const info = parsed(stdout, "docker info");
-    if (typeof info?.ServerVersion !== "string" || info.ServerVersion === "") return NO_DOCKER;
-    const can = (flag: string) => info[flag] === true;
-    return {
-      docker: true,
-      dockerOnPodman: await this.#dockerOnPodman(),
-      dockerLimits: {
-        memory: can("MemoryLimit"),
-        swap: can("SwapLimit"),
-        pids: can("PidsLimit"),
-        cpuQuota: can("CpuCfsQuota"),
-      },
-    };
-  }
-
-  /**
-   * Whether the daemon docker reaches is a podman service: its version names a `Podman Engine`
-   * component, which a docker daemon's never does. A version that cannot be read says nothing,
-   * and docker is taken as its own: `docker info` has already answered as a docker daemon does.
-   */
-  async #dockerOnPodman(): Promise<boolean> {
-    const args = ["version", "--format", "{{json .}}"];
-    const { code, stdout } = await this.runner.run("docker", args, { env: this.engineVars() });
-    if (code !== 0) return false;
-    const components: unknown = parsed(stdout, "docker version")?.Server?.Components;
-    if (!Array.isArray(components)) return false;
-    return components.some((c) => c?.Name === "Podman Engine");
   }
 
   async #bwrap(): Promise<Bwrap> {
@@ -181,18 +88,5 @@ export class HostBackendProber implements BackendProber {
   async #sandboxExec(): Promise<boolean> {
     const args = ["-p", "(version 1)(allow default)", "--", "/usr/bin/true"];
     return (await this.runner.run(SANDBOX_EXEC, args)).code === 0;
-  }
-}
-
-/** `stdout` as JSON, or `undefined` with a warning: a tool that answers garbled is not used. */
-// deno-lint-ignore no-explicit-any
-function parsed(stdout: string, what: string): any {
-  try {
-    return JSON.parse(stdout);
-  } catch (err) {
-    console.error(
-      `warning: ${what} did not print JSON, so it is not used: ${(err as Error).message}`,
-    );
-    return undefined;
   }
 }
