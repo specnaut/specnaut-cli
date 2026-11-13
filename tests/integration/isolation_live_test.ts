@@ -70,10 +70,7 @@ eachBackend(
     assertEquals(host.get(`read ${dotenv}`), `ok TOKEN=${iso.secret}`);
     assertEquals(host.get(`env ${iso.secret}`), "ok");
     const inside = await probeInside(kind, iso, words);
-    for (const word of words) {
-      if (kind === "container") assertEquals(inside.get(word.replace("=", " ")), "ok", word);
-      else assertRefused(inside.get(word.replace("=", " ")), word);
-    } // red probe, never to land
+    for (const word of words) assertRefused(inside.get(word.replace("=", " ")), word);
   },
 );
 
