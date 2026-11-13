@@ -31,6 +31,7 @@ src/infrastructure/fs_tree_export.ts  writes only under the user's cache folder,
 src/infrastructure/git_branch_fetch.ts::fetch  its only write is the alternates file of the bare repository the export store staged for it in the user's cache folder, outside the project
 src/infrastructure/private_folder.ts  its only mutation is a chmod that tightens the user's own cache folder, a path resolved from the environment and never from a project directory
 src/infrastructure/fs_export_files.ts  writes only inside the export's seats/ and scratch/ folders, which FsExportStore made new under the user's cache folder; each path is checked strictly inside its copy, and no path is built from a project directory
+src/infrastructure/fs_kept_export.ts  removes only `<cache folder>/<full commit id>`, the export fs_tree_export.ts made under the user's cache folder that exportCacheRoot resolves from the environment, after lstat refuses anything but a folder at that name; no path is built from a project directory
 src/infrastructure/fs_sandbox_host.ts::removeAll  removes only the scratch folder scratch() made new with makeTempDir in the system temp folder, never a path built from a project directory
 src/infrastructure/fs_sandbox_host.ts::reopen  restores the owner's permissions inside that same new scratch folder so it can be removed; it touches nothing outside it
 src/infrastructure/sandbox_runners.ts::run  creates only the policy's write folders, which the policy places under the run's new scratch folder in the system temp folder, never under a project directory
