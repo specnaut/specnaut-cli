@@ -42,16 +42,27 @@
 # INSTRUCTIONS_DIGEST the user said yes to (phases/script-gate.md).
 #
 # Usage: land-feature.sh [--instructions-digest <sha256>]
-set -euo pipefail
+# -E: the ERR trap below reaches functions and command substitutions too, so a failure there is
+# exit 12, never the raw code of the command that failed.
+set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
 # Every git call of the landing runs no hook: the branch being landed could commit hooks and a
 # repository-relative core.hooksPath naming them, and this script fetches, checks out, merges,
 # pushes and deletes for it. A project's own post-merge or pre-push hooks do not run here either.
 # The value is the one the binary's own git wrapper passes on every platform (untrusted_git.ts).
-git() { command git -c core.hooksPath=/dev/null "$@"; }
+# An alias, not a function: bash 3.2 runs the ERR trap for a `command git` that fails inside an
+# `if`, and a function's body escapes the caller's `if` under -E.
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # `set -e` alone would exit with git's own code, which no table lists.
-unexpected() { echo "land-feature: unexpected failure (exit $1) of: $2 — nothing was pushed" >&2; exit 12; }
+# In a command substitution the trap only passes the code out: the line that ran it decides, by its
+# own `||` or by this trap, as it did before -E.
+unexpected() {
+  [ "$BASH_SUBSHELL" -eq 0 ] || exit "$1"
+  echo "land-feature: unexpected failure (exit $1) of: $2 - nothing was pushed" >&2
+  exit 12
+}
 trap 'unexpected $? "$BASH_COMMAND"' ERR
 
 # HEAD's instructions verdict, from the binary: trusted, or the approved digest, or exit 13.

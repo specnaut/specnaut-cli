@@ -65,3 +65,40 @@ Deno.test("a verdict measured from another base is no verdict: 13", async () => 
 Deno.test("the base's name is matched as written, never as a pattern", async () => {
   await refused(["BASE_BRANCH relx1", DIGEST, ...TRUSTED], "could not judge", 0, "rel.1");
 });
+
+Deno.test("a verifier that could not run is 13, even printing a digest", async () => {
+  await refused(["BASE_BRANCH main", DIGEST, ...TRUSTED], "could not judge", 3);
+});
+
+Deno.test("a verdict with no digest line is 13", async () => {
+  await refused(["BASE_BRANCH main", ...TRUSTED], "could not judge");
+});
+
+Deno.test("trusted instructions land under untrusted scripts the user approved (exit 1)", async () => {
+  const sb = await featureBranch();
+  try {
+    const head = await git(sb.work, "rev-parse", "HEAD");
+    const lines = ["BASE_BRANCH main", DIGEST, TRUSTED[0], "VERDICT scripts untrusted"];
+    const r = await landWith(sb, lines, 1);
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(await git(sb.remote, "rev-parse", "main"), head);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a failure inside the verdict's reading is 12, named, never a raw exit", async () => {
+  const sb = await featureBranch();
+  try {
+    const before = await git(sb.remote, "rev-parse", "main");
+    // A names file `rm -f` cannot remove: a folder.
+    const folder = join(sb.root, "names-folder");
+    await Deno.mkdir(folder);
+    const r = await landWith(sb, ["BASE_BRANCH main", `NAMES_FILE ${folder}`, DIGEST, ...TRUSTED]);
+    assertEquals(r.code, 12, r.stderr);
+    assertStringIncludes(r.stderr, "nothing was pushed");
+    assertEquals(await git(sb.remote, "rev-parse", "main"), before);
+  } finally {
+    await sb.cleanup();
+  }
+});

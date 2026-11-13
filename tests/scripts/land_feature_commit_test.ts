@@ -52,3 +52,35 @@ Deno.test("a local base that already holds the branch and more is 6: nothing pus
     await sb.cleanup();
   }
 });
+
+Deno.test("a git failure inside the landing's git wrapper is 12, named, nothing pushed", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await featureBranch();
+  try {
+    const before = await git(sb.remote, "rev-parse", "main");
+    const r = await sb.scriptWithGit(shim(`[ "$1" = checkout ] && exit 1`), "land-feature.sh");
+    assertEquals(r.code, 12, r.stderr);
+    assertStringIncludes(r.stderr, 'checkout --quiet "$base"');
+    assertStringIncludes(r.stderr, "nothing was pushed");
+    assertEquals(await git(sb.remote, "rev-parse", "main"), before);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a git failure inside a command substitution is named once", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await featureBranch();
+  try {
+    const r = await sb.scriptWithGit(shim(`[ "$1" = rev-list ] && exit 128`), "land-feature.sh");
+    assertEquals(r.code, 12, r.stderr);
+    assertEquals(r.stderr.match(/unexpected failure/g)?.length, 1, r.stderr);
+    assertStringIncludes(r.stderr, "rev-list");
+  } finally {
+    await sb.cleanup();
+  }
+});
