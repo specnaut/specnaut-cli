@@ -54,3 +54,31 @@ Deno.test("review start takes no option and no --, wherever it is", () => {
     ]
   ) assertEquals(parseArgs(argv), { kind: "unknown", received: "review start takes no option" });
 });
+
+Deno.test("review start takes --expect <sha> as its last two words, and nowhere else", () => {
+  assertEquals(parseArgs(["review", "start", "12", "--expect", SHA]), {
+    kind: "review",
+    sub: "start",
+    source: "12",
+    expect: SHA,
+  });
+  for (
+    const [argv, why] of [
+      [["review", "start", "12", "--expect", "HEAD"], "start --expect takes one full commit id"],
+      [["review", "start", "12", "--expect", "-x"], "start --expect takes one full commit id"],
+      [["review", "start", "12", "--expect"], "start takes no option"],
+      [["review", "start", "--expect", SHA, "12"], "start takes no option"],
+      [["review", "--expect", SHA, "start", "12"], "start takes no option"],
+      [["review", "start", "12", `--expect=${SHA}`], "start takes no option"],
+      [["review", "start", "12", "--force", "--expect", SHA], "start takes no option"],
+      [["review", "start", "--expect", SHA], "start takes one source"],
+      [["review", "start", "a", "b", "--expect", SHA], "start takes one source"],
+    ] as const
+  ) {
+    assertEquals(
+      parseArgs([...argv]),
+      { kind: "unknown", received: `review ${why}` },
+      argv.join(" "),
+    );
+  }
+});

@@ -5,7 +5,11 @@ import { type TrustDecision, trustLine } from "../../domain/review_trust.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { GhPullRequests } from "../../infrastructure/gh_pull_request.ts";
 import { baseTipOf } from "../../application/verify_scripts.ts";
-import { type BranchExport, exportBranchTree } from "../../application/untrusted_review.ts";
+import {
+  type BranchExport,
+  exportBranchTree,
+  type ExportDeps,
+} from "../../application/untrusted_review.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { REVIEW_PASS_VAR } from "../../domain/review_gate.ts";
 import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
@@ -26,9 +30,11 @@ import { runReviewGuard } from "./review_guard_handler.ts";
  *
  *   gate          the PreToolUse hook's check (review_gate_handler.ts)
  *   guard         the PreToolUse hook's review lock (review_guard_handler.ts)
- *   start <src>   takes the gate's pass, only the one `SPECNAUT_REVIEW_PASS` names, locks the
+ *   start <src> [--expect <sha>]
+ *                 takes the gate's pass, only the one `SPECNAUT_REVIEW_PASS` names, locks the
  *                 session it names, exports the branch (a PR number or `<remote>/<branch>`) as
- *                 inert files outside the project, and keeps it. On stdout: `HEAD <sha>`,
+ *                 inert files outside the project, and keeps it; with `--expect`, a fetched head
+ *                 other than <sha> (the head the forge reported) is refused. On stdout: `HEAD <sha>`,
  *                 `SEATS <dir>` (the reviewers' copy), `SCRATCH <dir>` (the copy a sandbox runs),
  *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), `LOGS <dir>` (the
  *                 one folder a sandboxed run may log to under the lock), then one
@@ -64,16 +70,16 @@ export async function runReview(intent: ReviewIntent, deps = defaultDeps()): Pro
   }
   try {
     if (intent.sub === "end") return await end(deps, intent.sha);
-    return await start(deps, intent.source);
+    return await start(deps, intent.source, intent.expect);
   } catch (err) {
     return fail(deps, intent.sub, err instanceof Error ? err.message : String(err));
   }
 }
 
-async function start(deps: ReviewDeps, source: string): Promise<number> {
+async function start(deps: ReviewDeps, source: string, expect?: string): Promise<number> {
   const startDeps = await deps.start();
   if (startDeps === null) return fail(deps, "start", "this folder is in no git repository");
-  const outcome = await startReview(startDeps, source);
+  const outcome = await startReview(startDeps, source, expect);
   if (outcome.kind === "refused") return fail(deps, "start", outcome.why);
   deps.out(startLines(outcome.exported).join("\n"));
   return EXIT.done;
@@ -133,6 +139,11 @@ function closeDeps(cache: () => string) {
   };
 }
 
+/** The export `start` runs: the head the caller expects, when it names one, bound to the fetch. */
+export function branchExporter(deps: ExportDeps) {
+  return (source: string, expectedSha?: string) => exportBranchTree(deps, { source, expectedSha });
+}
+
 /** What `start` reads and writes in the repository `cwd` is in; `null` outside one. */
 async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | null> {
   const [pass, lock] = await Promise.all([FsReviewPass.open(cwd), FsReviewLock.open(cwd)]);
@@ -143,7 +154,7 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
     store: () => new FsExportStore(cwd, cache()),
     windows: Deno.build.os === "windows",
   };
-  const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
+  const exportBranch = branchExporter(exportDeps);
   const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
   const checkout = () => checkoutState(cwd);
   return {

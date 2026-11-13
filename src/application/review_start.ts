@@ -29,7 +29,8 @@ export type StartDeps = {
   readonly lock: (sessionId: string) => Promise<void>;
   /** Records in the session's lock the head exported and the folder for its logs. */
   readonly record: (sessionId: string, review: { head: string; logs: string }) => Promise<void>;
-  readonly exportBranch: (source: string) => Promise<BranchExport>;
+  /** Exports `source`; a fetched head other than `expectedSha`, when given, is refused. */
+  readonly exportBranch: (source: string, expectedSha?: string) => Promise<BranchExport>;
 };
 
 export type StartOutcome =
@@ -53,7 +54,11 @@ export const CHANGED_PASS = "the checkout changed since its verdict: run this co
 
 export const NO_SESSION = "the checkout verdict names no session to lock: run this command again";
 
-export async function startReview(deps: StartDeps, source: string): Promise<StartOutcome> {
+export async function startReview(
+  deps: StartDeps,
+  source: string,
+  expectedSha?: string,
+): Promise<StartOutcome> {
   const granted = await deps.pass.take();
   if (granted === null) return { kind: "refused", why: NO_PASS };
   if (!isPassNonce(deps.nonce) || granted.nonce !== deps.nonce) {
@@ -67,7 +72,7 @@ export async function startReview(deps: StartDeps, source: string): Promise<Star
   }
   if (!isSessionId(granted.session)) return { kind: "refused", why: NO_SESSION };
   await deps.lock(granted.session);
-  const exported = await deps.exportBranch(source);
+  const exported = await deps.exportBranch(source, expectedSha);
   await deps.record(granted.session, { head: exported.sha, logs: exported.logs });
   exported.keep();
   return { kind: "started", exported };

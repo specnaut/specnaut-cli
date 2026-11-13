@@ -53,8 +53,9 @@ function deps(
     lock: (id: string) => Promise.resolve(void done.push(`lock ${id}`)),
     record: (id: string, review: { head: string; logs: string }) =>
       Promise.resolve(void done.push(`record ${id} ${review.head} ${review.logs}`)),
-    exportBranch: (source: string) =>
-      Promise.resolve(void done.push(`export ${source}`)).then(() => exported),
+    exportBranch: (source: string, expected?: string) =>
+      Promise.resolve(void done.push(`export ${[source, expected].filter(Boolean).join(" ")}`))
+        .then(() => exported),
   };
 }
 
@@ -77,6 +78,13 @@ Deno.test("a start on a fresh pass takes it, exports the source and keeps the ex
     `record s-1 ${"a".repeat(40)} /cache/a/logs`,
     "kept",
   ]);
+});
+
+Deno.test("a start hands the head the caller expects to the export", async () => {
+  const done: string[] = [];
+  const expected = "b".repeat(40);
+  assertEquals((await startReview(deps(NOW - 1000, done), "12", expected)).kind, "started");
+  assertEquals(done[2], `export 12 ${expected}`);
 });
 
 Deno.test("an export the lock could not record is not kept", async () => {

@@ -14,10 +14,13 @@ file wins for an untrusted review.
 
 ## Start
 
-Run this block as written, from the project's root, with the argument the review was given:
+Run this block as written, from the project's root, with the argument the review was given and,
+as `<sha>`, the head the remote reported, written out: for a PR, the commit id step 0's `git
+ls-remote` printed; for a `<remote>/<branch>`, the one `git ls-remote "<remote>"
+"refs/heads/<branch>"` prints. A fetch that lands on any other head is refused:
 
 ```bash
-out=$(specnaut review start "<pr number or remote/branch>"); rc=$?; printf '%s\n' "$out"
+out=$(specnaut review start "<pr number or remote/branch>" --expect "<sha>"); rc=$?; printf '%s\n' "$out"
 ```
 
 The `review-gate` hook judges this session's checkout before the command runs, and the line it lets

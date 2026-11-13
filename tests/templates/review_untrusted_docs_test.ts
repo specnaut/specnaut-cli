@@ -29,7 +29,11 @@ Deno.test("an untrusted review is refused on Codex and anywhere but Claude Code"
 
 Deno.test("it starts through the gated command, and every script takes the start's objects", () => {
   const doc = flat("review-untrusted.md");
-  assertStringIncludes(doc, 'specnaut review start "<pr number or remote/branch>"');
+  assertStringIncludes(
+    doc,
+    'specnaut review start "<pr number or remote/branch>" --expect "<sha>"',
+  );
+  assertStringIncludes(doc, "A fetch that lands on any other head is refused");
   assertStringIncludes(doc, "A refusal, or any exit but 0, stops the review:");
   assertStringIncludes(doc, "every script below takes that `--objects` folder and no other");
   assertStringIncludes(doc, '--base "$BASE_TIP" --head "$HEAD" --objects "$OBJECTS"');

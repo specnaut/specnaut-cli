@@ -2,7 +2,16 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import type { BranchExport } from "../../../src/application/untrusted_review.ts";
 import type { TrustDecision } from "../../../src/domain/review_trust.ts";
 import type { CloseOutcome } from "../../../src/application/untrusted_review_close.ts";
-import { CHANGED_COPY, runReview, startLines } from "../../../src/cli/handlers/review_handler.ts";
+import {
+  branchExporter,
+  CHANGED_COPY,
+  runReview,
+  startLines,
+} from "../../../src/cli/handlers/review_handler.ts";
+import { parseArgs } from "../../../src/cli/parser.ts";
+import type { ReviewIntent } from "../../../src/cli/intent.ts";
+import { blob, commit, tree } from "../../helpers/git_fixture.ts";
+import { depsOf, fetcherOf, withWorld } from "../../helpers/export_world.ts";
 
 const SHA = "c".repeat(40);
 
@@ -131,3 +140,48 @@ Deno.test("trust prints its one line, inert, and exits 0 only when trusted", asy
     assertEquals(asked, [`12 ${SHA}`]);
   }
 });
+
+/** `specnaut review start <argv…>` on a pass that holds, its export the real one over `head`. */
+async function startOver(argv: string[], exportBranch: ReturnType<typeof branchExporter>) {
+  const said: string[] = [];
+  const judged = { head: "e".repeat(40), ref: null, reflog: null };
+  const tip = "d".repeat(40);
+  const pass = { granted: Date.now() - 1000, baseTip: tip, checkout: judged, session: "s-1" };
+  const code = await runReview(parseArgs(["review", "start", ...argv]) as ReviewIntent, {
+    out: (s) => said.push(`out ${s}`),
+    err: (s) => said.push(`err ${s}`),
+    gate: () => Promise.reject(new Error("unreached")),
+    guard: () => Promise.reject(new Error("unreached")),
+    trust: () => Promise.reject(new Error("unreached")),
+    end: () => Promise.reject(new Error("unreached")),
+    start: () =>
+      Promise.resolve({
+        pass: { take: () => Promise.resolve(pass), grant: unreached, revoke: unreached },
+        now: Date.now,
+        baseTip: () => Promise.resolve(tip),
+        checkout: () => Promise.resolve(judged),
+        lock: () => Promise.resolve(),
+        record: () => Promise.resolve(),
+        exportBranch,
+      }),
+  });
+  return { code, said: said.join("\n") };
+}
+
+const unreached = () => Promise.reject(new Error("unreached"));
+
+Deno.test("start --expect refuses a fetched head other than the one the forge reported", () =>
+  withWorld(async (w) => {
+    const head = await commit(
+      w.repo,
+      await tree(w.repo, [["100644", "a", await blob(w.repo, "x")]]),
+    );
+    const exporter = () => branchExporter(depsOf(w, fetcherOf(w, head)));
+    const other = "f".repeat(40);
+    const refused = await startOver(["origin/topic", "--expect", other], exporter());
+    assertEquals(refused.code, 1, refused.said);
+    assertStringIncludes(refused.said, `the fetched head is ${head}, not ${other}`);
+    const started = await startOver(["origin/topic", "--expect", head], exporter());
+    assertEquals(started.code, 0, started.said);
+    assertStringIncludes(started.said, `out HEAD ${head}`);
+  }));

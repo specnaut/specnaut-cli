@@ -29,10 +29,11 @@ ${bold("Usage:")}
   specnaut review guard               Judge, from a Claude Code PreToolUse hook's input on stdin, a tool
                                       call of a session under the review lock: only Read, Grep, Glob,
                                       TodoWrite, the review seats and the review's commands run. Exit 0, 2 refused
-  specnaut review start <pr|remote/branch>
+  specnaut review start <pr|remote/branch> [--expect <sha>]
                                       Once the gate let it through: lock the session until it ends, export
                                       the branch as inert files outside the project, and print where
-                                      (HEAD, SEATS, SCRATCH, OBJECTS, LOGS)
+                                      (HEAD, SEATS, SCRATCH, OBJECTS, LOGS). --expect: refuse a fetched
+                                      head other than <sha>, the one the forge reported
   specnaut review trust <pr> <sha>    Print trusted, or untrusted and why, for reviewing PR <pr> at commit
                                       <sha>, from the forge's facts alone: a team member's PR, its head in
                                       this repository and at <sha>. Exit 0 trusted, 1 untrusted
