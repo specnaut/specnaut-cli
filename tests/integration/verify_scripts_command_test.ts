@@ -161,11 +161,13 @@ Deno.test("run outside a project: exit 2", async () => {
 });
 
 Deno.test("the reader names no subcommand that reads the work tree through git", async () => {
-  const src = await Deno.readTextFile(
-    new URL("../../src/infrastructure/git_object_reader.ts", import.meta.url),
-  );
-  const code = src.replace(/\/\*\*[\s\S]*?\*\/|\/\/.*$/gm, "");
-  for (const word of ['"hash-object"', '"status"', '"diff"', '"--filters"', '"--textconv"']) {
-    assertEquals(code.includes(word), false, `git_object_reader.ts runs ${word}`);
+  for (const file of ["git_object_reader.ts", "git_tree_records.ts"]) {
+    const src = await Deno.readTextFile(
+      new URL(`../../src/infrastructure/${file}`, import.meta.url),
+    );
+    const code = src.replace(/\/\*\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+    for (const word of ['"hash-object"', '"status"', '"diff"', '"--filters"', '"--textconv"']) {
+      assertEquals(code.includes(word), false, `${file} runs ${word}`);
+    }
   }
 });
