@@ -1,6 +1,7 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { SHIM_MARKER, shimContent } from "../../scripts/install-hooks-shim.ts";
+import { installPreCommitHook } from "../../scripts/install-hooks.ts";
 import { classifyHook, installProblems } from "../../scripts/install-hooks-state.ts";
 
 /**
@@ -99,5 +100,41 @@ Deno.test({
         `${target} is not executable`,
         `the hook it resolves to is not executable: ${source}`,
       ]);
+    }),
+});
+
+/** No permission bits to take away on Windows, and none that bind root. */
+const PERMISSIONS_BIND = Deno.build.os !== "windows" && Deno.env.get("USER") !== "root";
+
+Deno.test({
+  name: "hook state: a link that cannot be followed for another reason than absence is kept",
+  ignore: !PERMISSIONS_BIND,
+  fn: () =>
+    withFolder(async (dir) => {
+      assert((await new Deno.Command("git", { args: ["init", "-q", dir] }).output()).success);
+      const [locked, target] = [join(dir, "locked"), join(dir, ".git", "hooks", "pre-commit")];
+      await Deno.mkdir(locked);
+      await Deno.mkdir(join(dir, ".git", "hooks"), { recursive: true });
+      await Deno.symlink(join(locked, "hook"), target);
+      await Deno.chmod(locked, 0o000);
+      try {
+        await assertRejects(() => classifyHook(target, "unused"), Deno.errors.PermissionDenied);
+        await assertRejects(() => installPreCommitHook(dir), Deno.errors.PermissionDenied);
+        assert((await Deno.lstat(target)).isSymlink, "a link that may not dangle was deleted");
+      } finally {
+        await Deno.chmod(locked, 0o755);
+      }
+    }),
+});
+
+Deno.test({
+  name: "hook state: a hook file that cannot be read is an error, not a foreign hook",
+  ignore: !PERMISSIONS_BIND,
+  fn: () =>
+    withFolder(async (dir) => {
+      const target = join(dir, "pre-commit");
+      await Deno.writeTextFile(target, shimContent());
+      await Deno.chmod(target, 0o000);
+      await assertRejects(() => classifyHook(target, "unused"), Deno.errors.PermissionDenied);
     }),
 });

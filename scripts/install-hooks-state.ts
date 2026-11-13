@@ -24,13 +24,33 @@ function isExecutable(info: Deno.FileInfo): boolean {
   return info.mode === null || (info.mode & 0o111) !== 0;
 }
 
-/** Whether `path` reaches a file, following links: any failure to `stat` is a "no". */
+/** An error that says the path leads nowhere, as opposed to one that says it may not be read. */
+function isAbsence(e: unknown): boolean {
+  return e instanceof Deno.errors.NotFound || e instanceof Deno.errors.NotADirectory;
+}
+
+/**
+ * Whether `path` reaches a file, following links. Only absence is a "no": a link
+ * answered "no" is deleted as dangling, so a `stat` refused for another reason
+ * (permission, a loop) is thrown, never read as a link pointing at nothing.
+ */
 async function resolves(path: string): Promise<boolean> {
   try {
     await Deno.stat(path);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    if (isAbsence(e)) return false;
+    throw e;
+  }
+}
+
+/** The text of the file at `path`, or "" when it is gone; any other failure is thrown. */
+async function textOrEmpty(path: string): Promise<string> {
+  try {
+    return await Deno.readTextFile(path);
+  } catch (e) {
+    if (isAbsence(e)) return "";
+    throw e;
   }
 }
 
@@ -56,7 +76,7 @@ export async function classifyHook(target: string, source: string): Promise<Hook
   if (info === null) return { kind: "absent" };
   if (info.isSymlink) return await classifySymlink(target, source);
 
-  const body = await Deno.readTextFile(target).catch(() => "");
+  const body = await textOrEmpty(target);
   if (body.includes(SHIM_MARKER)) {
     // Content, not just the marker. A shim written by an older version is
     // ours AND wrong, and a check that stops at the marker would report
