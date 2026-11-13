@@ -39,9 +39,12 @@ export const RECORDED_SOURCES: ReadonlySet<string> = new Set(["startup", "resume
 /** The one source that takes a session's record: the session's start. */
 export const TAKING_SOURCE = "startup";
 
+/** A session id's shape, which `.claude/hooks/review-lock.sh` matches with the same pattern. */
+export const SESSION_ID_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,127}";
+
 /** A session id as the record's file name: what the harness issues, never a path of its own. */
 export function isSessionId(id: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id);
+  return new RegExp(`^${SESSION_ID_PATTERN}$`).test(id);
 }
 
 /**

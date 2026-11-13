@@ -11,6 +11,10 @@ import { FsReviewLock } from "../../src/infrastructure/fs_review_lock.ts";
  */
 
 const SHA = "a".repeat(40);
+/** The lock's per-user copy, one folder for this file's tests, never the user's own. */
+const STATE_ROOT = Deno.makeTempDirSync({ prefix: "review-guard-state-" });
+const STATE = join(STATE_ROOT, "review-lock");
+globalThis.addEventListener("unload", () => Deno.removeSync(STATE_ROOT, { recursive: true }));
 
 async function guard(cwd: string, input: unknown, open?: (cwd: string) => Promise<ReviewLock>) {
   const said: string[] = [];
@@ -19,7 +23,7 @@ async function guard(cwd: string, input: unknown, open?: (cwd: string) => Promis
     cwd,
     input: text,
     err: (s) => said.push(s),
-    open: open ?? ((dir) => FsReviewLock.open(dir)),
+    open: open ?? ((dir) => FsReviewLock.open(dir, { state: STATE })),
   });
   return { code, err: said.join("\n") };
 }
@@ -37,7 +41,7 @@ Deno.test("a locked session runs only what the lock allows; another session runs
     await new Deno.Command("git", { args: ["init", "-q", root] }).output();
     const push = { command: "git push origin main" };
     assertEquals((await guard(root, call("s-1", "Bash", push))).code, 0, "no lock yet");
-    await (await FsReviewLock.open(root))!.lock("s-1");
+    await (await FsReviewLock.open(root, { state: STATE })).lock("s-1");
     const refused = await guard(root, call("s-1", "Bash", push));
     assertEquals(refused.code, 2);
     assertStringIncludes(refused.err, "review lock");
@@ -59,7 +63,7 @@ Deno.test("a locked session's sandboxed run logs only in its review's folder, fo
     await new Deno.Command("git", { args: ["init", "-q", root] }).output();
     const logs = join(root, "cache", "logs");
     await Deno.mkdir(logs, { recursive: true });
-    const lock = (await FsReviewLock.open(root))!;
+    const lock = await FsReviewLock.open(root, { state: STATE });
     await lock.lock("s-1");
     const exec = (log: string) => ({
       command: `specnaut sandbox exec ${SHA} --log ${log} -- deno task test`,
@@ -80,10 +84,26 @@ Deno.test("a locked session's sandboxed run logs only in its review's folder, fo
   }
 });
 
+Deno.test("a session locked in the per-user copy is refused where git finds no repository", async () => {
+  const root = await Deno.makeTempDir({ prefix: "review-guard-copy-" });
+  const bare = await Deno.makeTempDir({ prefix: "review-guard-bare-" });
+  try {
+    await new Deno.Command("git", { args: ["init", "-q", root] }).output();
+    await (await FsReviewLock.open(root, { state: STATE })).lock("s-copy");
+    const read = await guard(bare, call("s-copy", "Read", { file_path: "/x" }));
+    assertEquals(read.code, 2);
+    assertStringIncludes(read.err, "git cannot find this checkout's git directory");
+    assertEquals((await guard(bare, call("s-free", "Bash", { command: "ls" }))).code, 0);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+    await Deno.remove(bare, { recursive: true });
+  }
+});
+
 Deno.test("outside a repository no call is guarded, and a guard that throws refuses", async () => {
   const bare = await Deno.makeTempDir({ prefix: "review-guard-none-" });
   try {
-    assertEquals((await guard(bare, call("s-1", "Bash", { command: "git push" }))).code, 0);
+    assertEquals((await guard(bare, call("s-out", "Bash", { command: "git push" }))).code, 0);
     const broken = await guard(bare, call("s-1", "Read", {}), () => {
       throw new Error("git is not on the PATH");
     });

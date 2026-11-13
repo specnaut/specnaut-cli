@@ -3,6 +3,8 @@ import { fromFileUrl, join } from "@std/path";
 import { bundleForLock } from "../../src/application/lock_bundle.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
+import { SESSION_ID_PATTERN } from "../../src/domain/session_record.ts";
+import { ENV_ALLOWLIST } from "../../src/infrastructure/untrusted_git.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { LOCK } from "./verify_scripts_fixture.ts";
 
@@ -15,6 +17,11 @@ const HOOK = fromFileUrl(
   new URL("../../templates/harness-specific/claude/hooks/review-lock.sh", import.meta.url),
 );
 
+/** The lock's per-user copies for this file's tests, never the user's own. */
+const STATE = Deno.makeTempDirSync({ prefix: "review-lock-state-" });
+globalThis.addEventListener("unload", () => Deno.removeSync(STATE, { recursive: true }));
+const COPIES = join(STATE, "specnaut", "review-lock");
+
 async function runHook(project: string, input: string, stubExit = 0, path?: string) {
   const bin = await Deno.makeTempDir({ prefix: "review-lock-bin-" });
   try {
@@ -23,7 +30,11 @@ async function runHook(project: string, input: string, stubExit = 0, path?: stri
     await Deno.writeTextFile(join(bin, "specnaut"), stub, { mode: 0o755 });
     const child = new Deno.Command("bash", {
       args: [HOOK],
-      env: { PATH: path ?? `${bin}:${Deno.env.get("PATH")}`, CLAUDE_PROJECT_DIR: project },
+      env: {
+        PATH: path ?? `${bin}:${Deno.env.get("PATH")}`,
+        CLAUDE_PROJECT_DIR: project,
+        XDG_STATE_HOME: STATE,
+      },
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -135,6 +146,40 @@ Deno.test({
       }
     });
   },
+});
+
+Deno.test({
+  name:
+    "a session whose per-user copy is there is judged, and refused where git finds no repository",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    await Deno.mkdir(COPIES, { recursive: true });
+    await Deno.writeTextFile(join(COPIES, "s-copy.json"), "{}");
+    const bare = await Deno.makeTempDir({ prefix: "review-lock-bare-" });
+    try {
+      assertEquals(await runHook(bare, input("s-copy"), 0), { code: 2, called: null }, "no repo");
+      assertEquals(await runHook(bare, input("s-free"), 2), { code: 0, called: null }, "other");
+      await inProject(async (project) => {
+        const judged = await runHook(project, input("s-copy"), 0);
+        assertEquals(
+          judged,
+          { code: 0, called: `review guard\n${input("s-copy")}` },
+          "no lock dir",
+        );
+      });
+    } finally {
+      await Deno.remove(join(COPIES, "s-copy.json"));
+      await Deno.remove(bare, { recursive: true });
+    }
+  },
+});
+
+Deno.test("the hook reads a session id as isSessionId does, and asks git as the binary does", async () => {
+  const hook = await Deno.readTextFile(HOOK);
+  const pattern = hook.match(/^id_pattern='\^\\\{"session_id":"\((.+)\)"'$/m);
+  assertEquals(pattern?.[1], SESSION_ID_PATTERN);
+  const names = hook.match(/^for name in (.+); do$/m)?.[1].split(" ");
+  assertEquals(names, [...ENV_ALLOWLIST]);
 });
 
 Deno.test("only Claude Code is scaffolded the lock's hook, run before every tool call", () => {

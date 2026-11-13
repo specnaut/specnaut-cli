@@ -45,7 +45,7 @@ export const UNTRUSTED_GIT_ENV: Readonly<Record<string, string>> = {
  * configuration, the temp folder, the locale, and what Windows needs to start a process at all.
  */
 // deno-fmt-ignore
-const ENV_ALLOWLIST = [
+export const ENV_ALLOWLIST: readonly string[] = [
   "PATH", "HOME", "XDG_CONFIG_HOME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE",
   "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP",
 ];

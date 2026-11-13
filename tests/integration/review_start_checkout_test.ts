@@ -29,7 +29,7 @@ async function gate(root: string, sessionId: string): Promise<number> {
 /** The start as `specnaut review start` runs it in `root`, the export stood in for. */
 async function start(root: string) {
   const exported = { sha: "a".repeat(40), logs: "/cache/logs", keep: () => {} } as BranchExport;
-  const lock = (await FsReviewLock.open(root))!;
+  const lock = await FsReviewLock.open(root, { state: join(root, ".state") });
   return await startReview({
     pass: (await FsReviewPass.open(root))!,
     now: Date.now,
@@ -54,7 +54,7 @@ Deno.test("a start in the checkout its gate judged starts; one after the checkou
   await startSession(root, "startup", "control-session");
   assertEquals(await gate(root, "control-session"), 0);
   assertEquals((await start(root)).kind, "started", "the control: an unchanged checkout starts");
-  const lock = (await FsReviewLock.open(root))!;
+  const lock = await FsReviewLock.open(root, { state: join(root, ".state") });
   const recorded = { head: "a".repeat(40), logs: "/cache/logs" };
   assertEquals(await lock.held("control-session"), recorded, "the start locks the session judged");
   assertEquals(await lock.held("moved-session-0"), null, "and no other");

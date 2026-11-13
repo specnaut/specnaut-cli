@@ -1,7 +1,11 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { UNKNOWN_REVIEW } from "../../src/domain/review_lock.ts";
-import { FsReviewLock, realLogPath } from "../../src/infrastructure/fs_review_lock.ts";
+import {
+  FsReviewLock,
+  realLogPath,
+  reviewLockStateFolder,
+} from "../../src/infrastructure/fs_review_lock.ts";
 
 const SHA = "a".repeat(40);
 
@@ -9,7 +13,7 @@ async function inRepository(fn: (dir: string, lock: FsReviewLock) => Promise<voi
   const dir = await Deno.makeTempDir({ prefix: "review-lock-" });
   try {
     await new Deno.Command("git", { args: ["init", "-q", dir] }).output();
-    await fn(dir, (await FsReviewLock.open(dir))!);
+    await fn(dir, await FsReviewLock.open(dir, { state: join(dir, "state", "review-lock") }));
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -45,6 +49,8 @@ Deno.test("a lock is the entry's being there: a file emptied, or replaced by a f
   await inRepository(async (dir, lock) => {
     await lock.lock("s-1");
     await lock.record("s-1", { head: SHA, logs: "/c/logs" });
+    // The git directory's entry alone: the per-user copy, read first, is the same file format.
+    await Deno.remove(join(dir, "state", "review-lock", "s-1.json"));
     const file = join(dir, ".git", "specnaut", "review-lock", "s-1.json");
     for (const text of ["", "[]", `{"head":"HEAD","logs":"relative"}`, "{"]) {
       await Deno.writeTextFile(file, text);
@@ -76,7 +82,7 @@ Deno.test("anything but a folder where the locks live holds every session: the g
   });
 });
 
-Deno.test("only a session id is locked, and outside a repository there is no lock to open", async () => {
+Deno.test("only a session id is locked, and outside a repository nothing can be locked", async () => {
   await inRepository(async (_dir, lock) => {
     for (const id of ["", "../s", "s/1", ".s"]) {
       await assertRejects(() => lock.lock(id), Error, "not a session id");
@@ -85,10 +91,55 @@ Deno.test("only a session id is locked, and outside a repository there is no loc
   });
   const bare = await Deno.makeTempDir({ prefix: "review-lock-none-" });
   try {
-    assertEquals(await FsReviewLock.open(bare), null);
+    const lock = await FsReviewLock.open(bare, { state: join(bare, "state") });
+    await assertRejects(() => lock.lock("s-1"), Error, "no git repository");
+    assertEquals(await lock.held("s-1"), null);
+    assertEquals(await lock.all(), []);
   } finally {
     await Deno.remove(bare, { recursive: true });
   }
+});
+
+Deno.test("the lock has a per-user copy, and a session it holds is refused where git finds no repository", async () => {
+  await inRepository(async (dir, lock) => {
+    const state = join(dir, "state", "review-lock");
+    await lock.lock("s-1");
+    await lock.record("s-1", { head: SHA, logs: "/c/logs" });
+    const copy = JSON.parse(await Deno.readTextFile(join(state, "s-1.json")));
+    assertEquals([copy.session, copy.head, copy.logs], ["s-1", SHA, "/c/logs"]);
+    await Deno.remove(join(dir, ".git", "specnaut"), { recursive: true });
+    assertEquals(await lock.held("s-1"), { head: SHA, logs: "/c/logs" }, "the copy still locks");
+    const bare = await Deno.makeTempDir({ prefix: "review-lock-none-" });
+    try {
+      const outside = await FsReviewLock.open(bare, { state });
+      await assertRejects(() => outside.held("s-1"), Error, "cannot find this checkout's git");
+      assertEquals(await outside.held("s-2"), null, "another session runs as before");
+      assertEquals(await outside.held(null), null);
+      const none = await FsReviewLock.open(dir, { state: null });
+      await assertRejects(() => none.lock("s-3"), Error, "XDG_STATE_HOME or HOME");
+    } finally {
+      await Deno.remove(bare, { recursive: true });
+    }
+    await Deno.remove(state, { recursive: true });
+    await Deno.writeTextFile(state, "");
+    assertEquals(await lock.held("s-9"), UNKNOWN_REVIEW, "a copy folder that is no folder holds");
+  });
+});
+
+Deno.test("the per-user folder is XDG_STATE_HOME's, else the home's .local/state", () => {
+  const env = (vars: Record<string, string>) => (name: string) => vars[name];
+  const tail = join("specnaut", "review-lock");
+  assertEquals(reviewLockStateFolder(env({ XDG_STATE_HOME: "/x", HOME: "/h" })), join("/x", tail));
+  assertEquals(
+    reviewLockStateFolder(env({ XDG_STATE_HOME: "rel", HOME: "/h" })),
+    join("/h", ".local", "state", tail),
+  );
+  assertEquals(
+    reviewLockStateFolder(env({ USERPROFILE: "/u" })),
+    join("/u", ".local", "state", tail),
+  );
+  assertEquals(reviewLockStateFolder(env({ HOME: "rel" })), null);
+  assertEquals(reviewLockStateFolder(env({})), null);
 });
 
 Deno.test("a log resolves by its folder's real path; a relative, missing or dot name does not", async () => {
