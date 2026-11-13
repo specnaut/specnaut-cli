@@ -1,4 +1,3 @@
-import { isFullSha } from "./commit_sha.ts";
 import { plainWords } from "./plain_command.ts";
 
 /**
@@ -107,7 +106,8 @@ function isReviewCommand(words: readonly string[], review: LockedReview, log: st
   if (first === "verify-scripts") return words.length === 2;
   if (first === "sandbox" && second === "probe") return words.length === 3;
   if (first === "sandbox") return isLockedExec(words, review, log);
-  return first === "review" && second === "end" && words.length === 4 && isFullSha(third);
+  return first === "review" && second === "end" && words.length === 4 && review.head !== null &&
+    third === review.head;
 }
 
 /**

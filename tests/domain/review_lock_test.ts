@@ -60,6 +60,14 @@ Deno.test("under the review lock, a dispatch names a review seat or is refused",
   }
 });
 
+Deno.test("under the review lock, review end removes the session's own head, and no other", () => {
+  assertEquals(bash(`specnaut review end ${SHA}`), null);
+  const other = `specnaut review end ${"b".repeat(40)}`;
+  assertStringIncludes(bash(other) ?? "allowed", "review lock", "another head");
+  const unknown = { head: null, logs: null };
+  assertStringIncludes(bash(`specnaut review end ${SHA}`, unknown) ?? "allowed", "review lock");
+});
+
 Deno.test("under the review lock, a dispatch carries a seat, a description and a prompt, nothing else", () => {
   const seat = { subagent_type: "code-reviewer", description: "d", prompt: "p" };
   assertEquals(tool("Agent", seat), null);

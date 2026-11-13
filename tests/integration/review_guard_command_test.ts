@@ -49,7 +49,10 @@ Deno.test("a locked session runs only what the lock allows; another session runs
     assertEquals((await guard(root, call("s-1", "WebFetch", { url: "https://x" }))).code, 2);
     assertEquals((await guard(root, call("s-1", "Read", { file_path: "/x" }))).code, 0);
     const end = { command: `specnaut review end ${SHA}` };
-    assertEquals((await guard(root, call("s-1", "Bash", end))).code, 0);
+    assertEquals((await guard(root, call("s-1", "Bash", end))).code, 2, "no head recorded yet");
+    const lock = await FsReviewLock.open(root, { state: STATE });
+    await lock.record("s-1", { head: SHA, logs: root });
+    assertEquals((await guard(root, call("s-1", "Bash", end))).code, 0, "its own head");
     assertEquals((await guard(root, call("s-2", "Bash", push))).code, 0, "another session");
     assertEquals((await guard(root, "not json")).code, 2, "no session id: any lock holds");
   } finally {
