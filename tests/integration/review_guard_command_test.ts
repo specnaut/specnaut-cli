@@ -68,8 +68,9 @@ Deno.test("a locked session's sandboxed run logs only in its review's folder, fo
     await Deno.mkdir(logs, { recursive: true });
     const lock = await FsReviewLock.open(root, { state: STATE });
     await lock.lock("s-1");
+    // Quoted, as a shell needs it: a Windows path's backslashes are escapes when bare.
     const exec = (log: string) => ({
-      command: `specnaut sandbox exec ${SHA} --log ${log} -- deno task test`,
+      command: `specnaut sandbox exec ${SHA} --log '${log}' -- deno task test`,
     });
     assertEquals((await guard(root, call("s-1", "Bash", exec(join(logs, "1.log"))))).code, 2);
     await lock.record("s-1", { head: SHA, logs });
