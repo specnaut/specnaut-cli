@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { dirname } from "@std/path";
 import { seccompProfile } from "../../src/domain/sandbox_seccomp_profile.ts";
 import { engineRunEnv } from "../../src/infrastructure/sandbox_engine_env.ts";
@@ -106,9 +106,11 @@ Deno.test("engine profile: a run refused before its launch leaves nothing behind
         dropped: [],
         cpus: null,
       });
-      let refused = false;
-      await unpinned.run(policyOf("container"), COMMAND).catch(() => (refused = true));
-      assert(refused);
+      await assertRejects(
+        () => unpinned.run(policyOf("container"), COMMAND),
+        Error,
+        "is not pinned by digest",
+      );
       assertEquals(handed, []);
       assertEquals([...Deno.readDirSync(temp)], []);
     });
