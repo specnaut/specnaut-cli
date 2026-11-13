@@ -94,7 +94,7 @@ function commandRefusal(command: unknown, review: LockedReview, log: string | nu
 /** Whether `words` are one of the commands `phases/review-untrusted.md` runs under the lock. */
 function isReviewCommand(words: readonly string[], review: LockedReview, log: string | null) {
   const [program, first, second, third] = words;
-  if (program === "bash") return isReviewScript(words);
+  if (program === "bash") return isReviewScript(words, review);
   if (program !== "specnaut") return false;
   if (first === "verify-scripts") return words.length === 2;
   if (first === "sandbox" && second === "probe") return words.length === 3;

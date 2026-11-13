@@ -98,7 +98,7 @@ Deno.test("under the review lock, the review's own commands run, each alone", ()
     `bash .specnaut/scripts/bash/boundary-check.sh --head ${SHA} --objects /c/o`,
     `bash .specnaut/scripts/bash/git-read.sh --head ${SHA} --objects /c/o patch ${SHA} ${SHA} a.ts`,
     `bash .specnaut/scripts/bash/run-gate.sh fast --base ${SHA} --head ${SHA} --objects /c/o ` +
-    `--evidence /tmp/l --sandbox`,
+    `--evidence /c/logs --sandbox`,
   ];
   for (const command of allowed) assertEquals(bash(command), null, command);
 });
