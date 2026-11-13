@@ -67,6 +67,11 @@ Deno.test("sandboxPolicy: a folder that is or holds the home is refused", () => 
   assert(refusal({ home: "/usr/local/dev" }).includes("home"));
 });
 
+Deno.test("sandboxPolicy: a toolchain folder that is a credential location is refused", () => {
+  assert(refusal({ toolchain: ["/home/dev/.aws"] }).includes("where credentials are kept"));
+  assert(refusal({ toolchain: ["/home/dev/.ssh"] }, "seatbelt").includes("~/.ssh"));
+});
+
 Deno.test("sandboxPolicy: a folder inside, or holding, the checkout is refused", () => {
   assert(refusal({ tree: "/home/dev/src/my-app/.specnaut/sandbox/abc" }).includes("checkout"));
   assert(refusal({ toolchain: ["/home/dev/src"] }).includes("checkout"));

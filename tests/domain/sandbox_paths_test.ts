@@ -1,11 +1,15 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   ancestors,
+  CREDENTIAL_LOCATIONS,
+  layoutProblem,
   overlaps,
   pathProblem,
   safePath,
   within,
 } from "../../src/domain/sandbox_paths.ts";
+
+import { PATHS } from "./sandbox_fixture.ts";
 
 /** How sandbox paths relate: what lies above them, and what one holds of another. */
 
@@ -47,4 +51,37 @@ Deno.test("pathProblem: one reason for each way a path cannot be passed on", () 
 Deno.test("safePath: hands a plain path back, and throws with the reason otherwise", () => {
   assertEquals(safePath("/usr/bin"), "/usr/bin");
   assertThrows(() => safePath("/a,b"), Error, "cannot quote");
+});
+
+/** Every place in a home credentials are kept, written out: a location dropped from the list fails. */
+const CREDENTIALS = [
+  ".ssh",
+  ".aws",
+  ".gnupg",
+  ".cargo",
+  ".config",
+  ".docker",
+  ".kube",
+  ".netrc",
+  ".npmrc",
+  ".git-credentials",
+];
+
+const readOnly = (folder: string) => layoutProblem(PATHS, [PATHS.tree, folder], []);
+
+for (const location of CREDENTIALS) {
+  Deno.test(`layoutProblem: ~/${location} is never mounted read-only`, () => {
+    const folder = `${PATHS.home}/${location}`;
+    assertEquals(
+      readOnly(folder),
+      `${folder} is or holds ~/${location}, where credentials are kept`,
+    );
+  });
+}
+
+Deno.test("layoutProblem: the credential list is the one stated, and a folder inside one is read", () => {
+  assertEquals([...CREDENTIAL_LOCATIONS].sort(), [...CREDENTIALS].sort());
+  assertEquals(readOnly(`${PATHS.home}/.cargo/bin`), null);
+  assertEquals(readOnly(`${PATHS.home}/.sshd`), null, "a sibling sharing a prefix");
+  assertEquals(readOnly(`${PATHS.home}/.deno/bin`), null);
 });

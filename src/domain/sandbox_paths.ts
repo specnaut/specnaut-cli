@@ -21,7 +21,7 @@ export type SandboxPaths = {
   readonly toolchain: readonly string[];
   /** Folders searched before the system's, each inside a folder that is read. */
   readonly path: readonly string[];
-  /** The user's real home: neither it nor a folder holding it is ever visible. */
+  /** The user's real home: neither it, a folder holding it nor its credentials are ever visible. */
   readonly home: string;
   /** The user's checkout: no visible folder lies inside it or holds it. */
   readonly checkout: string;
@@ -70,8 +70,27 @@ export function ancestors(paths: readonly string[]): string[] {
 }
 
 /**
- * The first reason a layout would expose the home, the checkout or a read-only folder: `readOnly`
- * is every folder the sandbox only reads, `path` the PATH entries searched before the system's.
+ * Where a home keeps credentials: keys, cloud and registry tokens, the git and network logins.
+ * A read-only folder that is or holds one is refused, so a credential folder is never mounted; a
+ * folder inside one (`~/.cargo/bin`) is still a toolchain the sandbox may read.
+ */
+export const CREDENTIAL_LOCATIONS: readonly string[] = [
+  ".ssh",
+  ".aws",
+  ".gnupg",
+  ".cargo",
+  ".config",
+  ".docker",
+  ".kube",
+  ".netrc",
+  ".npmrc",
+  ".git-credentials",
+];
+
+/**
+ * The first reason a layout would expose the home, a credential location in it, the checkout or a
+ * read-only folder: `readOnly` is every folder the sandbox only reads, `path` the PATH entries
+ * searched before the system's.
  */
 export function layoutProblem(
   paths: SandboxPaths,
@@ -85,6 +104,8 @@ export function layoutProblem(
   }
   for (const p of [...readOnly, paths.scratch]) {
     if (within(paths.home, p)) return `${p} is or holds the home folder`;
+    const held = CREDENTIAL_LOCATIONS.find((c) => within(`${paths.home}/${c}`, p));
+    if (held) return `${p} is or holds ~/${held}, where credentials are kept`;
     if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
   }
   const shared = readOnly.find((p) => overlaps(p, paths.scratch));
