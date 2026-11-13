@@ -38,7 +38,11 @@ Deno.test("it starts through the gated command, and every script takes the start
 Deno.test("its code runs only in a sandbox, judged by exit code, its output briefed by path", () => {
   const doc = flat("review-untrusted.md");
   assertStringIncludes(doc, "the configured tiers and the auto-detected table alike");
-  assertStringIncludes(doc, 'specnaut sandbox exec "$HEAD" --log "$LOGS/<n>.log"');
+  assertStringIncludes(doc, 'specnaut sandbox exec "$HEAD" --log "$LOGS/<n>.log" -- <command>');
+  assertStringIncludes(doc, "Under the lock `sandbox exec` takes exactly that shape:");
+  assertStringIncludes(doc, "a `--toolchain` is refused, by the hook and by `sandbox exec` itself");
+  assertStringIncludes(doc, "`LOGS <dir>` (the one folder a sandboxed run logs to)");
+  assert(!doc.includes("mktemp"), "the lock refuses mktemp: the start makes the logs folder");
   assertStringIncludes(doc, "run-gate.sh <fast|full> --base");
   assertStringIncludes(doc, "--sandbox");
   assertStringIncludes(doc, "The result is the exit code alone");
@@ -83,7 +87,8 @@ Deno.test("tests that did not run cap the verdict, and the review ends with the 
   const doc = flat("review-untrusted.md");
   assertStringIncludes(doc, "never merge, push, close an item or move a card for this head");
   assertStringIncludes(doc, 'run `specnaut review end "$HEAD"`');
-  assertStringIncludes(doc, "under the lock nothing is removed");
+  assertStringIncludes(doc, "It removes the export, `$LOGS` with it;");
+  assertStringIncludes(doc, "under the lock nothing else is removed");
 });
 
 Deno.test("from the start on, the session is under the review lock, each command alone", () => {

@@ -1,16 +1,25 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { lockedCallOf, lockedCallRefusal, REVIEW_SEATS } from "../../src/domain/review_lock.ts";
+import {
+  lockedCallOf,
+  lockedCallRefusal,
+  type LockedReview,
+  REVIEW_SEATS,
+} from "../../src/domain/review_lock.ts";
 
 const SHA = "a".repeat(40);
-const bash = (command: string) => lockedCallRefusal("Bash", { command });
+const REVIEW: LockedReview = { head: SHA, logs: "/c/logs" };
+const LOG = "/c/logs/1.log";
+const bash = (command: string, review = REVIEW, log: string | null = LOG) =>
+  lockedCallRefusal("Bash", { command }, review, log);
+const tool = (name: string | null, input: unknown) => lockedCallRefusal(name, input, REVIEW, null);
 
 Deno.test("under the review lock, Read, Grep and Glob run, and the review seats are dispatched", () => {
-  for (const tool of ["Read", "Grep", "Glob"]) {
-    assertEquals(lockedCallRefusal(tool, { file_path: "/x" }), null, tool);
+  for (const name of ["Read", "Grep", "Glob"]) {
+    assertEquals(tool(name, { file_path: "/x" }), null, name);
   }
   for (const seat of REVIEW_SEATS) {
-    for (const tool of ["Agent", "Task"]) {
-      assertEquals(lockedCallRefusal(tool, { subagent_type: seat, prompt: "p" }), null, seat);
+    for (const name of ["Agent", "Task"]) {
+      assertEquals(tool(name, { subagent_type: seat, prompt: "p" }), null, seat);
     }
   }
 });
@@ -30,9 +39,9 @@ Deno.test("under the review lock, every other tool is refused: MCP tools, WebFet
     "",
     null,
   ];
-  for (const tool of tools) {
-    const why = lockedCallRefusal(tool, { url: "https://x" });
-    assertStringIncludes(why ?? "allowed", "review lock", String(tool));
+  for (const name of tools) {
+    const why = tool(name, { url: "https://x" });
+    assertStringIncludes(why ?? "allowed", "review lock", String(name));
   }
 });
 
@@ -47,7 +56,7 @@ Deno.test("under the review lock, a dispatch names a review seat or is refused",
     "code-reviewer",
   ];
   for (const input of inputs) {
-    assertStringIncludes(lockedCallRefusal("Agent", input) ?? "allowed", "seat", String(input));
+    assertStringIncludes(tool("Agent", input) ?? "allowed", "seat", String(input));
   }
 });
 
@@ -55,10 +64,9 @@ Deno.test("under the review lock, the review's own commands run, each alone", ()
   const allowed = [
     "specnaut verify-scripts",
     "specnaut sandbox probe",
-    `specnaut sandbox exec ${SHA} --log /tmp/l/1.log -- deno task test`,
-    `specnaut sandbox exec ${SHA} --log /tmp/l/2.log --toolchain /opt/x -- sh -c 'a && b'`,
+    `specnaut sandbox exec ${SHA} --log ${LOG} -- deno task test`,
+    `specnaut sandbox exec ${SHA} --log ${LOG} -- sh -c 'a && b'`,
     `specnaut review end ${SHA}`,
-    "mktemp -d",
     `bash .specnaut/scripts/audit/collect-audit-scope.sh --base ${SHA} --head ${SHA} --objects /c/o`,
     `bash .specnaut/scripts/bash/size-ratchet.sh --since ${SHA} --head ${SHA} --objects /c --report`,
     `bash .specnaut/scripts/bash/boundary-check.sh --head ${SHA} --objects /c/o`,
@@ -88,6 +96,7 @@ Deno.test("under the review lock, a push, a tracker write, a merge or the landin
     "specnaut task close 12",
     "specnaut verify-scripts --remote",
     "specnaut sandbox probe x",
+    "mktemp -d",
     "mktemp -d -p .git",
     "mktemp",
     "rm -rf .git/specnaut",
@@ -124,7 +133,7 @@ Deno.test("under the review lock, a review command chained to another, or substi
     assertStringIncludes(bash(command) ?? "allowed", "review lock", command);
   }
   for (const input of [{}, { command: 1 }, null, { command: ["specnaut", "verify-scripts"] }]) {
-    assertStringIncludes(lockedCallRefusal("Bash", input) ?? "allowed", "review lock");
+    assertStringIncludes(tool("Bash", input) ?? "allowed", "review lock");
   }
 });
 

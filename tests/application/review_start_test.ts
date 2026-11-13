@@ -27,7 +27,11 @@ function deps(
   judged: CheckoutState | null = JUDGED,
   session = "s-1",
 ) {
-  const exported = { sha: "a".repeat(40), keep: () => void done.push("kept") } as BranchExport;
+  const exported = {
+    sha: "a".repeat(40),
+    logs: "/cache/a/logs",
+    keep: () => void done.push("kept"),
+  } as BranchExport;
   return {
     pass: {
       take: () =>
@@ -42,6 +46,8 @@ function deps(
     baseTip: () => Promise.resolve(tip),
     checkout: () => Promise.resolve(now),
     lock: (id: string) => Promise.resolve(void done.push(`lock ${id}`)),
+    record: (id: string, review: { head: string; logs: string }) =>
+      Promise.resolve(void done.push(`record ${id} ${review.head} ${review.logs}`)),
     exportBranch: (source: string) =>
       Promise.resolve(void done.push(`export ${source}`)).then(() => exported),
   };
@@ -59,7 +65,20 @@ Deno.test("a start on a fresh pass takes it, exports the source and keeps the ex
   const done: string[] = [];
   const outcome = await startReview(deps(NOW - 1000, done), "origin/topic");
   assertEquals(outcome.kind, "started");
-  assertEquals(done, ["taken", "lock s-1", "export origin/topic", "kept"]);
+  assertEquals(done, [
+    "taken",
+    "lock s-1",
+    "export origin/topic",
+    `record s-1 ${"a".repeat(40)} /cache/a/logs`,
+    "kept",
+  ]);
+});
+
+Deno.test("an export the lock could not record is not kept", async () => {
+  const done: string[] = [];
+  const failing = { ...deps(NOW - 1000, done), record: () => Promise.reject(new Error("EROFS")) };
+  await assertRejects(() => startReview(failing, "12"), Error, "EROFS");
+  assertEquals(done, ["taken", "lock s-1", "export 12"]);
 });
 
 Deno.test("the session the pass names is locked before anything of the branch is fetched", async () => {

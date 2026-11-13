@@ -10,7 +10,9 @@ import type { BranchExport } from "./untrusted_review.ts";
  * longer the base's, or for a checkout that no longer reads the same, starts nothing and fetches
  * nothing: the verdict was taken on that checkout, against that tip. The session the gate judged
  * is locked before the branch is fetched (`review_lock.ts` in the domain), so nothing of the branch
- * reaches a session the lock does not hold.
+ * reaches a session the lock does not hold; once it is exported, the lock records its head and
+ * logs folder, the one head and the one folder the session's sandboxed runs may then name. An
+ * export the lock could not record is not kept.
  */
 
 export type StartDeps = {
@@ -22,6 +24,8 @@ export type StartDeps = {
   readonly checkout: () => Promise<CheckoutState>;
   /** Locks the session `sessionId` until it ends. */
   readonly lock: (sessionId: string) => Promise<void>;
+  /** Records in the session's lock the head exported and the folder for its logs. */
+  readonly record: (sessionId: string, review: { head: string; logs: string }) => Promise<void>;
   readonly exportBranch: (source: string) => Promise<BranchExport>;
 };
 
@@ -55,6 +59,7 @@ export async function startReview(deps: StartDeps, source: string): Promise<Star
   if (!isSessionId(granted.session)) return { kind: "refused", why: NO_SESSION };
   await deps.lock(granted.session);
   const exported = await deps.exportBranch(source);
+  await deps.record(granted.session, { head: exported.sha, logs: exported.logs });
   exported.keep();
   return { kind: "started", exported };
 }

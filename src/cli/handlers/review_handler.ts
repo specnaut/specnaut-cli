@@ -30,7 +30,8 @@ import { runReviewGuard } from "./review_guard_handler.ts";
  *   start <src>   takes the gate's pass, locks the session it names, exports the branch (a PR number or `<remote>/<branch>`)
  *                 as inert files outside the project, and keeps it. On stdout: `HEAD <sha>`,
  *                 `SEATS <dir>` (the reviewers' copy), `SCRATCH <dir>` (the copy a sandbox runs),
- *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), then one
+ *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), `LOGS <dir>` (the
+ *                 one folder a sandboxed run may log to under the lock), then one
  *                 `LISTED <kind> <blob sha> <path>` per entry listed and never written. Exit 0
  *                 started, 1 refused or failed (why on stderr).
  *   trust <pr> <sha>
@@ -87,6 +88,7 @@ export function startLines(exported: BranchExport): string[] {
     `SEATS ${t(exported.seats)}`,
     `SCRATCH ${t(exported.scratch)}`,
     `OBJECTS ${t(`${exported.gitDir}/objects`)}`,
+    `LOGS ${t(exported.logs)}`,
     ...exported.listed.map((l) => `LISTED ${t(l.kind)} ${l.sha} ${t(l.path)}`),
   ];
 }
@@ -126,6 +128,13 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
   const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
   const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
   const checkout = () => checkoutState(cwd);
-  const lockSession = (id: string) => lock.lock(id);
-  return { pass, now: Date.now, baseTip, checkout, lock: lockSession, exportBranch };
+  return {
+    pass,
+    now: Date.now,
+    baseTip,
+    checkout,
+    lock: (id) => lock.lock(id),
+    record: (id, review) => lock.record(id, review),
+    exportBranch,
+  };
 }

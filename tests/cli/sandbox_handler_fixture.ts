@@ -21,7 +21,11 @@ export const MAC: BackendProbe = {
   sandboxExec: true,
 };
 
-export function deps(probe: BackendProbe, exec: () => Promise<ExecOutcome>) {
+export function deps(
+  probe: BackendProbe,
+  exec: () => Promise<ExecOutcome>,
+  lockRefusal: string | null = null,
+) {
   const out: string[] = [];
   const err: string[] = [];
   const d: SandboxDeps = {
@@ -29,6 +33,7 @@ export function deps(probe: BackendProbe, exec: () => Promise<ExecOutcome>) {
     err: (s) => err.push(s),
     probe: () => Promise.resolve(probe),
     exec: () => exec(),
+    lockRefusal: () => Promise.resolve(lockRefusal),
   };
   return { d, out, err };
 }

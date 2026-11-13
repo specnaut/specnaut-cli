@@ -45,11 +45,29 @@ const LOCKED = "refused under the review lock: this session read a branch it can
   "until it ends only Read, Grep, Glob, the review seats and the review's own commands run; " +
   "start a new session for anything else";
 
-/** Why the call is refused under the lock, or `null` when it runs. */
-export function lockedCallRefusal(tool: string | null, input: unknown): string | null {
+/**
+ * What a session's lock entry records of its review, each `null` where the entry does not say:
+ * the head `specnaut review start` exported, and the folder it made for the review's logs (its
+ * real path). An entry written before the export, or one that cannot be read, says neither, and
+ * then no command that needs them runs.
+ */
+export type LockedReview = { readonly head: string | null; readonly logs: string | null };
+
+export const UNKNOWN_REVIEW: LockedReview = { head: null, logs: null };
+
+/**
+ * Why the call is refused under the lock of `review`, or `null` when it runs. `log` is where the
+ * `--log` file `lockedLogOf` names resolves (its folder's real path), `null` when it does not.
+ */
+export function lockedCallRefusal(
+  tool: string | null,
+  input: unknown,
+  review: LockedReview,
+  log: string | null,
+): string | null {
   if (tool !== null && READ_TOOLS.includes(tool)) return null;
   if (tool !== null && DISPATCH_TOOLS.includes(tool)) return dispatchRefusal(input);
-  if (tool === "Bash") return commandRefusal(field(input, "command"));
+  if (tool === "Bash") return commandRefusal(field(input, "command"), review, log);
   return `${tool ?? "a tool call naming no tool"} is ${LOCKED}`;
 }
 
@@ -59,27 +77,72 @@ function dispatchRefusal(input: unknown): string | null {
   return `a dispatch to anything but a review seat (${REVIEW_SEATS.join(", ")}) is ${LOCKED}`;
 }
 
-function commandRefusal(command: unknown): string | null {
+function commandRefusal(command: unknown, review: LockedReview, log: string | null) {
   const words = typeof command === "string" ? plainWords(command) : null;
   if (words === null) {
     return "a command that is not one program and its words (no `;`, `&&`, `|`, `$`, " +
       `redirection, glob or newline; every value written out) is ${LOCKED}`;
   }
-  return isReviewCommand(words) ? null : `\`${words.join(" ")}\` is ${LOCKED}`;
+  return isReviewCommand(words, review, log) ? null : `\`${words.join(" ")}\` is ${LOCKED}`;
 }
 
 /** Whether `words` are one of the commands `phases/review-untrusted.md` runs under the lock. */
-function isReviewCommand(words: readonly string[]): boolean {
+function isReviewCommand(words: readonly string[], review: LockedReview, log: string | null) {
   const [program, first, second, third] = words;
-  if (program === "mktemp") return words.length === 2 && first === "-d";
   if (program === "bash") {
     const flags = REVIEW_SCRIPTS.get(first);
     return flags !== undefined && flags.every((f) => words.includes(f));
   }
   if (program !== "specnaut") return false;
   if (first === "verify-scripts") return words.length === 2;
-  if (first === "sandbox") return second === "exec" || (second === "probe" && words.length === 3);
+  if (first === "sandbox" && second === "probe") return words.length === 3;
+  if (first === "sandbox") return isLockedExec(words, review, log);
   return first === "review" && second === "end" && words.length === 4 && isFullSha(third);
+}
+
+/**
+ * `specnaut sandbox exec <head> --log <file> -- <command>...`, exactly: the head this session's
+ * review exported, a log file below the folder `review start` made for it, and no `--toolchain`,
+ * which would mount folders no one recorded. A log anywhere else would be a new file on the host,
+ * its content the branch's.
+ */
+function isLockedExec(words: readonly string[], review: LockedReview, log: string | null) {
+  const [, , sub, sha, flag, , dash] = words;
+  return sub === "exec" && words.length >= 8 && flag === "--log" && dash === "--" &&
+    review.head !== null && sha === review.head && log !== null && review.logs !== null &&
+    isInsideFolder(log, review.logs);
+}
+
+/** The `--log` file of a call of `sandbox exec`'s locked shape, for the guard to resolve. */
+export function lockedLogOf(tool: string | null, input: unknown): string | null {
+  const command = tool === "Bash" ? field(input, "command") : undefined;
+  const words = typeof command === "string" ? plainWords(command) : null;
+  if (words === null || words.slice(0, 3).join(" ") !== "specnaut sandbox exec") return null;
+  return words[4] === "--log" && words[6] === "--" ? words[5] ?? null : null;
+}
+
+/**
+ * Why `specnaut sandbox exec` itself refuses a run while `held`, every review its checkout's lock
+ * records, is not empty: a run some script starts reaches no hook, so the binary holds the same
+ * line. `log` is where its `--log` resolves, `null` for none. With no lock it runs as it always did.
+ */
+export function lockedExecRefusal(
+  held: readonly LockedReview[],
+  toolchain: readonly string[],
+  log: string | null,
+): string | null {
+  if (held.length === 0) return null;
+  if (toolchain.length > 0) return `--toolchain is ${LOCKED}`;
+  if (log !== null && held.some((r) => r.logs !== null && isInsideFolder(log, r.logs))) return null;
+  return "a run with no --log, or a --log outside the folder `specnaut review start` made for " +
+    `the review's logs, is ${LOCKED}`;
+}
+
+/** Whether `path` lies below `folder`, both real paths, `/` or `\` between their names. */
+export function isInsideFolder(path: string, folder: string): boolean {
+  const base = folder.replace(/[\\/]+$/, "");
+  return path.length > base.length + 1 && path.startsWith(base) &&
+    (path[base.length] === "/" || path[base.length] === "\\");
 }
 
 function field(v: unknown, key: string): unknown {

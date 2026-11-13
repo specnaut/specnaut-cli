@@ -32,7 +32,7 @@ ${bold("Usage:")}
   specnaut review start <pr|remote/branch>
                                       Once the gate let it through: lock the session until it ends, export
                                       the branch as inert files outside the project, and print where
-                                      (HEAD, SEATS, SCRATCH, OBJECTS)
+                                      (HEAD, SEATS, SCRATCH, OBJECTS, LOGS)
   specnaut review trust <pr> <sha>    Print trusted, or untrusted and why, for reviewing PR <pr> at commit
                                       <sha>, from the forge's facts alone: a team member's PR, its head in
                                       this repository and at <sha>. Exit 0 trusted, 1 untrusted

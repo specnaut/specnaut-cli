@@ -87,3 +87,17 @@ Deno.test("sandbox exec: a refusal or a launcher that cannot start is 125, never
     assertEquals(err.join("\n").includes(failure.message), true);
   }
 });
+
+const NOT_RUN: ExecOutcome = { kind: "not_run", why: "unreached" };
+
+Deno.test("sandbox exec: a run the review lock refuses is 125, its reason said, nothing run", async () => {
+  let ran = false;
+  const exec = () => Promise.resolve(void (ran = true)).then(() => NOT_RUN);
+  const { d, err } = deps(MAC, exec, "--toolchain is refused under the review lock");
+  assertEquals(await runSandbox(EXEC, d), 125);
+  assertEquals(ran, false);
+  assertEquals(
+    err.join("\n").includes("not run: --toolchain is refused under the review lock"),
+    true,
+  );
+});

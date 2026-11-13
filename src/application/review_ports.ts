@@ -1,4 +1,5 @@
 import type { CheckoutState } from "../domain/review_gate.ts";
+import type { LockedReview } from "../domain/review_lock.ts";
 
 /**
  * The pass `specnaut review gate` leaves when the session's checkout holds, and the one thing
@@ -41,6 +42,13 @@ export interface ReviewPass {
 export interface ReviewLock {
   /** Locks the session `sessionId`; a lock already there stays as it is. */
   lock(sessionId: string): Promise<void>;
-  /** Whether the session `sessionId` is locked; for `null`, whether any session is. */
-  holds(sessionId: string | null): Promise<boolean>;
+  /** Records in the session's entry the head its review exported and the folder for its logs. */
+  record(sessionId: string, review: { head: string; logs: string }): Promise<void>;
+  /**
+   * What the lock of the session `sessionId` records (`UNKNOWN_REVIEW` where it names nothing), or
+   * `null` when it is not locked; for `null`, `UNKNOWN_REVIEW` when any session is.
+   */
+  held(sessionId: string | null): Promise<LockedReview | null>;
+  /** What every lock of this checkout records, whichever session holds it. */
+  all(): Promise<readonly LockedReview[]>;
 }

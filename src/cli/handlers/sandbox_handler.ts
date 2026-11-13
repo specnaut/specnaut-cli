@@ -1,4 +1,5 @@
 import { red } from "@std/fmt/colors";
+import { execLockRefusal } from "../../application/review_guard.ts";
 import {
   type ExecDeps,
   execInSandbox,
@@ -23,11 +24,14 @@ import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.t
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
 import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
+import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
 import { exportCacheRoot } from "../../infrastructure/fs_tree_export.ts";
 import { DenoProcessLauncher } from "../../infrastructure/sandbox_process.ts";
 import { HostBackendProber } from "../../infrastructure/sandbox_probe.ts";
 import { runnerFor } from "../../infrastructure/sandbox_runners.ts";
 import type { SandboxIntent } from "../intent.ts";
+
+type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
 
 /**
  * `specnaut sandbox`: the one entry through which a branch's code is run. The output contract and
@@ -42,8 +46,10 @@ import type { SandboxIntent } from "../intent.ts";
  *          `UNCAPPED` and `LIMIT` lines on stderr, prefixed `notice: specnaut sandbox exec: `, so
  *          stdout stays the command's. 124: the wall clock ran out and the run was stopped;
  *          a stop that failed (a container left behind) is said on a second line.
- *          125: nothing ran (static only, no such export, a layout the policy refuses, or a
- *          launcher that could not start). Every 124 and 125 says why on stderr; the command's own
+ *          125: nothing ran (static only, no such export, a layout the policy refuses, a
+ *          launcher that could not start, or a run the checkout's review lock refuses: under it,
+ *          a `--log` below the folder `review start` made and no `--toolchain`). Every 124 and 125
+ *          says why on stderr; the command's own
  *          output is passed through unchanged, or, with `--log <file>`, written to that new file
  *          with every control but tab and line feed dropped and cut at `LOG_CAP_BYTES`: a review
  *          briefs the file by path, and reads the result from the exit code alone.
@@ -57,6 +63,8 @@ export type SandboxDeps = {
   readonly err: (s: string) => void;
   readonly probe: () => Promise<BackendProbe>;
   readonly exec: (request: ExecRequest & { readonly log: string | null }) => Promise<ExecOutcome>;
+  /** Why the checkout's review lock refuses the run (`execLockRefusal`), or `null`. */
+  readonly lockRefusal: (request: SandboxExecIntent) => Promise<string | null>;
 };
 
 export async function runSandbox(
@@ -65,6 +73,8 @@ export async function runSandbox(
 ): Promise<number> {
   if (intent.sub === "probe") return probe(deps);
   try {
+    const locked = await deps.lockRefusal(intent);
+    if (locked !== null) return notRun(deps, locked);
     return answer(await deps.exec(intent), deps);
   } catch (err) {
     return notRun(deps, err instanceof Error ? err.message : String(err));
@@ -126,6 +136,8 @@ function defaultDeps(): SandboxDeps {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     probe: () => prober.probe(),
+    lockRefusal: async (request) =>
+      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request, realLogPath),
     exec: async (request) => {
       const log = request.log === null ? null : await openCappedLog(request.log);
       try {

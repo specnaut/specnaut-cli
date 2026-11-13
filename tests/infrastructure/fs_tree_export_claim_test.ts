@@ -60,3 +60,16 @@ Deno.test({
       }
     }),
 });
+
+Deno.test("claim makes the review's logs folder beside the copies: empty, private, its real path", () =>
+  withStore(async (store, cache) => {
+    const staged = await store.stage();
+    await Deno.mkdir(staged);
+    const sha = "d".repeat(40);
+    const home = await store.claim(sha, staged);
+    assertEquals(home.logs, join(await Deno.realPath(cache), sha, "logs"));
+    assertEquals(await Deno.realPath(home.logs), home.logs);
+    assertEquals([...Deno.readDirSync(home.logs)], []);
+    if (posix) assertEquals((await Deno.stat(home.logs)).mode! & 0o777, 0o700);
+    await store.remove();
+  }));

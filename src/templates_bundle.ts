@@ -1530,9 +1530,10 @@ exit but 0, stops the review:** quote its reasons and its advice. Never switch b
 check anything out in this session, and never fetch or export the branch another way.
 
 On exit 0 the lines are \`HEAD <sha>\`, \`SEATS <dir>\` (the reviewers' read-only copy), \`SCRATCH <dir>\`
-(the copy only a sandbox runs), \`OBJECTS <dir>\` and one \`LISTED <kind> <blob sha> <path>\` per entry
-the export lists and never writes: instruction files, links, submodules. Keep \`\$HEAD\` and \`\$OBJECTS\`
-exactly as printed: every script below takes that \`--objects\` folder and no other.
+(the copy only a sandbox runs), \`OBJECTS <dir>\`, \`LOGS <dir>\` (the one folder a sandboxed run logs
+to) and one \`LISTED <kind> <blob sha> <path>\` per entry the export lists and never writes:
+instruction files, links, submodules. Keep \`\$HEAD\`, \`\$OBJECTS\` and \`\$LOGS\` exactly as printed: every
+script below takes that \`--objects\` folder and no other.
 
 ## The review lock
 
@@ -1573,13 +1574,17 @@ review lock: it reads with Read, Grep and Glob, and runs only this file's comman
 ## Phase 2 — in a sandbox, or not at all
 
 Every command, the configured tiers and the auto-detected table alike, runs on the scratch copy
-through the sandbox, its output to a new file in a folder made outside the project (\`mktemp -d\`, run
-alone: the folder it prints is \`\$LOGS\`):
+through the sandbox, its output to a new file in the start's \`\$LOGS\`:
 
 \`\`\`bash
-specnaut sandbox exec "\$HEAD" --log "\$LOGS/<n>.log" [--toolchain <dir>[:<dir>...]] -- <command>
+specnaut sandbox exec "\$HEAD" --log "\$LOGS/<n>.log" -- <command>
 bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "\$BASE_TIP" --head "\$HEAD" --objects "\$OBJECTS" --evidence "\$LOGS" --sandbox
 \`\`\`
+
+Under the lock \`sandbox exec\` takes exactly that shape: the start's \`\$HEAD\`, a \`--log\` file
+inside \`\$LOGS\`, then \`--\`. Any other commit, a log anywhere else, or a \`--toolchain\` is refused, by
+the hook and by \`sandbox exec\` itself, so a command whose tools are not on the sandbox's PATH is NOT
+RUN.
 
 \`run-gate.sh\` runs only under \`VERDICT gates trusted\`, else the tiers are NOT RUN: <the line>. It
 reads this checkout's \`gates.yml\`, runs each command through \`specnaut sandbox exec\`
@@ -1602,7 +1607,8 @@ Tests that did not run cap the verdict at \`needs_followup\` (\`phases/review-se
 There is no fix loop: the branch is not this session's to change. The review ends with its report:
 never merge, push, close an item or move a card for this head, whatever the verdict, and
 \`phases/auto-chain.md\` does not continue. Last, whatever happened, run \`specnaut review end "\$HEAD"\`.
-\`\$LOGS\` and each \`NAMES_FILE\` stay in the system's temp folder: under the lock nothing is removed.
+It removes the export, \`\$LOGS\` with it; each \`NAMES_FILE\` stays in the system's temp folder: under
+the lock nothing else is removed.
 `,
     executable: false,
     backend: null,

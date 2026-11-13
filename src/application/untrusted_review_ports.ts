@@ -31,7 +31,10 @@ export interface TreeObjects {
   readBlobs(ids: readonly string[]): Promise<Map<string, Uint8Array>>;
 }
 
-/** Where one export lives: the borrowed repository and the two copies of the tree. */
+/**
+ * Where one export lives: the borrowed repository, the two copies of the tree, and the folder for
+ * the review's logs.
+ */
 export type ExportHome = {
   readonly root: string;
   readonly gitDir: string;
@@ -39,6 +42,8 @@ export type ExportHome = {
   readonly seats: string;
   /** Run by the sandbox, which mounts it read-only; executable bits kept; never re-hashed. */
   readonly scratch: string;
+  /** Where the review's sandboxed runs write their logs: empty, private, its real path. */
+  readonly logs: string;
 };
 
 /**

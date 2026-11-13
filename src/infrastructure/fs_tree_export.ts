@@ -66,10 +66,11 @@ export class FsExportStore implements ExportStore {
     await claimNew(root);
     this.#made.push(root);
     const home = { root, gitDir: join(root, "git"), seats: join(root, "seats") };
-    this.#home = { ...home, scratch: join(root, "scratch") };
+    this.#home = { ...home, scratch: join(root, "scratch"), logs: join(root, "logs") };
     await this.#adopt(staged, home.gitDir);
     await Deno.mkdir(this.#home.seats);
     await Deno.mkdir(this.#home.scratch);
+    await Deno.mkdir(this.#home.logs, { mode: 0o700 });
     return this.#home;
   }
 

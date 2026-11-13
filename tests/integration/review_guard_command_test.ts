@@ -1,4 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
+import { join } from "@std/path";
 import type { ReviewLock } from "../../src/application/review_ports.ts";
 import { runReviewGuard } from "../../src/cli/handlers/review_guard_handler.ts";
 import { FsReviewLock } from "../../src/infrastructure/fs_review_lock.ts";
@@ -47,6 +48,33 @@ Deno.test("a locked session runs only what the lock allows; another session runs
     assertEquals((await guard(root, call("s-1", "Bash", end))).code, 0);
     assertEquals((await guard(root, call("s-2", "Bash", push))).code, 0, "another session");
     assertEquals((await guard(root, "not json")).code, 2, "no session id: any lock holds");
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("a locked session's sandboxed run logs only in its review's folder, found by real path", async () => {
+  const root = await Deno.realPath(await Deno.makeTempDir({ prefix: "review-guard-log-" }));
+  try {
+    await new Deno.Command("git", { args: ["init", "-q", root] }).output();
+    const logs = join(root, "cache", "logs");
+    await Deno.mkdir(logs, { recursive: true });
+    const lock = (await FsReviewLock.open(root))!;
+    await lock.lock("s-1");
+    const exec = (log: string) => ({
+      command: `specnaut sandbox exec ${SHA} --log ${log} -- deno task test`,
+    });
+    assertEquals((await guard(root, call("s-1", "Bash", exec(join(logs, "1.log"))))).code, 2);
+    await lock.record("s-1", { head: SHA, logs });
+    assertEquals((await guard(root, call("s-1", "Bash", exec(join(logs, "1.log"))))).code, 0);
+    const outside = await guard(root, call("s-1", "Bash", exec(join(root, "1.log"))));
+    assertEquals(outside.code, 2);
+    assertStringIncludes(outside.err, "review lock");
+    if (Deno.build.os !== "windows") {
+      await Deno.symlink(root, join(logs, "up"));
+      const through = exec(join(logs, "up", "1.log"));
+      assertEquals((await guard(root, call("s-1", "Bash", through))).code, 2, "a link out");
+    }
   } finally {
     await Deno.remove(root, { recursive: true });
   }

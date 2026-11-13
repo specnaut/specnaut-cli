@@ -28,13 +28,15 @@ async function gate(root: string, sessionId: string): Promise<number> {
 
 /** The start as `specnaut review start` runs it in `root`, the export stood in for. */
 async function start(root: string) {
-  const exported = { sha: "a".repeat(40), keep: () => {} } as BranchExport;
+  const exported = { sha: "a".repeat(40), logs: "/cache/logs", keep: () => {} } as BranchExport;
+  const lock = (await FsReviewLock.open(root))!;
   return await startReview({
     pass: (await FsReviewPass.open(root))!,
     now: Date.now,
     baseTip: async () => await baseTipOf(await GitObjects.open(root)),
     checkout: () => checkoutState(root),
-    lock: async (id) => await (await FsReviewLock.open(root))!.lock(id),
+    lock: (id) => lock.lock(id),
+    record: (id, review) => lock.record(id, review),
     exportBranch: () => Promise.resolve(exported),
   }, "12");
 }
@@ -53,8 +55,9 @@ Deno.test("a start in the checkout its gate judged starts; one after the checkou
   assertEquals(await gate(root, "control-session"), 0);
   assertEquals((await start(root)).kind, "started", "the control: an unchanged checkout starts");
   const lock = (await FsReviewLock.open(root))!;
-  assertEquals(await lock.holds("control-session"), true, "the start locks the session judged");
-  assertEquals(await lock.holds("moved-session-0"), false, "and no other");
+  const recorded = { head: "a".repeat(40), logs: "/cache/logs" };
+  assertEquals(await lock.held("control-session"), recorded, "the start locks the session judged");
+  assertEquals(await lock.held("moved-session-0"), null, "and no other");
 
   for (const [i, [name, commands]] of Object.entries(MOVES).entries()) {
     // A new session each time: the gate refuses one whose HEAD visited another branch since.
@@ -62,7 +65,7 @@ Deno.test("a start in the checkout its gate judged starts; one after the checkou
     assertEquals(await gate(root, `moved-session-${i}`), 0, name);
     for (const command of commands) await git(root, ...command);
     assertEquals(await start(root), { kind: "refused", why: CHANGED_PASS }, name);
-    assertEquals(await lock.holds(`moved-session-${i}`), false, `${name}: a refusal locks nothing`);
+    assertEquals(await lock.held(`moved-session-${i}`), null, `${name}: a refusal locks nothing`);
     await git(root, "checkout", "-q", "-f", "feature");
   }
 });

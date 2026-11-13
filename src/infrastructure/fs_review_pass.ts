@@ -1,4 +1,4 @@
-import { dirname, join } from "@std/path";
+import { basename, dirname, join } from "@std/path";
 import type { GrantedPass, ReviewPass } from "../application/review_ports.ts";
 import type { CheckoutState } from "../domain/review_gate.ts";
 import { firstLine } from "./git_text.ts";
@@ -23,17 +23,8 @@ export class FsReviewPass implements ReviewPass {
   async grant(baseTip: string, checkout: CheckoutState, session: string): Promise<void> {
     const dir = dirname(this.path);
     await realFolder(dir);
-    const temp = join(dir, `.review-pass.${crypto.randomUUID()}.tmp`);
     const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout, session })}\n`;
-    await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
-    try {
-      await Deno.rename(temp, this.path);
-    } catch (err) {
-      await Deno.remove(temp).catch((cleanup) => {
-        console.error(`warning: could not remove ${temp}: ${(cleanup as Error).message}`);
-      });
-      throw err;
-    }
+    await replaceFile(this.path, text);
   }
 
   async revoke(): Promise<void> {
@@ -85,6 +76,23 @@ function checkoutOf(v: unknown): CheckoutState | null {
   const said = (f: unknown) => typeof f === "string" || f === null;
   if (!said(head) || !said(ref) || !said(reflog)) return null;
   return { head, ref, reflog } as CheckoutState;
+}
+
+/**
+ * Writes `text` to a file created new beside `path`, then renames it onto `path`: a link there is
+ * replaced, never followed, and no reader sees half a file.
+ */
+export async function replaceFile(path: string, text: string): Promise<void> {
+  const temp = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
+  await Deno.writeTextFile(temp, text, { createNew: true, mode: 0o600 });
+  try {
+    await Deno.rename(temp, path);
+  } catch (err) {
+    await Deno.remove(temp).catch((cleanup) => {
+      console.error(`warning: could not remove ${temp}: ${(cleanup as Error).message}`);
+    });
+    throw err;
+  }
 }
 
 /** `dir` made where missing; one existing as anything but a folder, a link included, is refused. */

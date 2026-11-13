@@ -3,7 +3,7 @@ import { guardToolCall } from "../../application/review_guard.ts";
 import type { ReviewLock } from "../../application/review_ports.ts";
 import { lockedCallOf } from "../../domain/review_lock.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
-import { FsReviewLock } from "../../infrastructure/fs_review_lock.ts";
+import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
 import { parsedInput, readHookInput } from "./hook_input.ts";
 
 /**
@@ -32,7 +32,7 @@ export async function runReviewGuard(deps: ReviewGuardDeps = defaultDeps()): Pro
     const text = await deps.input();
     if (text === null) return refuse(deps, "reads a PreToolUse hook's input on stdin");
     const call = lockedCallOf(parsedInput(text));
-    const outcome = await guardToolCall(await deps.open(deps.cwd), call);
+    const outcome = await guardToolCall(await deps.open(deps.cwd), call, realLogPath);
     return outcome.kind === "allowed" ? EXIT.allowed : refuse(deps, outcome.why);
   } catch (err) {
     // Not swallowed: the failure is the refusal's reason.

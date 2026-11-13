@@ -14,6 +14,7 @@ Deno.test("start prints where the export is, every path and listed name made ine
     seats: "/cache/s",
     scratch: "/cache/x",
     gitDir: "/cache/git",
+    logs: "/cache/l",
     listed: [{ kind: "instruction", sha: "d".repeat(40), path: "CLAUDE\u001b[2J.md" }],
   } as unknown as BranchExport;
   assertEquals(startLines(exported), [
@@ -21,6 +22,7 @@ Deno.test("start prints where the export is, every path and listed name made ine
     "SEATS /cache/s",
     "SCRATCH /cache/x",
     "OBJECTS /cache/git/objects",
+    "LOGS /cache/l",
     `LISTED instruction ${"d".repeat(40)} CLAUDE\\u001b[2J.md`,
   ]);
 });
@@ -45,6 +47,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
         baseTip: () => Promise.resolve(null),
         checkout: () => Promise.reject(new Error("read")),
         lock: () => Promise.reject(new Error("locked")),
+        record: () => Promise.reject(new Error("recorded")),
         exportBranch: () => Promise.reject(new Error("fetched")),
       }),
   };
