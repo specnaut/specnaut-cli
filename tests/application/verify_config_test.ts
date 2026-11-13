@@ -51,3 +51,21 @@ Deno.test("a .specnaut folder the walk cannot enter refuses every class, with wh
     Array(6).fill(".specnaut: a link"),
   );
 });
+
+Deno.test("the commits are read one at a time, never side by side", async () => {
+  let open = 0;
+  let most = 0;
+  const counting = {
+    readFile: async (commit: string, path: string): Promise<BaseFile> => {
+      most = Math.max(most, ++open);
+      await new Promise((r) => setTimeout(r, 1));
+      open--;
+      return await git.readFile(commit, path);
+    },
+  } as unknown as GitObjectReader;
+  const verdicts = await verifyConfig({ git: counting, tree: walker(entries()) }, {
+    tip: "t",
+    mergeBase: "m",
+  });
+  assertEquals([verdicts.length, most], [6, 1]);
+});
