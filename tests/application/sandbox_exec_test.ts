@@ -9,6 +9,7 @@ import {
 import type { BackendProbe, SandboxPolicy } from "../../src/domain/sandbox.ts";
 import { sandboxPolicy } from "../../src/domain/sandbox.ts";
 import { unenforcedCaps } from "../../src/domain/sandbox_limits.ts";
+import { LINUX_BWRAP } from "../domain/sandbox_fixture.ts";
 
 /**
  * Running a command on an export in a sandbox: the backend `chooseBackend` picks, the policy
@@ -24,25 +25,6 @@ const FOLDERS: HostFolders = {
 };
 const SCRATCH = "/tmp/specnaut-sandbox-1";
 const IMAGE = `acme/dev@sha256:${"b".repeat(64)}`;
-
-const LINUX_BWRAP: BackendProbe = {
-  os: "linux",
-  arch: "x86_64",
-  image: { kind: "none", why: "no devcontainer" },
-  podman: "absent",
-  podmanRemote: false,
-  podmanVersion: null,
-  podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
-  podmanCpus: null,
-  docker: false,
-  dockerOnPodman: false,
-  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
-  dockerCpus: null,
-  bwrap: "usable",
-  bwrapVersion: "bubblewrap 0.9.0",
-  bwrapScope: false,
-  sandboxExec: false,
-};
 
 type Seen = {
   located: string[];

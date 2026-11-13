@@ -3,6 +3,7 @@ import { join } from "@std/path";
 import { execInSandbox } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
+import { LINUX_BWRAP } from "../domain/sandbox_fixture.ts";
 
 /**
  * The host side of a sandboxed run: the export's scratch copy found by its commit, as real paths;
@@ -134,22 +135,3 @@ Deno.test({
       await assertRejects(run, SandboxRefused, "none");
     }),
 });
-
-const LINUX_BWRAP = {
-  os: "linux",
-  arch: "x86_64",
-  image: { kind: "none", why: "no devcontainer" },
-  podman: "absent",
-  podmanRemote: false,
-  podmanVersion: null,
-  podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
-  podmanCpus: null,
-  docker: false,
-  dockerOnPodman: false,
-  dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
-  dockerCpus: null,
-  bwrap: "usable",
-  bwrapVersion: "bubblewrap 0.9.0",
-  bwrapScope: false,
-  sandboxExec: false,
-} as const;
