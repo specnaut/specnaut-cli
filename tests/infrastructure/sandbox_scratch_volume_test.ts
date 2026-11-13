@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import { within } from "../../src/domain/sandbox_paths.ts";
@@ -13,6 +13,7 @@ import {
   imageFolder,
   MIB,
   onMount,
+  warningsOf,
 } from "./sandbox_scratch_volume_fixture.ts";
 
 /**
@@ -85,3 +86,26 @@ test("an attach that leaves nothing mounted on the scratch refuses the run", () 
 
 test("a missing hdiutil refuses the run", () =>
   assertRefused("could not start", { missing: true, mounted: false }));
+
+test("a refused attach whose volume cannot be detached is warned of, its trap kept", () =>
+  onMount(async (mount) => {
+    const stuck = [{ code: 16, stderr: "resource busy" }];
+    const ends = {
+      attach: [{ code: 1, stderr: "late" }],
+      detach: [...stuck],
+      "detach -force": [...stuck],
+    };
+    const { launcher, calls } = hdiutil(ends);
+    const { volumeHost, state } = host(true);
+    const volumes = new HdiutilVolumes(launcher, volumeHost);
+    try {
+      const warned = await warningsOf(() =>
+        assertRejects(() => volumes.attach(mount, 8 * MIB), SandboxRefused, "attach exited 1")
+      );
+      assertEquals(warned.length, 1);
+      assertStringIncludes(warned[0], `${mount} could not be detached`);
+      assertEquals(state.disarmed, 0, "a volume left is tried again at exit");
+    } finally {
+      await Deno.remove(imageFolder(calls), { recursive: true });
+    }
+  }));

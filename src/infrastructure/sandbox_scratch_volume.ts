@@ -26,9 +26,12 @@ export interface ScratchVolumes {
   attach(mount: string, bytes: number): Promise<ScratchVolume>;
 }
 
-/** What a volume's end is judged and guarded by: a mount point's test, and the exit trap. */
+/**
+ * What a volume's end is judged and guarded by: a mount point's test, synchronous so the exit trap
+ * can ask it too, and the exit trap.
+ */
 export type VolumeHost = {
-  readonly mounted: (path: string) => Promise<boolean>;
+  readonly mounted: (path: string) => boolean;
   readonly arm: (cleanup: () => void) => () => void;
 };
 
@@ -36,10 +39,13 @@ const HDIUTIL = "/usr/bin/hdiutil";
 const MIB = 1024 ** 2;
 
 /**
- * The watchdog's removal: hdiutil's word on a detach is not read, as the image is deleted either
- * way; a volume that is somehow still attached is gone at the next restart.
+ * The watchdog's removal, `$1` the mount, `$2` the image's folder, `$3` hdiutil. The forced detach
+ * runs only on a mount point (another device than the folder above it): on a plain folder it
+ * would detach the volume holding that folder. hdiutil's word is not read, as the image is
+ * deleted either way; a volume that is somehow still attached is gone at the next restart.
  */
-const REMOVAL = `${HDIUTIL} detach -force "$1"; /bin/rm -rf -- "$2"`;
+const REMOVAL = 'd=$(/usr/bin/stat -f %d "$1") && p=$(/usr/bin/stat -f %d "$1/..") && ' +
+  '[ "$d" != "$p" ] && "$3" detach -force "$1"; /bin/rm -rf -- "$2"';
 
 /** The image's creation: `size` rounded up to whole MiB, so the cap is never below the policy's. */
 const createArgs = (base: string, bytes: number) => [
@@ -65,20 +71,24 @@ export class HdiutilVolumes implements ScratchVolumes {
     try {
       await this.#made(mount, folder, bytes);
     } catch (err) {
-      // What a refused attach left goes now; what cannot go yet is tried again at exit.
-      try {
-        await this.#ended(mount, folder);
-        disarm();
-      } catch (end) {
-        console.error(`warning: the scratch volume was not cleaned up: ${(end as Error).message}`);
-      }
+      await this.#endedAfterRefusal(mount, folder, disarm);
       throw err;
     }
     const detach = async () => {
       await this.#ended(mount, folder);
       disarm();
     };
-    return { removal: ["/bin/sh", "-c", REMOVAL, "sh", mount, folder], detach };
+    return { removal: ["/bin/sh", "-c", REMOVAL, "sh", mount, folder, HDIUTIL], detach };
+  }
+
+  /** What a refused attach left goes now; what cannot go yet is tried again at exit. */
+  async #endedAfterRefusal(mount: string, folder: string, disarm: () => void): Promise<void> {
+    try {
+      await this.#ended(mount, folder);
+      disarm();
+    } catch (end) {
+      console.error(`warning: the scratch volume was not cleaned up: ${(end as Error).message}`);
+    }
   }
 
   /** The image made in `folder`, attached on `mount`, and its root closed to all but its owner. */
@@ -86,7 +96,7 @@ export class HdiutilVolumes implements ScratchVolumes {
     const base = join(folder, "scratch");
     await this.#refusedUnless("create", createArgs(base, bytes));
     await this.#refusedUnless("attach", attachArgs(mount, `${base}.sparseimage`));
-    if (!(await this.host.mounted(mount))) {
+    if (!this.host.mounted(mount)) {
       throw new SandboxRefused(`the scratch volume is not mounted on ${mount} after its attach`);
     }
     await Deno.chmod(mount, 0o700);
@@ -104,13 +114,14 @@ export class HdiutilVolumes implements ScratchVolumes {
    * run may still be draining the output of a process that left the group.
    */
   async #ended(mount: string, folder: string): Promise<void> {
-    if (await this.host.mounted(mount)) {
-      const plain = await this.#hdiutil(["detach", mount]);
-      const forced = plain === null ? null : await this.#hdiutil(["detach", "-force", mount]);
-      // A detach that fails on a volume already gone (the watchdog's removal) has nothing to do.
-      if (forced !== null && (await this.host.mounted(mount))) {
-        throw new Error(`the scratch volume on ${mount} could not be detached: ${forced}`);
-      }
+    // Each detach is asked for only while a volume is mounted there: one forced on a plain folder
+    // would detach the volume that holds it.
+    const plain = this.host.mounted(mount) ? await this.#hdiutil(["detach", mount]) : null;
+    const forced = plain !== null && this.host.mounted(mount)
+      ? await this.#hdiutil(["detach", "-force", mount])
+      : null;
+    if (forced !== null && this.host.mounted(mount)) {
+      throw new Error(`the scratch volume on ${mount} could not be detached: ${forced}`);
     }
     await removed(folder);
   }
@@ -136,7 +147,15 @@ export class HdiutilVolumes implements ScratchVolumes {
 
   /** The exit trap's end: synchronous, as `unload` waits for nothing; a failure is reported. */
   #endSync(mount: string, folder: string): void {
-    this.launcher.runSync({ cmd: HDIUTIL, args: ["detach", "-force", mount], env: "host" });
+    if (this.host.mounted(mount)) {
+      const args = ["detach", "-force", mount];
+      const code = this.launcher.runSync({ cmd: HDIUTIL, args, env: "host" });
+      if (code !== 0) {
+        console.error(
+          `warning: the scratch volume on ${mount} could not be detached (exited ${code})`,
+        );
+      }
+    }
     try {
       Deno.removeSync(folder, { recursive: true });
     } catch (err) {
@@ -156,10 +175,9 @@ async function removed(folder: string): Promise<void> {
 }
 
 /** Whether `path` is a mount point: on another device than the folder holding it. */
-async function mounted(path: string): Promise<boolean> {
+function mounted(path: string): boolean {
   try {
-    const [self, parent] = await Promise.all([Deno.stat(path), Deno.stat(dirname(path))]);
-    return self.dev !== parent.dev;
+    return Deno.statSync(path).dev !== Deno.statSync(dirname(path)).dev;
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return false;
     throw err;

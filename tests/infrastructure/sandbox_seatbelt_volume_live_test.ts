@@ -26,7 +26,7 @@ function watching(launcher: DenoProcessLauncher, seen: Seen[]): ScratchVolumes {
     async attach(mount, bytes) {
       const volume = await real.attach(mount, bytes);
       const mode = Deno.statSync(mount).mode! & 0o777;
-      seen.push({ mounted: mountedOn(mount), mode, image: volume.removal.at(-1)! });
+      seen.push({ mounted: mountedOn(mount), mode, image: volume.removal.at(-2)! });
       return volume;
     },
   };
