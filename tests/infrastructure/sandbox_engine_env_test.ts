@@ -14,7 +14,6 @@ const NEEDED = {
   DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/1000/bus",
   TMPDIR: "/tmp",
   CONTAINERS_CONF: "/etc/containers/containers.conf",
-  CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
   CONTAINERS_STORAGE_CONF: "/home/dev/storage.conf",
   CONTAINERS_REGISTRIES_CONF: "/home/dev/registries.conf",
   XDG_CONFIG_HOME: "/home/dev/.config",
@@ -40,6 +39,8 @@ const OTHERS = {
   CONTAINERS_CONF_EXTRA: "not-a-name-the-engine-reads",
   // A secret: a local podman with env_host would copy it into the container.
   CONTAINER_PASSPHRASE: "example",
+  // A podman run is handed the CLI's own override in its place (`engineRunEnv`).
+  CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
 };
 
 Deno.test("engineEnv: keeps exactly the variables the engine needs, dropping every other", () => {

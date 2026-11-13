@@ -6,7 +6,7 @@ import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
-import { engineEnv } from "./sandbox_engine_env.ts";
+import { engineRunEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
 import { DRAIN_GRACE_SECONDS, type Halt, untilWallClock } from "./sandbox_wall_clock.ts";
 import { watchdogSpec } from "./sandbox_watchdog.ts";
@@ -22,7 +22,9 @@ import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
  * The run's container, named so it can be removed when the wall clock runs out or we are stopped.
- * The engine's client, and each removal, start with `engineEnv` of ours, read at the run.
+ * The engine's client, and each removal, start with `engineRunEnv` of ours, read at the run. What
+ * it wrote is released once the run is over; on an interrupt it is left, as the watchdog's removal
+ * still reads it.
  */
 export class ContainerRunner implements SandboxRunner {
   constructor(
@@ -41,7 +43,7 @@ export class ContainerRunner implements SandboxRunner {
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const args = containerArgs(policy, { image: this.image, name, engine: this.engine }, command);
-    const env = engineEnv(this.hostEnv());
+    const { env, release } = await engineRunEnv(this.engine, this.hostEnv());
     const remove = removalOf(this.engine, name, env);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
@@ -52,6 +54,7 @@ export class ContainerRunner implements SandboxRunner {
         return watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
       });
     } finally {
+      release();
       disarm();
     }
   }

@@ -37,9 +37,11 @@ const HOST_ENV = {
 const ENGINE_ENV = {
   PATH: "/usr/bin:/bin",
   HOME: "/home/dev",
-  CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
   DOCKER_HOST: "unix:///var/run/docker.sock",
 };
+/** A podman launch's environment: the engine's, with the override written for the run. */
+const podmanEnv = (l: Launch) => ({ ...ENGINE_ENV, CONTAINERS_CONF_OVERRIDE: overrideOf(l) });
+const overrideOf = (l: Launch) => l.spec.env === "host" ? "" : l.spec.env.CONTAINERS_CONF_OVERRIDE;
 
 Deno.test("ContainerRunner: launches the engine with exactly containerArgs, under a fresh name", async () => {
   const { launcher, launches } = fakeLauncher(3);
@@ -59,7 +61,7 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
       { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman" },
       COMMAND,
     ),
-    env: ENGINE_ENV,
+    env: podmanEnv(launches[0]),
   });
 });
 
@@ -154,7 +156,7 @@ Deno.test("ContainerRunner: past the wall clock the container is removed by name
   assertEquals(launches.find((l) => l.spec.args[0] === "rm")?.spec, {
     cmd: "podman",
     args: ["rm", "--force", "--ignore", "specnaut-sandbox-x2"],
-    env: ENGINE_ENV,
+    env: podmanEnv(launches[0]),
     stdout: "discarded",
     stderr: "captured",
   });
