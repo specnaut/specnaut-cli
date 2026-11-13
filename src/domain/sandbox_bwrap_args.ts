@@ -18,7 +18,8 @@ const SHM = "/dev/shm";
  * session (no terminal to inject keystrokes into), an empty environment refilled from the
  * policy, no capabilities, and the syscall filter (`sandbox_seccomp.ts`) read from
  * {@link SECCOMP_FD}, which the launcher opens. System folders are bound read-only when
- * the host has them, the toolchain and the tree always; the scratch folders and shared memory are
+ * the host has them, the toolchain and the tree always, each hidden file then covered by an empty
+ * one (`/dev/null`) so it reads as nothing; the scratch folders and shared memory are
  * size-capped tmpfs. The sandbox's own root is remounted read-only last, so nothing outside those
  * folders can be created in it. `--` ends the options: a command starting with `-` is never one.
  */
@@ -31,6 +32,7 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
     ...bwrapNetwork(policy.network),
     ...policy.system.flatMap((p) => ["--ro-bind-try", safePath(p), p]),
     ...policy.reads.flatMap((p) => ["--ro-bind", safePath(p), p]),
+    ...policy.hiddenFiles.flatMap((f) => ["--ro-bind", "/dev/null", safePath(f)]),
     ...["--proc", "/proc", "--dev", "/dev"],
     ...[SHM, ...policy.writes].flatMap((p) => ["--size", size, "--tmpfs", safePath(p)]),
     ...["--chdir", safePath(policy.workdir)],

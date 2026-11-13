@@ -60,6 +60,7 @@ async function reported(probe: BackendProbe, outcome: RunOutcome): Promise<strin
       host: {
         locate: () => Promise.resolve({ ...PATHS }),
         real: (folders) => Promise.resolve([...folders]),
+        receipts: () => Promise.resolve([]),
         scratch: () => Promise.resolve(scratch),
       },
       runnerFor: () => ({ run: () => Promise.resolve(outcome) }),

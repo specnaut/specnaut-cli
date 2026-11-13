@@ -28,6 +28,11 @@ export type SandboxPaths = {
   readonly home: string;
   /** The user's checkout: no visible folder lies inside it or holds it. */
   readonly checkout: string;
+  /**
+   * The toolchain receipts the host found in the home (`HOME_RECEIPTS`), as real paths: never
+   * read, though a folder the sandbox reads holds them.
+   */
+  readonly receipts: readonly string[];
 };
 
 /** A character one of the backends' syntaxes would read as structure, or a control character. */
@@ -73,12 +78,16 @@ export function ancestors(paths: readonly string[]): string[] {
 }
 
 /**
- * The folders in a home a sandbox may read: where toolchains keep the tools a gate runs, none of
- * them a place credentials are kept. A visible folder in the home must be one of these or lie
- * inside one, and every other is refused: the credential folders (`~/.ssh`, `~/.aws`, `~/.config`,
- * `~/.cargo` itself) and any folder no one has looked at alike. A list of the places to refuse
- * would expose each one it left out. `*` is one folder name, a version. Paths under the home,
- * `/`-separated.
+ * The folders in a home a sandbox may read: where toolchains keep the tools a gate runs, not where
+ * logins are kept. A visible folder in the home must be one of these or lie inside one, and every
+ * other is refused: the credential folders (`~/.ssh`, `~/.aws`, `~/.config`, `~/.cargo` itself)
+ * and any folder no one has looked at alike. A list of the places to refuse would expose each one
+ * it left out. `*` is one folder name, a version. Paths under the home, `/`-separated.
+ *
+ * Two of them hold more than tools. `~/.local/bin` is the user's own space too: a script they put
+ * there is read like any tool, whatever it holds. And a pipx or uv venv keeps, beside the
+ * `pyvenv.cfg` Python needs, a receipt naming the index or git URL it came from, which can carry a
+ * login: those files are never read (`HOME_RECEIPTS`).
  */
 export const HOME_TOOLCHAINS: readonly string[] = [
   ".cargo/bin", // what cargo installs, and rustup's proxies
@@ -95,6 +104,16 @@ export const HOME_TOOLCHAINS: readonly string[] = [
 ];
 
 /**
+ * The receipts a venv in a listed toolchain folder keeps: where it was installed from, an index or
+ * git URL that can carry a login. The host finds the ones there are; the sandbox never reads them,
+ * though it reads the venv. `*` is one venv. Paths under the home, `/`-separated.
+ */
+export const HOME_RECEIPTS: readonly string[] = [
+  ".local/share/pipx/venvs/*/pipx_metadata.json",
+  ".local/share/uv/tools/*/uv-receipt.toml",
+];
+
+/**
  * The first reason a layout would expose the home, a folder in it outside its toolchains, the
  * checkout or a read-only folder: `readOnly` is every folder the sandbox only reads, `path` the
  * PATH entries searched before the system's. Every path is a real path: the caller resolves links
@@ -106,6 +125,7 @@ export function layoutProblem(
   path: readonly string[],
 ): string | null {
   const given = [paths.tree, paths.scratch, paths.home, paths.checkout, ...readOnly, ...path];
+  given.push(...paths.receipts);
   for (const p of given) {
     const problem = pathProblem(p);
     if (problem !== null) return `${JSON.stringify(p)} ${problem}`;

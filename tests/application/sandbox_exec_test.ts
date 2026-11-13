@@ -32,6 +32,10 @@ type Seen = {
   runs: { backend: RunnableBackend; policy: SandboxPolicy; command: readonly string[] }[];
 };
 
+/** A pipx venv root in the home, and the one receipt the host finds in it. */
+const VENVS = "/home/dev/.local/share/pipx/venvs";
+const RECEIPT = `${VENVS}/ruff/pipx_metadata.json`;
+
 /** A link as the host resolves it: the one folder the tests make a link of, to the home. */
 const LINKS: Record<string, string> = { "/opt/tools": "/home/dev" };
 
@@ -45,6 +49,7 @@ function world(probe: BackendProbe, outcome: RunOutcome = { kind: "exited", code
         return Promise.resolve(FOLDERS);
       },
       real: (folders) => Promise.resolve(folders.map((f) => LINKS[f] ?? f)),
+      receipts: (home) => Promise.resolve(home === FOLDERS.home ? [RECEIPT] : []),
       scratch: () =>
         Promise.resolve({
           path: SCRATCH,
@@ -66,6 +71,12 @@ function world(probe: BackendProbe, outcome: RunOutcome = { kind: "exited", code
 
 const REQUEST = { sha: SHA, toolchain: ["/opt/deno/bin"], command: ["deno", "test"] };
 
+Deno.test("execInSandbox: a receipt the host finds in the home is hidden from a run that reads it", async () => {
+  const { deps, seen } = world(LINUX_BWRAP);
+  await execInSandbox(deps, { ...REQUEST, toolchain: [VENVS] });
+  assertEquals(seen.runs[0].policy.hiddenFiles, [RECEIPT]);
+});
+
 Deno.test("execInSandbox: the chosen backend's runner runs the command under its policy", async () => {
   const { deps, seen } = world(LINUX_BWRAP);
   const result = await execInSandbox(deps, REQUEST);
@@ -82,6 +93,7 @@ Deno.test("execInSandbox: the chosen backend's runner runs the command under its
     scratch: SCRATCH,
     toolchain: ["/opt/deno/bin"],
     path: ["/opt/deno/bin"],
+    receipts: [RECEIPT],
   });
   assertEquals(expected.ok && seen.runs[0].policy, expected.ok && expected.policy);
   assertEquals(seen.runs[0].backend, { kind: "bwrap", scope: false });

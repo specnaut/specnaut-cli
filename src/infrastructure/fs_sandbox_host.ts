@@ -6,6 +6,7 @@ import {
   type ScratchFolder,
 } from "../application/sandbox_ports.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
+import { HOME_RECEIPTS } from "../domain/sandbox_paths.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { securePrivateFolder } from "./private_folder.ts";
 
@@ -50,6 +51,12 @@ export class FsSandboxHost implements SandboxHost {
     return found;
   }
 
+  async receipts(home: string): Promise<string[]> {
+    const found: string[] = [];
+    for (const receipt of HOME_RECEIPTS) found.push(...await matching(join(home, receipt)));
+    return found;
+  }
+
   async scratch(): Promise<ScratchFolder> {
     const path = await Deno.realPath(await Deno.makeTempDir({ prefix: "specnaut-sandbox-" }));
     const disarm = armExitTrap(() => removeScratchSync(path));
@@ -60,6 +67,33 @@ export class FsSandboxHost implements SandboxHost {
         disarm();
       },
     };
+  }
+}
+
+/** The files `pattern` names, its one `*` folder any folder in it, that are there: real paths. */
+async function matching(pattern: string): Promise<string[]> {
+  const [folder, file] = pattern.split("/*/");
+  const found: string[] = [];
+  try {
+    for await (const entry of Deno.readDir(folder)) {
+      const path = join(folder, entry.name, file);
+      if (await isFile(path)) found.push(await Deno.realPath(path));
+    }
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+  }
+  return found;
+}
+
+/** Whether `path` leads to a file; nothing there, or a file on its way, is no error. */
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await Deno.stat(path)).isFile;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound || err instanceof Deno.errors.NotADirectory) {
+      return false;
+    }
+    throw err;
   }
 }
 

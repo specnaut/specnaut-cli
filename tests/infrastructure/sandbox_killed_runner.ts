@@ -25,6 +25,7 @@ const result = sandboxPolicy(backend as SandboxedBackend, {
   path: [],
   home: await Deno.realPath(Deno.env.get("HOME")!),
   checkout: join(base, "checkout"),
+  receipts: [],
 });
 if (!result.ok) throw new Error(result.why);
 const launcher = new DenoProcessLauncher();

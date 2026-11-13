@@ -25,7 +25,7 @@ import {
 import { containerStatus } from "./sandbox_container.ts";
 import { LIMITS, type ReportedCap, type SandboxLimits } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
-import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
+import { ancestors, layoutProblem, type SandboxPaths, within } from "./sandbox_paths.ts";
 
 export type { BackendProbe };
 
@@ -126,6 +126,8 @@ export type SandboxPolicy = {
   readonly listings: readonly string[];
   /** Folders never read, on macOS, even below an allowed one. */
   readonly hidden: readonly string[];
+  /** Files never read on any backend, though a folder in `reads` holds them: the receipts. */
+  readonly hiddenFiles: readonly string[];
   /** Device files read and written (bubblewrap and a container provide their own `/dev`). */
   readonly devices: readonly string[];
   /** No network at all: loopback, unix sockets and dependency installs included. */
@@ -164,15 +166,20 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
   return why === null ? { ok: true, policy } : { ok: false, why };
 }
 
-type Folders = Pick<SandboxPolicy, "system" | "reads" | "writes">;
+type Folders = Pick<SandboxPolicy, "system" | "reads" | "writes" | "hiddenFiles">;
 
-/** The system folders, the read-only toolchain and tree, and the scratch home and temp. */
+/**
+ * The system folders, the read-only toolchain and tree, the scratch home and temp, and the
+ * receipts one of those reads holds.
+ */
 function folders(backend: SandboxedBackend, paths: SandboxPaths): Folders {
   const inContainer = backend === "container";
+  const reads = inContainer ? [paths.tree] : [...paths.toolchain, paths.tree];
   return {
     system: SYSTEM[backend],
-    reads: inContainer ? [paths.tree] : [...paths.toolchain, paths.tree],
+    reads,
     writes: [`${paths.scratch}/home`, `${paths.scratch}/tmp`],
+    hiddenFiles: paths.receipts.filter((f) => reads.some((r) => within(f, r))),
   };
 }
 

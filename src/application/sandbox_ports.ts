@@ -39,6 +39,8 @@ export interface SandboxHost {
    * into the checkout is refused like the folder itself. Refuses a folder that is not there.
    */
   real(folders: readonly string[]): Promise<string[]>;
+  /** The receipts `HOME_RECEIPTS` names that are in `home`, a real path, as real paths. */
+  receipts(home: string): Promise<string[]>;
   scratch(): Promise<ScratchFolder>;
 }
 

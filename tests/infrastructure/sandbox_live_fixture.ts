@@ -157,7 +157,8 @@ function layoutPolicy(
   { base, tree, scratch, home }: { base: string; tree: string; scratch: string; home: string },
 ): SandboxPolicy {
   const checkout = join(base, "checkout");
-  const result = sandboxPolicy(backend, { tree, scratch, toolchain: [], path: [], home, checkout });
+  const layout = { tree, scratch, toolchain: [], path: [], home, checkout, receipts: [] };
+  const result = sandboxPolicy(backend, layout);
   if (!result.ok) throw new Error(result.why);
   return result.policy;
 }

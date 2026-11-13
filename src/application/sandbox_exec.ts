@@ -50,9 +50,10 @@ export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promi
     return { kind: "not_run", why: `no backend: ${backend.why.join("; ")}` };
   }
   const toolchain = await deps.host.real(request.toolchain);
+  const receipts = await deps.host.receipts(folders.home);
   const scratch = await deps.host.scratch();
   try {
-    const paths = { ...folders, scratch: scratch.path, toolchain, path: toolchain };
+    const paths = { ...folders, scratch: scratch.path, toolchain, path: toolchain, receipts };
     return await runUnder(deps, backend, paths, request.command);
   } finally {
     await scratch.remove();

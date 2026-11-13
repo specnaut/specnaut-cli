@@ -148,3 +148,27 @@ Deno.test({
       await assertRejects(run, SandboxRefused, "none");
     }),
 });
+
+Deno.test({
+  name: "receipts: each pipx and uv venv's receipt there is, as a real path; none is no error",
+  ignore: !posix,
+  fn: () =>
+    withTemp(async (dir) => {
+      const home = join(dir, "home");
+      const host = hostOver(dir, dir);
+      await Deno.mkdir(home);
+      assertEquals(await host.receipts(home), [], "no venv folder at all");
+      const pipx = join(home, ".local/share/pipx/venvs");
+      const uv = join(home, ".local/share/uv/tools");
+      for (const venv of [join(pipx, "ruff"), join(pipx, "bare"), join(uv, "black")]) {
+        await Deno.mkdir(venv, { recursive: true });
+      }
+      await Deno.writeTextFile(join(pipx, "ruff/pipx_metadata.json"), "{}");
+      await Deno.writeTextFile(join(pipx, "stray-file"), "");
+      await Deno.writeTextFile(join(uv, "black/uv-receipt.toml"), "");
+      assertEquals((await host.receipts(home)).sort(), [
+        join(pipx, "ruff/pipx_metadata.json"),
+        join(uv, "black/uv-receipt.toml"),
+      ]);
+    }),
+});

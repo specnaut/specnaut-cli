@@ -39,13 +39,18 @@ function allows(policy: SandboxPolicy): string[] {
   ];
 }
 
-/** Denies no allow above can reopen: the network, launchd jobs, hidden folders, services. */
+/**
+ * Denies no allow above can reopen: the network, launchd jobs, hidden folders and files,
+ * services.
+ */
 function closingDenies(policy: SandboxPolicy): string[] {
   const forbidden = Object.values(FORBIDDEN_SERVICES).flat();
+  const { hidden, hiddenFiles } = policy;
   return [
     networkRule(policy.network),
     "(deny job-creation)",
-    ...(policy.hidden.length > 0 ? [`(deny file-read* ${rules("subpath", policy.hidden)})`] : []),
+    ...(hidden.length > 0 ? [`(deny file-read* ${rules("subpath", hidden)})`] : []),
+    ...(hiddenFiles.length > 0 ? [`(deny file-read* ${rules("literal", hiddenFiles)})`] : []),
     `(deny mach-lookup ${forbidden.map(service).join(" ")})`,
   ];
 }

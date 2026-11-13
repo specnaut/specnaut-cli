@@ -13,6 +13,7 @@ export const PATHS: SandboxPaths = {
   path: ["/home/dev/.deno/bin"],
   home: "/home/dev",
   checkout: "/home/dev/src/my-app",
+  receipts: [],
 };
 
 export const SCRATCH_HOME = `${PATHS.scratch}/home`;
