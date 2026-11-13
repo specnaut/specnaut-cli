@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { bwrapArgs, containerArgs, scopeArgs } from "../../src/domain/sandbox_args.ts";
+import { containerArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import {
   CAP_ENFORCEMENT,
   CAP_NAMES,

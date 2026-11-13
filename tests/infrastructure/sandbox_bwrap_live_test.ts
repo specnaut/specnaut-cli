@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { userBus } from "../../src/domain/sandbox_args.ts";
+import { userBus } from "../../src/domain/sandbox_bwrap_args.ts";
 import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_seccomp.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";

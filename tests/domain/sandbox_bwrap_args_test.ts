@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { bwrapArgs, scopeArgs, userBus } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs, userBus } from "../../src/domain/sandbox_bwrap_args.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
 import { DENIED_SYSCALLS, SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";

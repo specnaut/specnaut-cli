@@ -1,7 +1,8 @@
 /**
  * Running a branch's gates in a sandbox: which isolation backend runs them, and what a sandboxed
  * process may touch. Both decisions live here and nowhere else; the argument and profile
- * generators (`sandbox_args.ts`, `sandbox_seatbelt.ts`) only translate a {@link SandboxPolicy}.
+ * generators (`sandbox_args.ts`, `sandbox_bwrap_args.ts`, `sandbox_seatbelt.ts`) only translate a
+ * {@link SandboxPolicy}.
  *
  * The backends, best first: a container (rootless podman, then docker) running a digest-pinned
  * image; bubblewrap on Linux; `sandbox-exec` on macOS. With none of them the run is static only:

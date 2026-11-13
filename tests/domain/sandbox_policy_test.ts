@@ -7,7 +7,8 @@ import {
   FORBIDDEN_SERVICES,
   SEATBELT_SYSCTLS,
 } from "../../src/domain/sandbox_hosts.ts";
-import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
+import { containerArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 

@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
-import { bwrapArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";

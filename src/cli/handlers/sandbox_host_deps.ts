@@ -5,7 +5,7 @@ import {
   type ExecOutcome,
   type ExecRequest,
 } from "../../application/sandbox_exec.ts";
-import { userBus } from "../../domain/sandbox_args.ts";
+import { userBus } from "../../domain/sandbox_bwrap_args.ts";
 import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { baseTipOf } from "../../application/verify_scripts.ts";

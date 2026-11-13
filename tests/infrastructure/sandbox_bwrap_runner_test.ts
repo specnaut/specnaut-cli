@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
-import { bwrapArgs, scopeArgs } from "../../src/domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";

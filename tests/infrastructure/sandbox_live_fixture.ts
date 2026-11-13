@@ -8,7 +8,7 @@ import {
   type SandboxPolicy,
   sandboxPolicy,
 } from "../../src/domain/sandbox.ts";
-import { userBus } from "../../src/domain/sandbox_args.ts";
+import { userBus } from "../../src/domain/sandbox_bwrap_args.ts";
 import { isPinned } from "../../src/domain/sandbox_image.ts";
 import { DenoSubprocessRunner } from "../../src/infrastructure/deno_subprocess.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";

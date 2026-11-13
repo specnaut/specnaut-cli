@@ -5,7 +5,7 @@ import {
   type SandboxRunner,
 } from "../application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../domain/sandbox.ts";
-import { bwrapArgs, scopeArgs } from "../domain/sandbox_args.ts";
+import { bwrapArgs, scopeArgs } from "../domain/sandbox_bwrap_args.ts";
 import { isFilterArch, SECCOMP_FD, seccompFilter } from "../domain/sandbox_seccomp.ts";
 import type { ProcessLauncher, Started } from "./sandbox_process.ts";
 import { untilWallClock } from "./sandbox_wall_clock.ts";
