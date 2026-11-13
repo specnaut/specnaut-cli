@@ -70,11 +70,14 @@ under `--no-close`, once more after the push: there the item's line must read `O
    `phases/auto-chain.md` reads it (its one reader), and a `manual` answer is that question.
    Unless the last run printed `VERDICT instructions trusted`, or only `instructions` lines reading
    `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a missing
-   `instructions` line is an untrusted one. Show the diff of each named path as it lands (`git diff
-   <BASE_TIP> HEAD -- <path>`; a file the base lacks, in full); a `work tree differs from HEAD`
-   reason means the session read other bytes than those that land, whatever `git status` shows;
-   a `line endings differ` reason, whose diff can be empty, is shown as its reason says: the same
-   text, a CR before LF on one side only. Then ask once, as the one question before step 3:
+   `instructions` line is an untrusted one. Show each named path as it lands: `git diff --text
+   --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD -- <path>` (a file the base lacks, in
+   full). A `work tree differs from HEAD` reason means the session read other bytes than those that
+   land, whatever `git status` shows; for such a path HEAD lacks, show the work tree's file and say
+   it does not land. A `line endings differ` reason, whose diff can be empty, is shown as its
+   reason says: the same text, a CR before LF on one side only. A `holds invisible characters`
+   reason names each code point and its line: say so with the diff, which does not show them.
+   Then ask once, as the one question before step 3:
    *"This branch changes the instructions this session follows. Yes lands them."* A no stops on
    the branch. The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them)
    and nothing else: a later run with another digest asks again, even naming the same paths, and

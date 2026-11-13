@@ -1,6 +1,7 @@
 import { sameBytes } from "./bytes.ts";
 import type { CheckoutEntry, HoldsTip } from "./checkout_trust.ts";
-import { type BaseEntry, REASON } from "./script_trust.ts";
+import { invisibleIn } from "./invisible_text.ts";
+import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
 
 /**
@@ -11,7 +12,32 @@ import { refinedReason } from "./trust_reason.ts";
  */
 
 /** The reasons this class adds to `REASON`. */
-export const INSTRUCTION_REASON = { notHead: "work tree differs from HEAD" } as const;
+export const INSTRUCTION_REASON = {
+  notHead: "work tree differs from HEAD",
+  invisible: "holds invisible characters",
+} as const;
+
+/**
+ * Why HEAD's `bytes` at a path the branch changed cannot be read in a diff: the invisible code
+ * points they hold (`invisible_text.ts`), escaped, or `null`. A file the tip holds as it is asks
+ * nothing, so it is never judged here.
+ */
+export function invisibleReason(bytes: Uint8Array): string | null {
+  const found = invisibleIn(bytes);
+  return found === null ? null : `${INSTRUCTION_REASON.invisible}: ${found}`;
+}
+
+/** Each blob among HEAD's `entries` whose bytes are not the tip's and hold invisible characters. */
+export function invisibleReasons(
+  entries: readonly BaseEntry[],
+  tip: ReadonlyMap<string, BaseEntry>,
+): Untrusted[] {
+  return entries.flatMap((e) => {
+    if (e.kind !== "blob" || sameEntry(e, tip.get(e.path))) return [];
+    const reason = invisibleReason(e.bytes);
+    return reason === null ? [] : [{ path: e.path, reason }];
+  });
+}
 
 /** One path's entry in the tree, at HEAD and at the tip. */
 export type Sides = {
@@ -92,7 +118,8 @@ function landReasons(reasons: Map<string, string>, sides: Sides): void {
   }
 }
 
-function sameEntry(a: BaseEntry, b: BaseEntry): boolean {
+function sameEntry(a: BaseEntry, b: BaseEntry | undefined): boolean {
+  if (b === undefined) return false;
   if (a.kind === "blob") return b.kind === "blob" && sameBytes(a.bytes, b.bytes);
   if (a.kind === "link") return b.kind === "link" && a.target === b.target;
   return b.kind === "submodule";

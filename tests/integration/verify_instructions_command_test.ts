@@ -77,6 +77,15 @@ Deno.test("a later change to an approved path prints the same line and another d
   assertNotEquals(approved, clean);
 });
 
+Deno.test("an instruction file committed with an invisible character is named by its code point", async () => {
+  const { root } = await fixture({ files: base() });
+  await write(root, { "AGENTS.md": "# Rules\n\nRun every gate.\u{202E}\n" });
+  await commitAll(root, "edit AGENTS.md");
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted AGENTS.md holds invisible characters: U+202E (line 3)",
+  ]);
+});
+
 Deno.test("the digest covers a committed override as HEAD holds it", async () => {
   const { root } = await fixture({ files: { ...base(), "CLAUDE.local.md": "Mine.\n" } });
   const before = (await verify(root)).field("INSTRUCTIONS_DIGEST");

@@ -216,3 +216,18 @@ Deno.test("a committed link out of the class is named where links are off, whate
     `CLAUDE.md ${LINK_REASON.linkLeaves}`,
   ]);
 });
+
+Deno.test("an instruction file HEAD changes to hold invisible characters is named so", () => {
+  const hidden = enc("# Rules\n\nRun every gate.\u202e\n");
+  assertEquals(judge({ tree: walked(file(A, hidden)), head: [blob(A, hidden)] }), [
+    `${A} ${INSTRUCTION_REASON.invisible}: U+202E (line 3)`,
+  ]);
+  // The tip's own bytes are not the branch's change: nothing is asked.
+  const tip = [blob(A, hidden)];
+  assertEquals(judge({ tip, tree: walked(file(A, hidden)), head: tip }), ["trusted"]);
+});
+
+Deno.test("a committed override holding invisible characters is named so", () => {
+  const o = committed("CLAUDE.local.md", on("x\u200b\n"), none);
+  assertEquals(overrides(o), [`CLAUDE.local.md ${INSTRUCTION_REASON.invisible}: U+200B (line 1)`]);
+});

@@ -9,7 +9,7 @@ import {
 import type { ConfigFile, ConfigVerdict } from "./config_trust.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
-import { headReasons } from "./instruction_head.ts";
+import { headReasons, invisibleReason, invisibleReasons } from "./instruction_head.ts";
 import {
   type COMMITTED_INSTRUCTIONS,
   type HeadSplit,
@@ -78,7 +78,11 @@ function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   };
   const found = configReasons(input.tree, input.tip, holds, inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
-  const atHead = [...head.reasons, ...headLinkReasons(head.entries)];
+  const atHead = [
+    ...head.reasons,
+    ...headLinkReasons(head.entries),
+    ...invisibleReasons(head.entries, ctx.tip),
+  ];
   const reasons = new Map([...found, ...atHead].map((u) => [u.path, u.reason]));
   const blocked = input.tree.flatMap((w) => w.kind === "blocked" ? [w.path] : []);
   headReasons(reasons, { ...ctx, blocked, head: byPath(head.entries) }, holds);
@@ -93,6 +97,8 @@ function committedReason(c: CommittedInstruction, atHead: ConfigFile | undefined
   if (c.tip.kind === "refused") return why(REASON.baseNotRegular);
   const tip = c.tip.kind === "file" ? c.tip.bytes : undefined;
   if (sameBytes(atHead.bytes, tip)) return [];
+  const hidden = invisibleReason(atHead.bytes);
+  if (hidden !== null) return why(hidden);
   const mergeBase = c.mergeBase.kind === "file" ? c.mergeBase.bytes : undefined;
   const otherwise = c.tip.kind === "absent" ? REASON.notOnBase : REASON.differs;
   return why(refinedReason(atHead.bytes, { copies: [tip], mergeBase }, otherwise));

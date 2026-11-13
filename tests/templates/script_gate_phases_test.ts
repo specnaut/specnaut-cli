@@ -157,11 +157,22 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
       "reading `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a " +
       "missing `instructions` line is an untrusted one.",
   );
-  assertStringIncludes(said, "`git diff <BASE_TIP> HEAD -- <path>`");
-  assertStringIncludes(said, "a `work tree differs from HEAD` reason");
   assertStringIncludes(
     said,
-    "a `line endings differ` reason, whose diff can be empty, is shown as its reason says",
+    "`git diff --text --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD -- <path>`",
+  );
+  assertStringIncludes(
+    said,
+    "for such a path HEAD lacks, show the work tree's file and say it does not land",
+  );
+  assertStringIncludes(
+    said,
+    "A `holds invisible characters` reason names each code point and its line",
+  );
+  assertStringIncludes(said, "A `work tree differs from HEAD` reason");
+  assertStringIncludes(
+    said,
+    "A `line endings differ` reason, whose diff can be empty, is shown as its reason says",
   );
   assertStringIncludes(said, "ask once");
   assertStringIncludes(
