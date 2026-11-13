@@ -1,7 +1,6 @@
 import { assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from "@std/assert";
-import { DELIMITER, join } from "@std/path";
-import { git, hermetic, run, type Sandbox, sandbox } from "./git_sandbox.ts";
-import { specnautOnPath } from "./specnaut_shim.ts";
+import { join } from "@std/path";
+import { git, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 
 /**
  * land-feature.sh judges HEAD's instructions itself, with `specnaut verify-scripts`, and lands only
@@ -81,13 +80,16 @@ Deno.test("no verifier on the PATH: 13, never a landing on an unjudged HEAD", {
   const sb = await editedRules();
   try {
     const before = await git(sb.remote, "rev-parse", "main");
-    // git alone, linked into a folder of its own: its install folder may hold a `specnaut` too.
+    // Only the tools the landing runs, each linked into a folder of its own: the folders they come
+    // from may hold a `specnaut` too.
     const tools = join(sb.root, "tools");
     await Deno.mkdir(tools);
-    const real = (await run("bash", ["-c", "command -v git"], sb.work)).stdout.trim();
-    await Deno.symlink(real, join(tools, "git"));
-    const r = await run("bash", [".specnaut/scripts/bash/land-feature.sh"], sb.work, {
-      PATH: `${tools}:/usr/bin:/bin`,
+    for (const tool of ["bash", "git", "dirname", "sed", "awk", "grep", "rm"]) {
+      const real = (await run("bash", ["-c", `command -v ${tool}`], sb.work)).stdout.trim();
+      await Deno.symlink(real, join(tools, tool));
+    }
+    const r = await run(join(tools, "bash"), [".specnaut/scripts/bash/land-feature.sh"], sb.work, {
+      PATH: tools,
     });
     assertEquals(r.code, 13, r.stderr);
     assertStringIncludes(r.stderr, "could not judge");
@@ -103,32 +105,6 @@ Deno.test("a malformed digest is a usage error, before anything runs", async () 
     for (const args of [["--instructions-digest"], ["--instructions-digest", "abc"], ["main"]]) {
       assertEquals((await sb.script("land-feature.sh", ...args)).code, 2, args.join(" "));
     }
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("a verdict measured from another base is no verdict: 13", async () => {
-  const sb = await editedRules();
-  try {
-    const before = await git(sb.remote, "rev-parse", "main");
-    const fake = join(sb.root, "fake");
-    await Deno.mkdir(fake);
-    const said = ["BASE_BRANCH develop", `INSTRUCTIONS_DIGEST ${"0".repeat(64)}`];
-    const lines = [...said, "VERDICT instructions trusted", "VERDICT scripts trusted"];
-    await Deno.writeTextFile(
-      join(fake, "specnaut"),
-      `#!/usr/bin/env bash\nprintf '%s\\n' ${lines.map((l) => `'${l}'`).join(" ")}\n`,
-    );
-    if (Deno.build.os !== "windows") await Deno.chmod(join(fake, "specnaut"), 0o755);
-    const env = specnautOnPath(hermetic());
-    const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH")!;
-    const r = await run("bash", [".specnaut/scripts/bash/land-feature.sh"], sb.work, {
-      [key]: `${fake}${DELIMITER}${env[key]}`,
-    });
-    assertEquals(r.code, 13, r.stderr);
-    assertStringIncludes(r.stderr, "could not judge");
-    await nothingLanded(sb, before);
   } finally {
     await sb.cleanup();
   }

@@ -32308,7 +32308,7 @@ judge_instructions() {
   names=\$(sed -n 's/^NAMES_FILE //p' <<<"\$out")
   [ -z "\$names" ] || rm -f "\$names"
   digest=\$(sed -n 's/^INSTRUCTIONS_DIGEST \\([0-9a-f]\\{64\\}\\)\$/\\1/p' <<<"\$out")
-  if [ "\$rc" -gt 1 ] || [ -z "\$digest" ] || ! grep -qx "BASE_BRANCH \$base" <<<"\$out"; then
+  if [ "\$rc" -gt 1 ] || [ -z "\$digest" ] || ! grep -qxF "BASE_BRANCH \$base" <<<"\$out"; then
     echo "land-feature: specnaut verify-scripts could not judge HEAD (exit \$rc) - nothing was landed" >&2
     exit 13
   fi
@@ -32372,7 +32372,9 @@ last=\$(git rev-parse HEAD)
 judge_instructions
 
 git checkout --quiet "\$base"
-if ! git merge --quiet --ff-only "refs/heads/\$branch"; then
+# The commit judged above, never the branch's name: a ref that moved since would land unjudged. A
+# base that already contained it and more stays where it is: it holds commits origin lacks.
+if ! git merge --quiet --ff-only "\$last" || [ "\$(git rev-parse HEAD)" != "\$last" ]; then
   git checkout --quiet "\$branch"
   echo "land-feature: the local \$base has commits origin/\$base lacks (origin/\$base..\$base):" >&2
   git --no-pager log --format='  %h %s' "refs/remotes/origin/\$base..refs/heads/\$base" >&2
