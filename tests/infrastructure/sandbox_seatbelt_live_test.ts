@@ -1,6 +1,10 @@
 import { assert, assertEquals } from "@std/assert";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
+import {
+  HdiutilVolumes,
+  type ScratchVolumes,
+} from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { fromFileUrl, join } from "@std/path";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import {
@@ -101,6 +105,28 @@ function later<T>(ms: number, value: T): Promise<T> {
 
 const DETACHED = MISSING ?? NO_PERL;
 
+/**
+ * The real volumes, the milliseconds their attach and detach took added to `spent.ms`: the time a
+ * run spends on its scratch volume is not the drain grace a test bounds.
+ */
+function timedVolumes(launcher: DenoProcessLauncher, spent: { ms: number }): ScratchVolumes {
+  const real = new HdiutilVolumes(launcher);
+  const timed = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const from = Date.now();
+    try {
+      return await fn();
+    } finally {
+      spent.ms += Date.now() - from;
+    }
+  };
+  return {
+    attach: async (mount, bytes) => {
+      const volume = await timed(() => real.attach(mount, bytes));
+      return { ...volume, detach: () => timed(() => volume.detach()) };
+    },
+  };
+}
+
 Deno.test({
   name: live(
     "seatbelt live: a process that left the group delays the run by the grace only",
@@ -111,10 +137,12 @@ Deno.test({
     withLayout("seatbelt", async ({ policy }) => {
       const marker = "34.219";
       const timed = { ...policy, limits: { ...policy.limits, wallClockSeconds: 2 } };
+      const spent = { ms: 0 };
       const started = Date.now();
       try {
-        const { outcome, out } = await runIn(mac, timed, ["/bin/sh", "-c", detaching(marker)]);
-        const took = Date.now() - started;
+        const run = (l: DenoProcessLauncher) => new SeatbeltRunner(l, timedVolumes(l, spent));
+        const { outcome, out } = await runIn(run, timed, ["/bin/sh", "-c", detaching(marker)]);
+        const took = Date.now() - started - spent.ms;
         assertEquals(outcome, { kind: "exited", code: 0 });
         assertEquals(out, "before\n");
         assert(took < (2 + DRAIN_GRACE_SECONDS + 1) * 1000, `the run took ${took} ms`);
