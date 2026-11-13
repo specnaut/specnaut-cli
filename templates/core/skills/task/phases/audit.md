@@ -34,11 +34,16 @@ Load `phases/script-gate.md` and run its gate. Any outcome but `SCRIPTS TRUSTED`
 the tree: `--scan` goes on, since it runs none; any other audit stops there. The gate's
 `size-limits` line must be `VERDICT size-limits trusted` for the map below to run, and its
 `boundaries` line for the boundary check a seat is briefed with; otherwise each is
-`NOT RUN: <the line>`.
+`NOT RUN: <the line>`. **`--scan` is the exception**: the map is where to look, never a verdict,
+so it still runs under any other `size-limits` line, or none because the gate found no base (exit
+3), and the report opens with `Note: the size limits are the work tree's, not checked against the
+base — <the line, or verify-scripts exit 3>`. Any other gate outcome without a `BASE` line still
+means no map.
 
 ## Before Step 2 — Map the repository
 
-Run the scan once, before any scope or seat, under `VERDICT size-limits trusted`, and keep its JSON:
+Run the scan once, before any scope or seat, under `VERDICT size-limits trusted` (`--scan`: also
+under the note above), and keep its JSON:
 
 ```bash
 specnaut scan --format json [--path <subtree>]

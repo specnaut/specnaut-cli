@@ -32,11 +32,16 @@ trusted`, else each is briefed `NOT RUN: <the line>` (`phases/script-gate.md`).
 
 Run `bash .specnaut/scripts/bash/size-ratchet.sh --since "$base"
 --report`: every changed file's line count at the base and at head, renames measured against
-their old path. Put its output in every seat's brief, with the path
-`.specnaut/memory/size-limits.md` (and `.specnaut/size-limits.yml` when the project has one).
-Severity for size comes from that file's table, nowhere else; exit 2 (unreadable table) is a HIGH
-finding, and any exit but 0, 1 or 2 means nothing was measured — say so in every brief;
-never brief "no size data" as clean.
+their old path. Put its output in every seat's brief, with the path `.specnaut/size-limits.yml`
+when the project has one; its exit 2 (unreadable table) is a HIGH finding, and any exit but 0, 1
+or 2 means nothing was measured — say so in every brief; never brief "no size data" as clean.
+
+Severity for size comes from the base tip's table, nowhere else: a branch can edit its own copy,
+so the work tree's `.specnaut/memory/size-limits.md` is never read for it. Put the table rows of
+`bash .specnaut/scripts/bash/git-read.sh grep '|' <BASE_TIP> .specnaut/memory/size-limits.md`
+(step 1's `BASE_TIP`) in every brief: those under `| What the diff does | Severity |` rate size.
+Any exit but 0 (1: the base has no copy) is briefed *size severity not read: exit N*, and a size
+finding is then a `Suspicion —` with its counts, never rated.
 
 Then run `bash .specnaut/scripts/bash/boundary-check.sh` when it is present, and put its output in
 every brief too: exit 1 (a forbidden import in the domain) and exit 2 (the check could not run)
