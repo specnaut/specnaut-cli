@@ -102,7 +102,8 @@ Deno.test({
 });
 
 Deno.test({
-  name: "real: a --toolchain link to the home, a credential folder or the checkout is refused",
+  name:
+    "real: a --toolchain link to the home, a home folder outside its toolchains or the checkout is refused",
   ignore: !posix,
   fn: () =>
     withTemp(async (dir) => {
@@ -121,7 +122,7 @@ Deno.test({
       };
       const links = [["tools/to-home", "holds the home"], ["tools/to-checkout", "overlaps"], [
         "tools-cargo",
-        "is or holds ~/.cargo",
+        ".cargo is in the home folder",
       ]];
       for (const [link, why] of links) {
         const toolchain = [join(dir, link)];

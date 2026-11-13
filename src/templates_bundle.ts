@@ -1601,7 +1601,7 @@ inside \`\$LOGS\`, then \`--\`. The hook refuses any other commit, a log anywher
 exec\` itself judges only the \`--log\` and the \`--toolchain\`. A sandboxed gate finds its tools in
 the folders the base commit's \`gates.yml\` declares under \`toolchain:\` (absolute, or \`~/\` and a
 folder under the home), which the start records and \`run-gate.sh\` passes as \`--toolchain\`; each
-still passes the sandbox's layout check, so the home and its credential folders are never read. A
+still passes the sandbox's layout check, so in the home only a toolchain's folder is read. A
 command whose tools are on none of them, nor the sandbox's system PATH, exits 127: NOT RUN.
 
 \`run-gate.sh\` runs only under \`VERDICT gates trusted\`, else the tiers are NOT RUN: <the line>. It
@@ -37090,7 +37090,9 @@ function Invoke-SelectedRun(\$Answer) {
 # review of a branch this session cannot trust) reads its tools from: each an
 # absolute folder, or \`~/\` and a folder under your home. They are read from
 # the base branch, not the branch under review, put on the sandbox's PATH
-# read-only, and refused when one is or holds the home or a credential folder.
+# read-only. In your home only a toolchain's folder is read (~/.cargo/bin,
+# ~/.rustup/toolchains, ~/.deno/bin, ~/.bun/bin, ~/go/bin, ~/.local/bin, and
+# the nvm, pipx and uv tool folders): any other folder there is refused.
 #
 #   toolchain:
 #     - ~/.deno/bin

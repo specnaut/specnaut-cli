@@ -6,7 +6,8 @@
  *
  * `review start` reads this from the base branch's tip and records the folders in the review lock;
  * under the lock, `sandbox exec --toolchain` names those folders and no other, and each still
- * passes the sandbox's layout check, which refuses the home and every credential folder in it.
+ * passes the sandbox's layout check, which refuses the home and every folder in it but the
+ * toolchain folders it lists (`HOME_TOOLCHAINS`).
  * `run-gate.sh --parse-toolchain` reads the same list the same way: a test runs both on one file.
  *
  * Pure: the caller reads the file and names the home.

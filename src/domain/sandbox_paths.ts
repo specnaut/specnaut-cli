@@ -21,7 +21,10 @@ export type SandboxPaths = {
   readonly toolchain: readonly string[];
   /** Folders searched before the system's, each inside a folder that is read. */
   readonly path: readonly string[];
-  /** The user's real home: neither it, a folder holding it nor its credentials are ever visible. */
+  /**
+   * The user's real home: neither it, a folder holding it, nor a folder in it outside its
+   * toolchains (`HOME_TOOLCHAINS`) is ever visible.
+   */
   readonly home: string;
   /** The user's checkout: no visible folder lies inside it or holds it. */
   readonly checkout: string;
@@ -70,22 +73,32 @@ export function ancestors(paths: readonly string[]): string[] {
 }
 
 /**
- * Where a home keeps credentials: keys, cloud and registry tokens, the git and network logins,
- * password stores and keychains. A read-only folder that is or holds one is refused, so a
- * credential folder is never mounted; a folder inside one (`~/.cargo/bin`) is still a toolchain
- * the sandbox may read. Paths under the home, `/`-separated.
+ * The folders in a home a sandbox may read: where toolchains keep the tools a gate runs, none of
+ * them a place credentials are kept. A visible folder in the home must be one of these or lie
+ * inside one, and every other is refused: the credential folders (`~/.ssh`, `~/.aws`, `~/.config`,
+ * `~/.cargo` itself) and any folder no one has looked at alike. A list of the places to refuse
+ * would expose each one it left out. `*` is one folder name, a version. Paths under the home,
+ * `/`-separated.
  */
-// deno-fmt-ignore
-export const CREDENTIAL_LOCATIONS: readonly string[] = [
-  ".ssh", ".aws", ".azure", ".gnupg", ".password-store", ".cargo", ".config", ".docker",
-  ".kube", ".gradle", ".m2", ".gem", ".terraform.d", ".netrc", ".npmrc", ".git-credentials",
-  ".local/share/keyrings", "Library/Keychains",
+export const HOME_TOOLCHAINS: readonly string[] = [
+  ".cargo/bin", // what cargo installs, and rustup's proxies
+  ".rustup/toolchains", // the Rust toolchains themselves
+  ".deno/bin",
+  ".bun/bin",
+  "go/bin", // what `go install` builds
+  ".local/bin", // pip --user, pipx and uv tool commands: links into the next three
+  ".local/share/pipx/venvs",
+  ".local/share/uv/tools", // not `uv` whole: it keeps its logins in `credentials`
+  ".local/share/uv/python",
+  ".nvm/versions/node/*/bin",
+  ".nvm/versions/node/*/lib", // npm and global packages, which `bin` links into; not `etc/npmrc`
 ];
 
 /**
- * The first reason a layout would expose the home, a credential location in it, the checkout or a
- * read-only folder: `readOnly` is every folder the sandbox only reads, `path` the PATH entries
- * searched before the system's. Every path is a real path: the caller resolves links first.
+ * The first reason a layout would expose the home, a folder in it outside its toolchains, the
+ * checkout or a read-only folder: `readOnly` is every folder the sandbox only reads, `path` the
+ * PATH entries searched before the system's. Every path is a real path: the caller resolves links
+ * first.
  */
 export function layoutProblem(
   paths: SandboxPaths,
@@ -107,11 +120,25 @@ export function layoutProblem(
   return stray ? `PATH entry ${stray} is in no folder the sandbox reads` : null;
 }
 
-/** What the visible folder `p` would expose: the home, a credential location, the checkout. */
+/**
+ * What the visible folder `p` would expose: the home, the checkout, a folder in the home outside
+ * its toolchains. The tree and the scratch folder are the caller's own, made in its cache, which
+ * may lie in the home: they are not judged by the list.
+ */
 function exposureOf(p: string, paths: SandboxPaths): string | null {
   if (within(paths.home, p)) return `${p} is or holds the home folder`;
-  const held = CREDENTIAL_LOCATIONS.find((c) => within(`${paths.home}/${c}`, p));
-  if (held) return `${p} is or holds ~/${held}, where credentials are kept`;
   if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
-  return null;
+  const own = p === paths.tree || p === paths.scratch;
+  if (own || !within(p, paths.home) || inHomeToolchain(p, paths.home)) return null;
+  const listed = HOME_TOOLCHAINS.map((t) => `~/${t}`).join(", ");
+  return `${p} is in the home folder, outside every toolchain folder a sandbox reads there: ${listed}`;
+}
+
+/** Whether `p`, in `home`, is one of `HOME_TOOLCHAINS` or lies inside one. */
+function inHomeToolchain(p: string, home: string): boolean {
+  const names = p.slice(home.length + 1).split("/");
+  return HOME_TOOLCHAINS.some((entry) => {
+    const wanted = entry.split("/");
+    return wanted.length <= names.length && wanted.every((w, i) => w === "*" || w === names[i]);
+  });
 }

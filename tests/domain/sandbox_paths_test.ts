@@ -1,7 +1,7 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   ancestors,
-  CREDENTIAL_LOCATIONS,
+  HOME_TOOLCHAINS,
   layoutProblem,
   overlaps,
   pathProblem,
@@ -53,50 +53,65 @@ Deno.test("safePath: hands a plain path back, and throws with the reason otherwi
   assertThrows(() => safePath("/a,b"), Error, "cannot quote");
 });
 
-/** Every place in a home credentials are kept, written out: a location dropped from the list fails. */
-const CREDENTIALS = [
-  ".ssh",
-  ".aws",
-  ".azure",
-  ".gnupg",
-  ".password-store",
-  ".cargo",
-  ".config",
-  ".docker",
-  ".kube",
-  ".gradle",
-  ".m2",
-  ".gem",
-  ".terraform.d",
-  ".netrc",
-  ".npmrc",
-  ".git-credentials",
-  ".local/share/keyrings",
-  "Library/Keychains",
+/**
+ * Every folder under the home a sandbox may read, written out: an entry dropped from the list, or
+ * one added, fails. `*` is a version.
+ */
+const TOOLCHAINS = [
+  ".cargo/bin",
+  ".rustup/toolchains",
+  ".deno/bin",
+  ".bun/bin",
+  "go/bin",
+  ".local/bin",
+  ".local/share/pipx/venvs",
+  ".local/share/uv/tools",
+  ".local/share/uv/python",
+  ".nvm/versions/node/*/bin",
+  ".nvm/versions/node/*/lib",
 ];
 
 const readOnly = (folder: string) => layoutProblem(PATHS, [PATHS.tree, folder], []);
 
-for (const location of CREDENTIALS) {
-  Deno.test(`layoutProblem: ~/${location} is never mounted read-only`, () => {
-    const folder = `${PATHS.home}/${location}`;
-    assertEquals(
-      readOnly(folder),
-      `${folder} is or holds ~/${location}, where credentials are kept`,
-    );
+Deno.test("layoutProblem: the home's toolchain folders are the ones stated", () => {
+  assertEquals([...HOME_TOOLCHAINS], TOOLCHAINS);
+});
+
+for (const entry of TOOLCHAINS) {
+  Deno.test(`layoutProblem: ~/${entry} is read, and a folder inside it`, () => {
+    const folder = `${PATHS.home}/${entry.replace("*", "v22.11.0")}`;
+    assertEquals(readOnly(folder), null);
+    assertEquals(readOnly(`${folder}/x86_64/bin`), null);
   });
 }
 
-Deno.test("layoutProblem: the credential list is the one stated, and a folder inside one is read", () => {
-  assertEquals([...CREDENTIAL_LOCATIONS].sort(), [...CREDENTIALS].sort());
-  assertEquals(readOnly(`${PATHS.home}/.cargo/bin`), null);
-  assertEquals(readOnly(`${PATHS.home}/.local/bin`), null);
-  for (
-    const [folder, held] of [[".local", ".local/share/keyrings"], ["Library", "Library/Keychains"]]
-  ) {
-    const p = `${PATHS.home}/${folder}`;
-    assertEquals(readOnly(p), `${p} is or holds ~/${held}, where credentials are kept`);
+Deno.test("layoutProblem: any other folder under the home is refused, credential folders among them", () => {
+  const others = [
+    ".ssh",
+    ".aws",
+    ".config",
+    ".cargo",
+    ".local",
+    ".local/share",
+    ".nvm/versions/node",
+    ".nvm/versions/node/v22.11.0",
+    ".nvm/versions/node/v22.11.0/etc",
+    "Library/Keychains",
+    "tools/bin",
+    ".deno",
+    ".deno/binaries",
+  ];
+  for (const other of others) {
+    const folder = `${PATHS.home}/${other}`;
+    const why = readOnly(folder) ?? "read";
+    assertStringIncludes(why, `${folder} is in the home folder`, other);
+    assertStringIncludes(why, "~/.cargo/bin, ~/.rustup/toolchains", other);
   }
-  assertEquals(readOnly(`${PATHS.home}/.sshd`), null, "a sibling sharing a prefix");
-  assertEquals(readOnly(`${PATHS.home}/.deno/bin`), null);
+});
+
+Deno.test("layoutProblem: the tree and the scratch, made in a cache in the home, are let be", () => {
+  // Both are the caller's own folders, made in its cache: the list judges what else is read.
+  assertEquals(layoutProblem(PATHS, [PATHS.tree], []), null);
+  const beside = `${PATHS.home}/.cache/specnaut/sandbox/abc/other`;
+  assertStringIncludes(readOnly(beside) ?? "read", `${beside} is in the home folder`);
 });
