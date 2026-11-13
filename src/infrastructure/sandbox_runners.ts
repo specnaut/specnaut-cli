@@ -5,7 +5,7 @@ import { containerArgs, type ContainerRun } from "../domain/sandbox_args.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
-import { engineRunEnv } from "./sandbox_engine_env.ts";
+import { engineRunEnv, type RunEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec } from "./sandbox_process.ts";
 import { SeatbeltRunner } from "./sandbox_seatbelt_runner.ts";
 import { DRAIN_GRACE_SECONDS } from "./sandbox_wall_clock.ts";
@@ -39,27 +39,38 @@ export class ContainerRunner implements SandboxRunner {
   ) {}
 
   /**
+   * The run's engine environment is written first: the arguments name the syscall profile in it.
+   * What was written goes once the run is over, however it ends, a refused run included.
+   */
+  async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
+    const name = this.name();
+    const runEnv = await engineRunEnv(this.engine, this.hostEnv());
+    try {
+      const { dropped, cpus } = this.caps;
+      const run = { image: this.image, name, engine: this.engine, dropped, cpus };
+      const args = containerArgs(policy, { ...run, seccomp: runEnv.seccomp }, command);
+      return await this.#removed(name, runEnv, args, policy.limits.wallClockSeconds);
+    } finally {
+      runEnv.release();
+    }
+  }
+
+  /**
    * A container outlives its client, so it is removed however the run ends: at the wall clock, on
    * an interrupt, and once the run is over, which covers a client that ended early and a watchdog
    * that never started. A container left is said once, by the run's outcome or its error.
    */
-  async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
-    const name = this.name();
-    const { dropped, cpus } = this.caps;
-    const run = { image: this.image, name, engine: this.engine, dropped, cpus };
-    const args = containerArgs(policy, run, command);
-    const { env, globals, release } = await engineRunEnv(this.engine, this.hostEnv());
+  async #removed(name: string, runEnv: RunEnv, args: string[], seconds: number) {
+    const { env, globals } = runEnv;
     const remove = removalOf(this.engine, name, env);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
-      const seconds = policy.limits.wallClockSeconds;
       return await thenRemoved(this.launcher, remove, () => {
         const started = this.launcher.start({ cmd: this.engine, args: [...globals, ...args], env });
         const halt = () => removed(this.launcher, remove);
         return watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
       });
     } finally {
-      release();
       disarm();
     }
   }

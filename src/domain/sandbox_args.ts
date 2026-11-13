@@ -23,6 +23,11 @@ export type ContainerRun = {
   readonly dropped: readonly ReportedCap[];
   /** The CPUs on that engine's host (the offered backend's), or `null`: see `containerCaps`. */
   readonly cpus: number | null;
+  /**
+   * The CLI's own syscall profile (`seccompProfile`), a file written for the run: passed on the
+   * command line, it replaces the one the engine's configuration names, whatever that is.
+   */
+  readonly seccomp: string;
 };
 
 /** A name the engines accept that can never be read as a flag. */
@@ -32,20 +37,22 @@ const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
  * `run` arguments for podman or docker: a named run of an image already present (never pulled, so
  * offline), its entrypoint emptied so the command given is what runs, an init that reaps orphans
  * and forwards signals, no engine log, no network, a read-only root, no capabilities, no privilege
- * gain, the `nobody` user, the policy's caps (paged-out memory counted in the memory cap), its
- * scratch as tmpfs, the exported tree as the one read-only bind mount, the policy's variables only.
+ * gain, the CLI's own syscall profile, the `nobody` user, the policy's caps (paged-out memory
+ * counted in the memory cap), its scratch as tmpfs, the exported tree as the one read-only bind
+ * mount, the policy's variables only.
  */
 export function containerArgs(
   policy: SandboxPolicy,
   run: ContainerRun,
   command: readonly string[],
 ): string[] {
-  const { image, name } = checkedRun(run);
+  const { image, name, seccomp } = checkedRun(run);
   return [
     ...["run", "--rm", "--pull", "never", "--name", name, "--init", "--log-driver", "none"],
     ...containerNetwork(policy.network),
     ...["--entrypoint", "", "--read-only", "--cap-drop", "ALL"],
-    ...["--security-opt", "no-new-privileges", "--user", policy.user],
+    ...["--security-opt", "no-new-privileges", "--security-opt", `seccomp=${safePath(seccomp)}`],
+    ...["--user", policy.user],
     ...containerCaps(policy.limits, run),
     ...containerFolders(policy),
     ...containerEnv(policy, run.engine),

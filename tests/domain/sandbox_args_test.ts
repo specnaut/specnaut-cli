@@ -8,8 +8,10 @@ import {
   PATHS,
   policyOf,
   PROXY_NAMES,
+  runOf,
   SCRATCH_HOME,
   SCRATCH_TMP,
+  SECCOMP,
 } from "./sandbox_fixture.ts";
 
 /**
@@ -20,7 +22,7 @@ import {
 const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
 const NAME = "specnaut-gate-3f9c2a71";
-const RUN = { image: IMAGE, name: NAME, engine: "docker", dropped: [], cpus: null } as const;
+const RUN = runOf(IMAGE, NAME);
 
 const BLANKED = PROXY_NAMES.map((name) => `${name}=`);
 
@@ -48,6 +50,8 @@ const EXPECTED_CONTAINER_ARGS = [
   "ALL",
   "--security-opt",
   "no-new-privileges",
+  "--security-opt",
+  `seccomp=${SECCOMP}`,
   "--user",
   "65534:65534",
   "--pids-limit",
@@ -84,7 +88,7 @@ Deno.test("containerArgs: no network, read-only root, no capabilities, no privil
   assertEquals(after(args, "--network"), ["none"]);
   assert(args.includes("--read-only"));
   assertEquals(after(args, "--cap-drop"), ["ALL"]);
-  assertEquals(after(args, "--security-opt"), ["no-new-privileges"]);
+  assertEquals(after(args, "--security-opt"), ["no-new-privileges", `seccomp=${SECCOMP}`]);
   assertEquals(after(args, "--user"), ["65534:65534"]);
   assertEquals(args.filter((a) => a === "--cap-add" || a === "--privileged"), []);
 });

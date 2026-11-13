@@ -1,10 +1,12 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@std/assert";
+import { containerArgs } from "../../src/domain/sandbox_args.ts";
 import { AF_VSOCK, DENIED_SYSCALLS } from "../../src/domain/sandbox_seccomp.ts";
 import {
   CLONE_NAMESPACE_FLAGS,
   type ProfileRule,
   seccompProfile,
 } from "../../src/domain/sandbox_seccomp_profile.ts";
+import { after, policyOf, runOf, SECCOMP } from "./sandbox_fixture.ts";
 
 /**
  * The syscall filter a container run carries as its own: an OCI seccomp profile in the format
@@ -94,4 +96,20 @@ Deno.test("seccompProfile: a vsock socket is refused with EPERM; other families 
 Deno.test("seccompProfile: names no architecture, so the engine's own is the only one filtered", () => {
   const profile = seccompProfile() as Record<string, unknown>;
   assertEquals(Object.keys(profile).sort(), ["defaultAction", "syscalls"]);
+});
+
+const RUN = runOf(`ghcr.io/acme/dev@sha256:${"b".repeat(64)}`, "specnaut-gate-1");
+const COMMAND = ["deno", "task", "test"];
+
+Deno.test("containerArgs: on either engine, the run carries the CLI's own syscall profile", () => {
+  for (const engine of ["docker", "podman"] as const) {
+    const args = containerArgs(policyOf("container"), { ...RUN, engine }, COMMAND);
+    assertEquals(after(args, "--security-opt").filter((o) => o.startsWith("seccomp")), [
+      `seccomp=${SECCOMP}`,
+    ]);
+  }
+  for (const seccomp of ["", "unconfined", "seccomp.json", "/tmp/a,b.json", "/tmp/a\nb.json"]) {
+    const run = { ...RUN, seccomp };
+    assertThrows(() => containerArgs(policyOf("container"), run, COMMAND), Error, "", seccomp);
+  }
 });

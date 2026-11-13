@@ -10,7 +10,7 @@ import {
   STOP_LIMIT,
   unenforcedCaps,
 } from "../../src/domain/sandbox_limits.ts";
-import { after, policyOf } from "./sandbox_fixture.ts";
+import { after, policyOf, runOf } from "./sandbox_fixture.ts";
 
 /**
  * Where each resource cap is applied: a cap the data puts in a backend's arguments is in them,
@@ -18,13 +18,7 @@ import { after, policyOf } from "./sandbox_fixture.ts";
  */
 
 const COMMAND = ["deno", "task", "test"];
-const RUN = {
-  image: `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`,
-  name: "specnaut-gate-3f9c2a71",
-  engine: "docker",
-  dropped: [],
-  cpus: null,
-} as const;
+const RUN = runOf(`ghcr.io/acme/dev@sha256:${"b".repeat(64)}`, "specnaut-gate-3f9c2a71");
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
 const scope = () => after(scopeArgs(policyOf("bwrap")), "-p");

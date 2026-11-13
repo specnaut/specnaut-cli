@@ -85,7 +85,7 @@ Deno.test("probe: docker without a CPU quota runs without --cpus, and reports th
   if (backend.kind !== "container") throw new Error(`not a container: ${backend.kind}`);
   assertEquals(capsLacking(probed), ["cpus"]);
   // Docker refuses `--cpus` outright on such a host, so a run carrying it would never start.
-  const run = { ...backend, name: "specnaut-sandbox-c" };
+  const run = { ...backend, name: "specnaut-sandbox-c", seccomp: "/tmp/specnaut-engine-c/p.json" };
   const args = containerArgs(policyOf("container"), run, ["true"]);
   assertEquals(args.includes("--cpus"), false);
   assertEquals(args.includes("--memory"), true);

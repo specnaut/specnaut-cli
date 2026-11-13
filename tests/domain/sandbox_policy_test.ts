@@ -10,7 +10,7 @@ import {
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
 import { bwrapArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
-import { PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
+import { PATHS, policyOf, runOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /**
  * What a sandboxed gate may touch: a fixed environment, system and toolchain folders and the
@@ -116,15 +116,7 @@ Deno.test("sandboxPolicy: a path the backends cannot quote or that is not plain 
 
 Deno.test("sandboxPolicy: no network, loopback included, on every backend", () => {
   const image = `ghcr.io/acme/dev@sha256:${"c".repeat(64)}`;
-  const ctr = containerArgs(policyOf("container"), {
-    image,
-    name: "gate",
-    engine: "docker",
-    dropped: [],
-    cpus: null,
-  }, [
-    "true",
-  ]);
+  const ctr = containerArgs(policyOf("container"), runOf(image, "gate"), ["true"]);
   assertEquals(ctr.flatMap((a, i) => (a === "--network" ? [ctr[i + 1]] : [])), ["none"]);
   const bwrap = bwrapArgs(policyOf("bwrap"), ["true"]);
   assert(bwrap.includes("--unshare-all"));

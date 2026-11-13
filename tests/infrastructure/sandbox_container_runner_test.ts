@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { dirname, join } from "@std/path";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
-import { podmanGlobals } from "../../src/infrastructure/sandbox_engine_env.ts";
+import { podmanGlobals, SECCOMP } from "../../src/infrastructure/sandbox_engine_env.ts";
 import {
   DenoProcessLauncher,
   type ProcessLauncher,
@@ -63,6 +63,7 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs and i
     engine: "podman",
     dropped: [],
     cpus: null,
+    seccomp: join(dirname(overrideOf(launches[0])), SECCOMP),
   } as const;
   assertEquals(launches[0].spec, {
     cmd: "podman",

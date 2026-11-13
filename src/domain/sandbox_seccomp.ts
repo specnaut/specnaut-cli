@@ -11,6 +11,9 @@
  * One socket family is refused as well: vsock, which a network namespace does not isolate, and
  * which reaches the hypervisor or the host from a virtual machine.
  *
+ * {@link DENIED_SYSCALLS} and {@link AF_VSOCK} also build the container backend's profile
+ * (`sandbox_seccomp_profile.ts`): one list, so the two backends refuse the same calls.
+ *
  * Pure: the launcher hands the bytes to bubblewrap on {@link SECCOMP_FD}.
  */
 

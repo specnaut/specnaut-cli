@@ -25,6 +25,13 @@ export function policyOf(backend: SandboxedBackend, paths: SandboxPaths = PATHS)
   return result.policy;
 }
 
+/** Where a container run's syscall profile is written, as `engineRunEnv` would name it. */
+export const SECCOMP = "/tmp/specnaut-engine-x1/seccomp.json";
+
+/** A docker run of `image` named `name`: no cap dropped, CPUs unknown, its profile {@link SECCOMP}. */
+export const runOf = (image: string, name: string) =>
+  ({ image, name, engine: "docker", dropped: [], cpus: null, seccomp: SECCOMP }) as const;
+
 /** Each value that follows `flag`, in order. */
 export function after(args: readonly string[], flag: string): string[] {
   return args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));

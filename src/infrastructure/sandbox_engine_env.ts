@@ -1,5 +1,6 @@
 import { join } from "@std/path";
 import type { Engine } from "../domain/sandbox.ts";
+import { seccompProfile } from "../domain/sandbox_seccomp_profile.ts";
 
 /**
  * The environment a container engine's client starts with: what it needs to find and reach its
@@ -45,6 +46,8 @@ export function engineEnv(host: Readonly<Record<string, string>>): Record<string
   );
 }
 
+/** The CLI's syscall profile (`seccompProfile`) a run's engine reads, in the run's own folder. */
+export const SECCOMP = "seccomp.json";
 /** The empty folder a run's podman reads OCI hooks from, in the run's own folder. */
 export const HOOKS = "hooks";
 /** The empty mounts.conf a run's podman reads, in the run's own folder. */
@@ -66,10 +69,9 @@ export const MOUNTS = "mounts.conf";
  * `run.oci.*`). Mounts.conf, the other file that adds to every container, is no containers.conf
  * setting: {@link podmanGlobals} handles it.
  *
- * Left to the user's configuration, on purpose: `seccomp_profile`, whose default is a path the
- * distribution chooses (or podman's built-in profile, where that file is missing), so the CLI
- * cannot name it on every host; the run's own arguments drop every capability, forbid privilege
- * gain and run as `nobody`, which no containers.conf takes back. `label` (and `apparmor_profile`):
+ * Left out, as the run's own arguments override it: `seccomp_profile`, which the CLI's own profile
+ * ({@link SECCOMP}) replaces. Left to the user's configuration, on purpose: `label` (and
+ * `apparmor_profile`):
  * labelling is podman's default wherever SELinux is enabled; forcing it on would make the tree's
  * read-only bind mount unreadable on a host whose user turned it off to let that mount through,
  * and relabelling the mount (`:z`) would rewrite the labels of the user's own files.
@@ -103,41 +105,52 @@ export function podmanGlobals(dir: string): string[] {
 }
 
 /**
- * One run's engine environment, the options its engine takes before `run`, and how to remove what
- * was written for it.
+ * One run's engine environment, the options its engine takes before `run`, the syscall profile it
+ * is handed, and how to remove what was written for it.
  */
 export type RunEnv = {
   readonly env: Record<string, string>;
   readonly globals: readonly string[];
+  readonly seccomp: string;
   readonly release: () => void;
 };
 
 /**
- * The environment one run's `engine` client starts with: `engineEnv` of `host`, and for podman
- * {@link podmanOverride}, written for this run in a folder of its own beside the empty hooks folder
- * and mounts.conf it names, with {@link podmanGlobals}. The user's own override is replaced, not
- * merged: podman loads one override file only, and a merge would rewrite a file whose semantics
- * are podman's. Docker reads no containers.conf and is handed nothing more.
+ * The environment one run's `engine` client starts with: `engineEnv` of `host`, and the CLI's
+ * syscall profile, written for this run as {@link SECCOMP} in a folder of its own in the system's
+ * temporary folder, out of reach of anything the container runs. For podman the folder also holds
+ * {@link podmanOverride}, beside the empty hooks folder and mounts.conf it names, with
+ * {@link podmanGlobals}. The user's own override is replaced, not merged: podman loads one override
+ * file only, and a merge would rewrite a file whose semantics are podman's. Docker reads no
+ * containers.conf, and its client reads the profile itself, so a remote daemon needs no copy.
  */
 export async function engineRunEnv(
   engine: Engine,
   host: Readonly<Record<string, string>>,
 ): Promise<RunEnv> {
   const env = engineEnv(host);
-  if (engine !== "podman") return { env, globals: [], release: () => {} };
-  const dir = await Deno.makeTempDir({ prefix: "specnaut-podman-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-engine-" });
   const release = () => removeFolder(dir);
   try {
-    const path = join(dir, "containers.conf");
-    await Deno.mkdir(join(dir, HOOKS), { mode: 0o700 });
-    await Deno.writeTextFile(join(dir, MOUNTS), "", { mode: 0o600 });
-    await Deno.writeTextFile(path, podmanOverride(dir), { mode: 0o600 });
-    const globals = podmanGlobals(dir);
-    return { env: { ...env, CONTAINERS_CONF_OVERRIDE: path }, globals, release };
+    const seccomp = join(dir, SECCOMP);
+    await Deno.writeTextFile(seccomp, JSON.stringify(seccompProfile()), { mode: 0o600 });
+    if (engine !== "podman") return { env, globals: [], seccomp, release };
+    const override = await writePodmanConf(dir);
+    const podman = { ...env, CONTAINERS_CONF_OVERRIDE: override };
+    return { env: podman, globals: podmanGlobals(dir), seccomp, release };
   } catch (err) {
     release();
     throw err;
   }
+}
+
+/** Writes {@link podmanOverride} in `dir`, beside the hooks folder and mounts.conf it names. */
+async function writePodmanConf(dir: string): Promise<string> {
+  const path = join(dir, "containers.conf");
+  await Deno.mkdir(join(dir, HOOKS), { mode: 0o700 });
+  await Deno.writeTextFile(join(dir, MOUNTS), "", { mode: 0o600 });
+  await Deno.writeTextFile(path, podmanOverride(dir), { mode: 0o600 });
+  return path;
 }
 
 /** Removes `dir`; one that cannot be removed is named, not raised: the run has already ended. */
