@@ -51,7 +51,9 @@ const login = (accessExpiresAt: number): CredentialStore => ({
 });
 
 Deno.test("spec: a refused api_url is the handler's own message and exit 1", async () => {
-  const { all, err } = deps({ buildSession: () => Promise.reject(new InvalidApiUrl()) });
+  const { all, err } = deps({
+    buildSession: () => Promise.reject(new InvalidApiUrl("file:///tmp/x")),
+  });
   assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 1, apiUrl: null }, all), 1);
   assertStringIncludes(err.join("\n"), "invalid Specnaut Cloud API URL");
 });

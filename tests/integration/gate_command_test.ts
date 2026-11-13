@@ -223,7 +223,7 @@ Deno.test("gate: a refused api_url is the handler's own message and exit 1", asy
   const c = capture();
   const code = await runGate(raiseIntent(), {
     ...c.deps(null),
-    buildSession: () => Promise.reject(new InvalidApiUrl()),
+    buildSession: () => Promise.reject(new InvalidApiUrl("file:///tmp/x")),
   });
   assertEquals(code, 1);
   assertEquals(c.err.join("\n").includes("invalid Specnaut Cloud API URL"), true, c.err.join());

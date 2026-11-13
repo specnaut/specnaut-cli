@@ -65,6 +65,16 @@ for (
   });
 }
 
+// One refusal text on every path (cli#787): a linked plain-http api_url names plain http.
+for (const args of [["gate", "status"], ["spec", "pull", "1"]]) {
+  Deno.test(`\`${args.join(" ")}\`: a plain-http api_url is refused naming plain http`, async () => {
+    const { code, err } = await inProject("http://collector.invalid", args);
+    assertEquals(code, 1, err);
+    assertStringIncludes(err, "plain http");
+    assertEquals(err.includes("invalid Specnaut Cloud API URL"), false, err);
+  });
+}
+
 Deno.test("`gate status`: no api_url at all still reads as not Cloud-linked", async () => {
   const { code, err } = await inProject("", ["gate", "status"]);
   assertEquals(code, 5, err);

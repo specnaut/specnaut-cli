@@ -62,10 +62,14 @@ export function apiUrlRefusal(raw: string): string {
     : INVALID_API_URL;
 }
 
-/** An `api_url` is set, and is not a plain http(s) base: not the same as no link at all. */
+/**
+ * An `api_url` is set, and is not a plain http(s) base: not the same as no link
+ * at all. Its message is apiUrlRefusal's, so every path refuses `raw` in the
+ * same words, plain http named as the reason when it is the reason.
+ */
 export class InvalidApiUrl extends Error {
-  constructor() {
-    super(INVALID_API_URL);
+  constructor(readonly raw: string) {
+    super(apiUrlRefusal(raw));
     this.name = "InvalidApiUrl";
   }
 }
@@ -74,7 +78,7 @@ export class InvalidApiUrl extends Error {
 export function linkedApiUrl(raw: string): string | null {
   if (!raw.trim()) return null;
   const url = normalizeApiUrl(raw);
-  if (!url) throw new InvalidApiUrl();
+  if (!url) throw new InvalidApiUrl(raw);
   return url;
 }
 
