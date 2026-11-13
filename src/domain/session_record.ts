@@ -75,8 +75,15 @@ export const SESSION_REASON = {
   atStart: "at session start",
   visited: "HEAD was on this commit during the session, and the base's tip lacks it",
   reflogUnreadable: "HEAD's reflog cannot be read",
-  reflogRewritten: "HEAD's reflog no longer holds the entry the session started at, or is not " +
-    "a reflog git wrote: what HEAD was on since cannot be told",
+  /**
+   * A refusal even when `git gc` only expired entries older than the session's start, which say
+   * nothing of what HEAD did since: the mark is the reflog's leading bytes, and once they are gone
+   * nothing tells where the session's own entries begin. The reason names the commands that do it.
+   */
+  reflogRewritten: "HEAD's reflog no longer begins with the entries it held when the session " +
+    "started, or what follows them is not a reflog git wrote: `git gc` expires entries older " +
+    "than `gc.reflogExpire` (90 days unless set), and `git reflog expire` or `git reflog " +
+    "delete` removes them; what HEAD was on since cannot be told, so start a new session",
 } as const;
 
 /** The record of `tree` at `head`: each file's bytes replaced by their digest. */

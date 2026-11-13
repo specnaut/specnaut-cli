@@ -62,6 +62,17 @@ Deno.test("a reflog removed since the session started fails", async () => {
   assertEquals(reasons(await check(root, head)), rewritten);
 });
 
+Deno.test("a reflog git expired since the session started fails, saying git expired it", async () => {
+  const { root, head } = await setUp();
+  assertEquals((await check(root, head)).kind, "trusted", "a clean session");
+  await git(root, "reflog", "expire", "--expire=now", "--all");
+  const found = reasons(await check(root, head));
+  assertEquals(found, rewritten);
+  for (const why of ["git gc", "git reflog expire", "start a new session"]) {
+    assertStringIncludes(found[0].reason, why);
+  }
+});
+
 Deno.test("a reflog over the size cap fails, as a reason, never an uncaught error", async () => {
   const { root, head } = await setUp();
   await Deno.truncate(await logsHead(root), 33 * 1024 * 1024);
