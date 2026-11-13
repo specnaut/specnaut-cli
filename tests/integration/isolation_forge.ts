@@ -1,24 +1,35 @@
 /**
  * A stand-in for the forge: a listener on the host's loopback that counts the connections it
  * accepts. It runs as a perl process of its own, since the tests run without network permission.
+ *
+ * Its count is read without a wait: asked on its input, it first accepts every connection waiting
+ * in its queue, then answers. A connection made before the question is in the count, however
+ * loaded the host, so no fixed delay stands between a run ending and its connections being seen.
  */
 
 export type Forge = {
   /** `127.0.0.1:<port>`. */
   readonly address: string;
-  readonly accepted: () => number;
-  /** Resolves once `count` connections were accepted, or rejects past `ms`. */
-  readonly reached: (count: number, ms?: number) => Promise<void>;
+  /** The connections accepted so far, every one made before the call included. */
+  readonly settled: () => Promise<number>;
+  /** The listener's process, so a test can hold it still as a loaded host would. */
+  readonly pid: number;
   readonly close: () => Promise<void>;
 };
 
-const LISTEN = "use IO::Socket::INET; $| = 1; my $l = IO::Socket::INET->new(Listen => 5, " +
-  'LocalAddr => "127.0.0.1", ReuseAddr => 1) or die "listen: $!"; print $l->sockport, "\\n"; ' +
-  'while (my $c = $l->accept) { print "accepted\\n"; close $c }';
+/** Each line on its input asks for `settled`, printed once the queue is drained; EOF ends it. */
+const LISTEN = "use IO::Socket::INET; use IO::Select; $| = 1; " +
+  "my $l = IO::Socket::INET->new(Listen => 5, " +
+  'LocalAddr => "127.0.0.1", ReuseAddr => 1) or die "listen: $!"; $l->blocking(0); ' +
+  'print $l->sockport, "\\n"; my $s = IO::Select->new($l, \\*STDIN); ' +
+  "while (my @r = $s->can_read) { " +
+  'while (my $c = $l->accept) { print "accepted\\n"; close $c } ' +
+  "next unless grep { $_ != $l } @r; " +
+  'sysread(STDIN, my $q, 4096) or exit; print "settled\\n" for $q =~ /\\n/g }';
 
 const LISTENER: Deno.CommandOptions = {
   args: ["-e", LISTEN],
-  stdin: "null",
+  stdin: "piped",
   stdout: "piped",
   stderr: "inherit",
 };
@@ -29,41 +40,52 @@ export async function openForge(): Promise<Forge> {
   const first = await lines.next();
   if (first.done) {
     // It ended before listening: its exit code, and the reason it printed on our stderr, stand.
+    await child.stdin.close();
     const { code } = await child.status;
     throw new Error(`the forge stand-in exited ${code} before it listened`);
   }
   if (!/^\d+$/.test(first.value)) {
-    child.kill("SIGKILL");
+    await child.stdin.close();
     await child.status;
     throw new Error(`the forge stand-in printed ${JSON.stringify(first.value)}, not its port`);
   }
   return counted(child, first.value, lines);
 }
 
-/** The listener on `port`, counting each `accepted` line it prints until it is closed. */
+type Answer = { readonly ok: (n: number) => void; readonly fail: (e: Error) => void };
+
+/** The listener on `port`; asking for its count writes a question on its input. */
 function counted(child: Deno.ChildProcess, port: string, lines: AsyncGenerator<string>): Forge {
-  let accepted = 0;
-  const counting = (async () => {
-    for await (const _ of lines) accepted++;
-  })();
+  const answers = tally(lines);
+  const ask = child.stdin.getWriter();
   return {
     address: `127.0.0.1:${port}`,
-    accepted: () => accepted,
-    reached: async (count, ms = 5_000) => {
-      for (const until = Date.now() + ms; accepted < count; await later(50)) {
-        if (Date.now() > until) throw new Error(`${accepted} connection(s), not ${count}`);
-      }
+    settled: async () => {
+      const answer = answers.next();
+      await ask.write(new TextEncoder().encode("settled?\n"));
+      return await answer;
     },
+    pid: child.pid,
     close: async () => {
-      child.kill("SIGKILL");
+      await ask.close();
       await child.status;
-      await counting;
+      await answers.done;
     },
   };
 }
 
-function later(ms: number): Promise<void> {
-  return new Promise((ok) => setTimeout(ok, ms));
+/** Counts each `accepted` line of `lines`, and answers each `settled` one with the count. */
+function tally(lines: AsyncGenerator<string>) {
+  let accepted = 0;
+  const waiting: Answer[] = [];
+  const done = (async () => {
+    for await (const line of lines) {
+      if (line === "settled") waiting.shift()?.ok(accepted);
+      else accepted++;
+    }
+    for (const w of waiting.splice(0)) w.fail(new Error("the forge stand-in ended"));
+  })();
+  return { done, next: () => new Promise<number>((ok, fail) => waiting.push({ ok, fail })) };
 }
 
 /** The lines of `text`, as they arrive. */
