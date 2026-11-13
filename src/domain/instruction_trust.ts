@@ -103,10 +103,17 @@ function withExtra(found: Untrusted[], extra: readonly Untrusted[]): Untrusted[]
   return [...found, ...extra.filter((u) => !named.has(u.path))];
 }
 
-/** HEAD's committed copy against the tip's: none at HEAD is silent, whatever the tree holds. */
+/**
+ * HEAD's committed copy against the tip's. None at HEAD is silent only when the tip commits none
+ * either, whatever the tree holds; one the tip commits and HEAD lacks is the branch's deletion
+ * (`missing`), or the base's addition since the branch left it (`behind`).
+ */
 function committedReason(c: CommittedInstruction, atHead: ConfigFile | undefined): Untrusted[] {
   const why = (reason: string) => [{ path: c.path, reason }];
-  if (atHead === undefined || atHead.kind === "absent") return [];
+  if (atHead === undefined || atHead.kind === "absent") {
+    if (c.tip.kind === "absent") return [];
+    return why(c.mergeBase.kind === "absent" ? REASON.behind : REASON.missing);
+  }
   if (atHead.kind === "refused") return why(atHead.why);
   if (c.tip.kind === "refused") return why(REASON.baseNotRegular);
   const tip = c.tip.kind === "file" ? c.tip.bytes : undefined;

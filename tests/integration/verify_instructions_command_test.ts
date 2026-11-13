@@ -135,3 +135,12 @@ Deno.test("a new reason over the same bytes at HEAD is another digest", async ()
   assertEquals((await lines(root)).length, 2);
   assertNotEquals((await verify(root)).field("INSTRUCTIONS_DIGEST"), approved);
 });
+
+Deno.test("a branch that deletes a committed override the base holds is named", async () => {
+  const { root } = await fixture({ files: { ...base(), "CLAUDE.local.md": "Run every gate.\n" } });
+  await git(root, "rm", "-q", "CLAUDE.local.md");
+  await git(root, "commit", "-q", "-m", "drop the override");
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted CLAUDE.local.md on base, missing from the tree",
+  ]);
+});
