@@ -7,6 +7,7 @@ import type { BackendProbe, BackendStatus, Engine } from "./sandbox.ts";
 import { engineDrops } from "./sandbox_limits.ts";
 
 const NO_ROOTLESS = "no rootless podman";
+const NO_DOCKER = "no docker";
 const UNCAPPED = "rootless podman without cgroup v2 pids, memory and cpu delegated";
 const REMOTE = "podman answers from a remote service, which reads its own containers.conf";
 const UNREAD = "podman's version could not be read";
@@ -15,7 +16,6 @@ const DOCKER_ON_PODMAN =
 const DOCKER_UNREAD = "docker's components could not be read, so it may be a podman service";
 const UNFILTERED_PODMAN = "podman runs containers without a syscall filter (seccomp)";
 const UNFILTERED_DOCKER = "docker runs containers without a syscall filter (seccomp)";
-const OLD = "podman older than 4.8, whose containers.conf cannot empty a list";
 
 /**
  * The oldest podman that can run the sandbox's container: 4.8, the first to read `{append=false}`
@@ -23,8 +23,14 @@ const OLD = "podman older than 4.8, whose containers.conf cannot empty a list";
  * "APPENDING TO STRING ARRAYS"), which Podman 4.8.0 is the first to build on (4.7.2 has v0.56.0).
  * The CLI's own containers.conf empties each list with it, so that a list an earlier file marked
  * `{append=true}` cannot carry the user's entries into the container.
+ *
+ * A pre-release of 4.8 (`4.8.0-rc1`, `4.8.0-dev`) is accepted on purpose: 4.8.0-rc1 already builds
+ * on v0.57.0, and a development build from before it would refuse the CLI's containers.conf, so
+ * the run fails rather than going ahead without the reset.
  */
 const MINIMUM = { major: 4, minor: 8 };
+const OLD = `podman older than ${MINIMUM.major}.${MINIMUM.minor}, ` +
+  "whose containers.conf cannot empty a list";
 
 /** Whether podman `version` is at or above {@link MINIMUM}; `null` when it cannot be read. */
 function recentEnough(version: string | null): boolean | null {
@@ -62,7 +68,7 @@ function podmanWhy(probe: BackendProbe): string | null {
  * a daemon that starts containers without a syscall filter.
  */
 function dockerWhy(probe: BackendProbe): string | null {
-  if (!probe.docker) return "no docker";
+  if (!probe.docker) return NO_DOCKER;
   if (probe.dockerOnPodman === null) return DOCKER_UNREAD;
   if (probe.dockerOnPodman) return DOCKER_ON_PODMAN;
   return probe.dockerSeccomp ? null : UNFILTERED_DOCKER;

@@ -38,7 +38,7 @@ export type Backend =
     readonly image: string;
     /** The caps its engine drops on this host: the run goes without them, and says so. */
     readonly dropped: readonly ReportedCap[];
-    /** The CPUs on its engine's host, or `null` when the engine did not say: see `containerArgs`. */
+    /** The CPUs on its engine's host, or `null` where the engine did not say (`containerArgs`). */
     readonly cpus: number | null;
   }
   /** `scope`: run inside a systemd user scope that caps memory, processes and CPU. */

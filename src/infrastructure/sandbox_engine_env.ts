@@ -95,8 +95,8 @@ export function podmanOverride(dir: string): string {
  * The options a run's podman takes before `run`, for what no containers.conf can set: the
  * mounts.conf it reads is {@link MOUNTS}, empty, so none of the user's or the system's
  * (`~/.config/containers/mounts.conf`, `/etc/containers/mounts.conf`,
- * `/usr/share/containers/mounts.conf`) adds a folder to the container. `--default-mounts-file` is a hidden option of podman's, and the only
- * way to name that file.
+ * `/usr/share/containers/mounts.conf`) adds a folder to the container. `--default-mounts-file`
+ * is a hidden option of podman's, and the only way to name that file.
  */
 export function podmanGlobals(dir: string): string[] {
   return ["--default-mounts-file", join(dir, MOUNTS)];

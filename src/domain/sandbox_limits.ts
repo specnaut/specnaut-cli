@@ -46,8 +46,9 @@ const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
  * option ends a run on time. A container's arguments carry its caps, but its engine drops one its
  * host cannot apply ({@link engineDrops}), and the run goes without it. Neither bubblewrap nor
- * `sandbox-exec` can cap processes, memory or CPU; bubblewrap caps its scratch tmpfs by size, and gets the other three from a systemd user
- * scope where cgroups are delegated (`scopeArgs`). Nothing does so around `sandbox-exec`.
+ * `sandbox-exec` can cap processes, memory or CPU; bubblewrap caps its scratch tmpfs by size, and
+ * gets the other three from a systemd user scope where cgroups are delegated (`scopeArgs`).
+ * Nothing does so around `sandbox-exec`.
  */
 export const CAP_ENFORCEMENT: Readonly<
   Record<SandboxedBackend, Readonly<Record<keyof SandboxLimits, CapEnforcer>>>
