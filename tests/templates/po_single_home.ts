@@ -30,13 +30,15 @@ type List = { lead: string; items: string };
  * leaves the list around it open and that list's later items are read. An
  * indented paragraph continues the item it sits under, and leads a list when it
  * ends with a colon; a paragraph, heading or table row at the margin ends every
- * list. A table row is never a lead: its line ends with a pipe, not a colon.
+ * list. A heading that ends with a colon leads a list like a paragraph does; a
+ * table row never does: its line ends with a pipe, not a colon.
  */
 function introducedLists(prose: string[]): List[] {
   const lists: List[] = [];
   let open: Array<{ list: List; min: number }> = []; // min: the least indent a block of it has
   for (const block of prose) {
     const at = block.search(/\S/);
+    if (at < 0) continue; // a block that was only code has no text to open or close a list
     const item = ITEM.test(block);
     open = !item && at === 0 ? [] : open.filter((o) => at >= o.min);
     for (const o of open) o.list.items += ` ${flat(block)}`;

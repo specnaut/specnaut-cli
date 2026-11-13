@@ -85,10 +85,33 @@ Deno.test("a paragraph after the list closes it", () => {
   assert(!restates(text), "a list was read past the paragraph that ends it");
 });
 
-Deno.test("a decider is a whole word: 'browser' and 'superuser' are none", () => {
-  for (const who of ["browser", "superuser", "steam"]) {
+Deno.test("a decider is a whole word on both sides: no word that merely holds one", () => {
+  for (const who of ["superuser", "steam", "steamer"]) {
     const text = `The ${who} sets the priority and size fields in one request.`;
     assert(!restates(text), `"${who}" was read as a decider`);
   }
+  const board = "Priority and size changes are made by the leaderboard job.";
+  assert(!restates(board), `"leaderboard" was read as a decider`);
   assert(restates("The user sets the priority and size fields in one request."));
+});
+
+Deno.test("a fenced block between items leaves the list open", () => {
+  const text = [
+    "The product owner decides:",
+    "",
+    "- the priority of every item.",
+    "",
+    "  ```sh",
+    "  read-items.sh",
+    "  ```",
+    "",
+    "- the size of every item.",
+  ].join("\n");
+  assert(restates(text), "the code block closed the list");
+});
+
+Deno.test("a heading ending with a colon leads a list; a table row never does", () => {
+  const list = "\n\n- the priority of every item.\n- the size of every item.";
+  assert(restates(`## What the product owner decides:${list}`), "the heading was not a lead");
+  assert(!restates(`| The product owner decides: |${list}`), "a table row was read as a lead");
 });
