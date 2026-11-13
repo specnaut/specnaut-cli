@@ -35,6 +35,11 @@ export type BackendProbe = {
   readonly podmanRemote: boolean;
   /** What podman reported as its version (`version.Version`), or `null` when it did not. */
   readonly podmanVersion: string | null;
+  /**
+   * Podman starts a container under a syscall filter: its report has seccomp enabled
+   * (`host.security.seccompEnabled`), with a profile other than `unconfined`.
+   */
+  readonly podmanSeccomp: boolean;
   /** What podman can limit for the user on cgroup v2; every one false off it or when absent. */
   readonly podmanLimits: EngineLimits;
   /** The CPUs on podman's host, as it reports them (`host.cpus`), or `null` when it does not. */
@@ -47,6 +52,11 @@ export type BackendProbe = {
    * when its components could not be read, so it could be either.
    */
   readonly dockerOnPodman: boolean | null;
+  /**
+   * That daemon starts a container under a syscall filter: its `SecurityOptions` name seccomp
+   * (`name=seccomp`), with a profile other than `unconfined`.
+   */
+  readonly dockerSeccomp: boolean;
   /** What that daemon can limit; every one false when none answers. */
   readonly dockerLimits: EngineLimits;
   /** The CPUs on that daemon's host, as it reports them (`NCPU`), or `null` when it does not. */

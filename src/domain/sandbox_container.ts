@@ -13,6 +13,8 @@ const UNREAD = "podman's version could not be read";
 const DOCKER_ON_PODMAN =
   "docker answers from a podman service, which reads its own containers.conf";
 const DOCKER_UNREAD = "docker's components could not be read, so it may be a podman service";
+const UNFILTERED_PODMAN = "podman runs containers without a syscall filter (seccomp)";
+const UNFILTERED_DOCKER = "docker runs containers without a syscall filter (seccomp)";
 const OLD = "podman older than 4.8, whose containers.conf cannot empty a list";
 
 /**
@@ -38,13 +40,16 @@ function recentEnough(version: string | null): boolean | null {
  * controller. A remote podman is not offered: its service starts the container from its own
  * containers.conf, so the one the CLI hands a run's client, which keeps the user's variables,
  * volumes and mounts out of the container, would not apply. Nor is one older than
- * {@link MINIMUM}, or one whose version cannot be read, which may not read that file as written.
+ * {@link MINIMUM}, or one whose version cannot be read, which may not read that file as written,
+ * nor one that starts containers without a syscall filter: bubblewrap always has one, and a
+ * container is not offered with less.
  */
 function podmanWhy(probe: BackendProbe): string | null {
   if (probe.podman !== "rootless") return NO_ROOTLESS;
   if (probe.podmanRemote) return REMOTE;
   const recent = recentEnough(probe.podmanVersion);
   if (recent !== true) return recent === null ? UNREAD : OLD;
+  if (!probe.podmanSeccomp) return UNFILTERED_PODMAN;
   const { memory, pids, cpuQuota } = probe.podmanLimits;
   return memory && pids && cpuQuota ? null : UNCAPPED;
 }
@@ -53,12 +58,14 @@ function podmanWhy(probe: BackendProbe): string | null {
  * Why docker cannot run the sandbox's container, or `null` when it can. Its daemon discards a
  * limit its host cannot apply and runs, so docker is taken as it is, unless that daemon is a
  * podman service: it starts the container from its own containers.conf, as a remote podman does.
- * One whose components could not be read is not offered either: it may be such a service.
+ * One whose components could not be read is not offered either: it may be such a service. Nor is
+ * a daemon that starts containers without a syscall filter.
  */
 function dockerWhy(probe: BackendProbe): string | null {
   if (!probe.docker) return "no docker";
   if (probe.dockerOnPodman === null) return DOCKER_UNREAD;
-  return probe.dockerOnPodman ? DOCKER_ON_PODMAN : null;
+  if (probe.dockerOnPodman) return DOCKER_ON_PODMAN;
+  return probe.dockerSeccomp ? null : UNFILTERED_DOCKER;
 }
 
 /** The engine a container runs on: rootless podman first, then docker. */

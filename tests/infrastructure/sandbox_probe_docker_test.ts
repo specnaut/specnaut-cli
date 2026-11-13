@@ -20,6 +20,7 @@ const dockerInfo = (over: Record<string, unknown> = {}) =>
     SwapLimit: true,
     PidsLimit: true,
     CpuCfsQuota: true,
+    SecurityOptions: ["name=seccomp,profile=builtin", "name=cgroupns"],
     ...over,
   }));
 
@@ -141,3 +142,23 @@ for (
     assertEquals(chosen.kind === "static" && chosen.why[0], UNREAD_WHY);
   });
 }
+
+Deno.test("probe: docker filters syscalls only where its security options name a confining seccomp", async () => {
+  const filterOf = async (SecurityOptions: unknown) =>
+    (await prober("linux", daemon(dockerInfo({ SecurityOptions }))).prober.probe()).dockerSeccomp;
+  assertEquals(await filterOf(["name=seccomp,profile=builtin"]), true);
+  assertEquals(await filterOf(["name=apparmor", "name=seccomp,profile=default"]), true);
+  assertEquals(await filterOf(["name=seccomp,profile=unconfined"]), false);
+  for (const options of [["name=apparmor", "name=rootless"], [], undefined, "name=seccomp"]) {
+    assertEquals(await filterOf(options), false, JSON.stringify(options));
+  }
+});
+
+Deno.test("probe: docker without a syscall filter is not run on, and says why", async () => {
+  const off = dockerInfo({ SecurityOptions: ["name=seccomp,profile=unconfined"] });
+  const chosen = chooseBackend(await prober("linux", daemon(off)).prober.probe());
+  assertEquals(
+    chosen.kind === "static" && chosen.why[0],
+    "container: no rootless podman, and docker runs containers without a syscall filter (seccomp)",
+  );
+});

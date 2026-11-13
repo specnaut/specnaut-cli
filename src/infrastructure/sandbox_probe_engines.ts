@@ -12,20 +12,25 @@ export type Engines = { readonly runner: SubprocessRunner; readonly env: Record<
 
 type Podman = Pick<
   BackendProbe,
-  "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits" | "podmanCpus"
+  "podman" | "podmanRemote" | "podmanVersion" | "podmanSeccomp" | "podmanLimits" | "podmanCpus"
 >;
-type Docker = Pick<BackendProbe, "docker" | "dockerOnPodman" | "dockerLimits" | "dockerCpus">;
+type Docker = Pick<
+  BackendProbe,
+  "docker" | "dockerOnPodman" | "dockerSeccomp" | "dockerLimits" | "dockerCpus"
+>;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
 export const NO_PODMAN: Podman = {
   podman: "absent",
   podmanRemote: false,
   podmanVersion: null,
+  podmanSeccomp: false,
   podmanLimits: NO_LIMITS,
   podmanCpus: null,
 };
 export const NO_DOCKER: Docker = {
   docker: false,
   dockerOnPodman: false,
+  dockerSeccomp: false,
   dockerLimits: NO_LIMITS,
   dockerCpus: null,
 };
@@ -59,6 +64,8 @@ export async function probePodman({ runner, env }: Engines): Promise<Podman> {
     podman: host?.security?.rootless === true ? "rootless" : "root",
     podmanRemote,
     podmanVersion: typeof version === "string" ? version : null,
+    podmanSeccomp: host?.security?.seccompEnabled === true &&
+      host?.security?.seccompProfilePath !== UNCONFINED,
     podmanLimits: await podmanLimits(runner, host, podmanRemote),
     podmanCpus: count(host?.cpus),
   };
@@ -97,6 +104,7 @@ export async function probeDocker(engines: Engines): Promise<Docker> {
   return {
     docker: true,
     dockerOnPodman: await dockerOnPodman(engines),
+    dockerSeccomp: filtered(info.SecurityOptions),
     dockerCpus: count(info.NCPU),
     dockerLimits: {
       memory: can("MemoryLimit"),
@@ -119,6 +127,20 @@ async function dockerOnPodman({ runner, env }: Engines): Promise<boolean | null>
   const components: unknown = parsed(stdout, "docker version")?.Server?.Components;
   if (!Array.isArray(components)) return null;
   return components.some((c) => c?.Name === "Podman Engine");
+}
+
+const UNCONFINED = "unconfined";
+
+/**
+ * Whether docker's `SecurityOptions` (entries such as `name=seccomp,profile=builtin`) name seccomp
+ * with a profile other than `unconfined`; any other shape says it has none.
+ */
+function filtered(options: unknown): boolean {
+  if (!Array.isArray(options)) return false;
+  const fields = options.filter((o) => typeof o === "string")
+    .map((o: string) => new Map(o.split(",").map((f) => f.split("=", 2) as [string, string])));
+  const seccomp = fields.find((f) => f.get("name") === "seccomp");
+  return seccomp !== undefined && seccomp.get("profile") !== UNCONFINED;
 }
 
 /** `value` when it is a count (a whole number above zero), else `null`. */

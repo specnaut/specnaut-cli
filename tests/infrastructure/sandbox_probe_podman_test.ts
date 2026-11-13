@@ -24,7 +24,7 @@ const podmanInfo = (
   ok(JSON.stringify({
     version: release,
     host: {
-      security: { rootless },
+      security: { rootless, seccompEnabled: true, seccompProfilePath: SECCOMP_JSON },
       serviceIsRemote: false,
       cgroupVersion: version,
       cgroupControllers: controllers,
@@ -32,6 +32,7 @@ const podmanInfo = (
     },
   }));
 const ALL = ["cpu", "memory", "pids", "io"];
+const SECCOMP_JSON = "/usr/share/containers/seccomp.json";
 const FAILED = { code: 1, stdout: "", stderr: "" };
 
 /** The limits a probe finds with podman reporting `info`, and the trial answering `trial`. */
@@ -117,4 +118,24 @@ Deno.test("probe: the CPUs podman's host has are its host.cpus, when that is a c
 Deno.test("probe: podman whose report is not JSON is not used", async () => {
   const { probed } = await limitsOf(ok("garbled"));
   assertEquals([probed.podman, probed.podmanLimits.memory], ["absent", false]);
+});
+
+Deno.test("probe: podman filters syscalls only with seccomp enabled and a profile that confines", async () => {
+  const filterOf = async (security: Record<string, unknown>) =>
+    (await limitsOf(podmanInfo(true, "v2", ALL, { security: { rootless: true, ...security } })))
+      .probed.podmanSeccomp;
+  assertEquals(await filterOf({ seccompEnabled: true, seccompProfilePath: SECCOMP_JSON }), true);
+  assertEquals(await filterOf({ seccompEnabled: true, seccompProfilePath: "" }), true);
+  assertEquals(await filterOf({ seccompEnabled: true, seccompProfilePath: "unconfined" }), false);
+  assertEquals(await filterOf({ seccompEnabled: false, seccompProfilePath: SECCOMP_JSON }), false);
+  assertEquals(await filterOf({ seccompProfilePath: SECCOMP_JSON }), false);
+});
+
+Deno.test("probe: podman without a syscall filter is not run on, and says why", async () => {
+  const off = { security: { rootless: true, seccompEnabled: false } };
+  const chosen = chooseBackend((await limitsOf(podmanInfo(true, "v2", ALL, off))).probed);
+  assertEquals(
+    chosen.kind === "static" && chosen.why[0],
+    "container: podman runs containers without a syscall filter (seccomp), and no docker",
+  );
 });

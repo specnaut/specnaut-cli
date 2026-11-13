@@ -26,7 +26,7 @@ const UMASK = "0027";
 const MISSING = Deno.build.os !== "linux"
   ? "a local podman on Linux, as a remote client applies its machine's containers.conf"
   : containerEngine(probed) !== "podman"
-  ? "a local rootless podman 4.8 or later with the pids, memory and cpu controllers, as a run needs"
+  ? "a local rootless podman 4.8 or later, with seccomp and the pids, memory and cpu controllers"
   : isPinned(LIVE_IMAGE)
   ? null
   : "a digest-pinned image with /bin/sh, named in SPECNAUT_LIVE_IMAGE";

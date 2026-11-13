@@ -18,10 +18,12 @@ const PODMAN: BackendProbe = {
   podman: "rootless",
   podmanRemote: false,
   podmanVersion: "4.8.0",
+  podmanSeccomp: true,
   podmanLimits: ALL,
   podmanCpus: null,
   docker: false,
   dockerOnPodman: false,
+  dockerSeccomp: true,
   dockerLimits: ALL,
   dockerCpus: null,
   bwrap: "absent",
@@ -157,3 +159,13 @@ for (const controller of ["memory", "pids", "cpuQuota"] as const) {
     assertEquals(firstWhy(lacking), UNCAPPED_WHY);
   });
 }
+
+Deno.test("container: an engine without a syscall filter is passed over, with its reason", () => {
+  const unfiltered = probe({ podmanSeccomp: false });
+  assertEquals(chooseBackend({ ...unfiltered, docker: true }), ON_DOCKER);
+  assertEquals(
+    firstWhy(probe({ podmanSeccomp: false, docker: true, dockerSeccomp: false })),
+    "container: podman runs containers without a syscall filter (seccomp), and docker runs " +
+      "containers without a syscall filter (seccomp)",
+  );
+});
