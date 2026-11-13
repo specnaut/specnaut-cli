@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
+import { untilWallClock } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import { capture, detaching, killNamed, live, NO_PERL } from "./sandbox_live_fixture.ts";
 
 /**
@@ -96,6 +97,8 @@ Deno.test({
       const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
       const started = launcher.start({ cmd: "/bin/sh", args: ["-c", "exit 0"], env: {} });
       assertEquals(await started.exited, 0);
+      // Its end kills the group alone: by then its pid is reaped, and may be a stranger's.
+      assertEquals(kills, [-started.pid]);
       const before = kills.length;
       // Its id may belong to another process group by now: a signal could reach a stranger.
       started.stop();
@@ -116,6 +119,35 @@ Deno.test({
     }, () => {
       throw new Error("kill refused");
     }),
+});
+
+/** The real `Deno.kill`, for a stand-in that hands some kills on to it. */
+const REAL_KILL = Deno.kill;
+
+/** A kill that finds no process group (`NotFound`), as when the leader has left its own. */
+const groupGone: typeof Deno.kill = (pid, signal) => {
+  if (pid < 0) throw new Deno.errors.NotFound("no such process group");
+  REAL_KILL(pid, signal);
+};
+
+Deno.test({
+  name: "DenoProcessLauncher: at the deadline a leader whose group is gone is killed by its pid",
+  ignore: !POSIX,
+  fn: () =>
+    // The launcher's process leads a session of its own, which POSIX forbids from changing its
+    // group: the group's kill finding nothing is stood in for, the leader itself is real.
+    recordingKills(async (kills) => {
+      const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
+      const started = launcher.start({ cmd: "/bin/sleep", args: [MARKER], env: {} });
+      try {
+        const run = untilWallClock(started, 0.2, undefined, 0.2);
+        const outcome = await Promise.race([run, later(3000, "outlived the deadline")]);
+        assertEquals(outcome, { kind: "timed_out", seconds: 0.2 });
+        assertEquals(kills.includes(started.pid), true, "the leader was never killed by its pid");
+      } finally {
+        killNamed(`/bin/sleep ${MARKER}`);
+      }
+    }, groupGone),
 });
 
 Deno.test({
