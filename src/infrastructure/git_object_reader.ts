@@ -99,6 +99,20 @@ export class GitObjects implements GitObjectReader {
     return [...folders, ...await withBytes(this.#git, commit, kept)];
   }
 
+  async listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]> {
+    const folded = names.map((n) => n.toLowerCase());
+    const parts = this.projectPrefix.split("/").filter(Boolean);
+    const out: BaseEntry[] = [];
+    for (let up = 1; up <= parts.length; up++) {
+      const dir = parts.slice(0, parts.length - up).map((p) => `${p}/`).join("");
+      const listed = await lsTree(this.#git, dir, commit, dir === "" ? [] : ["--", dir]);
+      const kept = listed.filter((r) => folded.includes(r.path.toLowerCase()));
+      const entries = await withBytes(this.#git, commit, kept);
+      out.push(...entries.map((e) => ({ ...e, path: `${"../".repeat(up)}${e.path}` })));
+    }
+    return out;
+  }
+
   async readFile(commit: string, path: string): Promise<BaseFile> {
     const [record] = await lsTree(this.#git, this.projectPrefix, commit, [
       "--",

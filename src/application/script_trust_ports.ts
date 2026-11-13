@@ -54,6 +54,12 @@ export interface GitObjectReader {
    * target: no pathspec, so letter case is the caller's to judge. A kept blob over the cap is a throw.
    */
   listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]>;
+  /**
+   * The files directly in each folder above the project's, up to the repository's top, whose name
+   * is one of `names` but for letter case, a link with its target; none when the project is at the
+   * top. Paths are relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.
+   */
+  listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]>;
   /** One path at `commit`; a blob over the cap is a throw. */
   readFile(commit: string, path: string): Promise<BaseFile>;
   /** The paths changed between two commits, from the repository's top. */

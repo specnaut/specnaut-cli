@@ -118,7 +118,8 @@ function landReasons(reasons: Map<string, string>, sides: Sides): void {
   }
 }
 
-function sameEntry(a: BaseEntry, b: BaseEntry | undefined): boolean {
+/** Whether `b` is `a` as git stores it: the same bytes, the same link, a submodule. */
+export function sameEntry(a: BaseEntry, b: BaseEntry | undefined): boolean {
   if (b === undefined) return false;
   if (a.kind === "blob") return b.kind === "blob" && sameBytes(a.bytes, b.bytes);
   if (a.kind === "link") return b.kind === "link" && a.target === b.target;

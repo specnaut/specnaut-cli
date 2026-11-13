@@ -12,6 +12,11 @@ import {
   INSTRUCTION_SCOPE,
   judgeInstructions,
 } from "../domain/instruction_trust.ts";
+import {
+  PARENT_INSTRUCTIONS,
+  parentReasons,
+  type ParentSides,
+} from "../domain/instruction_parents.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
@@ -70,7 +75,8 @@ export type InstructionOutcome = {
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
  * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class,
- * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`).
+ * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`), and the files above
+ * a project in a subfolder (`instruction_parents.ts`).
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
@@ -82,9 +88,18 @@ export async function verifyInstructions(
   const committed = await readCommitted(deps.git, base);
   const symlinks = await deps.git.symlinks();
   const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
-  const extra = await shippedReasons(files, shipped);
+  const parents = await readParents(deps.git, base);
+  const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
-  return { verdicts, digest: await headDigest(files, await linkEnds(deps.git, base.head, files)) };
+  const ends = await linkEnds(deps.git, base.head, files);
+  return { verdicts, digest: await headDigest([...files, ...parents.head], ends) };
+}
+
+/** The files above the project ({@link PARENT_INSTRUCTIONS}) at HEAD, the tip and the merge base. */
+async function readParents(git: GitObjectReader, base: InstructionBase): Promise<ParentSides> {
+  const head = await git.listParents(base.head, PARENT_INSTRUCTIONS);
+  const tip = await git.listParents(base.tip, PARENT_INSTRUCTIONS);
+  return { head, tip, mergeBase: await git.listParents(base.mergeBase, PARENT_INSTRUCTIONS) };
 }
 
 /**

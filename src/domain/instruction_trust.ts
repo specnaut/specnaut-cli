@@ -62,7 +62,8 @@ export type InstructionInput = {
   readonly symlinks: boolean;
   /**
    * Reasons judged beside the walk, at HEAD: a shipped skill against the copy Specnaut ships
-   * (`shipped_skills.ts`). A path the walk already named keeps the walk's reason.
+   * (`shipped_skills.ts`), the files above a project in a subfolder (`instruction_parents.ts`).
+   * A path the walk already named keeps the walk's reason.
    */
   readonly extra?: readonly Untrusted[];
 };
