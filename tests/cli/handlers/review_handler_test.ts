@@ -73,6 +73,22 @@ Deno.test("end says whether it removed an export, and fails when the copy change
   assertStringIncludes(said[2], "seats/a differs from the commit");
 });
 
+Deno.test("end that throws is reported through the handler's own failure, escaped", async () => {
+  const said: string[] = [];
+  const code = await runReview({ kind: "review", sub: "end", sha: SHA }, {
+    out: (s) => said.push(`out ${s}`),
+    err: (s) => said.push(`err ${s}`),
+    gate: () => Promise.reject(new Error("unreached")),
+    guard: () => Promise.reject(new Error("unreached")),
+    trust: () => Promise.reject(new Error("unreached")),
+    end: () => Promise.reject(new Error("removal refused \x1b[2J")),
+    start: () => Promise.reject(new Error("unreached")),
+  });
+  assertEquals(code, 1);
+  assertStringIncludes(said.join("\n"), "removal refused");
+  assertEquals(said.join("\n").includes("\x1b[2J"), false);
+});
+
 Deno.test("guard and gate each run their own hook's check, and answer with its exit", async () => {
   const ran: string[] = [];
   const deps = {

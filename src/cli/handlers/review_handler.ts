@@ -61,7 +61,7 @@ export async function runReview(intent: ReviewIntent, deps = defaultDeps()): Pro
     return decision.trusted ? EXIT.done : EXIT.failed;
   }
   try {
-    if (intent.sub === "end") return end(deps, intent.sha);
+    if (intent.sub === "end") return await end(deps, intent.sha);
     return await start(deps, intent.source);
   } catch (err) {
     return fail(deps, intent.sub, err instanceof Error ? err.message : String(err));
