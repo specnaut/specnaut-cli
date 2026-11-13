@@ -97,7 +97,8 @@ Deno.test("ContainerRunner: a container already gone is removed, on docker befor
   for (
     const said of ["Error: No such container: ", "Error response from daemon: No such container: "]
   ) {
-    const { launcher } = removing(0, [{ code: 1, stderr: `${said}${NAME}\n` }]);
+    // `\r\n` as a Windows client ends the line.
+    const { launcher } = removing(0, [{ code: 1, stderr: `${said}${NAME}\r\n` }]);
     assertEquals(await runOn(launcher), { kind: "exited", code: 0 });
   }
 });
@@ -168,8 +169,12 @@ Deno.test("ContainerRunner: a removal whose end cannot be read is not called one
 
 Deno.test("ContainerRunner: a halt that removed the container drops a later removal's failure", async () => {
   // The halt at the wall clock succeeded, so the container is gone whatever the last removal says.
-  const { launcher } = removing(null, [{ code: 0 }, { code: 1, stderr: "daemon down\n" }]);
+  const { launcher, launches } = removing(null, [{ code: 0 }, {
+    code: 1,
+    stderr: "daemon down\n",
+  }]);
   const { result, errors } = await quiet(() => runOn(launcher, 0.01));
   assertEquals(result, { kind: "timed_out", seconds: 0.01 });
   assertEquals(errors, []);
+  assertEquals(launches.filter((l) => l.spec.args[0] === "rm").length, 2);
 });

@@ -110,4 +110,7 @@ Deno.test("uncaughtText: a thrown value with no string form is shown as unprinta
   });
   assertEquals(uncaughtText(err), `Uncaught ${UNPRINTABLE}`);
   assertEquals(uncaughtText("plain"), "Uncaught plain");
+  const numbered = new Error("kept");
+  (numbered as { stack: unknown }).stack = 42;
+  assertEquals(uncaughtText(numbered), "Uncaught Error: kept");
 });

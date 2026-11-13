@@ -96,12 +96,18 @@ export function errorText(err: unknown): string {
 export function uncaughtText(err: unknown): string {
   let said: string;
   try {
-    said = err instanceof Error ? err.stack ?? `${err.name}: ${err.message}` : String(err);
+    said = err instanceof Error ? stackOf(err) : String(err);
   } catch {
     // A value with no string form, or whose stack getter throws: the printer must not throw too.
     said = UNPRINTABLE;
   }
   return `Uncaught ${inertText(said)}`;
+}
+
+/** An error's stack, or its name and message where the stack is not a string. */
+function stackOf(err: Error): string {
+  const stack: unknown = err.stack;
+  return typeof stack === "string" ? stack : `${err.name}: ${err.message}`;
 }
 
 /** What `uncaughtText` shows for a thrown value it cannot turn into text. */

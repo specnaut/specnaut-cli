@@ -28,23 +28,30 @@ export async function readSameEntry(
   stats: EntryStats = SYSTEM_STATS,
 ): Promise<string> {
   if (!seen.isFile) throw changedStagedEntryRefusal(root, full);
-  const file = await Deno.open(full, { read: true });
-  let info: Deno.FileInfo;
-  try {
-    info = await stats.fstat(file);
-  } catch (err) {
-    file.close();
-    throw err;
-  }
-  if (!sameEntry(seen, info)) {
-    file.close();
-    throw changedStagedEntryRefusal(root, full);
-  }
+  const file = await openSameEntry(root, full, seen, stats);
   const text = await new Response(file.readable).text();
   if (seen.ino === null && !sameEntry(seen, await stats.lstat(full))) {
     throw changedStagedEntryRefusal(root, full);
   }
   return text;
+}
+
+/** `full` opened, once its handle is checked to be the entry `seen` describes; else refused. */
+async function openSameEntry(
+  root: string,
+  full: string,
+  seen: Deno.FileInfo,
+  stats: EntryStats,
+): Promise<Deno.FsFile> {
+  const file = await Deno.open(full, { read: true });
+  try {
+    if (sameEntry(seen, await stats.fstat(file))) return file;
+  } catch (err) {
+    file.close();
+    throw err;
+  }
+  file.close();
+  throw changedStagedEntryRefusal(root, full);
 }
 
 /** The two stat calls `readSameEntry` makes: the open handle's, and the path's after the read. */

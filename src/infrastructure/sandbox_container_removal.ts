@@ -32,7 +32,7 @@ export async function removed(
   try {
     started = launcher.start(remove);
   } catch (err) {
-    return `${what} could not start: ${(err as Error).message}`;
+    return `${what} could not start: ${messageOf(err)}`;
   }
   try {
     const code = await started.exited;
@@ -40,7 +40,7 @@ export async function removed(
     if (code === 0 || alreadyGone(remove, said)) return null;
     return said === "" ? `${what} exited ${code}` : `${what} exited ${code}: ${said}`;
   } catch (err) {
-    return `${what} started, but its end could not be read: ${(err as Error).message}`;
+    return `${what} started, but its end could not be read: ${messageOf(err)}`;
   }
 }
 
@@ -77,7 +77,7 @@ export async function thenRemoved(
   } catch (err) {
     const failed = await removed(launcher, remove);
     if (failed === null) throw err;
-    const why = err instanceof Error ? err.message : String(err);
+    const why = messageOf(err);
     throw new Error(`${why}; ${LEFT}: ${failed}`, { cause: err });
   }
   return withRemoval(outcome, await removed(launcher, remove));
@@ -92,3 +92,5 @@ function withRemoval(outcome: RunOutcome, failed: string | null): RunOutcome {
   const { seconds } = outcome;
   return failed === null ? { kind: "timed_out", seconds } : { ...outcome, haltFailed: failed };
 }
+
+const messageOf = (err: unknown) => err instanceof Error ? err.message : String(err);
