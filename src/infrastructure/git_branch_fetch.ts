@@ -34,6 +34,13 @@ export const PINNED_FSCK_CHECKS: readonly string[] = [
 /** The transports a fetch may use: authenticated ones only, never `file`, `git` or `ext`. */
 export const DEFAULT_PROTOCOLS: readonly string[] = ["https", "ssh"];
 
+/**
+ * Transports pinned to `never` one by one before the allowlist: a `protocol.<name>.allow=always`
+ * in the user's configuration outranks `protocol.allow=never`, and only a command-line setting
+ * outranks it. One the allowlist names is allowed again after them, the later setting winning.
+ */
+export const REFUSED_PROTOCOLS: readonly string[] = ["file", "ext", "git", "http"];
+
 export const FETCH_TIMEOUT_MS = 120_000;
 
 export type FetchOptions = {
@@ -49,11 +56,12 @@ export function fetchArgs(url: string, refspec: string, protocols: readonly stri
   return [
     ...UNTRUSTED_GIT_FLAGS,
     "-c", "protocol.allow=never",
+    ...REFUSED_PROTOCOLS.flatMap((p) => ["-c", `protocol.${p}.allow=never`]),
     ...protocols.flatMap((p) => ["-c", `protocol.${p}.allow=always`]),
     "-c", "protocol.version=2",
     "-c", "transfer.fsckObjects=true", "-c", "fetch.fsckObjects=true",
     ...PINNED_FSCK_CHECKS.flatMap((id) => ["-c", `fetch.fsck.${id}=error`]),
-    "-c", "transfer.bundleURI=false",
+    "-c", "transfer.bundleURI=false", "-c", "fetch.bundleURI=",
     "-c", "fetch.recurseSubmodules=false", "-c", "fetch.writeCommitGraph=false",
     "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
     "--no-auto-gc", "--", url, `${refspec}:${FETCHED_REF}`,

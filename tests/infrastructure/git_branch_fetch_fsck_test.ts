@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { ExportRefused } from "../../src/application/untrusted_review_ports.ts";
 import {
@@ -42,10 +42,24 @@ Deno.test("each fsck check git leaves at a warning is pinned to an error", () =>
   );
 });
 
-Deno.test("no bundle a server advertises is fetched", () => {
+Deno.test("no bundle a server advertises is fetched, nor one the configuration names", () => {
   const set = configs(fetchArgs("u", "r", ["https"]));
-  assertEquals(set.includes("transfer.bundleURI=false"), true);
   assertEquals(set.filter((c) => c.startsWith("transfer.bundleURI")), ["transfer.bundleURI=false"]);
+  assertEquals(set.filter((c) => c.startsWith("fetch.bundleURI")), ["fetch.bundleURI="]);
+});
+
+Deno.test("each refused transport is pinned to never, before the allowlist re-allows one", () => {
+  const set = configs(fetchArgs("u", "r", ["https", "ssh"]));
+  for (const p of ["file", "ext", "git", "http"]) {
+    assertEquals(
+      set.filter((c) => c.startsWith(`protocol.${p}.`)),
+      [`protocol.${p}.allow=never`],
+      p,
+    );
+  }
+  const allowed = configs(fetchArgs("u", "r", ["file"]));
+  const at = (c: string) => allowed.indexOf(c);
+  assert(at("protocol.file.allow=never") < at("protocol.file.allow=always"), "the allowlist wins");
 });
 
 /**
@@ -88,7 +102,8 @@ Deno.test("a tree fsck reports at a warning is refused, though the user's config
       await git(remote, ["update-ref", `refs/heads/${check}`, await commit(remote, bad)]);
       const source = { kind: "ref", remote: "origin", branch: check } as const;
       const out = join(base, `${check}.git`);
-      await assertRejects(() => fetcher.fetch(source, out), ExportRefused, "fsck", check);
+      const err = await assertRejects(() => fetcher.fetch(source, out), ExportRefused);
+      assertStringIncludes(err.message, `${check}:`, `refused, but not by ${check}`);
     }
   } finally {
     await Deno.remove(base, { recursive: true });

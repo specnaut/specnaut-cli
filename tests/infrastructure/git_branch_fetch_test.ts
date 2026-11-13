@@ -31,7 +31,7 @@ Deno.test("the fetch pins its transports, takes no tag or submodule, and runs fs
       "fetch.recurseSubmodules=false",
     ]
   ) assertEquals(configs.includes(c), true, c);
-  assertEquals(configs.some((c) => c.startsWith("protocol.file")), false);
+  assertEquals(configs.filter((c) => c.startsWith("protocol.file")), ["protocol.file.allow=never"]);
   for (const flag of ["--no-tags", "--no-recurse-submodules"]) {
     assertEquals(args.includes(flag), true, flag);
   }
