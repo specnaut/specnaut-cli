@@ -72,7 +72,7 @@ Deno.test({
         runSync: (spec) => real.runSync(spec),
         start: (spec) => {
           const started = real.start(spec);
-          if (spec.args[0] === "run") {
+          if (subcommandOf(spec.args) === "run") {
             appeared(name).then(() => Deno.kill(started.pid, "SIGKILL"), (err) => {
               console.error(`the client was never killed: ${(err as Error).message}`);
             });
@@ -131,3 +131,13 @@ Deno.test({
     }
   },
 });
+
+/**
+ * An engine call's subcommand: the first word after the global `--option value` pairs podman is
+ * given before it (`--default-mounts-file <file>`), so a hook keyed on `run` still finds it.
+ */
+function subcommandOf(args: readonly string[]): string | undefined {
+  let i = 0;
+  while (args[i]?.startsWith("--")) i += 2;
+  return args[i];
+}
