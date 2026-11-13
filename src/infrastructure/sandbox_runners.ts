@@ -24,8 +24,8 @@ import { watchdogSpec } from "./sandbox_watchdog.ts";
 /**
  * The run's container, named so it can be removed when the wall clock runs out or we are stopped.
  * The engine's client, and each removal, start with `engineRunEnv` of ours, read at the run, the
- * client with the options it gives before `run`. What it wrote is released once the run is over;
- * on an interrupt it is left, as the watchdog's removal still reads it.
+ * client with the options it gives before `run`. What it wrote is released once the run is over,
+ * and on an interrupt as `releaseOnExit` says: podman's is left for the watchdog's removal.
  */
 export class ContainerRunner implements SandboxRunner {
   constructor(
@@ -63,7 +63,10 @@ export class ContainerRunner implements SandboxRunner {
   async #removed(name: string, runEnv: RunEnv, args: string[], seconds: number) {
     const { env, globals } = runEnv;
     const remove = removalOf(this.engine, name, env);
-    const disarm = armExitTrap(() => void this.launcher.runSync(remove));
+    const disarm = armExitTrap(() => {
+      this.launcher.runSync(remove);
+      runEnv.releaseOnExit();
+    });
     try {
       return await thenRemoved(this.launcher, remove, () => {
         const started = this.launcher.start({ cmd: this.engine, args: [...globals, ...args], env });

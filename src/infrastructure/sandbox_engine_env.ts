@@ -106,13 +106,17 @@ export function podmanGlobals(dir: string): string[] {
 
 /**
  * One run's engine environment, the options its engine takes before `run`, the syscall profile it
- * is handed, and how to remove what was written for it.
+ * is handed, and how to remove what was written for it: `release` once the run is over, and
+ * `releaseOnExit` when the CLI is stopped, after the container's removal. That one keeps podman's
+ * folder, as the watchdog's removal, which outlives the CLI, still reads the containers.conf in
+ * it; docker's goes, as its client read the profile when the run started.
  */
 export type RunEnv = {
   readonly env: Record<string, string>;
   readonly globals: readonly string[];
   readonly seccomp: string;
   readonly release: () => void;
+  readonly releaseOnExit: () => void;
 };
 
 /**
@@ -134,10 +138,10 @@ export async function engineRunEnv(
   try {
     const seccomp = join(dir, SECCOMP);
     await Deno.writeTextFile(seccomp, JSON.stringify(seccompProfile()), { mode: 0o600 });
-    if (engine !== "podman") return { env, globals: [], seccomp, release };
+    if (engine !== "podman") return { env, globals: [], seccomp, release, releaseOnExit: release };
     const override = await writePodmanConf(dir);
     const podman = { ...env, CONTAINERS_CONF_OVERRIDE: override };
-    return { env: podman, globals: podmanGlobals(dir), seccomp, release };
+    return { env: podman, globals: podmanGlobals(dir), seccomp, release, releaseOnExit: () => {} };
   } catch (err) {
     release();
     throw err;
