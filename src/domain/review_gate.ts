@@ -11,7 +11,8 @@
  * Whether a shell command line starts such a review: the words `review start`, wherever they are
  * on the line. Wider than the command itself on purpose: a line it takes wrongly only costs a
  * check. A pass lives only until the next command, every other one removing it, and the start
- * refuses any option or `--`, so a line the gate misses meets a start that finds no pass.
+ * refuses any option or `--` but a trailing `--expect <sha>`, so a line the gate misses meets a
+ * start that finds no pass.
  *
  * A line it matches and lets through is rewritten to carry the pass's nonce ({@link passedCommand}),
  * and the start takes only the pass its nonce names: a start the gate never saw carries none. The

@@ -181,6 +181,7 @@ Deno.test("start --expect refuses a fetched head other than the one the forge re
     const refused = await startOver(["origin/topic", "--expect", other], exporter());
     assertEquals(refused.code, 1, refused.said);
     assertStringIncludes(refused.said, `the fetched head is ${head}, not ${other}`);
+    assertStringIncludes(refused.said, "this session stays under the review lock");
     const started = await startOver(["origin/topic", "--expect", head], exporter());
     assertEquals(started.code, 0, started.said);
     assertStringIncludes(started.said, `out HEAD ${head}`);

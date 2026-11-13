@@ -11,6 +11,11 @@ export class ExportRefused extends Error {
   override name = "ExportRefused";
 }
 
+/** The fetched head is not the one the caller was told to expect (`ExportRequest.expectedSha`). */
+export class UnexpectedHead extends ExportRefused {
+  override name = "UnexpectedHead";
+}
+
 export interface BranchFetcher {
   /** The remote names configured in the user's repository. */
   remotes(): Promise<string[]>;

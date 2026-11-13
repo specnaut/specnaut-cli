@@ -2,6 +2,7 @@ import { type CheckoutState, isPassNonce, passHolds, sameCheckout } from "../dom
 import { isSessionId } from "../domain/session_record.ts";
 import type { ReviewPass } from "./review_ports.ts";
 import type { BranchExport } from "./untrusted_review.ts";
+import { UnexpectedHead } from "./untrusted_review_ports.ts";
 
 /**
  * Starts a review that cannot trust its branch: takes the pass the checkout gate left, then
@@ -54,6 +55,13 @@ export const CHANGED_PASS = "the checkout changed since its verdict: run this co
 
 export const NO_SESSION = "the checkout verdict names no session to lock: run this command again";
 
+/**
+ * Said after a head other than the expected one: the session was locked before the fetch, and no
+ * lock is ever lifted, so the review of the new head is a new session's.
+ */
+export const LOCKED_AFTER_MISMATCH = "this session stays under the review lock: start a new " +
+  "session to review the branch at the head the remote reports now";
+
 export async function startReview(
   deps: StartDeps,
   source: string,
@@ -72,8 +80,23 @@ export async function startReview(
   }
   if (!isSessionId(granted.session)) return { kind: "refused", why: NO_SESSION };
   await deps.lock(granted.session);
-  const exported = await deps.exportBranch(source, expectedSha);
+  const exported = await exportOrRefusal(deps, source, expectedSha);
+  if (typeof exported === "string") return { kind: "refused", why: exported };
   await deps.record(granted.session, { head: exported.sha, logs: exported.logs });
   exported.keep();
   return { kind: "started", exported };
+}
+
+/** The export, or why it is refused once the session is locked: a head other than expected. */
+async function exportOrRefusal(
+  deps: StartDeps,
+  source: string,
+  expectedSha: string | undefined,
+): Promise<BranchExport | string> {
+  try {
+    return await deps.exportBranch(source, expectedSha);
+  } catch (err) {
+    if (!(err instanceof UnexpectedHead)) throw err;
+    return `${err.message}; ${LOCKED_AFTER_MISMATCH}`;
+  }
 }

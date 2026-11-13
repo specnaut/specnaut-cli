@@ -1,6 +1,8 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { UnexpectedHead } from "../../src/application/untrusted_review_ports.ts";
 import {
   CHANGED_PASS,
+  LOCKED_AFTER_MISMATCH,
   MOVED_PASS,
   NO_PASS,
   NO_SESSION,
@@ -85,6 +87,21 @@ Deno.test("a start hands the head the caller expects to the export", async () =>
   const expected = "b".repeat(40);
   assertEquals((await startReview(deps(NOW - 1000, done), "12", expected)).kind, "started");
   assertEquals(done[2], `export 12 ${expected}`);
+});
+
+Deno.test("a head other than the expected one is refused, the session left locked and said so", async () => {
+  const done: string[] = [];
+  const mismatch = () => Promise.reject(new UnexpectedHead("the fetched head is a, not b"));
+  const outcome = await startReview(
+    { ...deps(NOW - 1000, done), exportBranch: mismatch },
+    "12",
+    "b",
+  );
+  assertEquals(outcome, {
+    kind: "refused",
+    why: `the fetched head is a, not b; ${LOCKED_AFTER_MISMATCH}`,
+  });
+  assertEquals(done, ["taken", "lock s-1"], "locked, and nothing recorded or kept");
 });
 
 Deno.test("an export the lock could not record is not kept", async () => {

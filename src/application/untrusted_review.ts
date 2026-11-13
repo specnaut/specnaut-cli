@@ -14,6 +14,7 @@ import {
   ExportRefused,
   type ExportStore,
   type TreeObjects,
+  UnexpectedHead,
 } from "./untrusted_review_ports.ts";
 
 /**
@@ -100,7 +101,7 @@ async function removeAfter(store: ExportStore, failure: unknown): Promise<void> 
 function checkedHead(sha: string, expected: string | undefined): string {
   if (!isFullSha(sha)) throw new ExportRefused("the fetched ref names no full commit id");
   if (expected !== undefined && sha !== expected) {
-    throw new ExportRefused(`the fetched head is ${sha}, not ${expected}`);
+    throw new UnexpectedHead(`the fetched head is ${sha}, not ${expected}`);
   }
   return sha;
 }
