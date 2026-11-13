@@ -21,8 +21,11 @@ const git = {
 const walker = (walk: CheckoutWalk): CheckoutTreeWalker => ({ walk: () => Promise.resolve(walk) });
 const entries = (...e: CheckoutEntry[]): CheckoutWalk => ({ kind: "walked", entries: e });
 
-async function gates(walk: CheckoutWalk) {
-  const verdicts = await verifyConfig({ git, tree: walker(walk) }, { tip: "t", mergeBase: "m" });
+async function gates(walk: CheckoutWalk, reader: GitObjectReader = git) {
+  const verdicts = await verifyConfig({ git: reader, tree: walker(walk) }, {
+    tip: "t",
+    mergeBase: "m",
+  });
   const v = verdicts.find((x) => x.class === "gates")!;
   return v.trusted ? "trusted" : v.reason;
 }
@@ -68,4 +71,22 @@ Deno.test("the commits are read one at a time, never side by side", async () => 
     mergeBase: "m",
   });
   assertEquals([verdicts.length, most], [6, 1]);
+});
+
+Deno.test("an entry that is no regular file, or cannot be read, is refused with its reason", async () => {
+  assertEquals(await gates(entries({ kind: "other", path: GATES })), REASON.notRegular);
+  const unreadable = { kind: "unreadable" as const, path: GATES, why: "permission denied" };
+  assertEquals(await gates(entries(unreadable)), "unreadable: permission denied");
+});
+
+Deno.test("a base path that is no regular file is refused at the tip, and ignored at the merge base", async () => {
+  const at = (refused: string): GitObjectReader => ({
+    readFile: (commit: string, path: string): Promise<BaseFile> =>
+      commit === refused && path === GATES
+        ? Promise.resolve({ kind: "not_regular" })
+        : git.readFile(commit, path),
+  } as unknown as GitObjectReader);
+  const tree = entries({ kind: "file", path: GATES, bytes, links: 1 });
+  assertEquals(await gates(tree, at("t")), REASON.baseNotRegular);
+  assertEquals(await gates(tree, at("m")), "trusted");
 });
