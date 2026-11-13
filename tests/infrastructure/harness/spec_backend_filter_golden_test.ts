@@ -34,6 +34,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // cli#774 re-captured plan's: its Re-entry section moved to plan-reentry.md behind a pointer.
 // Review's golden re-captured when its Phase 2 gate table moved to review-gates.md behind a
 // pointer, and its step 0 began sending a PR or a remote branch to review-untrusted.md.
+// Re-captured when step 0 wrote the PR's commit out (`<sha>`, no shell variable) and stopped a
+// PR review short of the fix loop and the merge.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
