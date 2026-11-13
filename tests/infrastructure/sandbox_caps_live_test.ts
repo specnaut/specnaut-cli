@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert } from "@std/assert";
 import { execInSandbox } from "../../src/application/sandbox_exec.ts";
 import type { RunOutcome } from "../../src/application/sandbox_ports.ts";
 import { runSandbox } from "../../src/cli/handlers/sandbox_handler.ts";
@@ -17,7 +17,7 @@ import {
 import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
 import { deps, EXEC, MAC } from "../cli/sandbox_handler_fixture.ts";
 import { PATHS } from "../domain/sandbox_fixture.ts";
-import { type Bomb, BOMBS, type Cap, HANG, START } from "./sandbox_caps_bombs.ts";
+import { type Bomb, BOMBS, type Cap, expectedVerdicts, HANG, START } from "./sandbox_caps_bombs.ts";
 import {
   killNamed,
   live,
@@ -111,25 +111,35 @@ async function detonate(offered: OfferedBackend, policy: SandboxPolicy, bomb: Bo
   }
 }
 
-/** Runs `cap`'s bomb on `offered`: stopped where the table enforces it, else run and reported. */
+/**
+ * Runs `cap`'s bomb on `offered`: stopped where the table enforces it, else run and reported; a
+ * memory bomb the host paged out is reported by the half of the cap it went without.
+ */
 async function checkCap(offered: OfferedBackend, cap: Cap, { policy }: Run): Promise<void> {
-  const enforced = !capsWithout(offered).includes(cap);
+  const without = capsWithout(offered);
   const { outcome, out, verdict } = await detonate(offered, policy, BOMBS[cap]);
   const detail = JSON.stringify({ outcome, out: out.slice(0, 400) });
   // Only the bomb's own shell prints it: a run that never started proves nothing.
   assert(out.startsWith(`${START}\n`), `the bomb never ran: ${detail}`);
-  assertEquals(verdict, enforced ? "stopped" : "finished", detail);
-  if (enforced) return;
+  assert(expectedVerdicts(cap, without).includes(verdict), `${verdict}: ${detail}`);
+  if (verdict === "stopped") return;
   const probe = only({ ...probed, image: { kind: "pinned", ref: LIVE_IMAGE } }, offered.kind);
-  assertUncapped(await reported(probe, outcome), offered.kind, cap);
+  const lacking = without.includes(cap) ? cap : "memorySwap";
+  assertUncapped(await reported(probe, outcome), offered.kind, lacking);
+}
+
+/** What a live case claims of `cap`'s bomb on a backend that runs without `without`. */
+function claimOf(cap: Cap, without: readonly ReportedCap[]): string {
+  const verdicts = expectedVerdicts(cap, without);
+  if (verdicts.length > 1) return "is stopped, or runs to its end on a host that pages it out";
+  return verdicts[0] === "stopped" ? "is stopped" : "runs to its end and is reported UNCAPPED";
 }
 
 for (const status of STATUSES) {
   const missing = skipOf(status);
   const offered = "offered" in status ? status.offered : null;
   for (const cap of Object.keys(BOMBS) as Cap[]) {
-    const enforced = offered !== null && !capsWithout(offered).includes(cap);
-    const claim = enforced ? "is stopped" : "runs to its end and is reported UNCAPPED";
+    const claim = claimOf(cap, offered === null ? [cap] : capsWithout(offered));
     Deno.test({
       name: live(`caps live: on ${status.kind}, ${BOMBS[cap].what} ${claim}`, missing),
       ignore: missing !== null,
