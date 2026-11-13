@@ -1,0 +1,70 @@
+import { execLockRefusal } from "../../application/review_guard.ts";
+import { type ExecDeps, execInSandbox } from "../../application/sandbox_exec.ts";
+import { userBus } from "../../domain/sandbox_args.ts";
+import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
+import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
+import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
+import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
+import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
+import { exportCacheRoot } from "../../infrastructure/fs_tree_export.ts";
+import { DenoProcessLauncher } from "../../infrastructure/sandbox_process.ts";
+import { HostBackendProber } from "../../infrastructure/sandbox_probe.ts";
+import { runnerFor } from "../../infrastructure/sandbox_runners.ts";
+import type { SandboxDeps } from "./sandbox_handler.ts";
+
+/** `specnaut sandbox` on the real host: its engines, its folders, the checkout's review lock. */
+export function sandboxHostDeps(): SandboxDeps {
+  const subprocess = new DenoSubprocessRunner();
+  const checkout = () => checkoutRoot(subprocess);
+  const { os, arch } = Deno.build;
+  const image = async () => readDevcontainerImage(await checkout());
+  // The engines are asked with the environment a run gives them, and nothing of ours beside it.
+  const prober = new HostBackendProber(
+    new DenoSubprocessRunner({ wholeEnv: true }),
+    { os, arch },
+    image,
+  );
+  return {
+    out: (s) => console.log(s),
+    err: (s) => console.error(s),
+    probe: () => prober.probe(),
+    lockRefusal: async (request) =>
+      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request, realLogPath),
+    exec: async (request) => {
+      const log = request.log === null ? null : await openCappedLog(request.log);
+      try {
+        return await execInSandbox(execDeps(prober, checkout, log), request);
+      } finally {
+        await log?.close();
+      }
+    },
+  };
+}
+
+/** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
+function execDeps(
+  prober: HostBackendProber,
+  checkout: () => Promise<string>,
+  log: CappedLog | null,
+): ExecDeps {
+  const { os, arch } = Deno.build;
+  const env = (name: string) => Deno.env.get(name);
+  const path = env("PATH") ?? "/usr/bin:/bin";
+  return {
+    prober,
+    host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
+    runnerFor: (backend) =>
+      runnerFor(backend, new DenoProcessLauncher(log?.out, log?.err), {
+        arch,
+        path,
+        bus: userBus(env),
+      }),
+  };
+}
+
+/** The checkout the command runs from: the repository's top, or the folder itself outside one. */
+async function checkoutRoot(subprocess: DenoSubprocessRunner): Promise<string> {
+  const args = ["-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"];
+  const top = await subprocess.run("git", args, { cwd: Deno.cwd() });
+  return await Deno.realPath(top.code === 0 ? top.stdout.trim() : Deno.cwd());
+}

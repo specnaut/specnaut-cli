@@ -1,11 +1,5 @@
 import { red } from "@std/fmt/colors";
-import { execLockRefusal } from "../../application/review_guard.ts";
-import {
-  type ExecDeps,
-  execInSandbox,
-  type ExecOutcome,
-  type ExecRequest,
-} from "../../application/sandbox_exec.ts";
+import type { ExecOutcome, ExecRequest } from "../../application/sandbox_exec.ts";
 import type { RunOutcome } from "../../application/sandbox_ports.ts";
 import {
   assessBackends,
@@ -19,18 +13,9 @@ import {
   type SandboxLimits,
   STOP_LIMIT,
 } from "../../domain/sandbox_limits.ts";
-import { userBus } from "../../domain/sandbox_args.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
-import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
-import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
-import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
-import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
-import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
-import { exportCacheRoot } from "../../infrastructure/fs_tree_export.ts";
-import { DenoProcessLauncher } from "../../infrastructure/sandbox_process.ts";
-import { HostBackendProber } from "../../infrastructure/sandbox_probe.ts";
-import { runnerFor } from "../../infrastructure/sandbox_runners.ts";
 import type { SandboxIntent } from "../intent.ts";
+import { sandboxHostDeps } from "./sandbox_host_deps.ts";
 
 type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
 
@@ -70,7 +55,7 @@ export type SandboxDeps = {
 
 export async function runSandbox(
   intent: SandboxIntent,
-  deps: SandboxDeps = defaultDeps(),
+  deps: SandboxDeps = sandboxHostDeps(),
 ): Promise<number> {
   if (intent.sub === "probe") return probe(deps);
   try {
@@ -137,60 +122,4 @@ function timedOut(run: Extract<RunOutcome, { kind: "timed_out" }>, deps: Sandbox
 function notRun(deps: SandboxDeps, why: string): number {
   deps.err(red(`error: specnaut sandbox exec: not run: ${terminalText(why)}`));
   return EXIT.notRun;
-}
-
-function defaultDeps(): SandboxDeps {
-  const subprocess = new DenoSubprocessRunner();
-  const checkout = () => checkoutRoot(subprocess);
-  const { os, arch } = Deno.build;
-  const image = async () => readDevcontainerImage(await checkout());
-  // The engines are asked with the environment a run gives them, and nothing of ours beside it.
-  const prober = new HostBackendProber(
-    new DenoSubprocessRunner({ wholeEnv: true }),
-    { os, arch },
-    image,
-  );
-  return {
-    out: (s) => console.log(s),
-    err: (s) => console.error(s),
-    probe: () => prober.probe(),
-    lockRefusal: async (request) =>
-      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request, realLogPath),
-    exec: async (request) => {
-      const log = request.log === null ? null : await openCappedLog(request.log);
-      try {
-        return await execInSandbox(execDeps(prober, checkout, log), request);
-      } finally {
-        await log?.close();
-      }
-    },
-  };
-}
-
-/** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
-function execDeps(
-  prober: HostBackendProber,
-  checkout: () => Promise<string>,
-  log: CappedLog | null,
-): ExecDeps {
-  const { os, arch } = Deno.build;
-  const env = (name: string) => Deno.env.get(name);
-  const path = env("PATH") ?? "/usr/bin:/bin";
-  return {
-    prober,
-    host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),
-    runnerFor: (backend) =>
-      runnerFor(backend, new DenoProcessLauncher(log?.out, log?.err), {
-        arch,
-        path,
-        bus: userBus(env),
-      }),
-  };
-}
-
-/** The checkout the command runs from: the repository's top, or the folder itself outside one. */
-async function checkoutRoot(subprocess: DenoSubprocessRunner): Promise<string> {
-  const args = ["-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"];
-  const top = await subprocess.run("git", args, { cwd: Deno.cwd() });
-  return await Deno.realPath(top.code === 0 ? top.stdout.trim() : Deno.cwd());
 }
