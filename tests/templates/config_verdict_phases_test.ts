@@ -18,7 +18,19 @@ Deno.test("merge rebases on a config line behind the base, and judges workflow o
     "A config line whose reason is `behind base: rebase` is handled as that reason is for a " +
       "script: `git rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once",
   );
-  assertStringIncludes(m, "the `workflow` line counts on the last run only");
+  assertStringIncludes(
+    m,
+    "A `NAMES_FILE` listing `.specnaut/workflow.yml` or `.specnaut/backlog-config.yml`, on any " +
+      "run, makes the merge mode `manual`; the `workflow` and `backlog-config` lines count on the " +
+      "last run only, and unless that run printed both `VERDICT workflow trusted` and " +
+      "`VERDICT backlog-config trusted` the mode is `manual` too",
+  );
+  assertStringIncludes(
+    m,
+    "A rebase this phase runs that changes `.specnaut/workflow.yml` " +
+      "(`git diff --quiet ORIG_HEAD HEAD -- .specnaut/workflow.yml` exits non-zero) re-reads the " +
+      "mode after this step, as `phases/auto-chain.md` reads it",
+  );
   assert(
     !m.includes("so does any run unless it printed `VERDICT workflow trusted`"),
     "a workflow line from an earlier run still makes the mode manual",
@@ -48,5 +60,10 @@ Deno.test("a review rates size from the base tip's table, never from the work tr
   assertStringIncludes(s, "the work tree's `.specnaut/memory/size-limits.md` is never read for it");
   assert(!s.includes("Severity for size comes from that file's table"), "the tree's table rates");
   const reviewer = read("agents/code-reviewer.md");
-  assertStringIncludes(reviewer, "the severity table as your brief carries it from the base");
+  assertStringIncludes(reviewer, "its severity table from the base tip's rows your brief carries");
+  assertStringIncludes(
+    reviewer,
+    "When the brief says those rows were not read, say so, and report a size finding as a " +
+      "`Suspicion —` with its counts, never rated",
+  );
 });

@@ -93,9 +93,10 @@ const GROOMING_KEYS = /^(intake_column|ready_column):/;
 /**
  * A grooming line exactly as `groom-columns.sh` writes it: one double-quoted value, nothing a
  * YAML parser could read past. Anything else could break the parse of the whole file (and with it
- * remote mode) while the line itself goes unjudged, so it is refused.
+ * remote mode) while the line itself goes unjudged, so it is refused. A CRLF ending is a line
+ * ending, not part of the value: the rest of the file is judged for it.
  */
-const GROOMING_LINE = /^(?:intake_column|ready_column): "[^"\\\r]*"[ \t]*$/;
+const GROOMING_LINE = /^(?:intake_column|ready_column): "[^"\\\r]*"[ \t]*\r?$/;
 
 /**
  * What a class's readers take from the file, as bytes to compare, or why it cannot be read.

@@ -89,4 +89,7 @@ Deno.test("a base path that is no regular file is refused at the tip, and ignore
   const tree = entries({ kind: "file", path: GATES, bytes, links: 1 });
   assertEquals(await gates(tree, at("t")), REASON.baseNotRegular);
   assertEquals(await gates(tree, at("m")), "trusted");
+  const edited = new TextEncoder().encode("fast_gate:\n  - false\n");
+  const differs = entries({ kind: "file", path: GATES, bytes: edited, links: 1 });
+  assertEquals(await gates(differs, at("m")), REASON.differs);
 });

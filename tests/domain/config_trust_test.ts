@@ -79,6 +79,8 @@ Deno.test("backlog-config: a grooming line that is not one quoted value is refus
     "a carriage return inside a line",
   );
   assertEquals(judged('repo: "acme/my-app"\r\nready_column: "Ready"\n'), REASON.lineEndings);
+  assertEquals(judged('repo: "acme/my-app"\r\nready_column: "Ready"\r\n'), REASON.lineEndings);
+  assertEquals(judged('repo: "acme/my-app"\nready_column: "Ready"\r\n'), "trusted");
 });
 
 Deno.test("backlog-config: a remote block turned off is judged, like any line grooming does not write", () => {
