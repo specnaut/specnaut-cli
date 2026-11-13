@@ -3,7 +3,8 @@ import type { RecordedReview, ReviewLock } from "../application/review_ports.ts"
 import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
 import { entryAt, entryIn, entryNames, heldIn } from "./fs_review_lock_entries.ts";
 import { isSessionId } from "../domain/session_record.ts";
-import { lstatOrNull, realFolder, replaceFile } from "./fs_review_pass.ts";
+import { lstatOrNull, realFolder } from "./fs_folder.ts";
+import { replaceFile } from "./fs_review_pass.ts";
 import { firstLine } from "./git_text.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 

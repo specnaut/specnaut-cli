@@ -4,6 +4,7 @@ import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import type { LinkEnd } from "../domain/checkout_link.ts";
 import type { CheckoutEntry, CheckoutWalk } from "../domain/checkout_trust.ts";
 import { REASON } from "../domain/script_trust.ts";
+import { lstatOrNull } from "./fs_folder.ts";
 
 /**
  * Walks a folder as the disk holds it: every folder from the project's root down is `lstat`ed, so
@@ -131,13 +132,4 @@ async function readAll(file: Deno.FsFile): Promise<Uint8Array> {
     chunks.push(buf.slice(0, n));
   }
   return new Uint8Array(await new Blob(chunks).arrayBuffer());
-}
-
-async function lstatOrNull(abs: string): Promise<Deno.FileInfo | null> {
-  try {
-    return await Deno.lstat(abs);
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return null;
-    throw err;
-  }
 }

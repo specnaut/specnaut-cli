@@ -6,15 +6,9 @@ import type {
   SessionRecordWriter,
 } from "../application/script_trust_ports.ts";
 import { isSessionId, SESSION_REASON } from "../domain/session_record.ts";
-import { lstatOrNull, realFolder } from "./fs_review_pass.ts";
+import { folderFault, lstatOrNull, realFolder, refuseFolderFault } from "./fs_folder.ts";
 import { firstLine } from "./git_text.ts";
-import {
-  folderFault,
-  placeRecord,
-  pruneRecords,
-  refuseFolderFault,
-  renew,
-} from "./session_record_files.ts";
+import { placeRecord, pruneRecords, renew } from "./session_record_files.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 
 /** The most bytes a record is read as: far above the record of any checkout's checked files. */

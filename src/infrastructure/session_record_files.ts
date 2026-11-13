@@ -1,7 +1,7 @@
 import { dirname, join } from "@std/path";
 import type { RecordWrite } from "../application/script_trust_ports.ts";
 import { isSessionId, RECORD_RETENTION_MS } from "../domain/session_record.ts";
-import { lstatOrNull } from "./fs_review_pass.ts";
+import { lstatOrNull, refuseFolderFault } from "./fs_folder.ts";
 
 /**
  * The files of one session record folder, `<git dir>/specnaut/session/`, as `FsSessionRecords`
@@ -9,24 +9,6 @@ import { lstatOrNull } from "./fs_review_pass.ts";
  * and other sessions' stale records pruned. Every path here is built from the folder the adapter
  * was opened on, never from the work tree.
  */
-
-/**
- * Why the record folder `dir` cannot be gone through: `specnaut/` or `session/` existing as
- * anything but a folder, a link included; `null` when neither does.
- */
-export async function folderFault(dir: string): Promise<string | null> {
-  for (const folder of [dirname(dir), dir]) {
-    const info = await lstatOrNull(folder);
-    if (info !== null && !info.isDirectory) return `${folder} is not a folder`;
-  }
-  return null;
-}
-
-/** {@link folderFault} as a throw: a resume and a renewal never go through a linked folder. */
-export async function refuseFolderFault(dir: string): Promise<void> {
-  const fault = await folderFault(dir);
-  if (fault !== null) throw new Error(`${fault}: a link is not followed`);
-}
 
 /**
  * `text` written to a file created new in `dir`, then hard-linked to `<id>.json`, which fails when

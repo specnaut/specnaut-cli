@@ -1,7 +1,7 @@
 import { isAbsolute, join } from "@std/path";
 import { isFullSha } from "../domain/commit_sha.ts";
 import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
-import { lstatOrNull } from "./fs_review_pass.ts";
+import { lstatOrNull } from "./fs_folder.ts";
 
 /**
  * Reading the review lock's entries (`fs_review_lock.ts`): a folder of `<session id>.json` files,
