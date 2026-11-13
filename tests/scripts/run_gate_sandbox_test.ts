@@ -8,6 +8,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { dirname } from "@std/path";
 import { ALWAYS, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
 import { evidenceOf, sandboxed } from "./run_gate_sandbox_fixture.ts";
+import { blob, commit, mktree } from "../helpers/git_fixture.ts";
 
 Deno.test("run-gate --sandbox: each configured command runs on the head in the sandbox, never here", async () => {
   const { repo, head, evidence, run, full } = await sandboxed();
@@ -121,4 +122,15 @@ Deno.test("run-gate --sandbox: no --base, one naming no commit, or the head's, r
   const own = await run(["fast", "--base", head, ...full]);
   assertEquals([own.code, own.calls], [3, []], own.stderr);
   assertStringIncludes(own.stderr, `${head} names no commit of this repository`);
+});
+
+Deno.test("run-gate --sandbox: a base git cannot list is refused with git's reason, not read as none", async () => {
+  const { repo, run, full } = await sandboxed({ declaration: null });
+  const tree = await mktree(repo.root, [["100644", "only-here", await blob(repo.root, "gone\n")]]);
+  const base = await commit(repo.root, tree);
+  await Deno.remove(`${repo.root}/.git/objects/${tree.slice(0, 2)}/${tree.slice(2)}`);
+  const r = await run(["fast", "--base", base, ...full]);
+  assertEquals([r.code, r.calls], [3, []], r.stdout + r.stderr);
+  assertStringIncludes(r.stderr, `base-refused: git ls-tree ${base} failed: `);
+  assertStringIncludes(r.stderr, "not a tree object");
 });

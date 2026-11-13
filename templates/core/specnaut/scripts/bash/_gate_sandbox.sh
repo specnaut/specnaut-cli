@@ -43,9 +43,11 @@ gate_none_declared() {
   exit 125
 }
 
-# gate_sandbox_start - takes the head and makes the log folder, or stops: exit 2 for an
-# evidence folder or option missing or misplaced, 3 for a head refused.
+# gate_sandbox_start - takes the head and makes the log folder, or stops: exit 2 for a
+# --base, an evidence folder or an option missing or misplaced, 3 for a head or a base
+# refused. --base is checked first: nothing is read or made for a run that has none.
 gate_sandbox_start() {
+  [ "$FLAG" = --base ] || flag_usage "--sandbox needs --base <rev>: its gates are that commit's"
   [ -n "$EVIDENCE" ] || flag_usage "--sandbox needs --evidence <dir>"
   case "$EVIDENCE" in /* | [A-Za-z]:[/\\]*) ;; *) flag_usage "--evidence takes an absolute folder" ;; esac
   [ "${#HEAD_ARGS[@]}" -gt 0 ] || flag_usage "--sandbox needs --head <sha>"
@@ -60,15 +62,16 @@ gate_sandbox_start() {
 # gate_sandbox_gates - points GATES at a copy of the --base commit's gates.yml, kept beside
 # the logs. The base is read from this repository's own objects, never the export's, so a
 # commit only the branch carries cannot be named as the base. A base with no regular
-# gates.yml leaves GATES naming no file: no tier is declared, which is NOT RUN. Exit 2 with
-# no --base, 3 for a base this repository does not hold as a commit.
+# gates.yml leaves GATES naming no file: no tier is declared, which is NOT RUN. Exit 3 for
+# a base this repository does not hold as a commit, or one git cannot list, with its reason.
 gate_sandbox_gates() {
-  local commit path=.specnaut/gates.yml
-  [ "$FLAG" = --base ] || flag_usage "--sandbox needs --base <rev>: its gates are that commit's"
+  local commit entry path=.specnaut/gates.yml
   commit="$(gate_base_git rev-parse --verify --quiet --end-of-options "$BASE_VALUE^{commit}")" ||
     refuse_candidate "base-refused: $(gate_ascii "$BASE_VALUE") names no commit of this repository"
   GATES="$GATE_LOGS/base-gates.yml"
-  case "$(gate_base_git ls-tree "$commit" -- "$path" 2>/dev/null)" in
+  entry="$(gate_base_git ls-tree "$commit" -- "$path" 2>&1)" ||
+    refuse_candidate "base-refused: git ls-tree $commit failed: $(gate_ascii "$entry")"
+  case "$entry" in
     "100644 blob "* | "100755 blob "*) ;;
     *) return 0 ;;
   esac

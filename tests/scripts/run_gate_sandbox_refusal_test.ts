@@ -32,9 +32,28 @@ Deno.test("run-gate --sandbox: the options it needs, and a head only with it", a
   }
 });
 
+Deno.test("run-gate --sandbox: --base is checked first, before the head and the evidence", async () => {
+  const { evidence, run } = await sandboxed();
+  for (const extra of [["--sandbox"], ["--evidence", evidence, "--sandbox"]]) {
+    const r = await run(["fast", ...extra]);
+    assertEquals([r.code, r.calls], [2, []], extra.join(" "));
+    assertStringIncludes(r.stderr, "--sandbox needs --base <rev>");
+  }
+  assertEquals([...Deno.readDirSync(evidence)], [], "no log folder was made");
+});
+
 Deno.test("run-gate --sandbox: a head out of reach, or evidence beside it, runs nothing", async () => {
-  const { head, objects, evidence, run } = await sandboxed();
-  const unreached = await run(["fast", "--head", head, "--evidence", evidence, "--sandbox"]);
+  const { repo, head, objects, evidence, run } = await sandboxed();
+  const base = ["--base", repo.main];
+  const unreached = await run([
+    "fast",
+    ...base,
+    "--head",
+    head,
+    "--evidence",
+    evidence,
+    "--sandbox",
+  ]);
   assertEquals(unreached.code, 3, unreached.stderr);
   assertStringIncludes(
     unreached.stdout,
@@ -44,6 +63,7 @@ Deno.test("run-gate --sandbox: a head out of reach, or evidence beside it, runs 
   await Deno.mkdir(beside);
   const inside = await run([
     "fast",
+    ...base,
     "--head",
     head,
     "--objects",

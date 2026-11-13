@@ -160,11 +160,15 @@ fi
 count="$(printf '%s\n' "$COMMANDS" | wc -l | tr -d ' ')"
 echo "running the $TIER gate — $count command(s) from $(basename "$GATES")"
 
+# A command is echoed through gate_ascii: a control character in gates.yml must not
+# steer the terminal or forge a line of this report.
+declare -F gate_ascii >/dev/null || . "$SCRIPT_DIR/_gate_candidate.sh" ||
+  { echo "run-gate: _gate_candidate.sh is missing" >&2; exit 3; }
 i=0
 while IFS= read -r cmd; do
   [ -n "$cmd" ] || continue
   i=$((i + 1))
-  echo "  [$i/$count] $cmd"
+  echo "  [$i/$count] $(gate_ascii "$cmd")"
   # `cd` per command: a command that changes directory must not silently
   # relocate the next one. Stdin from /dev/null: this loop reads its list from
   # stdin, so a command inheriting it would consume the commands after it, and
@@ -173,7 +177,7 @@ while IFS= read -r cmd; do
   rc=$?
   [ "$SANDBOX" = 0 ] || ! gate_sandbox_not_run "$rc" || gate_not_run "$i/$count" "$rc" "$cmd"
   if [ "$rc" -ne 0 ]; then
-    echo "  ✗ the $TIER gate failed at command $i/$count (exit $rc): $cmd" >&2
+    echo "  x the $TIER gate failed at command $i/$count (exit $rc): $(gate_ascii "$cmd")" >&2
     exit 1
   fi
 done <<EOF
