@@ -7,6 +7,8 @@
  * The probe asks the engine with these same variables, so the engine it finds is the one a run
  * reaches: the same storage, configuration and connection.
  */
+// CONTAINER_PASSPHRASE is left out: it is a secret, and serves only a remote connection, where
+// `env_host` does not apply; an ssh agent or CONTAINER_SSHKEY alone serves that connection.
 const NAMES: ReadonlySet<string> = new Set([
   "PATH",
   "HOME",
@@ -22,7 +24,6 @@ const NAMES: ReadonlySet<string> = new Set([
   "CONTAINER_HOST",
   "CONTAINER_CONNECTION",
   "CONTAINER_SSHKEY",
-  "CONTAINER_PASSPHRASE",
   "DOCKER_HOST",
   "DOCKER_CONTEXT",
   "DOCKER_CONFIG",

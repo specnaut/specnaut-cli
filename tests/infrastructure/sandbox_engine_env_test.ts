@@ -20,7 +20,6 @@ const NEEDED = {
   XDG_CONFIG_HOME: "/home/dev/.config",
   XDG_DATA_HOME: "/home/dev/.local/share",
   CONTAINER_SSHKEY: "/home/dev/.ssh/podman",
-  CONTAINER_PASSPHRASE: "example",
   CONTAINER_HOST: "unix:///run/podman.sock",
   CONTAINER_CONNECTION: "dev",
   DOCKER_HOST: "unix:///var/run/docker.sock",
@@ -39,6 +38,8 @@ const OTHERS = {
   DOCKER_HOSTNAME: "not-a-docker-variable",
   XCONTAINERS_CONF: "not-a-prefix-match",
   CONTAINERS_CONF_EXTRA: "not-a-name-the-engine-reads",
+  // A secret: a local podman with env_host would copy it into the container.
+  CONTAINER_PASSPHRASE: "example",
 };
 
 Deno.test("engineEnv: keeps exactly the variables the engine needs, dropping every other", () => {
