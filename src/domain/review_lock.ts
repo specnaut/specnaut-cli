@@ -1,4 +1,5 @@
 import { plainWords } from "./plain_command.ts";
+import { isReviewScript } from "./review_lock_scripts.ts";
 
 /**
  * The review lock: once `specnaut review start` has exported a branch this session cannot trust,
@@ -34,19 +35,6 @@ const SESSION_TOOLS: readonly string[] = ["TodoWrite"];
 
 /** The tools that dispatch an agent, `Task` being the name older harness versions give it. */
 const DISPATCH_TOOLS: readonly string[] = ["Agent", "Task"];
-
-/**
- * The scripts `phases/review-untrusted.md` runs, each with the flags it must carry there: every
- * one reads the exported head (`--head`), never this checkout's work, and the gate runner runs
- * only in the sandbox (`--sandbox`). A map, so a name like `constructor` is no script.
- */
-const REVIEW_SCRIPTS = new Map<string, readonly string[]>([
-  [".specnaut/scripts/audit/collect-audit-scope.sh", ["--head"]],
-  [".specnaut/scripts/bash/size-ratchet.sh", ["--head"]],
-  [".specnaut/scripts/bash/boundary-check.sh", ["--head"]],
-  [".specnaut/scripts/bash/git-read.sh", ["--head"]],
-  [".specnaut/scripts/bash/run-gate.sh", ["--head", "--sandbox"]],
-]);
 
 const LOCKED = "refused under the review lock: this session read a branch it cannot trust, so " +
   "until it ends only Read, Grep, Glob, TodoWrite, the review seats and the review's own commands " +
@@ -106,10 +94,7 @@ function commandRefusal(command: unknown, review: LockedReview, log: string | nu
 /** Whether `words` are one of the commands `phases/review-untrusted.md` runs under the lock. */
 function isReviewCommand(words: readonly string[], review: LockedReview, log: string | null) {
   const [program, first, second, third] = words;
-  if (program === "bash") {
-    const flags = REVIEW_SCRIPTS.get(first);
-    return flags !== undefined && flags.every((f) => words.includes(f));
-  }
+  if (program === "bash") return isReviewScript(words);
   if (program !== "specnaut") return false;
   if (first === "verify-scripts") return words.length === 2;
   if (first === "sandbox" && second === "probe") return words.length === 3;
