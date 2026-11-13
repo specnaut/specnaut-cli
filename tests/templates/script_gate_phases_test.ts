@@ -148,12 +148,15 @@ Deno.test("merge settles a link the branch wrote only for the id the run was giv
 
 Deno.test("an untrusted instructions line makes merge step 0 manual, shows the diff, asks once", () => {
   const m = flat(read("phases/merge.md"));
-  const rule = m.slice(
-    m.indexOf("An `instructions` line other than `VERDICT instructions trusted`"),
-  );
+  const rule = m.slice(m.indexOf("Unless the last run printed `VERDICT instructions trusted`"));
   assert(rule.length < m.length, "merge.md step 0 has no rule for the instructions line");
   const said = rule.slice(0, rule.indexOf(" read.") + 6);
-  assertStringIncludes(said, "this run's merge mode is `manual`");
+  assertStringIncludes(
+    said,
+    "Unless the last run printed `VERDICT instructions trusted`, or only `instructions` lines " +
+      "reading `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a " +
+      "missing `instructions` line is an untrusted one.",
+  );
   assertStringIncludes(said, "`git diff <BASE_TIP> -- <path>`");
   assertStringIncludes(said, "ask once");
   assertStringIncludes(said, "The session read `AGENTS.md` before this step ran");
@@ -161,6 +164,7 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
   assertStringIncludes(flat(gate()), "| `instructions` |");
   assertStringIncludes(
     flat(read("phases/auto-chain.md")),
-    "an `instructions` line other than `VERDICT instructions trusted`",
+    "unless it printed `VERDICT instructions trusted`, or only `instructions` lines reading " +
+      "`behind base: rebase`: a missing `instructions` line is an untrusted one",
   );
 });
