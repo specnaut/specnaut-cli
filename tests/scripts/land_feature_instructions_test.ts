@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
 import { git, hermetic, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 import { specnautOnPath } from "./specnaut_shim.ts";
@@ -20,7 +20,11 @@ async function editedRules(): Promise<Sandbox> {
 async function digest(sb: Sandbox): Promise<string> {
   const out = (await run("bash", ["-c", "specnaut verify-scripts"], sb.work)).stdout;
   const field = (key: string) => out.match(new RegExp(`^${key} (.+)$`, "m"))?.[1] ?? "";
-  await Deno.remove(field("NAMES_FILE")).catch(() => {});
+  const names = field("NAMES_FILE");
+  assertNotEquals(names, "", `no NAMES_FILE line: the verifier did not judge\n${out}`);
+  await Deno.remove(names).catch((e) => {
+    if (!(e instanceof Deno.errors.NotFound)) throw e;
+  });
   return field("INSTRUCTIONS_DIGEST");
 }
 
