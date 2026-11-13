@@ -1,3 +1,4 @@
+import { SEPARATOR } from "@std/path";
 import { plainWords } from "./plain_command.ts";
 import { isReviewScript } from "./review_lock_scripts.ts";
 
@@ -127,7 +128,8 @@ export function lockedLogOf(tool: string | null, input: unknown): string | null 
 /**
  * Why `specnaut sandbox exec` itself refuses a run while `held`, the reviews whose logs folder the
  * run may use (`execLockRefusal` says which), is not empty: a run some script starts reaches no
- * hook, so the binary holds the same line. `log` is where its `--log` resolves, `null` for none. With no lock it runs as it always did.
+ * hook, so the binary holds the same line. `log` is where its `--log` resolves, `null` for none.
+ * With no lock it runs as it always did.
  */
 export function lockedExecRefusal(
   held: readonly LockedReview[],
@@ -141,11 +143,13 @@ export function lockedExecRefusal(
     `the review's logs, is ${LOCKED}`;
 }
 
-/** Whether `path` lies below `folder`, both real paths, `/` or `\` between their names. */
+/**
+ * Whether `path` lies below `folder`, both real paths, by the host's own separator: on POSIX a `\`
+ * is a character of a name, so `<logs>\x` is a file beside `<logs>`, not in it.
+ */
 export function isInsideFolder(path: string, folder: string): boolean {
-  const base = folder.replace(/[\\/]+$/, "");
-  return path.length > base.length + 1 && path.startsWith(base) &&
-    (path[base.length] === "/" || path[base.length] === "\\");
+  const base = folder.endsWith(SEPARATOR) ? folder.slice(0, -SEPARATOR.length) : folder;
+  return path.length > base.length + 1 && path.startsWith(base + SEPARATOR);
 }
 
 function field(v: unknown, key: string): unknown {

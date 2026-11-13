@@ -55,13 +55,32 @@ Deno.test("the log the guard must resolve is the one of exec's exact shape, and 
   assertEquals(log("specnaut verify-scripts"), null);
 });
 
-Deno.test("a path is inside a folder only below it, whichever separator the host writes", () => {
-  assertEquals(isInsideFolder("/c/logs/1.log", "/c/logs"), true);
-  assertEquals(isInsideFolder("/c/logs/a/1.log", "/c/logs/"), true);
-  assertEquals(isInsideFolder("C:\\c\\logs\\1.log", "C:\\c\\logs"), true);
-  for (const path of ["/c/logs", "/c/logs/", "/c/logsx/1.log", "/c/log", "/d/1.log"]) {
-    assertEquals(isInsideFolder(path, "/c/logs"), false, path);
-  }
+const POSIX = Deno.build.os !== "windows";
+
+Deno.test({
+  name: "a path is inside a folder only below it, by the separator of the host",
+  ignore: !POSIX,
+  fn: () => {
+    assertEquals(isInsideFolder("/c/logs/1.log", "/c/logs"), true);
+    assertEquals(isInsideFolder("/c/logs/a/1.log", "/c/logs/"), true);
+    // A `\` is a character of a name here: `logs\x` is a file beside `logs`, not in it.
+    const beside = ["/c/logs\\x", "/c/logs\\a/1.log"];
+    for (const path of ["/c/logs", "/c/logs/", "/c/logsx/1.log", "/c/log", "/d/1.log", ...beside]) {
+      assertEquals(isInsideFolder(path, "/c/logs"), false, path);
+    }
+  },
+});
+
+Deno.test({
+  name: "a path is inside a folder only below it, on Windows",
+  ignore: POSIX,
+  fn: () => {
+    assertEquals(isInsideFolder("C:\\c\\logs\\1.log", "C:\\c\\logs"), true);
+    assertEquals(isInsideFolder("C:\\c\\logs\\1.log", "C:\\c\\logs\\"), true);
+    for (const path of ["C:\\c\\logs", "C:\\c\\logsx\\1.log", "C:\\d\\1.log"]) {
+      assertEquals(isInsideFolder(path, "C:\\c\\logs"), false, path);
+    }
+  },
 });
 
 Deno.test("sandbox exec itself, under any lock of its checkout, logs only in a review's folder", () => {
