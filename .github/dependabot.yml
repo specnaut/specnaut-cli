@@ -27,3 +27,14 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependency"
+  # The live sandbox image's digest (.github/sandbox-live/Dockerfile, read by ci.yml's
+  # sandbox-linux job): moved monthly, never built.
+  - package-ecosystem: "docker"
+    directory: "/.github/sandbox-live"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependency"

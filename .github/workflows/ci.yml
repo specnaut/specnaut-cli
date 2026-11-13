@@ -166,3 +166,88 @@ jobs:
               exit 1
             fi
           done
+
+  # The live sandbox suites on Linux: the container backend (an image pinned by digest in
+  # .github/sandbox-live/Dockerfile, pulled here since a run never pulls) and bubblewrap inside a
+  # systemd user scope. cross-smoke runs the same files on a stock runner, where these skip;
+  # macos-latest covers seatbelt. A green job whose container or bwrap tests all skipped would
+  # prove nothing, so a skip fails it.
+  sandbox-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Pull the pinned live image into every engine
+        shell: bash
+        run: |
+          from=$(sed -n 's/^FROM //p' .github/sandbox-live/Dockerfile)
+          ref="${from%%:*}@${from##*@}"
+          if ! [[ "$ref" =~ ^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::.github/sandbox-live/Dockerfile does not pin an image by digest: $from"
+            exit 1
+          fi
+          for engine in docker podman; do
+            command -v "$engine" >/dev/null || continue
+            for try in 1 2 3; do
+              "$engine" pull --quiet "$ref" && break
+              [ "$try" = 3 ] && { echo "::error::$engine could not pull $ref"; exit 1; }
+              sleep 10
+            done
+          done
+          echo "SPECNAUT_LIVE_IMAGE=$ref" >> "$GITHUB_ENV"
+      - name: The image holds every tool the probe calls
+        run: |
+          docker run --rm --pull never --network none --user 65534:65534 "$SPECNAUT_LIVE_IMAGE" \
+            /bin/sh -c 'for p in /bin/sh /bin/cat /bin/ls /bin/mkdir /bin/ln /usr/bin/env \
+              /usr/bin/grep /usr/bin/sort /usr/bin/tr /usr/bin/head /usr/bin/perl; do
+                [ -x "$p" ] || { echo "missing $p"; exit 1; }; done
+              /usr/bin/perl -MIO::Socket::INET -MIO::Socket::UNIX -MPOSIX -e 1'
+      - name: A systemd user manager, for bubblewrap's capped scope
+        run: |
+          uid=$(id -u)
+          sudo loginctl enable-linger "$USER"
+          sudo systemctl start "user@${uid}.service"
+          echo "XDG_RUNTIME_DIR=/run/user/${uid}" >> "$GITHUB_ENV"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid}/bus" >> "$GITHUB_ENV"
+      - name: The host offers the container and bubblewrap, bubblewrap in a scope
+        run: |
+          deno eval --ext=ts '
+            import { probed, STATUSES } from "./tests/infrastructure/sandbox_live_fixture.ts";
+            console.log(JSON.stringify(STATUSES, null, 1));
+            const off = STATUSES.filter((s) => s.kind !== "seatbelt" && !("offered" in s));
+            if (off.length > 0) {
+              console.log(`::error::not offered here: ${JSON.stringify(off)}`);
+              Deno.exit(1);
+            }
+            if (!probed.bwrapScope) {
+              console.log("::error::bubblewrap has no systemd user scope with pids, memory, cpu");
+              Deno.exit(1);
+            }'
+      - name: The live sandbox suites
+        shell: bash
+        run: |
+          deno test --allow-read --allow-write --allow-run --allow-env \
+            tests/integration/isolation_live_test.ts \
+            tests/infrastructure/sandbox_*_live_test.ts 2>&1 | tee sandbox.log
+          # Only seatbelt may skip on Linux; any other skip means the setup above did not hold.
+          skipped=$(grep -F '(skipped: needs' sandbox.log | grep -v seatbelt || true)
+          if [ -n "$skipped" ]; then
+            echo "::error::a Linux live sandbox test skipped on a host set up for it"
+            echo "$skipped"
+            exit 1
+          fi
+          # And each backend's path must have produced a pass, not merely an absence of skips.
+          for want in 'isolation live: on container' 'isolation live: on bwrap' \
+            'caps live: on container' 'caps live: on bwrap' 'bwrap live: in a user scope'; do
+            grep -F "$want" sandbox.log | grep -q ' ok (' ||
+              { echo "::error::no passing test for: $want"; exit 1; }
+          done
