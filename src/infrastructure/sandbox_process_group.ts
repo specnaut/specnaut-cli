@@ -9,6 +9,11 @@ import { armExitTrap } from "./exit_trap.ts";
  * no longer holds it, and its kill would leave the leader running past the deadline, the run then
  * waiting on it. Only a stop does: once the child has ended, its pid is reaped and may be a
  * stranger's, so the retirement kills the group alone.
+ *
+ * One window is left: the runtime reaps the child before its status reaches us, and a stop that
+ * runs between the two (the deadline, or an exit) still signals that pid and group. A pid is
+ * handed out again only after the others in turn, so a stranger holding it within that window is
+ * not expected; nothing short of waiting on the child ourselves would close it.
  */
 
 /** Whether a started process leads a process group of its own: POSIX only. */
@@ -22,12 +27,7 @@ export const LEADS_A_GROUP = Deno.build.os !== "windows";
 export function groupStop(child: Deno.ChildProcess): { stop: () => void; retire: () => void } {
   let gone = false;
   const stop = () => {
-    if (gone) return;
-    try {
-      if (LEADS_A_GROUP) killedUnlessGone(() => Deno.kill(child.pid, "SIGKILL"));
-    } finally {
-      killGroup(child);
-    }
+    if (!gone) killLeaderAndGroup(child);
   };
   const disarm = armExitTrap(stop);
   const retire = () => {
@@ -39,6 +39,15 @@ export function groupStop(child: Deno.ChildProcess): { stop: () => void; retire:
     }
   };
   return { stop, retire };
+}
+
+/** Kills the leader by its pid (POSIX), then its group, whatever the leader's kill answers. */
+function killLeaderAndGroup(child: Deno.ChildProcess): void {
+  try {
+    if (LEADS_A_GROUP) killedUnlessGone(() => Deno.kill(child.pid, "SIGKILL"));
+  } finally {
+    killGroup(child);
+  }
 }
 
 /**
