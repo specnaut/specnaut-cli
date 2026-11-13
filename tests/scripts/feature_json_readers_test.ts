@@ -16,6 +16,7 @@ import {
   NO_KEY,
   outcome,
   REFUSAL,
+  storeRow,
   toolBin,
   which,
   WINDOWS,
@@ -132,26 +133,6 @@ async function windowsPython3(): Promise<string> {
     `${WINDOWS_PATH}if command -v jq >/dev/null; then echo jq; elif ! command -v python3 >/dev/null; then echo none; elif python3 -c '' >/dev/null 2>&1; then echo starts; else echo fails; fi`,
   ], ".");
   return r.code === 0 ? r.stdout.trim() : `the probe failed (${r.code}): ${r.stderr.trim()}`;
-}
-
-type Row = { label: string; skip?: string; fail?: string };
-/**
- * The Windows row, from what the probe found: off CI, no Store alias is a note; on
- * CI a run that never reaches the alias fails, never passes on nothing (cli#786).
- */
-export function storeRow(found: string, onCi: boolean): Row {
-  const label = "python3 is the Store alias, which fails to start";
-  if (found === "fails") return { label };
-  const why = found === "jq"
-    ? "a jq sits among Git's tools and would answer first"
-    : found === "starts"
-    ? "the WindowsApps python3 starts, so no launcher fails here"
-    : found === "none"
-    ? "no python3 on PATH, so no Store alias"
-    : found;
-  if (onCi) return { label, fail: `the Windows row never reached the Store alias on CI: ${why}` };
-  if (found === "none") return { label: "no python3 on PATH (the stub row stands in)" };
-  return { label: "the runner's own python3", skip: why };
 }
 
 Deno.test("the Windows row fails on CI when the probe never reaches the Store alias", () => {

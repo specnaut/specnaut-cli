@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Check that the bundled hooks are installed and registered on Claude Code and
-# Codex, then fire each Claude hook with a synthetic stdin payload and verify
-# the side effects and exit codes: the guards (protect-generated, protect-
-# constitution) refuse with exit 2, the observers (log-subagent) always exit 0,
-# and Stop blocks an unapproved change. check-backlog-prereqs is fired in
-# smoke-backlog-prereqs.sh, the session's record in smoke-record-checkout.sh.
+# Check that the bundled hooks are installed and registered: on Claude Code,
+# every hook script and its support files, executable where they run, the
+# Specnaut marketplace pinned to a release with the cockpit mod enabled, and
+# no registration naming a script that is missing; on Codex, the status ledger
+# registered and the installed hooks matching their SHA256SUMS. Then fire the
+# hooks with a synthetic stdin payload and check their exit codes and side
+# effects: review-gate lets a command that never mentions a review through,
+# silent; protect-generated refuses an edit to the lock with exit 2, even once
+# the lock is gone, and fails closed on an empty payload; log-subagent appends
+# one line per event, `unknown` for a missing field. check-backlog-prereqs is
+# fired here only with no lock; its own checks are in smoke-backlog-prereqs.sh,
+# the session's record in smoke-record-checkout.sh.
 #
 # Usage: smoke-hooks.sh <name>
 set -euo pipefail

@@ -148,3 +148,23 @@ export async function toolBin(
   }
   return bin;
 }
+
+export type StoreRow = { label: string; skip?: string; fail?: string };
+/**
+ * The Windows row, from what the probe found: off CI, no Store alias is a note; on
+ * CI a run that never reaches the alias fails, never passes on nothing (cli#786).
+ */
+export function storeRow(found: string, onCi: boolean): StoreRow {
+  const label = "python3 is the Store alias, which fails to start";
+  if (found === "fails") return { label };
+  const why = found === "jq"
+    ? "a jq sits among Git's tools and would answer first"
+    : found === "starts"
+    ? "the WindowsApps python3 starts, so no launcher fails here"
+    : found === "none"
+    ? "no python3 on PATH, so no Store alias"
+    : found;
+  if (onCi) return { label, fail: `the Windows row never reached the Store alias on CI: ${why}` };
+  if (found === "none") return { label: "no python3 on PATH (the stub row stands in)" };
+  return { label: "the runner's own python3", skip: why };
+}
