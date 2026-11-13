@@ -211,6 +211,11 @@ jobs:
               /usr/bin/grep /usr/bin/sort /usr/bin/tr /usr/bin/head /usr/bin/perl; do
                 [ -x "$p" ] || { echo "missing $p"; exit 1; }; done
               /usr/bin/perl -MIO::Socket::INET -MIO::Socket::UNIX -MPOSIX -e 1'
+      - name: bubblewrap, and catatonit for podman's --init
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap catatonit
+          bwrap --version
       - name: A systemd user manager, for bubblewrap's capped scope
         run: |
           uid=$(id -u)
