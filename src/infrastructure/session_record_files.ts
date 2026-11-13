@@ -22,6 +22,12 @@ export async function folderFault(dir: string): Promise<string | null> {
   return null;
 }
 
+/** {@link folderFault} as a throw: a resume and a renewal never go through a linked folder. */
+export async function refuseFolderFault(dir: string): Promise<void> {
+  const fault = await folderFault(dir);
+  if (fault !== null) throw new Error(`${fault}: a link is not followed`);
+}
+
 /**
  * `text` written to a file created new in `dir`, then hard-linked to `<id>.json`, which fails when
  * anything is already there: the record taken, or the one already there kept and renewed.
@@ -48,9 +54,11 @@ export async function placeRecord(
 
 /**
  * A record's last use set to now, from which its retention counts. Only a regular file: a link is
- * left as it is, never followed, and refused when read.
+ * left as it is, never followed, and refused when read. A record folder that is a link is refused:
+ * the times set through it would be another folder's record's.
  */
 export async function renew(path: string): Promise<void> {
+  await refuseFolderFault(dirname(path));
   if (!(await lstatOrNull(path))?.isFile) return;
   const now = new Date();
   await Deno.utime(path, now, now);

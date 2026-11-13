@@ -8,7 +8,13 @@ import type {
 import { isSessionId, SESSION_REASON } from "../domain/session_record.ts";
 import { lstatOrNull, realFolder } from "./fs_review_pass.ts";
 import { firstLine } from "./git_text.ts";
-import { folderFault, placeRecord, pruneRecords, renew } from "./session_record_files.ts";
+import {
+  folderFault,
+  placeRecord,
+  pruneRecords,
+  refuseFolderFault,
+  renew,
+} from "./session_record_files.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 
 /** The most bytes a record is read as: far above the record of any checkout's checked files. */
@@ -52,9 +58,14 @@ export class FsSessionRecords implements SessionRecordWriter {
     }
   }
 
-  /** The record a resumed or forked session's start took, renewed; `null` when it took none. */
+  /**
+   * The record a resumed or forked session's start took, renewed; `null` when it took none. A
+   * linked `specnaut/` or `session/` is refused, as reading refuses it: a record found through one
+   * would be another folder's.
+   */
   async find(sessionId: string): Promise<RecordWrite | null> {
     if (!isSessionId(sessionId)) throw new Error(`not a session id: ${sessionId}`);
+    await refuseFolderFault(this.dir);
     const path = join(this.dir, `${sessionId}.json`);
     if (await lstatOrNull(path) === null) return null;
     await renew(path);

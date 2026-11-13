@@ -1,7 +1,8 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import { RECORD_RETENTION_MS } from "../../src/domain/session_record.ts";
 import { FsSessionRecords } from "../../src/infrastructure/fs_session_records.ts";
+import { renew } from "../../src/infrastructure/session_record_files.ts";
 import { git } from "../integration/verify_scripts_fixture.ts";
 
 /**
@@ -102,4 +103,43 @@ Deno.test("a link that fails is the error reported, even when removing the temp 
     Deno.link = link;
     Deno.remove = remove;
   }
+});
+
+/** `folder` of the store moved beside the repository and a link left at its name. */
+async function linkedAway(folder: string): Promise<void> {
+  const elsewhere = `${folder}-elsewhere`;
+  await Deno.rename(folder, elsewhere);
+  await Deno.symlink(elsewhere, folder);
+}
+
+Deno.test({
+  name: "a resume through a linked specnaut/ or session/ folder is refused, the record not renewed",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    for (const outer of [true, false]) {
+      const store = await records();
+      const own = (await store.write("own-session", "{}\n")).path;
+      await aged(own);
+      const folder = outer ? dirname(store.dir) : store.dir;
+      await linkedAway(folder);
+      const err = await assertRejects(() => store.find("own-session"));
+      assertStringIncludes((err as Error).message, `${folder} is not a folder`);
+      assertEquals(await fresh(own), false, "never renewed through the link");
+      await assertRejects(() => store.find("other-session"), Error, "is not a folder");
+    }
+  },
+});
+
+Deno.test({
+  name: "a renewal through a linked folder is refused, the record left as it was",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const store = await records();
+    const own = (await store.write("own-session", "{}\n")).path;
+    await aged(own);
+    await linkedAway(store.dir);
+    const err = await assertRejects(() => renew(own));
+    assertStringIncludes((err as Error).message, `${store.dir} is not a folder`);
+    assertEquals(await fresh(own), false);
+  },
 });
