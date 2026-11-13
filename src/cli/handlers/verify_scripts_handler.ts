@@ -23,8 +23,7 @@ import { findHarness } from "../harnesses.ts";
  *   1  untrusted: one `UNTRUSTED <path> <reason>` line per cause
  *   2  usage: no `.specnaut/` in the folder it runs in. An argument is exit 2 too, but the parser's
  *      (`main.ts`): it refuses before this handler runs, help on stderr and no `VERDICT` line
- *   3  the base is unknown, or the check could not run. The Go port exits 3 with no `VERDICT`
- *      line: it parses the command but does not run it (`internal/cli/notported.go`)
+ *   3  the base is unknown, or the check could not run
  *
  * Exits 0 and 1 print, in order, `BASE <merge-base sha>`, `BASE_TIP <sha>`, `BASE_BRANCH <name>`,
  * `NAMES_FILE <path>` (the paths changed since BASE, one per line, in a new temp file outside the

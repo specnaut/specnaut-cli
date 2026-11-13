@@ -1,12 +1,0 @@
-{"text":"plain/a.md","shown":"plain/a.md","inert":"plain/a.md"}
-{"text":"a\\b","shown":"a\\\\b","inert":"a\\b"}
-{"text":"\u0000\u001b","shown":"\\u0000\\u001b\\u007f\\u0085\\u009f","inert":"\\u0000\\u001b\\u007f\\u0085\\u009f"}
-{"text":"­​‍‮⁦﻿","shown":"\\u00ad\\u200b\\u200d\\u202e\\u2066\\ufeff","inert":"\\u00ad\\u200b\\u200d\\u202e\\u2066\\ufeff"}
-{"text":"  ","shown":"\\u2028\\u2029","inert":"\\u2028\\u2029"}
-{"text":"󰀀","shown":"\\ue000\\u{f0000}","inert":"\\ue000\\u{f0000}"}
-{"text":"͸","shown":"\\u0378","inert":"\\u0378"}
-{"text":"͏ᅟㅤﾠ᠎","shown":"\\u034f\\u115f\\u3164\\uffa0\\u180e","inert":"\\u034f\\u115f\\u3164\\uffa0\\u180e"}
-{"text":"️󠄀󠁁󠇰","shown":"\\ufe0f\\u{e0100}\\u{e0041}\\u{e01f0}","inert":"\\ufe0f\\u{e0100}\\u{e0041}\\u{e01f0}"}
-{"text":"é中😀�","shown":"é中😀�","inert":"é中😀�"}
-{"text":"a\\u001bb","shown":"a\\\\u001bb","inert":"a\\u001bb"}
-{"text":"two\nlines\r\t","shown":"two\\u000alines\\u000d\\u0009","inert":"two\nlines\\u000d\\u0009"}

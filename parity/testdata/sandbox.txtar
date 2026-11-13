@@ -1,6 +1,0 @@
-# sandbox: probe reports each backend this host offers or why not, then the one a
-# run would use (exit 0 or 1 by host, so the step is not negated); exec on a commit
-# that was never exported runs nothing and exits 125. Compared TypeScript against
-# TypeScript: the Go port answers "not ported" (excluded.go, PortedToGo).
-specnaut sandbox probe
-! specnaut sandbox exec 0123456789abcdef0123456789abcdef01234567 -- /bin/echo hi

@@ -19,13 +19,13 @@ import { parse } from "@std/yaml";
  * are held to the same rule: one rule per file is easier to keep than a list of
  * exceptions, and the pinned SHA is what actually runs either way.
  *
- * Scope is keyed on the PERMISSION, not on a file name (cli#662): any workflow
- * requesting `id-token: write` — `release.yml` and the Go dry run today — can
- * sign as this repository, so a floating action in any of them runs with that
- * power. A per-file list is the one a new signing workflow is missing from.
+ * Scope is keyed on the PERMISSION, not on a file name: any workflow
+ * requesting `id-token: write` — `release.yml` today — can sign as this
+ * repository, so a floating action in any of them runs with that power. A
+ * per-file list is the one a new signing workflow is missing from.
  *
  * And `release.yml` stays uncallable: its triggers are exactly `push: tags`. A
- * `workflow_call` or `workflow_dispatch` added "for the dry run" would let
+ * `workflow_call` or `workflow_dispatch` added for any other caller would let
  * another workflow mint the release identity that every installed binary
  * trusts, for any tag, irreversibly.
  */

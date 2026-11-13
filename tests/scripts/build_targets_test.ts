@@ -1,37 +1,26 @@
-import { assert, assertEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import { goBuildCommand, TARGETS } from "../../scripts/build.ts";
+import { TARGETS } from "../../scripts/build.ts";
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
 
 /**
- * cli#662 — the Go port builds from the same target table as the release.
- *
- * A second list in the dry-run workflow is how the asset names would drift
- * (they drifted once, cli#595), so each entry carries its Go coordinates and
- * `build.ts --go` reads them. These pin what the issue asks for: the five
- * targets, cgo off, every output under dist/ with the current asset name.
+ * The release target table, which release.yml reads through `--list-json` rather than keeping a
+ * second list (the asset names drifted once that way, cli#595). It filters the macOS binaries it
+ * signs on `goos`, and runs each one's smoke test on `runner`, so both are pinned here.
  */
 
-Deno.test("every release target names its Go platform, and the set is the five", () => {
+Deno.test("every release target names its OS family, and the set is the five", () => {
   assertEquals(
-    TARGETS.map((t) => `${t.goos}/${t.goarch}=${t.outName}`),
+    TARGETS.map((t) => `${t.goos}=${t.outName}`),
     [
-      "darwin/amd64=specnaut-macos-x64",
-      "darwin/arm64=specnaut-macos-arm64",
-      "linux/amd64=specnaut-linux-x64",
-      "linux/arm64=specnaut-linux-arm64",
-      "windows/amd64=specnaut-windows-x64.exe",
+      "darwin=specnaut-macos-x64",
+      "darwin=specnaut-macos-arm64",
+      "linux=specnaut-linux-x64",
+      "linux=specnaut-linux-arm64",
+      "windows=specnaut-windows-x64.exe",
     ],
   );
-});
-
-Deno.test("the Go build is cgo-free, trimmed, and writes the asset name under dist/", () => {
-  for (const t of TARGETS) {
-    const { args, env } = goBuildCommand(t);
-    assertEquals(env, { CGO_ENABLED: "0", GOOS: t.goos, GOARCH: t.goarch });
-    assertEquals(args, ["build", "-trimpath", "-o", `dist/${t.outName}`, "./cmd/specnaut"]);
-  }
 });
 
 Deno.test("each target names the native runner that executes it", () => {
@@ -55,19 +44,4 @@ Deno.test("--list-json prints the target table and nothing else", async () => {
   }).output();
   assertEquals(code, 0);
   assertEquals(JSON.parse(new TextDecoder().decode(stdout)), TARGETS);
-});
-
-Deno.test("go-dry-run.yml names no asset: its matrix and asset list come from --list-json", async () => {
-  const workflow = await Deno.readTextFile(`${ROOT}.github/workflows/go-dry-run.yml`);
-  for (const t of TARGETS) {
-    assert(
-      !workflow.includes(t.outName),
-      `go-dry-run.yml names ${t.outName}; read it from TARGETS`,
-    );
-  }
-  assert(
-    workflow.includes("scripts/build.ts --list-json"),
-    "the dry run no longer reads the table",
-  );
-  assert(workflow.includes("fromJSON(needs.build.outputs.targets)"), "the matrix is not the table");
 });

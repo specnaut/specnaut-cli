@@ -1,11 +1,6 @@
 // Compiles specnaut for the five supported targets into dist/.
 // Requires: deno task bundle to have been run first (deno task build does both).
 //
-// `--go` builds the Go port (cli#662) for the same targets, under the same
-// asset names, with cgo off: `deno run --allow-read --allow-write --allow-run
-// --allow-env scripts/build.ts --go [<target>]`. One target table for both
-// languages, so a dry run cannot drift from the release.
-//
 // `--list-json` prints that table and nothing else (no permission needed), so
 // a workflow builds its matrix and its expected asset list from it
 // (`fromJSON`) instead of naming an asset itself.
@@ -17,11 +12,11 @@ const OUT = new URL("dist/", ROOT);
 const ENTRY = fromFileUrl(new URL("src/main.ts", ROOT));
 
 /**
- * `goos`/`goarch` are the Go port's coordinates for the same target; `runner`
- * is the GitHub-hosted runner that executes it natively (the dry run measures
- * each binary on its own platform).
+ * `goos` is the target's OS family, which release.yml filters on to pick the
+ * macOS binaries it signs; `runner` is the GitHub-hosted runner that executes
+ * a binary natively (release.yml's macOS smoke test runs on it).
  */
-type Target = { triple: string; goos: string; goarch: string; runner: string; outName: string };
+type Target = { triple: string; goos: string; runner: string; outName: string };
 
 /**
  * Exported so `verify-release.ts` checks exactly the set this compiler emits,
@@ -35,35 +30,30 @@ export const TARGETS: Target[] = [
   {
     triple: "x86_64-apple-darwin",
     goos: "darwin",
-    goarch: "amd64",
     runner: "macos-15-intel",
     outName: "specnaut-macos-x64",
   },
   {
     triple: "aarch64-apple-darwin",
     goos: "darwin",
-    goarch: "arm64",
     runner: "macos-latest",
     outName: "specnaut-macos-arm64",
   },
   {
     triple: "x86_64-unknown-linux-gnu",
     goos: "linux",
-    goarch: "amd64",
     runner: "ubuntu-latest",
     outName: "specnaut-linux-x64",
   },
   {
     triple: "aarch64-unknown-linux-gnu",
     goos: "linux",
-    goarch: "arm64",
     runner: "ubuntu-24.04-arm",
     outName: "specnaut-linux-arm64",
   },
   {
     triple: "x86_64-pc-windows-msvc",
     goos: "windows",
-    goarch: "amd64",
     runner: "windows-latest",
     outName: "specnaut-windows-x64.exe",
   },
@@ -116,43 +106,16 @@ async function compile(target: Target): Promise<void> {
   if (!status.success) throw new Error(`Compile failed for ${target.triple}`);
 }
 
-/**
- * The Go build of one target. `CGO_ENABLED=0` is the point of the port (no
- * C toolchain per target, no FFI), and `-trimpath` keeps the builder's paths
- * out of the binary. Exported so a test can pin the command without running
- * a toolchain.
- */
-export function goBuildCommand(target: Target): { args: string[]; env: Record<string, string> } {
-  return {
-    args: ["build", "-trimpath", "-o", `dist/${target.outName}`, "./cmd/specnaut"],
-    env: { CGO_ENABLED: "0", GOOS: target.goos, GOARCH: target.goarch },
-  };
-}
-
-async function compileGo(target: Target): Promise<void> {
-  const { args, env } = goBuildCommand(target);
-  console.log(`→ ${target.goos}/${target.goarch}  (${target.outName}, go)`);
-  const status = await new Deno.Command("go", {
-    args,
-    env,
-    cwd: ROOT,
-    stdout: "inherit",
-    stderr: "inherit",
-  }).output();
-  if (!status.success) throw new Error(`Go build failed for ${target.goos}/${target.goarch}`);
-}
-
 async function main() {
   if (Deno.args.includes("--list-json")) {
     console.log(JSON.stringify(TARGETS));
     return;
   }
   await ensureOutDir();
-  const go = Deno.args.includes("--go");
-  const only = Deno.args.find((a) => a !== "--go");
+  const only = Deno.args[0];
   for (const t of TARGETS) {
     if (only && only !== t.triple && only !== t.outName) continue;
-    await (go ? compileGo(t) : compile(t));
+    await compile(t);
   }
   console.log("\ndist/:");
   for await (const entry of Deno.readDir(OUT)) console.log(`  ${entry.name}`);

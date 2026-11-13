@@ -54,9 +54,6 @@ Read these rather than any list in prose — prose lists here have drifted befor
 
 - Layering under `src/`: `domain/` (pure), `application/` (use cases + ports), `infrastructure/`
   (adapters), `cli/` (presentation). Tests mirror `src/`.
-- A Go port lives beside the TypeScript source (`cmd/specnaut/`, `internal/`, `templates.go`). The
-  black-box harness in `parity/` compares the two binaries. Run `go test ./...` before you commit a
-  change to it, or to `templates/manifest.json`, which the port reads too.
 - Adding a harness is additive: one adapter under `src/infrastructure/harness/`, registered in
   `src/cli/harnesses.ts`. Nothing in the CLI surface or the bundle is harness-specific by default.
 - Templates are bundled into the binary by `scripts/bundle-templates.ts`. **Never hand-edit

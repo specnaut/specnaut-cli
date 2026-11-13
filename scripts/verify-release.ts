@@ -1,15 +1,6 @@
 // Verifies published release artefacts with the SHIPPED verifier (cli#595).
 //
 // Usage: deno run --allow-read scripts/verify-release.ts --tag v4.3.0 --dir <downloaded>
-//        deno run --allow-read scripts/verify-release.ts --dry-run-ref refs/heads/main --dir <artefacts>
-//
-// `--dry-run-ref` (cli#662) verifies what `go-dry-run.yml` attested: the
-// identity is DERIVED from the ref — that workflow, that ref, exact match —
-// never passed in, and the flag is exclusive with `--tag`. No version is
-// needed: a dry run's identity names a ref, not a tag. A release never passes
-// it (tests/scripts/verify_release_test.ts holds postflight and release.yml to
-// that), and the shipped verifier under src/domain/sigstore/ is untouched —
-// `self_update.ts` still demands the release identity.
 //
 // `postflight.sh` already checked two things about the attestation: that the
 // certificate SAN ends with `@refs/tags/$TAG`, and that the signed statement's
@@ -39,7 +30,6 @@ import {
   ATTESTATION_ASSET_NAME,
   expectedSignerIdentity,
 } from "../src/domain/sigstore/trust_anchor.ts";
-import { RELEASE_REPO } from "../src/domain/release.ts";
 import { DEFAULT_TRUST_ANCHOR } from "../src/application/self_update.ts";
 import { TARGETS } from "./build.ts";
 
@@ -72,7 +62,7 @@ type Anchor = {
  */
 export async function verifyReleaseDir(opts: {
   readonly dir: string;
-  /** The exact certificate identity every artefact must carry (see `identityFor`). */
+  /** The exact certificate identity every artefact must carry (see `parseCommandLine`). */
   readonly identity: string;
   readonly anchor: Anchor;
   readonly now?: Date;
@@ -123,72 +113,24 @@ async function verifyOne(outName: string, c: {
     : { outName, ok: false, reason: outcome.reason, detail: outcome.detail };
 }
 
-/** The workflow whose dispatch-only dry run attests the Go artefacts. */
-export const DRY_RUN_WORKFLOW_PATH = ".github/workflows/go-dry-run.yml";
-
-/** The only ref a dry run attests from: every go-dry-run.yml job is guarded
- *  to it, so any other ref names a certificate that cannot exist. */
-export const DRY_RUN_REF = "refs/heads/main";
+const USAGE = "usage: verify-release.ts --tag <vX.Y.Z> --dir <dir>";
 
 /**
- * The identity a dry run's certificate carries for `ref`, derived as
- * `expectedSignerIdentity` derives a release's: the repository, the workflow
- * file, the ref, nothing pattern-matched.
+ * What the command line asks for, or null for a usage error (exit 2). The identity is derived from
+ * the tag — release.yml at `refs/tags/<tag>` — and never taken from an argument, so nothing on the
+ * command line can make another workflow's certificate pass for a release's.
  */
-export function dryRunSignerIdentity(ref: string): string {
-  return `https://github.com/${RELEASE_REPO}/${DRY_RUN_WORKFLOW_PATH}@${ref}`;
-}
-
-/**
- * Which identity the command line asks for: exactly one of `--tag` (a
- * release) or `--dry-run-ref` (a dry run). Both, or neither, is a usage
- * error — never a precedence rule, which would let a dry-run identity stand
- * in for a release check.
- */
-export function identityFor(
-  opts: { tag: string | null; dryRunRef: string | null },
-): { identity: string; label: string } | null {
-  if ((opts.tag === null) === (opts.dryRunRef === null)) return null;
-  if (opts.tag !== null) {
-    return { identity: expectedSignerIdentity(opts.tag.replace(/^v/, "")), label: opts.tag };
-  }
-  const ref = opts.dryRunRef!;
-  // Exactly the one ref the workflow runs from — not a pattern, not "any
-  // branch": accepting another would accept an identity no run can carry.
-  if (ref !== DRY_RUN_REF) return null;
-  return { identity: dryRunSignerIdentity(ref), label: `the dry run on ${ref}` };
-}
-
-/**
- * `--only <asset>` narrows the check to one published binary — for a runner
- * that downloaded only the asset it is about to execute (go-dry-run.yml's
- * measure job). The name must be one `TARGETS` emits; anything else is a
- * usage error, never "verified nothing". Absent, every target is checked, as
- * postflight requires.
- */
-export function targetsFor(only: string | null): readonly { readonly outName: string }[] | null {
-  if (only === null) return TARGETS;
-  const t = TARGETS.find((x) => x.outName === only);
-  return t ? [t] : null;
-}
-
-const USAGE = "usage: verify-release.ts (--tag <vX.Y.Z> | --dry-run-ref refs/heads/main) " +
-  "--dir <dir> [--only <asset>]";
-
-/** What the command line asks for, or null for a usage error (exit 2). */
-export function parseCommandLine(args: readonly string[]): {
-  dir: string;
-  wanted: { identity: string; label: string };
-  targets: readonly { readonly outName: string }[];
-} | null {
+export function parseCommandLine(
+  args: readonly string[],
+): { dir: string; tag: string; identity: string } | null {
   const arg = (name: string): string | null => {
     const i = args.indexOf(`--${name}`);
     return i >= 0 && i + 1 < args.length ? args[i + 1] : null;
   };
   const dir = arg("dir");
-  const wanted = identityFor({ tag: arg("tag"), dryRunRef: arg("dry-run-ref") });
-  const targets = targetsFor(arg("only"));
-  return dir === null || wanted === null || targets === null ? null : { dir, wanted, targets };
+  const tag = arg("tag");
+  if (dir === null || tag === null) return null;
+  return { dir, tag, identity: expectedSignerIdentity(tag.replace(/^v/, "")) };
 }
 
 /** Prints one line per binary and the verdict; returns the exit code. */
@@ -223,14 +165,9 @@ async function main(): Promise<number> {
     console.error(USAGE);
     return 2;
   }
-  const { dir, wanted, targets } = cmd;
-  const results = await verifyReleaseDir({
-    dir,
-    identity: wanted.identity,
-    anchor: DEFAULT_TRUST_ANCHOR,
-    targets,
-  });
-  return report(results, wanted.label);
+  const { dir, tag, identity } = cmd;
+  const results = await verifyReleaseDir({ dir, identity, anchor: DEFAULT_TRUST_ANCHOR });
+  return report(results, tag);
 }
 
 if (import.meta.main) Deno.exit(await main());

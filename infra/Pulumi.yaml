@@ -52,8 +52,8 @@ resources:
   # The only provider in the pool. Its condition is the whole trust decision:
   # this repository and owner (by id), a `v*` tag push of release.yml, the
   # `macos-signing` environment, a GitHub-hosted runner, and the maintainer as
-  # the actor (by id). go-dry-run.yml and every other workflow stay outside it;
-  # do not widen it. tests/scripts/release_signing_infra_test.ts pins it.
+  # the actor (by id). Every other workflow stays outside it; do not widen it.
+  # tests/scripts/release_signing_infra_test.ts pins it.
   provider:
     type: gcp:iam:WorkloadIdentityPoolProvider
     properties:
