@@ -1,0 +1,185 @@
+import { assert, assertEquals } from "@std/assert";
+import { encodeHex } from "@std/encoding/hex";
+import { join } from "@std/path";
+import { type ExecDeps, execInSandbox } from "../../src/application/sandbox_exec.ts";
+import { type BranchExport, exportBranchTree } from "../../src/application/untrusted_review.ts";
+import type { BackendProbe, SandboxedBackend } from "../../src/domain/sandbox.ts";
+import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
+import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
+import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
+import { depsOf, fetcherOf } from "../helpers/export_world.ts";
+import { initRepo, tempDir } from "../helpers/git_fixture.ts";
+import {
+  capture,
+  LIVE_IMAGE,
+  probed,
+  RUNNER_HOST,
+} from "../infrastructure/sandbox_live_fixture.ts";
+import { type BranchText, probingBranch } from "./isolation_branch.ts";
+import { type Forge, openForge } from "./isolation_forge.ts";
+
+/**
+ * One branch exported through the real export, then run through the real `execInSandbox` on one
+ * backend, with secrets planted where a run must never reach them: a token file and a `hosts.yml`
+ * in the home the sandbox is given, an `.env` in the checkout, a token in our own environment,
+ * and a stand-in for the forge listening on the host. Only the fetch is the fixture's own
+ * (`export_world.ts`); the home is a folder of the test's, so no real secret is ever read.
+ */
+
+export type Isolation = {
+  readonly base: string;
+  readonly repo: string;
+  readonly cache: string;
+  readonly home: string;
+  readonly nonce: string;
+  /** The planted secret, in every planted file and in our environment. */
+  readonly secret: string;
+  readonly planted: { readonly token: string; readonly hosts: string; readonly dotenv: string };
+  readonly exported: BranchExport;
+  readonly forge: Forge;
+  readonly canary: string;
+  readonly control: string;
+};
+
+const SECRET_VARS = ["GH_TOKEN", "GITHUB_TOKEN"];
+/** `<what>-<16 random hex digits>`: a value no other run, and no fixture, can hold. */
+const fresh = (what: string) => `${what}-${encodeHex(crypto.getRandomValues(new Uint8Array(8)))}`;
+
+export async function withIsolation(
+  fn: (iso: Isolation) => Promise<void>,
+  lookup?: Uint8Array,
+): Promise<void> {
+  const base = await tempDir("specnaut-isolation-");
+  const secret = fresh("secret");
+  const before = SECRET_VARS.map((name) => [name, Deno.env.get(name)] as const);
+  for (const name of SECRET_VARS) Deno.env.set(name, secret);
+  try {
+    const forge = await openForge();
+    try {
+      await exported(base, secret, lookup, (iso) => fn({ ...iso, forge }));
+    } finally {
+      await forge.close();
+    }
+  } finally {
+    for (const [k, v] of before) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v);
+    await Deno.remove(base, { recursive: true });
+  }
+}
+
+/** The secrets planted under `base`, and the branch exported, for as long as `fn` runs. */
+async function exported(
+  base: string,
+  secret: string,
+  lookup: Uint8Array | undefined,
+  fn: (iso: Omit<Isolation, "forge">) => Promise<void>,
+): Promise<void> {
+  const [repo, cache, home] = ["repo", "cache", "home"].map((d) => join(base, d));
+  for (const d of [repo, join(home, ".config", "gh")]) await Deno.mkdir(d, { recursive: true });
+  await initRepo(repo);
+  const planted = await plant(repo, home, secret);
+  const text = { nonce: fresh("nonce"), canary: fresh("canary"), control: fresh("plain") };
+  const branch = await exportBranch(repo, cache, { ...text, linkTarget: planted.token, lookup });
+  try {
+    await fn({ base, repo, cache, home, secret, planted, exported: branch, ...text });
+  } finally {
+    await branch.remove();
+  }
+}
+
+/** The branch built in `repo`, exported into `cache` by the real export. */
+async function exportBranch(repo: string, cache: string, text: BranchText) {
+  const head = await probingBranch(repo, text);
+  const w = { repo, project: repo, cache };
+  return await exportBranchTree(depsOf(w, fetcherOf(w, head)), { source: "origin/topic" });
+}
+
+async function plant(repo: string, home: string, secret: string) {
+  const planted = {
+    token: join(home, "token"),
+    hosts: join(home, ".config", "gh", "hosts.yml"),
+    dotenv: join(repo, ".env"),
+  };
+  await Deno.writeTextFile(planted.token, `${secret}\n`);
+  await Deno.writeTextFile(planted.hosts, `github.com:\n    oauth_token: ${secret}\n`);
+  await Deno.writeTextFile(planted.dotenv, `TOKEN=${secret}\n`);
+  return planted;
+}
+
+/** What this host offers, with every backend but `kind` taken away: the run is on that one. */
+function only(kind: SandboxedBackend): BackendProbe {
+  const none = { image: { kind: "none", why: "not this test's backend" } } as const;
+  const off = { podman: "absent", docker: false } as const;
+  if (kind === "container") {
+    return {
+      ...probed,
+      image: { kind: "pinned", ref: LIVE_IMAGE },
+      bwrap: "absent",
+      sandboxExec: false,
+    };
+  }
+  if (kind === "bwrap") return { ...probed, ...none, ...off, sandboxExec: false };
+  return { ...probed, ...none, ...off, bwrap: "absent" };
+}
+
+/** `command` run on the export, on `kind`, as `specnaut sandbox exec` runs it. */
+export async function sandboxed(kind: SandboxedBackend, iso: Isolation, command: string[]) {
+  const out = capture();
+  const err = capture();
+  const deps: ExecDeps = {
+    prober: { probe: () => Promise.resolve(only(kind)) },
+    host: new FsSandboxHost(iso.cache, iso.home, () => Promise.resolve(iso.repo)),
+    runnerFor: (b) => runnerFor(b, new DenoProcessLauncher(out.stream, err.stream), RUNNER_HOST),
+  };
+  const outcome = await execInSandbox(deps, { sha: iso.exported.sha, toolchain: [], command });
+  assert(outcome.kind === "ran", `nothing ran: ${JSON.stringify(outcome)}`);
+  assertEquals(outcome.backend, kind);
+  return { outcome: outcome.outcome, out: out.text(), err: err.text() };
+}
+
+/** The probe's results, by `<kind> <target>`; it must have started, or it proved nothing. */
+export function results(out: string): Map<string, string> {
+  const lines = out.trim().split("\n");
+  assertEquals(lines[0], "probe started", `the probe never ran: ${out.slice(0, 300)}`);
+  const found = new Map<string, string>();
+  for (const line of lines.slice(1)) {
+    const [kind, target, ...rest] = line.split(" ");
+    found.set(`${kind} ${target}`, rest.join(" ").trim());
+  }
+  return found;
+}
+
+/** The probe run inside the sandbox on `kind`. */
+export async function probeInside(kind: SandboxedBackend, iso: Isolation, words: string[]) {
+  const { outcome, out, err } = await sandboxed(kind, iso, ["/bin/sh", "./probe.sh", ...words]);
+  assertEquals(outcome, { kind: "exited", code: 0 }, err);
+  return results(out);
+}
+
+/** The control: the same probe file, the same words, run on the host from the export. */
+export async function probeOnHost(iso: Isolation, words: string[]) {
+  const run = new Deno.Command("/bin/sh", {
+    args: ["./probe.sh", ...words],
+    cwd: iso.exported.scratch,
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const { code, stdout, stderr } = await run.output();
+  assertEquals(code, 0, new TextDecoder().decode(stderr));
+  return results(new TextDecoder().decode(stdout));
+}
+
+/** Every file below `root` with its bytes, folders and links named: a copy's whole state. */
+export async function snapshot(root: string): Promise<Map<string, string>> {
+  const seen = new Map<string, string>();
+  const walk = async (dir: string, prefix: string) => {
+    for await (const e of Deno.readDir(dir)) {
+      const path = `${prefix}${e.name}`;
+      const full = join(dir, e.name);
+      if (e.isSymlink) seen.set(path, `link ${await Deno.readLink(full)}`);
+      else if (e.isDirectory) (seen.set(path, "folder"), await walk(full, `${path}/`));
+      else seen.set(path, await Deno.readTextFile(full));
+    }
+  };
+  await walk(root, "");
+  return seen;
+}

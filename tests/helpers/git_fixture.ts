@@ -1,6 +1,6 @@
 /**
  * Crafted git objects for tests: trees written byte for byte with `hash-object --literally`, so a
- * fixture can hold a name `git mktree` would refuse (a slash, `.git`, bytes that are not UTF-8).
+ * fixture can hold a name `git mktree` refuses (a slash), or built by `git mktree` itself.
  */
 
 /** Runs git in `cwd` with a fixed identity and locale; throws with stderr on failure. */
@@ -13,17 +13,19 @@ export async function git(cwd: string, args: string[], input?: Uint8Array): Prom
     stdout: "piped",
     stderr: "piped",
   }).spawn();
-  if (input !== undefined) {
-    const writer = child.stdin.getWriter();
-    await writer.write(input);
-    await writer.close();
-  }
+  if (input !== undefined) await feed(child, input);
   const out = await child.output();
   const text = new TextDecoder().decode(out.stdout).trim();
   if (out.code !== 0) {
     throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(out.stderr)}`);
   }
   return text;
+}
+
+async function feed(child: Deno.ChildProcess, input: Uint8Array): Promise<void> {
+  const writer = child.stdin.getWriter();
+  await writer.write(input);
+  await writer.close();
 }
 
 export async function initRepo(dir: string): Promise<string> {
@@ -48,6 +50,21 @@ export async function tree(repo: string, entries: readonly RawEntry[]): Promise<
   }
   const args = ["hash-object", "-w", "-t", "tree", "--literally", "--stdin"];
   return await git(repo, args, new Uint8Array(parts));
+}
+
+/**
+ * A tree built by `git mktree` itself, which sorts the entries and accepts any name without a
+ * slash: `.git`, `..` and control characters included, as a branch pushed from anywhere can.
+ */
+export async function mktree(repo: string, entries: readonly RawEntry[]): Promise<string> {
+  const enc = new TextEncoder();
+  const parts: number[] = [];
+  for (const [mode, name, id] of entries) {
+    const type = mode === "40000" ? "tree" : "blob";
+    parts.push(...enc.encode(`${mode} ${type} ${id}\t`));
+    parts.push(...(typeof name === "string" ? enc.encode(name) : name), 0);
+  }
+  return await git(repo, ["mktree", "-z"], new Uint8Array(parts));
 }
 
 export async function commit(repo: string, treeId: string, ref?: string): Promise<string> {
