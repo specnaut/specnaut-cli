@@ -13,6 +13,7 @@ export const MAC: BackendProbe = {
   image: { kind: "none", why: "no devcontainer" },
   podman: "absent",
   podmanRemote: false,
+  podmanVersion: null,
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },

@@ -17,6 +17,7 @@ const PODMAN: BackendProbe = {
   image: { kind: "pinned", ref: IMAGE },
   podman: "rootless",
   podmanRemote: false,
+  podmanVersion: "4.8.0",
   podmanLimits: ALL,
   docker: false,
   dockerLimits: ALL,
@@ -57,4 +58,26 @@ Deno.test("container: on macOS a remote podman leaves the run to sandbox-exec, a
 
 Deno.test("container: a remote podman's reason comes before what it could not cap", () => {
   assertEquals(firstWhy(probe({ podmanRemote: true, podmanLimits: NONE })), REMOTE_WHY);
+});
+
+const OLD_WHY =
+  "container: podman older than 4.8, whose containers.conf cannot empty a list, and no docker";
+const UNREAD_WHY = "container: podman's version could not be read, and no docker";
+
+Deno.test("container: podman older than 4.8 is passed over for docker, else says why", () => {
+  for (const podmanVersion of ["4.7.2", "4.4.1", "3.4.4", "v4.7.0", "4.7.0-dev"]) {
+    assertEquals(chooseBackend(probe({ podmanVersion, docker: true })), ON_DOCKER, podmanVersion);
+    assertEquals(firstWhy(probe({ podmanVersion })), OLD_WHY, podmanVersion);
+  }
+  for (const podmanVersion of ["4.8.0", "4.8.0-rc1", "4.10.1", "5.0.0", "v5.2.3-dev"]) {
+    assertEquals(chooseBackend(probe({ podmanVersion })), ON_PODMAN, podmanVersion);
+  }
+});
+
+Deno.test("container: a podman whose version cannot be read is not offered, and says why", () => {
+  for (const podmanVersion of [null, "", "garbled", "4", "four.eight", "4.8.0 extra"]) {
+    assertEquals(firstWhy(probe({ podmanVersion })), UNREAD_WHY, String(podmanVersion));
+    const withDocker = probe({ podmanVersion, docker: true });
+    assertEquals(chooseBackend(withDocker), ON_DOCKER, String(podmanVersion));
+  }
 });

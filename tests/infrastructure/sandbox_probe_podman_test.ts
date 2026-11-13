@@ -10,14 +10,19 @@ import { ok, prober } from "./sandbox_probe_fixture.ts";
  * drops that bound, warning, where it does not.
  */
 
-/** Podman's report of a local engine; `host` sets or replaces what its `host` says. */
+/**
+ * Podman's report of a local engine; `host` sets or replaces what its `host` says, and `release`
+ * is its `version`.
+ */
 const podmanInfo = (
   rootless: boolean,
   version: string,
   controllers: string[],
   host: Record<string, unknown> = {},
+  release: Record<string, unknown> = { Version: "4.9.3" },
 ) =>
   ok(JSON.stringify({
+    version: release,
     host: {
       security: { rootless },
       serviceIsRemote: false,
@@ -92,6 +97,14 @@ Deno.test("probe: a remote podman is read as remote, and its bound is not tried 
 Deno.test("probe: a podman whose report does not say it is local is counted remote", async () => {
   const unsaid = await limitsOf(podmanInfo(true, "v2", ALL, { serviceIsRemote: undefined }));
   assertEquals([unsaid.probed.podmanRemote, unsaid.trials], [true, []]);
+});
+
+Deno.test("probe: podman's version is what its report says, or null when it says none", async () => {
+  assertEquals((await limitsOf()).probed.podmanVersion, "4.9.3");
+  for (const release of [{}, { Version: 4.9 }, { Version: null }]) {
+    const { probed } = await limitsOf(podmanInfo(true, "v2", ALL, {}, release));
+    assertEquals(probed.podmanVersion, null, JSON.stringify(release));
+  }
 });
 
 Deno.test("probe: podman whose report is not JSON is not used", async () => {

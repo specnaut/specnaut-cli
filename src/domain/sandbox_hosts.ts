@@ -33,6 +33,8 @@ export type BackendProbe = {
    * container from its own containers.conf, never from the one the CLI hands a run's client.
    */
   readonly podmanRemote: boolean;
+  /** What podman reported as its version (`version.Version`), or `null` when it did not. */
+  readonly podmanVersion: string | null;
   /** What podman can limit for the user on cgroup v2; every one false off it or when absent. */
   readonly podmanLimits: EngineLimits;
   /** A docker daemon answers. */

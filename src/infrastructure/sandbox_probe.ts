@@ -23,11 +23,16 @@ const USERNS_REFUSED = /namespace|uid map|Permission denied|Operation not permit
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
-type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanLimits">;
+type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits">;
 type Docker = Pick<BackendProbe, "docker" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
-const NO_PODMAN: Podman = { podman: "absent", podmanRemote: false, podmanLimits: NO_LIMITS };
+const NO_PODMAN: Podman = {
+  podman: "absent",
+  podmanRemote: false,
+  podmanVersion: null,
+  podmanLimits: NO_LIMITS,
+};
 const NO_DOCKER: Docker = { docker: false, dockerLimits: NO_LIMITS };
 
 /**
@@ -83,19 +88,22 @@ export class HostBackendProber implements BackendProber {
 
   /**
    * Podman's own report: whether it runs as the user, whether it answers from a service it does not
-   * run itself, and what it can limit on its host. Only a report saying it is local is taken as
-   * local: one that does not say is counted remote.
+   * run itself, its version, and what it can limit on its host. Only a report saying it is local
+   * is taken as local: one that does not say is counted remote.
    */
   async #podman(): Promise<Podman> {
     const args = ["info", "--format", "json"];
     const { code, stdout } = await this.runner.run("podman", args, { env: this.engineVars() });
     if (code !== 0) return NO_PODMAN;
-    const host = parsed(stdout, "podman info")?.host;
+    const info = parsed(stdout, "podman info");
+    const host = info?.host;
     if (host === undefined) return NO_PODMAN;
     const podmanRemote = host?.serviceIsRemote !== false;
+    const version: unknown = info?.version?.Version;
     return {
       podman: host?.security?.rootless === true ? "rootless" : "root",
       podmanRemote,
+      podmanVersion: typeof version === "string" ? version : null,
       podmanLimits: await this.#podmanLimits(host, podmanRemote),
     };
   }

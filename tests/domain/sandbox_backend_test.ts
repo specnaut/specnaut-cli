@@ -20,6 +20,7 @@ const NOTHING: BackendProbe = {
   image: IMAGE,
   podman: "absent",
   podmanRemote: false,
+  podmanVersion: "4.8.0",
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },

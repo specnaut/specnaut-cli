@@ -16,6 +16,7 @@ Deno.test("probe: nothing installed on Linux reads as nothing offered", async ()
     image: IMAGE,
     podman: "absent",
     podmanRemote: false,
+    podmanVersion: null,
     podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
     docker: false,
     dockerLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
