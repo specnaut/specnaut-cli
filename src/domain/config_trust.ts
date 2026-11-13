@@ -1,5 +1,5 @@
 import { sameBytes } from "./bytes.ts";
-import { REASON, withoutCr } from "./trust_reason.ts";
+import { REASON, refinedReason } from "./trust_reason.ts";
 
 /**
  * Whether the config inputs a branch can edit hold, in the work tree, what the base branch's tip
@@ -69,21 +69,21 @@ function configReason(input: ConfigInput, sides: ConfigSides): string | null {
   if (tree.kind === "absent") return tip.kind === "absent" ? null : REASON.missing;
   const mine = valueOf(input, tree.bytes);
   if (!(mine instanceof Uint8Array)) return mine.why;
+  const mergeBase = valueAt(input, sides.mergeBase);
   if (tip.kind === "absent") {
-    return isBehind(input, mine, sides.mergeBase) ? REASON.behind : REASON.notOnBase;
+    return refinedReason(mine, { copies: [], mergeBase }, REASON.notOnBase);
   }
   const theirs = valueOf(input, tip.bytes);
   if (!(theirs instanceof Uint8Array)) return `at base: ${theirs.why}`;
   if (sameBytes(mine, theirs)) return null;
-  if (sameBytes(withoutCr(mine), withoutCr(theirs))) return REASON.lineEndings;
-  return isBehind(input, mine, sides.mergeBase) ? REASON.behind : REASON.differs;
+  return refinedReason(mine, { copies: [theirs], mergeBase }, REASON.differs);
 }
 
-/** The tree's value is the merge base's: only the base moved since the branch left it. */
-function isBehind(input: ConfigInput, mine: Uint8Array, mergeBase: ConfigFile) {
-  if (mergeBase.kind !== "file") return false;
-  const theirs = valueOf(input, mergeBase.bytes);
-  return theirs instanceof Uint8Array && sameBytes(mine, theirs);
+/** The merge base's value, read only to say the tree's is behind: none when it has no file. */
+function valueAt(input: ConfigInput, side: ConfigFile): Uint8Array | undefined {
+  if (side.kind !== "file") return undefined;
+  const value = valueOf(input, side.bytes);
+  return value instanceof Uint8Array ? value : undefined;
 }
 
 type Refusal = { readonly why: string };

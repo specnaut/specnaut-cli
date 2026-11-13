@@ -17,7 +17,7 @@
  */
 
 import { sameBytes } from "./bytes.ts";
-import { REASON, withoutCr } from "./trust_reason.ts";
+import { REASON, refinedReason } from "./trust_reason.ts";
 
 /** The folder checked, relative to the project's root. */
 export const SCRIPTS_DIR = ".specnaut/scripts";
@@ -140,21 +140,15 @@ function mismatchReason(
 ): string {
   const { atTip, tipBytes, bundled } = copies;
   if (atTip !== undefined && atTip.kind !== "blob") return REASON.baseNotRegular;
+  const old = ctx.mergeBase.get(path);
+  const mergeBase = old?.kind === "blob" ? old.bytes : undefined;
   if (atTip === undefined && bundled === undefined) {
     // The tip deleted or renamed a file the branch never touched: the rebase settles it.
-    if (isBehind(path, bytes, ctx)) return REASON.behind;
-    if (hasCaseTwin(path, ctx.tip)) return REASON.caseDiffers;
-    return ctx.bundle.kind === "no_lock_at_base" ? REASON.firstInstall : REASON.notOnBase;
+    const added = ctx.bundle.kind === "no_lock_at_base" ? REASON.firstInstall : REASON.notOnBase;
+    const otherwise = hasCaseTwin(path, ctx.tip) ? REASON.caseDiffers : added;
+    return refinedReason(bytes, { copies: [], mergeBase }, otherwise);
   }
-  const lf = withoutCr(bytes);
-  if (sameBytes(lf, tipBytes) || sameBytes(lf, bundled)) return REASON.lineEndings;
-  return isBehind(path, bytes, ctx) ? REASON.behind : REASON.differs;
-}
-
-/** The bytes are the merge base's: only the base moved since the branch left it. */
-function isBehind(path: string, bytes: Uint8Array, ctx: Context): boolean {
-  const atMergeBase = ctx.mergeBase.get(path);
-  return atMergeBase?.kind === "blob" && sameBytes(bytes, atMergeBase.bytes);
+  return refinedReason(bytes, { copies: [tipBytes, bundled], mergeBase }, REASON.differs);
 }
 
 /**

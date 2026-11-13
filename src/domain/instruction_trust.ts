@@ -3,7 +3,7 @@ import { inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
 import { type CheckoutWalk, configReasons, holdsBytes } from "./checkout_trust.ts";
 import type { ConfigFile, ConfigVerdict } from "./config_trust.ts";
 import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
-import { withoutCr } from "./trust_reason.ts";
+import { refinedReason } from "./trust_reason.ts";
 
 /**
  * Whether the instruction files a session takes as its rules hold, in the work tree, what the base
@@ -78,11 +78,11 @@ function committedReason(c: CommittedInstruction): Untrusted[] {
   if (c.head.kind === "absent") return [];
   if (c.head.kind === "refused") return why(c.head.why);
   if (c.tip.kind === "refused") return why(REASON.baseNotRegular);
-  if (c.tip.kind === "file" && sameBytes(c.head.bytes, c.tip.bytes)) return [];
-  if (c.mergeBase.kind === "file" && sameBytes(c.head.bytes, c.mergeBase.bytes)) {
-    return why(REASON.behind);
-  }
-  return why(c.tip.kind === "absent" ? REASON.notOnBase : REASON.differs);
+  const tip = c.tip.kind === "file" ? c.tip.bytes : undefined;
+  if (sameBytes(c.head.bytes, tip)) return [];
+  const mergeBase = c.mergeBase.kind === "file" ? c.mergeBase.bytes : undefined;
+  const otherwise = c.tip.kind === "absent" ? REASON.notOnBase : REASON.differs;
+  return why(refinedReason(c.head.bytes, { copies: [tip], mergeBase }, otherwise));
 }
 
 type Context = {
@@ -94,12 +94,9 @@ type Context = {
 /** The checkout check's reason, made the script check's where it says more: CRLF, or behind. */
 function refined(u: Untrusted, ctx: Context): string {
   const mine = ctx.tree.get(u.path);
-  const tip = blobBytes(ctx.tip.get(u.path));
-  if (u.reason === REASON.differs && mine && tip && sameBytes(withoutCr(mine), withoutCr(tip))) {
-    return REASON.lineEndings;
-  }
-  if (u.reason === REASON.differs || u.reason === REASON.notOnBase) {
-    return mine && sameBytes(mine, blobBytes(ctx.old.get(u.path))) ? REASON.behind : u.reason;
+  if (mine && (u.reason === REASON.differs || u.reason === REASON.notOnBase)) {
+    const copies = [blobBytes(ctx.tip.get(u.path))];
+    return refinedReason(mine, { copies, mergeBase: blobBytes(ctx.old.get(u.path)) }, u.reason);
   }
   // A tip file the branch never had: only the base moved since the branch left it.
   if (u.reason === REASON.missing && !ctx.old.has(u.path)) return REASON.behind;

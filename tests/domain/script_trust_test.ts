@@ -151,6 +151,12 @@ Deno.test("a checkout with CRLF line endings is untrusted, and says why", () => 
   assertEquals(judge({ entries: [file(P, "echo base\r\n")] }), untrusted(P, REASON.lineEndings));
 });
 
+Deno.test("a base committed with CRLF and a checkout with LF differ in line endings too", () => {
+  const crlf = "echo base\r\n";
+  const verdict = judge({ tip: [blob(P, crlf)], bundle: mapped({ [P]: crlf }) });
+  assertEquals(verdict, untrusted(P, REASON.lineEndings));
+});
+
 Deno.test("no lock at base: the base rule alone, and a file the base lacks is a first install", () => {
   const entries = [file(P, BASE), file(Q, "echo new\n")];
   const verdict = judge({ entries, bundle: { kind: "no_lock_at_base" } });

@@ -176,6 +176,11 @@ Deno.test("a committed override that differs from the tip's is named; the same o
   }
 });
 
+Deno.test("a committed override that differs from the tip's only in line endings says so", () => {
+  const verdict = judge(walked(), [], [], committed("CLAUDE.local.md", on("x\r\n"), on("x\n")));
+  assertEquals(verdict, [`CLAUDE.local.md ${REASON.lineEndings}`]);
+});
+
 Deno.test("the committed overrides are the ones a session loads beside the instruction files", () => {
   assertEquals(COMMITTED_INSTRUCTIONS, ["AGENTS.override.md", "CLAUDE.local.md"]);
 });
