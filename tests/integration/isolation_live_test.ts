@@ -77,13 +77,13 @@ eachBackend(
 eachBackend("the forge stand-in is never reached, and only loopback exists", async (kind, iso) => {
   const word = `connect=${iso.forge.address}`;
   assertEquals((await probeOnHost(iso, [word])).get(`connect ${iso.forge.address}`), "ok");
-  await iso.forge.reached(1);
+  assertEquals(await iso.forge.settled(), 1, "the forge stand-in missed the control's connection");
   const inside = await probeInside(kind, iso, [word, "ifaces=-"]);
   // `sandbox-exec` refuses the connect; a namespace of its own has no listener on its loopback.
   const reasons = kind === "seatbelt" ? [EPERM] : ["Connection refused", "Network is unreachable"];
   assertRefused(inside.get(`connect ${iso.forge.address}`), word, reasons);
-  await new Promise((ok) => setTimeout(ok, 300));
-  assertEquals(iso.forge.accepted(), 1, "the forge stand-in accepted the run's connection");
+  // The run has ended: a connection it made is counted now, so no wait could add to the count.
+  assertEquals(await iso.forge.settled(), 1, "the forge stand-in accepted the run's connection");
   // Linux backends run in a network namespace of their own: the probe lists its one interface.
   if (kind !== "seatbelt") assertEquals(inside.get("ifaces -"), "lo");
 });

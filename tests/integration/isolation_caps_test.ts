@@ -2,7 +2,14 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { exportBranchTree } from "../../src/application/untrusted_review.ts";
 import { DEFAULT_TREE_CAPS, TreeRefused } from "../../src/domain/tree_plan.ts";
 import { FsExportStore } from "../../src/infrastructure/fs_tree_export.ts";
-import { cacheEntries, depsOf, fetcherOf, withWorld, type World } from "../helpers/export_world.ts";
+import {
+  cacheEntries,
+  depsOf,
+  exportHead,
+  fetcherOf,
+  withWorld,
+  type World,
+} from "../helpers/export_world.ts";
 import { blob, commit, mktree, type RawEntry } from "../helpers/git_fixture.ts";
 
 /**
@@ -82,7 +89,7 @@ for (const bomb of BOMBS) {
       const at = await planned(w, await commit(w.repo, await bomb.build(w.repo, bomb.cap)));
       await at.remove();
       const over = await commit(w.repo, await bomb.build(w.repo, bomb.cap + 1));
-      const run = () => exportBranchTree(depsOf(w, fetcherOf(w, over)), { source: "origin/topic" });
+      const run = () => exportHead(w, over);
       const err = await assertRejects(run, TreeRefused);
       assertEquals(err.faults.length, 1);
       assertEquals(err.faults[0].endsWith(bomb.fault), true, err.faults[0]);

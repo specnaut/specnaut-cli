@@ -9,7 +9,7 @@
 // both layouts. This test pins the contract by exercising both.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { resolveHooksDir } from "../../scripts/install-hooks.ts";
+import { installPreCommitHook, resolveHooksDir } from "../../scripts/install-hooks.ts";
 
 Deno.test("resolveHooksDir: plain checkout (.git is a directory)", async () => {
   const dir = await Deno.makeTempDir({ prefix: "install-hooks-plain-" });
@@ -68,7 +68,7 @@ Deno.test("resolveHooksDir: submodule checkout (.git is a gitdir file)", async (
 // nothing was treated exactly like a hand-written hook that must not be
 // clobbered.
 
-import { classifyHook, installPreCommitHook, SHIM_MARKER } from "../../scripts/install-hooks.ts";
+import { SHIM_MARKER } from "../../scripts/install-hooks-shim.ts";
 
 /** A git repo with a `hooks/pre-commit` that leaves a marker only it can leave. */
 async function fakeRepo(
@@ -148,12 +148,7 @@ Deno.test("install: a dangling symlink is repaired, not reported as a foreign ho
     await Deno.symlink(`${dir}/gone/pre-commit`, `${dir}/.git/hooks/pre-commit`, {
       type: "file",
     });
-
-    const state = await classifyHook(
-      `${dir}/.git/hooks/pre-commit`,
-      `${dir}/hooks/pre-commit`,
-    );
-    assertEquals(state.kind, "legacy-symlink", `classified as ${state.kind}`);
+    // Classified as a stale link, not a foreign hook: `install_hooks_state_test.ts`.
 
     const r = await installPreCommitHook(dir);
     assert(r.ok, `a dangling link was refused:\n${r.lines.join("\n")}`);

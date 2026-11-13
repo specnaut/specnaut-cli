@@ -4,6 +4,7 @@ import type { BranchFetcher } from "../../src/application/untrusted_review_ports
 import { type BranchSource, FETCHED_REF } from "../../src/domain/branch_source.ts";
 import { isFullSha } from "../../src/domain/commit_sha.ts";
 import { DEFAULT_TREE_CAPS, type TreeCaps } from "../../src/domain/tree_plan.ts";
+import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { FsExportStore } from "../../src/infrastructure/fs_tree_export.ts";
 import { GitTreeObjects } from "../../src/infrastructure/git_tree_objects.ts";
 import { commit, git, initRepo, type RawEntry, tempDir, tree } from "./git_fixture.ts";
@@ -50,6 +51,16 @@ export function depsOf(w: World, fetcher: BranchFetcher): ExportDeps {
     store: () => new FsExportStore(w.project, w.cache),
     windows: false,
   };
+}
+
+/** The commit `head` exported as a review exports a branch: the real export, only the fetch staged. */
+export function exportHead(w: World, head: string) {
+  return exportBranchTree(depsOf(w, fetcherOf(w, head)), { source: "origin/topic" });
+}
+
+/** The host a sandboxed run locates `w`'s exports with; the run's home is `home`. */
+export function hostOf(w: World, home = w.project): FsSandboxHost {
+  return new FsSandboxHost(w.cache, home, () => Promise.resolve(w.repo));
 }
 
 /** Commits `entries` as a crafted tree; `run` exports that commit. */

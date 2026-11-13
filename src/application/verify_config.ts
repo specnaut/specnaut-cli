@@ -35,16 +35,20 @@ export async function verifyConfig(
   base: ConfigBase,
 ): Promise<ConfigVerdict[]> {
   const walk = await deps.tree.walk(ROOT);
-  return await Promise.all(CONFIG_INPUTS.map(async (input) => {
-    const [tip, mergeBase] = await Promise.all([
-      deps.git.readFile(base.tip, input.path),
-      deps.git.readFile(base.mergeBase, input.path),
-    ]);
+  // One read at a time: each spawns git with a piped input, and on Windows a dozen such children
+  // started at once hung the run for good, intermittently, on every class in turn.
+  const verdicts: ConfigVerdict[] = [];
+  for (const input of CONFIG_INPUTS) {
+    const tip = await deps.git.readFile(base.tip, input.path);
+    const mergeBase = await deps.git.readFile(base.mergeBase, input.path);
     const tree: ConfigFile = walk.kind === "blocked"
       ? { kind: "refused", why: `${walk.path}: ${walk.why}` }
       : treeFile(input.path, walk.entries);
-    return judgeConfig(input, { tree, tip: commitFile(tip), mergeBase: commitFile(mergeBase) });
-  }));
+    verdicts.push(
+      judgeConfig(input, { tree, tip: commitFile(tip), mergeBase: commitFile(mergeBase) }),
+    );
+  }
+  return verdicts;
 }
 
 /**
