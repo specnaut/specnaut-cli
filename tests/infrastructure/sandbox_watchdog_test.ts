@@ -72,8 +72,10 @@ Deno.test({
 });
 
 Deno.test("watchdogSpec: its own process, quiet, in our environment, the deadline rounded up", () => {
-  const spec = watchdogSpec(4321, 61.2, ["podman", "rm", "--force", "x"]);
-  assertEquals([spec.cmd, spec.env, spec.stdout], ["/bin/sh", "host", "discarded"]);
+  assertEquals(watchdogSpec(4321, 61.2).env, "host");
+  const env = { PATH: "/usr/bin:/bin" };
+  const spec = watchdogSpec(4321, 61.2, ["podman", "rm", "--force", "x"], env);
+  assertEquals([spec.cmd, spec.env, spec.stdout], ["/bin/sh", env, "discarded"]);
   assertEquals(spec.args.slice(2), [
     "specnaut-watchdog",
     "62",

@@ -13,7 +13,7 @@ import { armExitTrap } from "./exit_trap.ts";
 export type ProcessSpec = {
   readonly cmd: string;
   readonly args: readonly string[];
-  /** Its whole environment; `host` only for a container engine's client, which needs ours. */
+  /** Its whole environment; `host` (ours) only for a watchdog that runs nothing but host tools. */
   readonly env: Readonly<Record<string, string>> | "host";
   readonly cwd?: string;
   readonly stdin?: Uint8Array;

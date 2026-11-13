@@ -5,6 +5,7 @@ import { containerArgs } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
+import { engineEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
 import { DRAIN_GRACE_SECONDS, type Halt, untilWallClock } from "./sandbox_wall_clock.ts";
 import { watchdogSpec } from "./sandbox_watchdog.ts";
@@ -18,13 +19,17 @@ import { watchdogSpec } from "./sandbox_watchdog.ts";
  * drain grace.
  */
 
-/** The run's container, named so it can be removed when the wall clock runs out or we are stopped. */
+/**
+ * The run's container, named so it can be removed when the wall clock runs out or we are stopped.
+ * The engine's client, and each removal, start with `engineEnv` of ours, read at the run.
+ */
 export class ContainerRunner implements SandboxRunner {
   constructor(
     readonly engine: Engine,
     readonly image: string,
     readonly launcher: ProcessLauncher,
     readonly name: () => string = containerName,
+    readonly hostEnv: () => Readonly<Record<string, string>> = () => Deno.env.toObject(),
   ) {}
 
   /**
@@ -35,13 +40,14 @@ export class ContainerRunner implements SandboxRunner {
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const args = containerArgs(policy, { image: this.image, name, engine: this.engine }, command);
-    const remove = removalOf(this.engine, name);
+    const env = engineEnv(this.hostEnv());
+    const remove = removalOf(this.engine, name, env);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
-      const started = this.launcher.start({ cmd: this.engine, args, env: "host" });
-      const removal = [remove.cmd, ...remove.args];
+      const started = this.launcher.start({ cmd: this.engine, args, env });
+      const seconds = policy.limits.wallClockSeconds;
       const halt = () => removed(this.launcher, remove);
-      return await watched(this.launcher, started, policy.limits.wallClockSeconds, removal, halt);
+      return await watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
     } finally {
       const failed = await removed(this.launcher, remove);
       if (failed !== null) console.error(`warning: the sandbox's container may be left: ${failed}`);
@@ -54,14 +60,15 @@ export class ContainerRunner implements SandboxRunner {
  * Removes the named container; what the engine prints (the name) never passes for the run's.
  * Podman, unlike docker, fails on a container already gone, as a `--rm` one is once it ended.
  */
-function removalOf(engine: Engine, name: string): ProcessSpec {
+function removalOf(engine: Engine, name: string, env: Record<string, string>): ProcessSpec {
   const ignore = engine === "podman" ? ["--ignore"] : [];
-  return {
-    cmd: engine,
-    args: ["rm", "--force", ...ignore, name],
-    env: "host",
-    stdout: "discarded",
-  };
+  return { cmd: engine, args: ["rm", "--force", ...ignore, name], env, stdout: "discarded" };
+}
+
+/** The watchdog of a container's run: it ends with `remove`, in the removal's environment. */
+function watchdogOf(remove: ProcessSpec, seconds: number): (pid: number) => ProcessSpec {
+  const removal = [remove.cmd, ...remove.args];
+  return (pid) => watchdogSpec(pid, seconds + DRAIN_GRACE_SECONDS, removal, remove.env);
 }
 
 /**
@@ -97,22 +104,25 @@ export class SeatbeltRunner implements SandboxRunner {
       env: policy.env,
       cwd: policy.workdir,
     });
-    return await watched(this.launcher, started, policy.limits.wallClockSeconds, []);
+    const seconds = policy.limits.wallClockSeconds;
+    const watchdog = (pid: number) => watchdogSpec(pid, seconds + DRAIN_GRACE_SECONDS);
+    return await watched(this.launcher, started, seconds, watchdog);
   }
 }
 
 /**
- * `started` run to its end under the wall clock, beside its watchdog, which is stopped once the
- * run has ended. A watchdog that cannot start stops the run: it never goes unwatched.
+ * `started` run to its end under the wall clock, beside its watchdog (`watchdog` of its pid), which
+ * is stopped once the run has ended. A watchdog that cannot start stops the run: it never goes
+ * unwatched.
  */
 async function watched(
   launcher: ProcessLauncher,
   started: Started,
   seconds: number,
-  removal: readonly string[],
+  watchdogOf: (pid: number) => ProcessSpec,
   halt?: Halt,
 ): Promise<RunOutcome> {
-  const watchdog = startWatchdog(launcher, started, seconds, removal);
+  const watchdog = startWatchdog(launcher, started, watchdogOf);
   try {
     return await untilWallClock(started, seconds, halt);
   } finally {
@@ -121,18 +131,14 @@ async function watched(
   }
 }
 
-/**
- * The watchdog of `started`, past the wall clock and the drain grace; if it cannot start, the run
- * is stopped and the failure raised.
- */
+/** The watchdog of `started`; if it cannot start, the run is stopped and the failure raised. */
 function startWatchdog(
   launcher: ProcessLauncher,
   started: Started,
-  seconds: number,
-  removal: readonly string[],
+  watchdogOf: (pid: number) => ProcessSpec,
 ): Started {
   try {
-    return launcher.start(watchdogSpec(started.pid, seconds + DRAIN_GRACE_SECONDS, removal));
+    return launcher.start(watchdogOf(started.pid));
   } catch (err) {
     started.stop();
     throw err;

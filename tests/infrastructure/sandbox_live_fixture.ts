@@ -69,6 +69,20 @@ export function live(title: string, missing: string | null): string {
   return missing === null ? title : `${title} (skipped: needs ${missing})`;
 }
 
+/** The variables `fn` runs under, restored after it whatever happens. */
+export async function withEnv(
+  vars: Record<string, string>,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const before = Object.keys(vars).map((k) => [k, Deno.env.get(k)] as const);
+  for (const [k, v] of Object.entries(vars)) Deno.env.set(k, v);
+  try {
+    await fn();
+  } finally {
+    for (const [k, v] of before) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v);
+  }
+}
+
 /** Whether `path` exists on this host. */
 export function exists(path: string): boolean {
   try {

@@ -27,19 +27,21 @@ const WATCHDOG = [
 
 /**
  * The watchdog of process group `group`: past `seconds` (rounded up) it kills the group; once the
- * group is gone, by its kill or its own end, it runs `removal`. It runs in our environment, which
- * a container engine's client needs.
+ * group is gone, by its kill or its own end, it runs `removal`, in `env`: a container engine's
+ * removal is given the engine's environment. Without one it runs in ours, starting nothing but
+ * `date`, `sleep` and `kill` on the host.
  */
 export function watchdogSpec(
   group: number,
   seconds: number,
   removal: readonly string[] = [],
+  env: ProcessSpec["env"] = "host",
 ): ProcessSpec {
   const after = String(Math.ceil(seconds));
   return {
     cmd: "/bin/sh",
     args: ["-c", WATCHDOG, "specnaut-watchdog", after, String(group), ...removal],
-    env: "host",
+    env,
     stdout: "discarded",
   };
 }

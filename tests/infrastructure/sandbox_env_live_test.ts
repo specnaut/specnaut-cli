@@ -11,6 +11,7 @@ import {
   RUNNER_HOST,
   skipOf,
   STATUSES,
+  withEnv,
   withLayout,
 } from "./sandbox_live_fixture.ts";
 
@@ -24,17 +25,6 @@ import {
 
 const PROXY = "http://proxy.example:3128";
 const CONFIG_KEYS = ["httpProxy", "httpsProxy", "ftpProxy", "noProxy", "allProxy"];
-
-/** The variables `fn` runs under, restored after it whatever happens. */
-async function withEnv(vars: Record<string, string>, fn: () => Promise<void>): Promise<void> {
-  const before = Object.keys(vars).map((k) => [k, Deno.env.get(k)] as const);
-  for (const [k, v] of Object.entries(vars)) Deno.env.set(k, v);
-  try {
-    await fn();
-  } finally {
-    for (const [k, v] of before) v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v);
-  }
-}
 
 /**
  * Docker's client configuration in a folder of its own, holding proxies, with the daemon it

@@ -25,10 +25,32 @@ import {
  * the run ends, however it ends.
  */
 
+/** A host environment: what the engine needs, beside what it must never be handed. */
+const HOST_ENV = {
+  PATH: "/usr/bin:/bin",
+  HOME: "/home/dev",
+  CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
+  DOCKER_HOST: "unix:///var/run/docker.sock",
+  GITHUB_TOKEN: "ghp_example",
+  SPECNAUT_CLOUD_TOKEN: "example",
+};
+const ENGINE_ENV = {
+  PATH: "/usr/bin:/bin",
+  HOME: "/home/dev",
+  CONTAINERS_CONF_OVERRIDE: "/home/dev/override.conf",
+  DOCKER_HOST: "unix:///var/run/docker.sock",
+};
+
 Deno.test("ContainerRunner: launches the engine with exactly containerArgs, under a fresh name", async () => {
   const { launcher, launches } = fakeLauncher(3);
   const policy = policyOf("container");
-  const runner = new ContainerRunner("podman", IMAGE, launcher, () => "specnaut-sandbox-x1");
+  const runner = new ContainerRunner(
+    "podman",
+    IMAGE,
+    launcher,
+    () => "specnaut-sandbox-x1",
+    () => HOST_ENV,
+  );
   assertEquals(await runner.run(policy, COMMAND), { kind: "exited", code: 3 });
   assertEquals(launches[0].spec, {
     cmd: "podman",
@@ -37,19 +59,18 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
       { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman" },
       COMMAND,
     ),
-    env: "host",
+    env: ENGINE_ENV,
   });
 });
 
 Deno.test("ContainerRunner: a watchdog beside the run removes the container past the clock and grace", async () => {
   const { launcher, launches } = fakeLauncher(0);
   const policy = withWallClock(policyOf("container"), 60);
-  await new ContainerRunner("docker", IMAGE, launcher, () => "specnaut-sandbox-x4").run(
-    policy,
-    COMMAND,
-  );
+  const name = () => "specnaut-sandbox-x4";
+  await new ContainerRunner("docker", IMAGE, launcher, name, () => HOST_ENV).run(policy, COMMAND);
   const removal = ["docker", "rm", "--force", "specnaut-sandbox-x4"];
-  assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, 60 + DRAIN_GRACE_SECONDS, removal));
+  const seconds = 60 + DRAIN_GRACE_SECONDS;
+  assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, seconds, removal, ENGINE_ENV));
   assertEquals(launches[1].stopped, 1);
 });
 
@@ -125,14 +146,15 @@ Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async 
 
 Deno.test("ContainerRunner: past the wall clock the container is removed by name", async () => {
   const { launcher, launches } = fakeLauncher(null);
-  const runner = new ContainerRunner("podman", IMAGE, launcher, () => "specnaut-sandbox-x2");
+  const name = () => "specnaut-sandbox-x2";
+  const runner = new ContainerRunner("podman", IMAGE, launcher, name, () => HOST_ENV);
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, { kind: "timed_out", seconds: 0.01 });
   // `--ignore`: podman, unlike docker, fails on a container already gone, as a `--rm` one is.
   assertEquals(launches.find((l) => l.spec.args[0] === "rm")?.spec, {
     cmd: "podman",
     args: ["rm", "--force", "--ignore", "specnaut-sandbox-x2"],
-    env: "host",
+    env: ENGINE_ENV,
     stdout: "discarded",
   });
   assertEquals(launches[0].stopped, 1);
