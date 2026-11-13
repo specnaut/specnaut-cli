@@ -1698,20 +1698,8 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    -- .specnaut/workflow.yml\` exits non-zero) re-reads the mode after this step, as
    \`phases/auto-chain.md\` reads it (its one reader), and a \`manual\` answer is that question.
    Unless the last run printed \`VERDICT instructions trusted\`, or only \`instructions\` lines reading
-   \`behind base: rebase\` (rebased as above), this run's merge mode is \`manual\`: a missing
-   \`instructions\` line is an untrusted one. Show each named path as it lands: \`git diff --text
-   --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD -- <path>\` (a file the base lacks, in
-   full). A \`work tree differs from HEAD\` reason means the session read other bytes than those that
-   land, whatever \`git status\` shows; for such a path HEAD lacks, show the work tree's file and say
-   it does not land. A \`line endings differ\` reason, whose diff can be empty, is shown as its
-   reason says: the same text, a CR before LF on one side only. A \`holds invisible characters\`
-   reason names each code point and its line: say so with the diff, which does not show them.
-   Then ask once, as the one question before step 3:
-   *"This branch changes the instructions this session follows. Yes lands them."* A no stops on
-   the branch. The yes covers that run's \`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them)
-   and nothing else: a later run with another digest asks again, even naming the same paths, and
-   a run with no such line asks. The session read \`AGENTS.md\` before this step ran: this stop is
-   the control, not undoing that read.
+   \`behind base: rebase\` (rebased as above), this run's merge mode is \`manual\`, and
+   \`phases/script-gate.md\` § The instructions verdict says what to show and the one question to ask.
    Every other config line acts where its input is read, per \`phases/script-gate.md\` § The config
    verdicts.
    Each run's \`NAMES_FILE\` is removed (\`rm -f\`) once the next run prints its own, and the last
@@ -3908,13 +3896,30 @@ none, means the tree's value is never read, and the row below applies:
 | \`backlog-config\` | every backlog script, and remote mode: \`backlog.md\`, \`groom.md\`, \`resume.md\`, \`phases/auto-chain.md\`, \`phases/merge.md\` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is \`manual\`; remote mode is on if either copy turns it on, and then nothing lands (\`phases/auto-chain.md\`) |
 | \`linked-issue\` | \`.specnaut/feature.json\`'s link: \`resume.md\`, \`phases/plan-reentry.md\`, \`phases/merge.md\` step 5 (whose item \`phases/merge-close.md\` takes) | the link is not read; \`phases/merge.md\` step 5 names its one exception |
 | \`gates\` | \`run-gate.sh\`: \`phases/merge.md\` **The full tier**, \`phases/review-seats.md\`, \`phases/quality-gates.md\` | \`merge\` asks; the review's fast tier is skipped |
-| \`instructions\` | the session itself: \`AGENTS.md\`, \`CLAUDE.md\`, \`.claude/CLAUDE.md\` every turn, \`docs/constitution.md\` and a phase's project additions as it runs, judged in the work tree and at HEAD; \`AGENTS.override.md\` and \`CLAUDE.local.md\` judged as committed at HEAD | the read already happened: \`phases/merge.md\` step 0 makes the mode \`manual\` and asks; one line per path |
+| \`instructions\` | the session itself: \`AGENTS.md\`, \`CLAUDE.md\`, \`.claude/CLAUDE.md\` every turn, \`docs/constitution.md\` and a phase's project additions as it runs, judged in the work tree and at HEAD; \`AGENTS.override.md\` and \`CLAUDE.local.md\` judged as committed at HEAD | the read already happened: \`phases/merge.md\` step 0 makes the mode \`manual\` and asks, as **The instructions verdict** below says; one line per path |
 
 \`backlog-config\` judges every line of \`.specnaut/backlog-config.yml\` but the columns grooming
 writes (\`intake_column\`, \`ready_column\`), each held to the one quoted value grooming writes: the
 tracker's address on any backend, and the \`remote:\` block. \`linked-issue\` judges the link as its
 \`sed\` readers take it, raw: one \`"linked_issue"\` key, whose value is \`null\` or a whole number from
 1, compared as written; a file its readers could read two ways is refused.
+
+### The instructions verdict
+
+\`phases/merge.md\` step 0 acts on it. Unless the last run printed \`VERDICT instructions trusted\`,
+or only \`instructions\` lines reading \`behind base: rebase\` (rebased as step 0 rebases a config
+line), the merge mode is \`manual\`: a missing \`instructions\` line is an untrusted one. Show each
+named path as it lands: \`git diff --text --no-textconv --no-ext-diff --no-color <BASE_TIP> HEAD
+-- <path>\` (a file the base lacks, in full). A \`work tree differs from HEAD\` reason means the
+session read other bytes than those that land, whatever \`git status\` shows; for such a path HEAD
+lacks, show the work tree's file and say it does not land. A \`line endings differ\` reason, whose
+diff can be empty, is shown as its reason says: the same text, a CR before LF on one side only. A
+\`holds invisible characters\` reason names each code point and its line: say so with the diff,
+which does not show them. Then ask once, as the one question before step 3: *"This branch changes
+the instructions this session follows. Yes lands them."* A no stops on the branch. The yes covers
+that run's \`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them) and nothing else: a later run
+with another digest asks again, even naming the same paths, and a run with no such line asks. The
+session read \`AGENTS.md\` before step 0 ran: this stop is the control, not undoing that read.
 `,
     executable: false,
     backend: null,
