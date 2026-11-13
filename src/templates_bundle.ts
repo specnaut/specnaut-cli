@@ -30510,13 +30510,15 @@ main "\${@:6}"
 . "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_explicit_head.sh" || return 70
 
 # gate_git <git args...> - git on this repository, with every inherited GIT_*
-# variable gone and no filesystem monitor to start. One that cannot be dropped
-# fails the call as git's own fatal error does.
+# variable gone, no filesystem monitor to start and no replace ref obeyed: a ref
+# under refs/replace/ would have a base, a candidate or a tree read as other
+# objects than its id names. One that cannot be dropped fails the call as git's
+# own fatal error does.
 gate_git() {
   (
     explicit_head_clear_env || exit 128
     explicit_head_env
-    explicit_head_git -C "\$REPO_ROOT" -c core.fsmonitor=false "\$@"
+    explicit_head_git -C "\$REPO_ROOT" --no-replace-objects -c core.fsmonitor=false "\$@"
   )
 }
 
@@ -30843,12 +30845,15 @@ gate_graph_changes() {
 }
 
 # gate_graph_protected_entries <commit> <path> - the path's tracked entries as text,
-# for comparing sides. Returns 1 when it has none, 2 when one is not a regular file.
-# ls-tree finds nothing through a symlink component, so that reads as untracked.
+# for comparing sides. Returns 1 when it has none, 2 when one is not a regular file
+# or its name holds a newline: the text is newline-joined, so such a name could read
+# as two entries and match a side that holds them. ls-tree finds nothing through a
+# symlink component, so that reads as untracked.
 gate_graph_protected_entries() {
   local entry found=1
   while IFS= read -r -d '' entry; do
     found=0
+    case "\$entry" in *\$'\\n'*) return 2 ;; esac
     case "\$entry" in 100644\\ *|100755\\ *) ;; *) return 2 ;; esac
     printf '%s\\n' "\$entry"
   done < <(gate_git ls-tree -r -z "\$1" -- "\$2" 2>/dev/null)
@@ -36387,8 +36392,10 @@ function Invoke-GateProcess([string]\$File, [string[]]\$Arguments, [string]\$Cwd
     return [pscustomobject]@{ Code = \$process.ExitCode; Out = \$stdout }
 }
 
+# Never obeys a replace ref, as the bash twin's gate_git: one would have a base, a
+# candidate or a tree read as other objects than its id names.
 function Invoke-GateGit([string[]]\$GitArgs) {
-    return Invoke-GateProcess 'git' (@('-C', \$repoRoot, '-c', 'core.fsmonitor=false') + \$GitArgs) ''
+    return Invoke-GateProcess 'git' (@('-C', \$repoRoot, '--no-replace-objects', '-c', 'core.fsmonitor=false') + \$GitArgs) ''
 }
 
 # Runs git and returns its stdout with the line end gone, or \$null when it failed.
@@ -36773,13 +36780,15 @@ function Get-GateChanges([string]\$Base, [string]\$Commit) {
 }
 
 # The path's tracked entries as text, for comparing sides. Code 1 when it has none, 2 when
-# one is not a regular file. ls-tree finds nothing through a symlink component, so that
-# reads as untracked.
+# one is not a regular file or its name holds a newline: the text is newline-joined, so
+# such a name could read as two entries. ls-tree finds nothing through a symlink
+# component, so that reads as untracked.
 function Get-GateProtectedEntries([string]\$Commit, [string]\$Path) {
     \$r = Invoke-GateGit @('ls-tree', '-r', '-z', \$Commit, '--', \$Path)
     \$entries = @(\$r.Out.Split([char]0) | Where-Object { \$_.Length -gt 0 })
     if (\$entries.Count -eq 0) { return @{ Code = 1; Text = '' } }
     foreach (\$entry in \$entries) {
+        if (\$entry.Contains("\`n")) { return @{ Code = 2; Text = '' } }
         if (-not (\$entry.StartsWith('100644 ', [StringComparison]::Ordinal) -or \$entry.StartsWith('100755 ', [StringComparison]::Ordinal))) {
             return @{ Code = 2; Text = '' }
         }

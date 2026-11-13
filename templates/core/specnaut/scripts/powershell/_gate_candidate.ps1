@@ -50,8 +50,10 @@ function Invoke-GateProcess([string]$File, [string[]]$Arguments, [string]$Cwd) {
     return [pscustomobject]@{ Code = $process.ExitCode; Out = $stdout }
 }
 
+# Never obeys a replace ref, as the bash twin's gate_git: one would have a base, a
+# candidate or a tree read as other objects than its id names.
 function Invoke-GateGit([string[]]$GitArgs) {
-    return Invoke-GateProcess 'git' (@('-C', $repoRoot, '-c', 'core.fsmonitor=false') + $GitArgs) ''
+    return Invoke-GateProcess 'git' (@('-C', $repoRoot, '--no-replace-objects', '-c', 'core.fsmonitor=false') + $GitArgs) ''
 }
 
 # Runs git and returns its stdout with the line end gone, or $null when it failed.

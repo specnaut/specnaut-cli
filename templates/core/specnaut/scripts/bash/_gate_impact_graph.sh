@@ -28,12 +28,15 @@ gate_graph_changes() {
 }
 
 # gate_graph_protected_entries <commit> <path> - the path's tracked entries as text,
-# for comparing sides. Returns 1 when it has none, 2 when one is not a regular file.
-# ls-tree finds nothing through a symlink component, so that reads as untracked.
+# for comparing sides. Returns 1 when it has none, 2 when one is not a regular file
+# or its name holds a newline: the text is newline-joined, so such a name could read
+# as two entries and match a side that holds them. ls-tree finds nothing through a
+# symlink component, so that reads as untracked.
 gate_graph_protected_entries() {
   local entry found=1
   while IFS= read -r -d '' entry; do
     found=0
+    case "$entry" in *$'\n'*) return 2 ;; esac
     case "$entry" in 100644\ *|100755\ *) ;; *) return 2 ;; esac
     printf '%s\n' "$entry"
   done < <(gate_git ls-tree -r -z "$1" -- "$2" 2>/dev/null)

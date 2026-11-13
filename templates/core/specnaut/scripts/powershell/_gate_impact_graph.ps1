@@ -24,13 +24,15 @@ function Get-GateChanges([string]$Base, [string]$Commit) {
 }
 
 # The path's tracked entries as text, for comparing sides. Code 1 when it has none, 2 when
-# one is not a regular file. ls-tree finds nothing through a symlink component, so that
-# reads as untracked.
+# one is not a regular file or its name holds a newline: the text is newline-joined, so
+# such a name could read as two entries. ls-tree finds nothing through a symlink
+# component, so that reads as untracked.
 function Get-GateProtectedEntries([string]$Commit, [string]$Path) {
     $r = Invoke-GateGit @('ls-tree', '-r', '-z', $Commit, '--', $Path)
     $entries = @($r.Out.Split([char]0) | Where-Object { $_.Length -gt 0 })
     if ($entries.Count -eq 0) { return @{ Code = 1; Text = '' } }
     foreach ($entry in $entries) {
+        if ($entry.Contains("`n")) { return @{ Code = 2; Text = '' } }
         if (-not ($entry.StartsWith('100644 ', [StringComparison]::Ordinal) -or $entry.StartsWith('100755 ', [StringComparison]::Ordinal))) {
             return @{ Code = 2; Text = '' }
         }

@@ -18,13 +18,15 @@
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_explicit_head.sh" || return 70
 
 # gate_git <git args...> - git on this repository, with every inherited GIT_*
-# variable gone and no filesystem monitor to start. One that cannot be dropped
-# fails the call as git's own fatal error does.
+# variable gone, no filesystem monitor to start and no replace ref obeyed: a ref
+# under refs/replace/ would have a base, a candidate or a tree read as other
+# objects than its id names. One that cannot be dropped fails the call as git's
+# own fatal error does.
 gate_git() {
   (
     explicit_head_clear_env || exit 128
     explicit_head_env
-    explicit_head_git -C "$REPO_ROOT" -c core.fsmonitor=false "$@"
+    explicit_head_git -C "$REPO_ROOT" --no-replace-objects -c core.fsmonitor=false "$@"
   )
 }
 
