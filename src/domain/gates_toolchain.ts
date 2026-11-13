@@ -14,10 +14,17 @@
 
 const KEY = "toolchain:";
 
-/** The folders `text` declares, `~/` expanded against `home`; an item that cannot be one is dropped. */
+/**
+ * The folders `text` declares, `~/` expanded against `home`; an item that cannot be one is dropped.
+ * An empty `home` is no home, as `run-gate.sh` reads an empty HOME: `~/bin` is dropped, never read
+ * as `/bin`, a folder the user did not name.
+ */
 export function declaredToolchain(text: string, home: string | null): string[] {
+  const known = home === "" ? null : home;
   return listItems(text, KEY).flatMap((item) => {
-    const folder = item.startsWith("~/") ? (home === null ? "" : `${home}${item.slice(1)}`) : item;
+    const folder = item.startsWith("~/")
+      ? (known === null ? "" : `${known}${item.slice(1)}`)
+      : item;
     return isFolder(folder) ? [folder] : [];
   });
 }

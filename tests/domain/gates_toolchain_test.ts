@@ -49,7 +49,20 @@ Deno.test("declaredToolchain: the toolchain list, ~/ against the home, a non-fol
     assertEquals(declaredToolchain(text, HOME), EXPECTED[name], name);
   }
   assertEquals(declaredToolchain(FILES.plain, null), ["/opt/go/bin"], "no home, no ~/ folder");
+  // An empty HOME is no home: `~/.deno/bin` is never read as `/.deno/bin`.
+  assertEquals(declaredToolchain(FILES.plain, ""), ["/opt/go/bin"], "an empty home");
 });
+
+/** What `run-gate.sh --parse-toolchain` prints for `file`, its HOME `home`, or unset (`null`). */
+async function shellToolchain(root: string, file: string, home: string | null) {
+  const out = await new Deno.Command("bash", {
+    args: [join(root, ".specnaut/scripts/bash/run-gate.sh"), "fast", "--parse-toolchain", file],
+    clearEnv: true,
+    env: { PATH: Deno.env.get("PATH") ?? "", ...(home === null ? {} : { HOME: home }) },
+    stdout: "piped",
+  }).output();
+  return [out.code, new TextDecoder().decode(out.stdout).split("\n").filter(Boolean)];
+}
 
 Deno.test({
   name: "run-gate.sh --parse-toolchain reads every file as declaredToolchain does",
@@ -59,13 +72,10 @@ Deno.test({
     for (const [name, text] of Object.entries(FILES)) {
       const file = join(root, `${name}.yml`);
       await Deno.writeTextFile(file, text);
-      const out = await new Deno.Command("bash", {
-        args: [join(root, ".specnaut/scripts/bash/run-gate.sh"), "fast", "--parse-toolchain", file],
-        env: { HOME },
-        stdout: "piped",
-      }).output();
-      const shell = new TextDecoder().decode(out.stdout).split("\n").filter(Boolean);
-      assertEquals([out.code, shell], [0, declaredToolchain(text, HOME)], name);
+      for (const home of [HOME, "", null]) {
+        const shell = await shellToolchain(root, file, home);
+        assertEquals(shell, [0, declaredToolchain(text, home)], `${name}, HOME ${home}`);
+      }
     }
   },
 });

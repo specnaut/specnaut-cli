@@ -24,6 +24,8 @@ Deno.test("the toolchain a start records is the base commit's, never HEAD's or t
       "/home/u/.deno/bin",
       "/opt/go/bin",
     ]);
+    // An empty HOME is read as unset, as run-gate.sh reads it: no `~/` folder.
+    assertEquals(await baseToolchain(objects, base, ""), ["/opt/go/bin"], "an empty home");
     await git(root, ["rm", "-q", "-f", ".specnaut/gates.yml"]);
     await git(root, ["commit", "-q", "-m", "none"]);
     const none = await git(root, ["rev-parse", "HEAD"]);
