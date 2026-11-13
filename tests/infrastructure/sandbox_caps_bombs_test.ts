@@ -32,6 +32,11 @@ Deno.test("fork bomb: a refused fork is the cap; fewer units for another reason 
     assertEquals(verdict("processes", lines(...range(10, (i) => `up ${i}`), refused)), "stopped");
   }
   assertMatch(verdict("processes", lines(...range(10, (i) => `up ${i}`))), /^unexplained: /);
+  // dash writes its prefix and its message apart, and another unit's line can come between them.
+  const split = lines("up 0", "/bin/sh: 0: up 1", "up 2", "Cannot fork", "up 3");
+  assertEquals(verdict("processes", split), "stopped");
+  const splitOther = lines("up 0", "/bin/sh: 0: up 1", "sleep: not found");
+  assertMatch(verdict("processes", splitOther), /^unexplained: /);
   const noSleep = lines(...range(40, (i) => `up ${i}`), "sh: sleep: not found");
   assertMatch(verdict("processes", noSleep), /^unexplained: /);
 });

@@ -84,6 +84,8 @@ Deno.test("scopeArgs: a systemd user scope carrying the policy's memory, process
     `TasksMax=${LIMITS.processes}`,
     "-p",
     `CPUQuota=${LIMITS.cpus * 100}%`,
+    "-p",
+    "OOMPolicy=continue",
   ]);
 });
 

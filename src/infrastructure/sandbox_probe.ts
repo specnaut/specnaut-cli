@@ -36,11 +36,12 @@ const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null, bwrapScope: false
  * A trial user scope: the shell inside it prints the controllers its own cgroup (cgroup v2, the
  * one `0::` line) can use, which are the ones a scope's limits act through. It sets a limit through
  * each, as a run's scope does: systemd enables a controller in a scope only when the scope asks for
- * it, so a scope with no limit sees memory and pids but never cpu.
+ * it, so a scope with no limit sees memory and pids but never cpu. It sets the OOM policy a run
+ * sets too, so a systemd too old to know it reads as no scope rather than failing every run.
  */
 const SCOPE_TRIAL = [
   ...["--user", "--scope", "--quiet", "--collect"],
-  ...["-p", "MemoryMax=1G", "-p", "TasksMax=64", "-p", "CPUQuota=100%"],
+  ...["-p", "MemoryMax=1G", "-p", "TasksMax=64", "-p", "CPUQuota=100%", "-p", "OOMPolicy=continue"],
   ...["/bin/sh", "-c"],
   'read -r line < /proc/self/cgroup; cat "/sys/fs/cgroup${line#0::}/cgroup.controllers"',
 ];

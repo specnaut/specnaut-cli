@@ -28,9 +28,17 @@ export const START = "start";
 /** A unit's line once it ran to its end, and a line only the cap's refusal of one prints. */
 type Marks = { readonly units: number; readonly done: RegExp; readonly capped: RegExp };
 
+/**
+ * The `sh: 2: ` dash puts before an error, written apart from the message: another unit's line can
+ * land between the two, so the prefix is taken off and what follows it judged on its own. The
+ * message still shows up on a line of its own, and is judged there.
+ */
+const SHELL_ERROR_PREFIX = /^(?:\/bin\/)?sh: \d+: /;
+
 /** The verdict on `out` under `marks`: any line neither marks is unexplained. */
 export function judged(out: string, marks: Marks): Verdict {
-  const lines = out.split("\n").filter((l) => l !== "" && l !== START);
+  const lines = out.split("\n").map((l) => l.replace(SHELL_ERROR_PREFIX, ""))
+    .filter((l) => l !== "" && l !== START);
   const odd = lines.filter((l) => !marks.done.test(l) && !marks.capped.test(l));
   if (odd.length > 0) return `unexplained: ${odd.slice(0, 3).join(" | ")}`;
   if (lines.some((l) => marks.capped.test(l))) return "stopped";
