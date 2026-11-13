@@ -52,7 +52,7 @@ Deno.test("scratch fill: a full scratch is the cap; a write refused otherwise is
   assertMatch(verdict("scratchBytes", denied), /^unexplained: /);
 });
 
-Deno.test("hang: stopped only by the wall clock, and well before it would end on its own", () => {
+Deno.test("wall clock sleeps: stopped only by the wall clock, and well before they would end", () => {
   const timedOut: RunOutcome = { kind: "timed_out", seconds: WALL };
   assertEquals(verdict("wallClockSeconds", lines(), timedOut, (WALL + 1) * 1000), "stopped");
   // An engine that is slow to start, stop and remove the run on a loaded host is still in time.
@@ -63,4 +63,15 @@ Deno.test("hang: stopped only by the wall clock, and well before it would end on
   assertEquals(verdict("wallClockSeconds", lines()), "finished");
   assertMatch(verdict("wallClockSeconds", lines(), { kind: "exited", code: 1 }), /^unexplained: /);
   assertMatch(verdict("wallClockSeconds", lines("sh: setsid: oops")), /^unexplained: /);
+});
+
+Deno.test("wall clock sleeps: the case is named after the two sleeps it runs", () => {
+  const { what, command } = BOMBS.wallClockSeconds;
+  // One sleep is left in the background (in a session of its own where `setsid` exists), and the
+  // shell's own sleep runs past the wall clock beside it.
+  assert(command.includes(`sleep ${HANG}.5 &`) && command.endsWith(`; sleep ${HANG}.5`), command);
+  assertEquals(
+    what,
+    `a sleep past the wall clock, beside a background one (${HANG}.5 s each, wall clock ${WALL} s)`,
+  );
 });

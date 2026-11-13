@@ -93,7 +93,8 @@ export const BOMBS: Readonly<Record<Cap, Bomb>> = {
     verdict: (_, out) => judged(out, { units: 4, done: /^wrote \d+$/, capped: FULL }),
   },
   wallClockSeconds: {
-    what: `a detaching hang (${HANG} s, wall clock ${WALL} s)`,
+    what:
+      `a sleep past the wall clock, beside a background one (${HANG}.5 s each, wall clock ${WALL} s)`,
     limits: { wallClockSeconds: WALL },
     command:
       `if command -v setsid >/dev/null; then setsid sleep ${HANG}.5 & else (sleep ${HANG}.5 &); fi; ` +

@@ -73,6 +73,21 @@ Deno.test("sandbox exec: a stop that failed at the wall clock is said after the 
   assertEquals(said.includes("not stopped cleanly: docker rm --force n exited 1"), true, said);
 });
 
+Deno.test("sandbox exec: a run that ended with its container left says so once, with its code", async () => {
+  const left: ExecOutcome = {
+    kind: "ran",
+    backend: "container",
+    outcome: { kind: "exited", code: 3, removalFailed: "docker rm --force n exited 1" },
+    unenforced: [],
+  };
+  const { d, err } = deps(MAC, () => Promise.resolve(left));
+  assertEquals(await runSandbox(EXEC, d), 3);
+  const warned = err.filter((l) => l.includes("docker rm --force n exited 1"));
+  assertEquals(warned, [
+    "warning: specnaut sandbox exec: the sandbox's container may be left: docker rm --force n exited 1",
+  ]);
+});
+
 Deno.test("sandbox exec: nothing ran is 125, with the reason", async () => {
   const notRun: ExecOutcome = { kind: "not_run", why: "no backend: no sandbox on Windows" };
   const { d, err } = deps(MAC, () => Promise.resolve(notRun));

@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { capture, detaching, killNamed, live, NO_PERL } from "./sandbox_live_fixture.ts";
 
@@ -67,16 +67,18 @@ Deno.test({
   },
 });
 
-/** Runs `fn` with every `Deno.kill` recorded and passed through, then restores it. */
-async function recordingKills(fn: (kills: number[]) => Promise<void>): Promise<void> {
+/** Runs `fn` with every `Deno.kill` recorded and handed to `kill` (the real one), then undone. */
+async function recordingKills(
+  fn: (kills: number[]) => Promise<void>,
+  kill: typeof Deno.kill = Deno.kill,
+): Promise<void> {
   const original = Object.getOwnPropertyDescriptor(Deno, "kill")!;
-  const real = Deno.kill;
   const kills: number[] = [];
   Object.defineProperty(Deno, "kill", {
     configurable: true,
     get: () => (pid: number, signal?: Deno.Signal) => {
       kills.push(pid);
-      real(pid, signal);
+      kill(pid, signal);
     },
   });
   try {
@@ -99,4 +101,36 @@ Deno.test({
       started.stop();
       assertEquals(kills.slice(before), []);
     }),
+});
+
+Deno.test({
+  name: "DenoProcessLauncher: a group kill that fails at its end still retires the group's id",
+  ignore: !POSIX,
+  fn: () =>
+    recordingKills(async (kills) => {
+      const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
+      const started = launcher.start({ cmd: "/bin/sh", args: ["-c", "exit 0"], env: {} });
+      await assertRejects(() => started.exited, Error, "kill refused");
+      started.stop();
+      assertEquals(kills.length, 1);
+    }, () => {
+      throw new Error("kill refused");
+    }),
+});
+
+Deno.test({
+  name: "DenoProcessLauncher: an error output that is captured is read, never copied to ours",
+  ignore: !POSIX,
+  fn: async () => {
+    const err = capture();
+    const launcher = new DenoProcessLauncher(capture().stream, err.stream);
+    const script = "echo gone >&2; exit 1";
+    const spec = { cmd: "/bin/sh", args: ["-c", script], env: {} };
+    const captured = launcher.start({ ...spec, stderr: "captured" });
+    assertEquals(await captured.exited, 1);
+    assertEquals([await captured.stderr, err.text()], ["gone\n", ""]);
+    const copied = launcher.start(spec);
+    assertEquals(await copied.exited, 1);
+    assertEquals([await copied.stderr, err.text()], ["", "gone\n"]);
+  },
 });

@@ -114,7 +114,16 @@ export function killNamed(marker: string): void {
   const ps = new Deno.Command("/bin/ps", { args: ["-axo", "pid=,command="] }).outputSync();
   for (const line of new TextDecoder().decode(ps.stdout).split("\n")) {
     const [, pid, cmd] = line.match(/^\s*(\d+)\s+(.*)$/) ?? [];
-    if (cmd?.startsWith(marker)) Deno.kill(Number(pid), "SIGKILL");
+    if (cmd?.startsWith(marker)) killIfThere(Number(pid));
+  }
+}
+
+/** Kills `pid`; one that ended since `ps` listed it is already stopped, which is no error. */
+function killIfThere(pid: number): void {
+  try {
+    Deno.kill(pid, "SIGKILL");
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
   }
 }
 

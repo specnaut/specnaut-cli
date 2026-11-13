@@ -4,7 +4,7 @@ import type { Engine, SandboxPolicy } from "../domain/sandbox.ts";
 import { containerArgs } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
-import { removalOf, removed } from "./sandbox_container_removal.ts";
+import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import { engineEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
@@ -36,7 +36,7 @@ export class ContainerRunner implements SandboxRunner {
   /**
    * A container outlives its client, so it is removed however the run ends: at the wall clock, on
    * an interrupt, and once the run is over, which covers a client that ended early and a watchdog
-   * that never started. A removal that fails at the wall clock is named in the outcome.
+   * that never started. A container left is said once, by the run's outcome or its error.
    */
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
@@ -45,13 +45,13 @@ export class ContainerRunner implements SandboxRunner {
     const remove = removalOf(this.engine, name, env);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
-      const started = this.launcher.start({ cmd: this.engine, args, env });
       const seconds = policy.limits.wallClockSeconds;
-      const halt = () => removed(this.launcher, remove);
-      return await watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
+      return await thenRemoved(this.launcher, remove, () => {
+        const started = this.launcher.start({ cmd: this.engine, args, env });
+        const halt = () => removed(this.launcher, remove);
+        return watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
+      });
     } finally {
-      const failed = await removed(this.launcher, remove);
-      if (failed !== null) console.error(`warning: the sandbox's container may be left: ${failed}`);
       disarm();
     }
   }

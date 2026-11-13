@@ -45,10 +45,11 @@ export interface SandboxHost {
 /**
  * How a run ended: the command's exit code, or the wall clock ran out and it was stopped. A stop
  * that needed more than the launcher (a container's removal) and failed is named in `haltFailed`:
- * part of the run may still be going.
+ * part of the run may still be going. A run that ended whose container could not be removed after
+ * it names that in `removalFailed`. Each is the last removal's word, said once.
  */
 export type RunOutcome =
-  | { readonly kind: "exited"; readonly code: number }
+  | { readonly kind: "exited"; readonly code: number; readonly removalFailed?: string }
   | { readonly kind: "timed_out"; readonly seconds: number; readonly haltFailed?: string };
 
 /** A backend that runs something. */

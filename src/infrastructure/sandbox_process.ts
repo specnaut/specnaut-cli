@@ -19,6 +19,8 @@ export type ProcessSpec = {
   readonly stdin?: Uint8Array;
   /** `discarded` for a helper whose output must never pass for the command's own; `copied` else. */
   readonly stdout?: "copied" | "discarded";
+  /** `captured` for a helper whose failure is read, not shown: `Started.stderr` holds it. */
+  readonly stderr?: "copied" | "captured";
 };
 
 export type Started = {
@@ -28,6 +30,8 @@ export type Started = {
   readonly ended: Promise<number>;
   /** The exit code, once the process has ended and its output is copied, or let go by `release`. */
   readonly exited: Promise<number>;
+  /** What it wrote to its standard error, by `exited`, when its spec `captured` it; else empty. */
+  readonly stderr: Promise<string>;
   /**
    * Kills it and its process group; a process already gone is not an error. Once `ended` has
    * settled it signals nothing: the group was killed then, and its id may since be another's.
@@ -58,35 +62,34 @@ export class DenoProcessLauncher implements ProcessLauncher {
 
   start(spec: ProcessSpec): Started {
     const child = command(spec, spec.stdin ? "piped" : "null").spawn();
-    // Once the group's last kill is sent, its id may be reused by a stranger's group: never again.
-    let gone = false;
-    const stop = () => {
-      if (!gone) killGroup(child);
-    };
-    const disarm = armExitTrap(stop);
+    const { stop, retire } = groupStop(child);
     const released = new AbortController();
-    const copied = this.#copy(child, spec, released.signal);
+    const output = this.#copy(child, spec, released.signal);
     if (spec.stdin) feed(child.stdin, spec.stdin, spec.cmd);
     const ended = child.status.then(({ code }) => {
-      stop();
-      gone = true;
-      disarm();
+      retire();
       return code;
     });
     const exited = ended.then(async (code) => {
-      await copied;
+      await output.copied;
       return code;
     });
-    return { pid: child.pid, ended, exited, stop, release: () => released.abort() };
+    const release = () => released.abort();
+    return { pid: child.pid, ended, exited, stderr: output.stderr, stop, release };
   }
 
-  /** Copies the child's output to ours (its stdout only unless discarded) until `released`. */
-  #copy(child: Deno.ChildProcess, spec: ProcessSpec, released: AbortSignal): Promise<unknown> {
+  /**
+   * Copies the child's output to ours (its stdout unless discarded, its stderr unless captured)
+   * until `released`; what it captured is `stderr`.
+   */
+  #copy(child: Deno.ChildProcess, spec: ProcessSpec, released: AbortSignal) {
     const sinks = this.#sinks ??= { out: this.out.getWriter(), err: this.err.getWriter() };
-    return Promise.all([
+    const captured = spec.stderr === "captured" ? textOf(child.stderr, released) : null;
+    const copied = Promise.all([
       spec.stdout === "discarded" ? undefined : copy(child.stdout, sinks.out, released),
-      copy(child.stderr, sinks.err, released),
+      captured ?? copy(child.stderr, sinks.err, released),
     ]);
+    return { copied, stderr: captured ?? Promise.resolve("") };
   }
 
   runSync(spec: ProcessSpec): number {
@@ -103,6 +106,36 @@ type Sinks = {
   readonly out: WritableStreamDefaultWriter<Uint8Array>;
   readonly err: WritableStreamDefaultWriter<Uint8Array>;
 };
+
+/**
+ * How `child`'s group is stopped, and its retirement once the child has ended: the group's last
+ * kill, after which it is never signalled again, as its id may be reused by a stranger's group.
+ * The retirement holds even when that kill throws, the error raised after it.
+ */
+function groupStop(child: Deno.ChildProcess): { stop: () => void; retire: () => void } {
+  let gone = false;
+  const stop = () => {
+    if (!gone) killGroup(child);
+  };
+  const disarm = armExitTrap(stop);
+  const retire = () => {
+    try {
+      stop();
+    } finally {
+      gone = true;
+      disarm();
+    }
+  };
+  return { stop, retire };
+}
+
+/** What `from` holds, as text, once it ends or is `released`. */
+async function textOf(from: ReadableStream<Uint8Array>, released: AbortSignal): Promise<string> {
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  const sink = new WritableStream<Uint8Array<ArrayBuffer>>({ write: (c) => void chunks.push(c) });
+  await copy(from, sink.getWriter(), released);
+  return await new Blob(chunks).text();
+}
 
 /** Copies `from` into `to` until it ends, or until `released`, which cancels it. */
 async function copy(

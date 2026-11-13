@@ -34,7 +34,8 @@ export function fakeLauncher(code: number | null = 0) {
         launch.stopped++;
         exit(137);
       };
-      return { pid: launch.pid, ended: exited, exited, stop, release: () => launch.released++ };
+      const release = () => launch.released++;
+      return { pid: launch.pid, ended: exited, exited, stderr: Promise.resolve(""), stop, release };
     },
     runSync(spec) {
       synced.push(spec);

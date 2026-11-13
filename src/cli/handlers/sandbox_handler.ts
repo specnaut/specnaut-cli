@@ -6,6 +6,7 @@ import {
   type ExecOutcome,
   type ExecRequest,
 } from "../../application/sandbox_exec.ts";
+import type { RunOutcome } from "../../application/sandbox_ports.ts";
 import {
   assessBackends,
   type BackendProbe,
@@ -111,11 +112,23 @@ function answer(outcome: ExecOutcome, deps: SandboxDeps): number {
   for (const line of gaps(outcome.backend, outcome.unenforced)) {
     deps.err(`notice: specnaut sandbox exec: ${line}`);
   }
-  if (outcome.outcome.kind === "exited") return outcome.outcome.code;
-  const { seconds, haltFailed } = outcome.outcome;
-  deps.err(red(`error: specnaut sandbox exec: the wall clock ran out after ${seconds} s`));
-  if (haltFailed !== undefined) {
-    const why = terminalText(haltFailed);
+  const run = outcome.outcome;
+  return run.kind === "exited" ? exited(run, deps) : timedOut(run, deps);
+}
+
+/** The command's own code; a container its run left behind is warned of first. */
+function exited(run: Extract<RunOutcome, { kind: "exited" }>, deps: SandboxDeps): number {
+  if (run.removalFailed !== undefined) {
+    const why = terminalText(run.removalFailed);
+    deps.err(`warning: specnaut sandbox exec: the sandbox's container may be left: ${why}`);
+  }
+  return run.code;
+}
+
+function timedOut(run: Extract<RunOutcome, { kind: "timed_out" }>, deps: SandboxDeps): number {
+  deps.err(red(`error: specnaut sandbox exec: the wall clock ran out after ${run.seconds} s`));
+  if (run.haltFailed !== undefined) {
+    const why = terminalText(run.haltFailed);
     deps.err(red(`error: specnaut sandbox exec: the run was not stopped cleanly: ${why}`));
   }
   return EXIT.timedOut;

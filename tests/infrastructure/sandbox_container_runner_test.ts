@@ -156,6 +156,7 @@ Deno.test("ContainerRunner: past the wall clock the container is removed by name
     args: ["rm", "--force", "--ignore", "specnaut-sandbox-x2"],
     env: ENGINE_ENV,
     stdout: "discarded",
+    stderr: "captured",
   });
   assertEquals(launches[0].stopped, 1);
 });
