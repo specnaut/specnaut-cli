@@ -61,6 +61,10 @@ Deno.test("outside a repository no call is guarded, and a guard that throws refu
     });
     assertEquals(broken.code, 2);
     assertStringIncludes(broken.err, "git is not on the PATH");
+    // A throw that is no Error refuses all the same, the value it threw as the reason.
+    const thrown = await guard(bare, call("s-1", "Read", {}), () => Promise.reject(null));
+    assertEquals(thrown.code, 2);
+    assertStringIncludes(thrown.err, "the guard could not finish: null");
   } finally {
     await Deno.remove(bare, { recursive: true });
   }

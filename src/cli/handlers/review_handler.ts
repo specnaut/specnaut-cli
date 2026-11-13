@@ -109,20 +109,23 @@ function defaultDeps(): ReviewDeps {
       return decideTrust({ pullRequest: (n) => forge.facts(n) }, pr, head);
     },
     end: (sha) => removeKeptExport(cache(), sha),
-    start: async () => {
-      const [pass, lock] = await Promise.all([FsReviewPass.open(cwd), FsReviewLock.open(cwd)]);
-      if (pass === null || lock === null) return null;
-      const exportDeps = {
-        fetcher: new GitBranchFetcher(cwd),
-        objects: (gitDir: string) => new GitTreeObjects(gitDir),
-        store: () => new FsExportStore(cwd, cache()),
-        windows: Deno.build.os === "windows",
-      };
-      const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
-      const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
-      const checkout = () => checkoutState(cwd);
-      const lockSession = (id: string) => lock.lock(id);
-      return { pass, now: Date.now, baseTip, checkout, lock: lockSession, exportBranch };
-    },
+    start: () => startDeps(cwd, cache),
   };
+}
+
+/** What `start` reads and writes in the repository `cwd` is in; `null` outside one. */
+async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | null> {
+  const [pass, lock] = await Promise.all([FsReviewPass.open(cwd), FsReviewLock.open(cwd)]);
+  if (pass === null || lock === null) return null;
+  const exportDeps = {
+    fetcher: new GitBranchFetcher(cwd),
+    objects: (gitDir: string) => new GitTreeObjects(gitDir),
+    store: () => new FsExportStore(cwd, cache()),
+    windows: Deno.build.os === "windows",
+  };
+  const exportBranch = (source: string) => exportBranchTree(exportDeps, { source });
+  const baseTip = async () => await baseTipOf(await GitObjects.open(cwd));
+  const checkout = () => checkoutState(cwd);
+  const lockSession = (id: string) => lock.lock(id);
+  return { pass, now: Date.now, baseTip, checkout, lock: lockSession, exportBranch };
 }

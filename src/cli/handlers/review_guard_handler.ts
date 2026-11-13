@@ -36,7 +36,10 @@ export async function runReviewGuard(deps: ReviewGuardDeps = defaultDeps()): Pro
     return outcome.kind === "allowed" ? EXIT.allowed : refuse(deps, outcome.why);
   } catch (err) {
     // Not swallowed: the failure is the refusal's reason.
-    return refuse(deps, `the guard could not finish: ${(err as Error).message ?? String(err)}`);
+    return refuse(
+      deps,
+      `the guard could not finish: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
