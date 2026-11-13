@@ -1,9 +1,12 @@
 /**
  * The syscall filter bubblewrap loads (`--seccomp`) just before it runs a branch's gates: a classic
  * BPF program over the kernel's `struct seccomp_data`, built here as bytes. It narrows the kernel
- * the sandbox can reach to what a build or a test uses: a call that mounts, enters or makes a
- * namespace, touches a kernel keyring, loads a module or a BPF program, or acts on the whole host
- * fails with EPERM, so a tool that probes for it carries on. A call made under another architecture
+ * the sandbox can reach to what a build or a test uses: a call that mounts, enters a namespace or
+ * makes one with `unshare`, touches a kernel keyring, loads a module or a BPF program, or acts on
+ * the whole host fails with EPERM, so a tool that probes for it carries on. `clone` and `clone3`
+ * are not filtered, whatever their flags (`clone3` passes them behind a pointer no filter reads):
+ * a new namespace needs a capability the sandbox drops, or a user namespace, which bubblewrap's
+ * `--disable-userns` forbids (`bwrapArgs`). A call made under another architecture
  * (32-bit, or x32 on x86_64) would reach the same kernel under other numbers, so it is refused too.
  * One socket family is refused as well: vsock, which a network namespace does not isolate, and
  * which reaches the hypervisor or the host from a virtual machine.

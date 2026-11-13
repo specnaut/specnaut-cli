@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { bwrapArgs, scopeArgs, userBus } from "../../src/domain/sandbox_args.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
-import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
+import { DENIED_SYSCALLS, SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
 import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /** Bubblewrap's arguments carry the policy and nothing else, every isolation flag present. */
@@ -29,6 +29,15 @@ Deno.test("bwrapArgs: every namespace unshared, tied to its parent, new session,
     String(SECCOMP_FD),
   ]);
   assertEquals(args.filter((a) => a.startsWith("--share") || a === "--cap-add"), []);
+});
+
+Deno.test("bwrapArgs: no nested user namespace, since the syscall filter lets clone through", () => {
+  const args = bwrap();
+  const denied: readonly string[] = DENIED_SYSCALLS;
+  assertEquals(["clone", "clone3"].filter((c) => denied.includes(c)), [], "the filter's docstring");
+  assertEquals(args.filter((a) => a === "--disable-userns"), ["--disable-userns"]);
+  assert(args.indexOf("--unshare-user") < args.indexOf("--disable-userns"));
+  assertEquals(after(args, "--cap-drop"), ["ALL"]);
 });
 
 Deno.test("bwrapArgs: system folders, the toolchain and the tree are bound read-only", () => {
