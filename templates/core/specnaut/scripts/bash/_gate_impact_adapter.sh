@@ -31,9 +31,7 @@ gate_adapter_cleanup() {
 # reach it, and its stdout goes to stderr: only the file it writes is its answer.
 gate_adapter_run() {
   (
-    for gate_var in $(compgen -e); do
-      case "$gate_var" in GIT_*) unset "$gate_var" ;; esac
-    done
+    explicit_head_clear_env || exit 125
     cd "$2" || exit 125
     export SPECNAUT_IMPACT_TREE="$3" SPECNAUT_IMPACT_COMMIT="$4" SPECNAUT_IMPACT_OUT="$5"
     export SPECNAUT_IMPACT_SCHEMA=1 SPECNAUT_IMPACT_REPO="$REPO_ROOT"

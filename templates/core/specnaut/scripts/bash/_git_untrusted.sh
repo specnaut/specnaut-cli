@@ -102,7 +102,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  explicit_head_clear_env
+  explicit_head_clear_env || { _gu_refuse "an inherited GIT_* variable cannot be dropped"; exit 2; }
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "$@"

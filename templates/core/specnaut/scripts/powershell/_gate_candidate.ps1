@@ -14,7 +14,16 @@
 
 function Test-GateSame([string]$A, [string]$B) { return [string]::Equals($A, $B, [StringComparison]::Ordinal) }
 
-# Invoke-GateProcess - a process with stdin closed and the repository variables gone;
+# Remove-GateGitEnv - drops every GIT_* variable from a process about to start, as the bash
+# twin's explicit_head_clear_env does: not only those `git rev-parse --local-env-vars` lists,
+# since others still change what git answers, such as how a pathspec matches.
+function Remove-GateGitEnv([System.Diagnostics.ProcessStartInfo]$Psi) {
+    foreach ($name in @($Psi.Environment.Keys)) {
+        if ($name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]$Psi.Environment.Remove($name) }
+    }
+}
+
+# Invoke-GateProcess - a process with stdin closed and every GIT_* variable gone;
 # returns its exit code and its whole stdout. A program that cannot start reads as exit
 # 127, as bash has it, so each caller's own check on the exit reports it.
 function Invoke-GateProcess([string]$File, [string[]]$Arguments, [string]$Cwd) {
@@ -26,7 +35,7 @@ function Invoke-GateProcess([string]$File, [string[]]$Arguments, [string]$Cwd) {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    foreach ($name in $script:GateLocalEnv) { [void]$psi.Environment.Remove($name) }
+    Remove-GateGitEnv $psi
     try {
         $process = [System.Diagnostics.Process]::Start($psi)
     } catch [System.ComponentModel.Win32Exception] {
@@ -39,12 +48,6 @@ function Invoke-GateProcess([string]$File, [string[]]$Arguments, [string]$Cwd) {
     [void]$stderr.Result
     return [pscustomobject]@{ Code = $process.ExitCode; Out = $stdout }
 }
-
-$script:GateLocalEnv = @()
-$gateEnvList = Invoke-GateProcess 'git' @('rev-parse', '--local-env-vars') ''
-# No git at all has no variables to scrub. A git that fails here would leave them in place.
-if ($gateEnvList.Code -ne 0 -and $gateEnvList.Code -ne 127) { throw "git rev-parse --local-env-vars exited $($gateEnvList.Code)" }
-$script:GateLocalEnv = @($gateEnvList.Out -split '\s+' | Where-Object { $_.Length -gt 0 })
 
 function Invoke-GateGit([string[]]$GitArgs) {
     return Invoke-GateProcess 'git' (@('-C', $repoRoot, '-c', 'core.fsmonitor=false') + $GitArgs) ''

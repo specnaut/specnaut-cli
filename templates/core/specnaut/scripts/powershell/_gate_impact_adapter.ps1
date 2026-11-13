@@ -33,7 +33,7 @@ function Invoke-GateAdapter([string]$Command, [string]$Worktree, [string]$Tree, 
     # New-GateCommandStart is run-gate.ps1's, the one caller of this script family.
     $psi = New-GateCommandStart $Command $Worktree
     $psi.RedirectStandardOutput = $true
-    foreach ($name in @($psi.Environment.Keys)) { if ($name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]$psi.Environment.Remove($name) } }
+    Remove-GateGitEnv $psi
     $psi.Environment['SPECNAUT_IMPACT_TREE'] = $Tree
     $psi.Environment['SPECNAUT_IMPACT_COMMIT'] = $Commit
     $psi.Environment['SPECNAUT_IMPACT_OUT'] = $Out

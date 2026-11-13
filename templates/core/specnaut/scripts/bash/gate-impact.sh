@@ -40,7 +40,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=SCRIPTDIR/_gate_impact_graph.sh
 . "$SCRIPT_DIR/_gate_impact_graph.sh" || exit 70
 
-for gate_var in $GATE_LOCAL_ENV; do unset "$gate_var"; done
+explicit_head_clear_env || exit 70
 
 TIER="${1:?}" COMMANDS="${2:?}" RECORDS="${3:?}" MODE="${4:?}" BASE_ARG="${5:-}"
 : >"$RECORDS" || exit 70

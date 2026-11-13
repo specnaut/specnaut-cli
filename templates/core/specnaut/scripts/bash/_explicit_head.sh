@@ -54,7 +54,10 @@
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
-#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
+#   and others git does not list in `rev-parse --local-env-vars` still change its answers
+#   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
+#   the variable, when one cannot be unset (readonly): a kept one would be read.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with `-c core.commitGraph=false -c
@@ -114,7 +117,7 @@ explicit_head_is_id() {
 explicit_head_clear_env() {
   local name
   for name in $(compgen -e); do
-    case "$name" in GIT_*) unset "$name" 2>/dev/null || true ;; esac
+    case "$name" in GIT_*) unset "$name" || return 1 ;; esac
   done
 }
 
@@ -156,14 +159,10 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a `.` or `..` component, a drive letter
 # outside MSYS, a leading `/` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="$1" line own count
+  local file="$1" line own
   shift
   [ -e "$file" ] || [ -L "$file" ] || return 0
-  [ -f "$file" ] && [ ! -L "$file" ] || return 1
-  # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  # A tr that fails prints nothing, which would count as none: its failure refuses.
-  count="$(set -o pipefail && LC_ALL=C tr -dc '\000-\011\013-\037\177' <"$file" | wc -c)" || return 1
-  [ "${count//[!0-9]/}" = 0 ] || return 1
+  [ -f "$file" ] && [ ! -L "$file" ] && _explicit_head_no_control_byte "$file" || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"$file" && [ "$(cat -- "$file")" = "$line" ] || return 1
   case "$line" in
@@ -175,6 +174,15 @@ _explicit_head_own_alternates() {
   case "$line/" in */./* | */../*) return 1 ;; esac
   own="$("$@" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
   [ "$line" -ef "$own/objects" ]
+}
+
+# _explicit_head_no_control_byte <file> - true when <file> holds no control byte but the
+# newline: read drops a NUL git would not, and no path written holds one. The count fails
+# closed: a tr that fails prints nothing, which would count as none, so its failure is false.
+_explicit_head_no_control_byte() {
+  local count
+  count="$(set -o pipefail && LC_ALL=C tr -dc '\000-\011\013-\037\177' <"$1" | wc -c)" || return 1
+  [ "${count//[!0-9]/}" = 0 ]
 }
 
 # _explicit_head_msys - true under Git for Windows' bash, whose git reads a drive letter as

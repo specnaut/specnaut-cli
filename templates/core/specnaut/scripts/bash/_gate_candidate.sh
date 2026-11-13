@@ -6,7 +6,9 @@
 #
 # Requires REPO_ROOT. Every git call goes through gate_git: this runs inside hooks,
 # where git has exported GIT_DIR and friends pointing at someone else's view of
-# the repository.
+# the repository. Every GIT_* variable is dropped, through explicit_head_clear_env,
+# not only those `git rev-parse --local-env-vars` lists: others still change
+# what git answers, such as how a pathspec matches.
 #
 # Given a head (gate_candidate_head, _explicit_head.sh), the candidate is that
 # commit, read from git's objects by its id: never HEAD, the index or a work tree,
@@ -14,13 +16,13 @@
 
 # shellcheck source=SCRIPTDIR/_explicit_head.sh disable=SC1091
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_explicit_head.sh" || return 70
-GATE_LOCAL_ENV="$(git rev-parse --local-env-vars 2>/dev/null)"
 
-# gate_git <git args...> - git on this repository, with the inherited repository
-# variables gone and no filesystem monitor to start.
+# gate_git <git args...> - git on this repository, with every inherited GIT_*
+# variable gone and no filesystem monitor to start. One that cannot be dropped
+# fails the call as git's own fatal error does.
 gate_git() {
   (
-    for gate_var in $GATE_LOCAL_ENV; do unset "$gate_var"; done
+    explicit_head_clear_env || exit 128
     explicit_head_env
     explicit_head_git -C "$REPO_ROOT" -c core.fsmonitor=false "$@"
   )
