@@ -49,7 +49,8 @@ var Unrunnable = []Exclusion{
 }
 
 // credentialScenarios open the OS credential store (cloud_handler.ts,
-// gate_handler.ts and spec_handler.ts all call defaultCredentialStore()).
+// cloud_read_commands.ts, gate_handler.ts and spec_handler.ts all call
+// defaultCredentialStore()).
 // They run only where no keyring is reachable.
 var credentialScenarios = map[string]string{
 	"cloud-session": "cloud orgs/board/logout open the credential store",
