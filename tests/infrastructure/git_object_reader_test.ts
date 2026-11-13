@@ -46,3 +46,20 @@ Deno.test("in a project under the top, the refusal names the project's path", as
   const reader = await GitObjects.open(join(root, "app"));
   await assertRejects(() => reader.listTree(head, ".specnaut/scripts"), Error, `${SCRIPT} at`);
 });
+
+Deno.test("the changed names hold a gitlink bump its submodule is set to ignore", async () => {
+  const { root, head: first } = await repo({ "a.ts": "a\n" });
+  const gitmodules = '[submodule "v"]\n\tpath = vendor/lib\n\turl = ./v.git\n\tignore = all\n';
+  await write(root, { ".gitmodules": gitmodules });
+  // Committed from the index: no folder backs the gitlink, so `add -A` would drop it.
+  await git(root, "add", ".gitmodules");
+  await git(root, "update-index", "--add", "--cacheinfo", `160000,${first},vendor/lib`);
+  await git(root, "commit", "-q", "-m", "a vendored module");
+  const before = (await git(root, "rev-parse", "HEAD")).trim();
+  await git(root, "update-index", "--cacheinfo", `160000,${before},vendor/lib`);
+  await git(root, "commit", "-q", "-m", "bump it");
+  const plain = await git(root, "diff-tree", "-r", "--name-only", before, "HEAD");
+  assertEquals(plain.trim(), "", "the control: ignore = all hides the gitlink from git");
+  const reader = await GitObjects.open(root);
+  assertEquals(await reader.changedNames(before, "HEAD"), ["vendor/lib"]);
+});

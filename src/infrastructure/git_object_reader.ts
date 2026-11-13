@@ -97,7 +97,7 @@ export class GitObjects implements GitObjectReader {
   }
 
   async changedNames(from: string, to: string): Promise<string[]> {
-    const args = ["-r", "-z", "--name-only", "--no-renames", ...PLAIN_DIFF_FLAGS, from, to];
+    const args = ["-r", "-z", "--name-only", ...PLAIN_DIFF_FLAGS, from, to];
     return decode(await this.#git.run("diff-tree", args)).split("\0").filter(Boolean);
   }
 }

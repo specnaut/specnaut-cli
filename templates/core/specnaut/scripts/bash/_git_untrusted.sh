@@ -14,7 +14,10 @@
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
 #                                     exist: no signature program, for any format
 #   -c submodule.recurse=false -c diff.submodule=short
-#   --no-textconv --no-ext-diff --no-color on every form that diffs
+#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none
+#                                     on every form that diffs: a rename is its delete
+#                                     and its add, and a gitlink change is listed
+#                                     whatever the submodule's own `ignore` says
 #   -c core.commitGraph=false -c core.multiPackIndex=false, given an objects folder
 #                                     (_explicit_head.sh): its own graph and index
 #                                     are never read in place of its objects
@@ -119,8 +122,9 @@ _gu_git() {
     -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "$@"
 }
 
-# The flags every form that diffs carries: no textconv, no external diff, no color.
-_GU_PLAIN=(--no-textconv --no-ext-diff --no-color)
+# The flags every form that diffs carries: no textconv, no external diff, no color; and
+# every changed path counted, a renamed one under both names and an ignored gitlink too.
+_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none)
 
 gu_names() {
   [ $# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }

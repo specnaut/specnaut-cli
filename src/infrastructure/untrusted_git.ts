@@ -27,8 +27,17 @@ export const UNTRUSTED_GIT_FLAGS: readonly string[] = [
 /** Passed only to a git that knows it (2.44 or later); below it, a promisor remote is refused. */
 export const LAZY_FETCH_FLAG = "--no-lazy-fetch";
 
-/** `_GU_PLAIN`: the flags every form that diffs carries. */
-export const PLAIN_DIFF_FLAGS: readonly string[] = ["--no-textconv", "--no-ext-diff", "--no-color"];
+/**
+ * `_GU_PLAIN`: the flags every form that diffs carries. Every changed path is counted: a rename as
+ * its delete and its add, and a gitlink change whatever the submodule's `ignore` setting says.
+ */
+export const PLAIN_DIFF_FLAGS: readonly string[] = [
+  "--no-textconv",
+  "--no-ext-diff",
+  "--no-color",
+  "--no-renames",
+  "--ignore-submodules=none",
+];
 
 /** What `_gu_env_run` exports, plus no system configuration (a file the repository cannot see). */
 export const UNTRUSTED_GIT_ENV: Readonly<Record<string, string>> = {
