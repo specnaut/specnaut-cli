@@ -114,6 +114,13 @@ Deno.test("container: podman older than 4.8 is passed over for docker, else says
   }
 });
 
+// The boundary as sandbox_container.ts states it: a 4.8 pre-release already reads the CLI's
+// containers.conf, and no 4.7 patch does, however high.
+Deno.test("container: a 4.8 pre-release is offered; the highest 4.7 patch is not", () => {
+  assertEquals(chooseBackend(probe({ podmanVersion: "4.8.0-rc1" })), ON_PODMAN);
+  assertEquals(firstWhy(probe({ podmanVersion: "4.7.9" })), OLD_WHY);
+});
+
 Deno.test("container: a podman whose version cannot be read is not offered, and says why", () => {
   for (const podmanVersion of [null, "", "garbled", "4", "four.eight", "4.8.0 extra"]) {
     assertEquals(firstWhy(probe({ podmanVersion })), UNREAD_WHY, String(podmanVersion));
