@@ -85,13 +85,27 @@ async function removeAll(path: string): Promise<void> {
   }
 }
 
-/** Opens `dir` and every real folder under it to its owner; a link is left as it is. */
-export async function reopen(dir: string): Promise<void> {
+/** The system `chmod` walk `reopen` runs: recursive, physical, so a link is never traversed. */
+export const REOPEN_ARGS = (dir: string) => ["-R", "-P", "u+rwx", dir];
+
+/** Runs `chmod` with `args`; the exit code and what it printed on stderr. */
+export type ChmodRun = (args: string[]) => Promise<{ code: number; stderr: string }>;
+
+const systemChmod: ChmodRun = async (args) => {
+  const out = await new Deno.Command("/bin/chmod", { args, stdout: "null", stderr: "piped" })
+    .output();
+  return { code: out.code, stderr: new TextDecoder().decode(out.stderr) };
+};
+
+/**
+ * Opens `dir` and every real folder under it to its owner; a link is left as it is, at any depth.
+ * The walk is the system `chmod -R -P`'s, which descends through each folder it opened, rather than
+ * one made here path by path.
+ */
+export async function reopen(dir: string, run: ChmodRun = systemChmod): Promise<void> {
   if (!(await Deno.lstat(dir)).isDirectory) return;
-  await Deno.chmod(dir, 0o700);
-  for await (const entry of Deno.readDir(dir)) {
-    if (entry.isDirectory) await reopen(join(dir, entry.name));
-  }
+  const { code, stderr } = await run(REOPEN_ARGS(dir));
+  if (code !== 0) throw new Error(`chmod could not open ${dir} to its owner: ${stderr.trim()}`);
 }
 
 /** The trap's removal: synchronous, as `unload` waits for nothing; a failure is reported. */

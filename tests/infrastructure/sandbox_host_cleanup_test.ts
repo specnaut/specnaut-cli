@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { dirname, join } from "@std/path";
 import { FsSandboxHost, reopen } from "../../src/infrastructure/fs_sandbox_host.ts";
+import type { ChmodRun } from "../../src/infrastructure/fs_sandbox_host.ts";
 
 const posix = Deno.build.os !== "windows";
 const modeOf = async (path: string) => (await Deno.lstat(path)).mode! & 0o777;
@@ -25,12 +26,15 @@ Deno.test({
     const dir = await Deno.makeTempDir({ prefix: "specnaut-reopen-" });
     try {
       const locked = join(dir, "locked");
-      await Deno.mkdir(locked);
+      const deep = join(locked, "deep");
+      await Deno.mkdir(deep, { recursive: true });
+      await Deno.chmod(deep, 0o000);
       await Deno.chmod(locked, 0o500);
       await Deno.symlink(outside, join(dir, "link"));
       await reopen(dir);
       await reopen(join(dir, "link"));
-      assertEquals(await modeOf(locked), 0o700);
+      assertEquals(await modeOf(locked) & 0o700, 0o700);
+      assertEquals(await modeOf(deep) & 0o700, 0o700, "a folder below a closed one is opened too");
       assertEquals(await modeOf(outside), 0o555);
     } finally {
       await Deno.remove(dir, { recursive: true });
@@ -63,4 +67,21 @@ Deno.test({
       await dropOutside(outside);
     }
   },
+});
+
+Deno.test("reopen: the walk is the system chmod's, recursive and physical, never one made by path", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-reopen-" });
+  const calls: string[][] = [];
+  const run: ChmodRun = (args) => {
+    calls.push(args);
+    return Promise.resolve({ code: 0, stderr: "" });
+  };
+  try {
+    await reopen(dir, run);
+    assertEquals(calls, [["-R", "-P", "u+rwx", dir]]);
+    const failing: ChmodRun = () => Promise.resolve({ code: 1, stderr: "denied" });
+    await assertRejects(() => reopen(dir, failing), Error, "denied");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });
