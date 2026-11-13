@@ -8,7 +8,7 @@ import type { ImageSource } from "../../src/domain/sandbox_image.ts";
  */
 
 const IMAGE: ImageSource = { kind: "pinned", ref: `acme/dev@sha256:${"a".repeat(64)}` };
-const NO_ENGINE_WHY = "container: no rootless podman and no docker";
+const NO_ENGINE_WHY = "container: no rootless podman, and no docker";
 const CGROUPS_WHY =
   "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
 const OLD_BWRAP_WHY = "bubblewrap: older than 0.8, which cannot forbid nested user namespaces";
@@ -19,6 +19,7 @@ const NOTHING: BackendProbe = {
   arch: "x86_64",
   image: IMAGE,
   podman: "absent",
+  podmanRemote: false,
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },

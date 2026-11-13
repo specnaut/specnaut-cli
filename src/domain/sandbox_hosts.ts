@@ -27,6 +27,12 @@ export type BackendProbe = {
   readonly image: ImageSource;
   /** Podman running as the user, as root (passed over), or not installed. */
   readonly podman: "rootless" | "root" | "absent";
+  /**
+   * Podman answers from a service it does not run itself (`host.serviceIsRemote`): a podman
+   * machine's VM, `CONTAINER_HOST`, a containers.conf `[engine] remote`. That service starts a
+   * container from its own containers.conf, never from the one the CLI hands a run's client.
+   */
+  readonly podmanRemote: boolean;
   /** What podman can limit for the user on cgroup v2; every one false off it or when absent. */
   readonly podmanLimits: EngineLimits;
   /** A docker daemon answers. */

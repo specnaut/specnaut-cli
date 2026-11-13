@@ -140,6 +140,7 @@ const LINUX_BWRAP = {
   arch: "x86_64",
   image: { kind: "none", why: "no devcontainer" },
   podman: "absent",
+  podmanRemote: false,
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },

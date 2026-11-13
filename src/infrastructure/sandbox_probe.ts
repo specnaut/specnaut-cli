@@ -23,17 +23,18 @@ const USERNS_REFUSED = /namespace|uid map|Permission denied|Operation not permit
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
-type Podman = Pick<BackendProbe, "podman" | "podmanLimits">;
+type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanLimits">;
 type Docker = Pick<BackendProbe, "docker" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
-const NO_PODMAN: Podman = { podman: "absent", podmanLimits: NO_LIMITS };
+const NO_PODMAN: Podman = { podman: "absent", podmanRemote: false, podmanLimits: NO_LIMITS };
 const NO_DOCKER: Docker = { docker: false, dockerLimits: NO_LIMITS };
 
 /**
  * Whether this process's own cgroup (cgroup v2) has the file podman checks before it passes on the
  * memory cap's bound on what is paged out: without it podman drops that bound, warning, and runs.
- * A podman in a VM (macOS) is not read here, so its bound counts as missing.
+ * A remote podman's cgroup (a podman machine's VM) is not this process's: it is not tried, and its
+ * bound counts as missing.
  */
 const PAGING_TRIAL = [
   "-c",
@@ -80,16 +81,22 @@ export class HostBackendProber implements BackendProber {
     return { os, arch, image, ...podman, ...docker, ...bwrap, sandboxExec };
   }
 
-  /** Podman's own report: whether it runs as the user, and what it can limit on its host. */
+  /**
+   * Podman's own report: whether it runs as the user, whether it answers from a service it does not
+   * run itself, and what it can limit on its host. Only a report saying it is local is taken as
+   * local: one that does not say is counted remote.
+   */
   async #podman(): Promise<Podman> {
     const args = ["info", "--format", "json"];
     const { code, stdout } = await this.runner.run("podman", args, { env: this.engineVars() });
     if (code !== 0) return NO_PODMAN;
     const host = parsed(stdout, "podman info")?.host;
     if (host === undefined) return NO_PODMAN;
+    const podmanRemote = host?.serviceIsRemote !== false;
     return {
       podman: host?.security?.rootless === true ? "rootless" : "root",
-      podmanLimits: await this.#podmanLimits(host),
+      podmanRemote,
+      podmanLimits: await this.#podmanLimits(host, podmanRemote),
     };
   }
 
@@ -98,11 +105,12 @@ export class HostBackendProber implements BackendProber {
    * and the memory cap's bound on what is paged out where the host has it ({@link PAGING_TRIAL}).
    */
   // deno-lint-ignore no-explicit-any
-  async #podmanLimits(host: any): Promise<EngineLimits> {
+  async #podmanLimits(host: any, remote: boolean): Promise<EngineLimits> {
     const controllers: unknown = host?.cgroupControllers;
     if (host?.cgroupVersion !== "v2" || !Array.isArray(controllers)) return NO_LIMITS;
     const memory = controllers.includes("memory");
-    const paging = memory && (await this.runner.run("/bin/sh", PAGING_TRIAL)).code === 0;
+    const tried = memory && !remote;
+    const paging = tried && (await this.runner.run("/bin/sh", PAGING_TRIAL)).code === 0;
     const pids = controllers.includes("pids");
     return { memory, swap: paging, pids, cpuQuota: controllers.includes("cpu") };
   }

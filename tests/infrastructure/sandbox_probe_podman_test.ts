@@ -10,9 +10,21 @@ import { ok, prober } from "./sandbox_probe_fixture.ts";
  * drops that bound, warning, where it does not.
  */
 
-const podmanInfo = (rootless: boolean, version: string, controllers: string[]) =>
+/** Podman's report of a local engine; `host` sets or replaces what its `host` says. */
+const podmanInfo = (
+  rootless: boolean,
+  version: string,
+  controllers: string[],
+  host: Record<string, unknown> = {},
+) =>
   ok(JSON.stringify({
-    host: { security: { rootless }, cgroupVersion: version, cgroupControllers: controllers },
+    host: {
+      security: { rootless },
+      serviceIsRemote: false,
+      cgroupVersion: version,
+      cgroupControllers: controllers,
+      ...host,
+    },
   }));
 const ALL = ["cpu", "memory", "pids", "io"];
 const FAILED = { code: 1, stdout: "", stderr: "" };
@@ -62,6 +74,24 @@ Deno.test("probe: podman whose host lacks the bound is offered, and reports it U
   if (backend.kind !== "container") return;
   assertEquals(backend.dropped, ["memorySwap"]);
   assertEquals(capsWithout(backend), ["memorySwap"]);
+});
+
+Deno.test("probe: a remote podman is read as remote, and its bound is not tried here", async () => {
+  const local = await limitsOf();
+  assertEquals(local.probed.podmanRemote, false);
+  const remote = await limitsOf(podmanInfo(true, "v2", ALL, { serviceIsRemote: true }));
+  assertEquals([remote.probed.podmanRemote, remote.trials], [true, []]);
+  assertEquals(remote.probed.podmanLimits, {
+    memory: true,
+    swap: false,
+    pids: true,
+    cpuQuota: true,
+  });
+});
+
+Deno.test("probe: a podman whose report does not say it is local is counted remote", async () => {
+  const unsaid = await limitsOf(podmanInfo(true, "v2", ALL, { serviceIsRemote: undefined }));
+  assertEquals([unsaid.probed.podmanRemote, unsaid.trials], [true, []]);
 });
 
 Deno.test("probe: podman whose report is not JSON is not used", async () => {
