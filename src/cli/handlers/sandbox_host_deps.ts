@@ -1,5 +1,10 @@
 import { execLockRefusal } from "../../application/review_guard.ts";
-import { type ExecDeps, execInSandbox } from "../../application/sandbox_exec.ts";
+import {
+  type ExecDeps,
+  execInSandbox,
+  type ExecOutcome,
+  type ExecRequest,
+} from "../../application/sandbox_exec.ts";
 import { userBus } from "../../domain/sandbox_args.ts";
 import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
@@ -29,22 +34,34 @@ export function sandboxHostDeps(): SandboxDeps {
     err: (s) => console.error(s),
     probe: () => prober.probe(),
     realLog: realLogPath,
-    // The session a run is started from: Claude Code sets it in its shell's environment.
-    lockRefusal: async (request) =>
-      await execLockRefusal(
-        await FsReviewLock.open(Deno.cwd()),
-        request,
-        Deno.env.get("CLAUDE_CODE_SESSION_ID") ?? null,
-      ),
-    exec: async (request) => {
-      const log = request.log === null ? null : await openCappedLog(request.log);
-      try {
-        return await execInSandbox(execDeps(prober, checkout, log), request);
-      } finally {
-        await log?.close();
-      }
-    },
+    lockRefusal: sessionLockRefusal,
+    exec: (request) => execWithLog(prober, checkout, request),
   };
+}
+
+/**
+ * Why the review lock refuses `request`, judged for the session the run is started from: Claude
+ * Code sets it in its shell's environment.
+ */
+async function sessionLockRefusal(
+  request: Parameters<typeof execLockRefusal>[1],
+): Promise<string | null> {
+  const session = Deno.env.get("CLAUDE_CODE_SESSION_ID") ?? null;
+  return await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request, session);
+}
+
+/** The run of `request`, its output to the `--log` file when it names one, closed after. */
+async function execWithLog(
+  prober: HostBackendProber,
+  checkout: () => Promise<string>,
+  request: ExecRequest & { readonly log: string | null },
+): Promise<ExecOutcome> {
+  const log = request.log === null ? null : await openCappedLog(request.log);
+  try {
+    return await execInSandbox(execDeps(prober, checkout, log), request);
+  } finally {
+    await log?.close();
+  }
 }
 
 /** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
