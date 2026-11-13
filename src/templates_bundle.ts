@@ -38415,8 +38415,10 @@ exit 2
 # starting the binary, and so does a call whose input opens with a session id
 # that holds none: Claude Code writes \`session_id\` first, and any other input
 # goes to the binary. A session whose copy is there while git cannot find the
-# checkout's git directory is refused. A lock with no \`specnaut\` on PATH to
-# judge it stops the call.
+# checkout's git directory is refused, and so is one whose copy cannot be told
+# absent (a file, or a folder the hook may not search, on the way to it), which
+# the binary refuses too. A lock with no \`specnaut\` on PATH to judge it stops
+# the call.
 input=\$(cat)
 refuse() {
   echo "review-lock: \$1" >&2
@@ -38428,18 +38430,38 @@ dir=\$(cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P) ||
 id_pattern='^\\{"session_id":"([A-Za-z0-9][A-Za-z0-9_-]{0,127})"'
 id=""
 [[ \$input =~ \$id_pattern ]] && id=\${BASH_REMATCH[1]}
+# Whether \$1 is a path the binary reads as absolute: on a Windows shell a drive
+# letter starts one too (isAbsolute there), its backslashes read as slashes.
+absolute() {
+  case "\$1" in /*) return 0 ;; esac
+  case "\${OSTYPE:-}" in msys* | cygwin*) case "\$1" in [A-Za-z]:[\\\\/]*) return 0 ;; esac ;; esac
+  return 1
+}
+# Whether nothing is at \$1 for certain: the nearest path above it that is there
+# is a folder this hook may search. A file, a folder it may not search, or no
+# folder at all on the way proves no absence: the binary refuses such a path.
+absent() {
+  local up=\$1
+  while [ ! -e "\$up" ]; do
+    case "\$up" in */*) up=\${up%/*} ;; *) return 1 ;; esac
+    [ -n "\$up" ] || up=/
+  done
+  [ -d "\$up" ] && [ -x "\$up" ]
+}
 # The per-user copy, found as reviewLockStateFolder finds it.
 state=\${XDG_STATE_HOME:-}
-case "\$state" in /*) ;; *) state="\${HOME:-}/.local/state" ;; esac
+absolute "\$state" || state="\${HOME:-}/.local/state"
+case "\${OSTYPE:-}" in msys* | cygwin*) state=\${state//\\\\//} ;; esac
 mine=0
-case "\$state" in /*)
+if [ -n "\$id" ] && absolute "\$state"; then
   copies="\$state/specnaut/review-lock"
-  if [ -n "\$id" ] && { [ -e "\$copies" ] || [ -L "\$copies" ]; }; then
-    if [ ! -d "\$copies" ] || [ -L "\$copies" ] || [ -e "\$copies/\$id.json" ] ||
-      [ -L "\$copies/\$id.json" ]; then mine=1; fi
+  if [ -e "\$copies" ] || [ -L "\$copies" ]; then
+    if [ ! -d "\$copies" ] || [ -L "\$copies" ] || [ ! -x "\$copies" ] ||
+      [ -e "\$copies/\$id.json" ] || [ -L "\$copies/\$id.json" ]; then mine=1; fi
+  elif ! absent "\$copies"; then
+    mine=1
   fi
-  ;;
-esac
+fi
 # Git is asked as the binary asks it (UNTRUSTED_GIT_ENV, ENV_ALLOWLIST in
 # src/infrastructure/untrusted_git.ts): none of the caller's GIT_* variables.
 vars=(GIT_CONFIG_NOSYSTEM=1)
