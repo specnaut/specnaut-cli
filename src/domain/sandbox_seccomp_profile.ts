@@ -5,10 +5,12 @@
  * `seccomp_profile` nor a daemon.json `seccomp-profile` can weaken or remove it.
  *
  * Layered as "allow, but these", like bubblewrap's filter, and built from the same list
- * (`DENIED_SYSCALLS`, `AF_VSOCK`), so the two backends cannot drift. It is not built on the
- * engine's default profile: that default is the engine's to change, and an allow-list copied here
- * would be a second list to keep current with every kernel. The calls the engine's default refuses
- * and this profile allows are, in the main, ones the run's dropped capabilities already refuse.
+ * (`DENIED_SYSCALLS`, `AF_VSOCK`), so the two refuse the same calls. The list is shared, not how an
+ * argument is compared: each filter does that its own way, and both read the socket family as the
+ * kernel does, its low 32 bits. It is not built on the engine's default profile: that default is
+ * the engine's to change, and an allow-list copied here would be a second list to keep current
+ * with every kernel. The calls the engine's default refuses and this profile allows are, in the
+ * main, ones the run's dropped capabilities already refuse.
  *
  * What bubblewrap gets from `--disable-userns`, a container gets here: `unshare` and `setns` are
  * on the shared list, `clone` with any namespace flag is refused, and `clone3`, whose flags lie
@@ -25,6 +27,12 @@ import { AF_VSOCK, DENIED_SYSCALLS, EPERM } from "./sandbox_seccomp.ts";
 
 /** `clone3` fails as on a kernel without it: the one errno a C library falls back on. */
 const ENOSYS = 38;
+
+/**
+ * The low 32 bits of an argument: `socket` reads its family as an `int`, so a rule comparing all
+ * 64 would let `(1 << 32) | AF_VSOCK` past it to a vsock socket.
+ */
+const INT = 0xffffffff;
 
 /**
  * The flags with which `clone` makes a namespace. CLONE_NEWTIME (0x80) is not one: `clone` reads
@@ -44,7 +52,7 @@ export type ProfileArg = {
   readonly index: number;
   readonly value: number;
   readonly valueTwo: number;
-  readonly op: "SCMP_CMP_EQ" | "SCMP_CMP_MASKED_EQ";
+  readonly op: "SCMP_CMP_MASKED_EQ";
 };
 
 /** One rule: its calls fail with `errnoRet` when every one of its `args` holds. */
@@ -70,10 +78,10 @@ export function seccompProfile(): SeccompProfile {
     syscalls: [
       refused([...DENIED_SYSCALLS], EPERM),
       ...Object.values(CLONE_NAMESPACE_FLAGS).map((flag) =>
-        refused(["clone"], EPERM, [firstArg("SCMP_CMP_MASKED_EQ", flag, flag)])
+        refused(["clone"], EPERM, [firstArg(flag, flag)])
       ),
       refused(["clone3"], ENOSYS),
-      refused(["socket"], EPERM, [firstArg("SCMP_CMP_EQ", AF_VSOCK)]),
+      refused(["socket"], EPERM, [firstArg(INT, AF_VSOCK)]),
     ],
   };
 }
@@ -83,7 +91,7 @@ function refused(names: string[], errnoRet: number, args?: ProfileArg[]): Profil
   return args === undefined ? rule : { ...rule, args };
 }
 
-/** A condition on the call's first argument: equal to `value`, or masked by it to `valueTwo`. */
-function firstArg(op: ProfileArg["op"], value: number, valueTwo = 0): ProfileArg {
-  return { index: 0, value, valueTwo, op };
+/** A condition on the call's first argument: masked by `value`, it equals `valueTwo`. */
+function firstArg(value: number, valueTwo: number): ProfileArg {
+  return { index: 0, value, valueTwo, op: "SCMP_CMP_MASKED_EQ" };
 }

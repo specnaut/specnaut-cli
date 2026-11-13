@@ -34,9 +34,8 @@ function refusal(name: string, args: readonly number[] = []): number | null {
 
 function holds(rule: ProfileRule, args: readonly number[]): boolean {
   return (rule.args ?? []).every(({ index, value, valueTwo, op }) => {
-    const arg = BigInt(args[index] ?? 0);
-    if (op === "SCMP_CMP_EQ") return arg === BigInt(value);
-    return (arg & BigInt(value)) === BigInt(valueTwo);
+    assertEquals(op, "SCMP_CMP_MASKED_EQ");
+    return (BigInt(args[index] ?? 0) & BigInt(value)) === BigInt(valueTwo);
   });
 }
 
@@ -89,6 +88,14 @@ Deno.test("seccompProfile: clone3 fails with ENOSYS, so a C library falls back t
 
 Deno.test("seccompProfile: a vsock socket is refused with EPERM; other families are not", () => {
   assertEquals(refusal("socket", [AF_VSOCK, 1, 0]), EPERM);
+  // The kernel reads the family as an int: bits above the low 32 must not carry it past the rule.
+  assertEquals(refusal("socket", [2 ** 32 + AF_VSOCK, 1, 0]), EPERM);
+  assertEquals(refusal("socket", [2 ** 40 + AF_VSOCK, 1, 0]), EPERM);
+  assertEquals(refusal("socket", [2 ** 32 + AF_UNIX, 1, 0]), null);
+  const rule = seccompProfile().syscalls.find((r) => r.names.includes("socket"));
+  assertEquals(rule?.args, [
+    { index: 0, value: 0xffffffff, valueTwo: AF_VSOCK, op: "SCMP_CMP_MASKED_EQ" },
+  ]);
   assertEquals(refusal("socket", [AF_UNIX, 1, 0]), null);
   assertEquals(refusal("socket", [AF_INET, 1, 0]), null);
 });
