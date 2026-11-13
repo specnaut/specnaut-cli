@@ -1,18 +1,12 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { FsHeadReflog, REFTABLE } from "../../src/infrastructure/fs_head_reflog.ts";
+import { gitTest, REFTABLE_INIT } from "../integration/git_feature.ts";
 import { git } from "../integration/verify_scripts_fixture.ts";
 
 /**
  * HEAD's reflog as a file: a repository that keeps its refs in a reftable has none, and is refused
  * by name rather than read as one git keeps no reflog for.
  */
-
-/** Whether this git can make a reftable repository: `--ref-format` is git 2.45's. */
-const REFTABLE_GIT = await new Deno.Command("git", {
-  args: ["init", "-q", "--ref-format=reftable", await Deno.makeTempDir({ prefix: "reftable-" })],
-  stdout: "null",
-  stderr: "null",
-}).output().then((o) => o.success);
 
 /** A repository with one commit, its refs in `format`, its config set by `config` first. */
 async function repository(format: "files" | "reftable", config: string[] = []): Promise<string> {
@@ -23,28 +17,28 @@ async function repository(format: "files" | "reftable", config: string[] = []): 
   return root;
 }
 
-Deno.test({
-  name: "a reftable repository's reflog is refused by name, never read as no reflog",
-  ignore: !REFTABLE_GIT,
-  fn: async () => {
+gitTest(
+  REFTABLE_INIT,
+  "a reftable repository's reflog is refused by name, never read as no reflog",
+  async () => {
     const reflog = await FsHeadReflog.open(await repository("reftable"));
     await assertRejects(() => reflog.headReflog(), Error, REFTABLE);
   },
-});
+);
 
-Deno.test({
-  name: "a repository git keeps no reflog for reads as none, not as a reftable",
-  ignore: !REFTABLE_GIT,
-  fn: async () => {
+gitTest(
+  REFTABLE_INIT,
+  "a repository git keeps no reflog for reads as none, not as a reftable",
+  async () => {
     const root = await repository("files", ["core.logAllRefUpdates", "false"]);
     assertEquals(await (await FsHeadReflog.open(root)).headReflog(), null);
   },
-});
+);
 
-Deno.test({
-  name: "a logs/HEAD left in a reftable repository is refused, never read as its reflog",
-  ignore: !REFTABLE_GIT,
-  fn: async () => {
+gitTest(
+  REFTABLE_INIT,
+  "a logs/HEAD left in a reftable repository is refused, never read as its reflog",
+  async () => {
     const root = await repository("reftable");
     const z = "0".repeat(40);
     await Deno.mkdir(`${root}/.git/logs`, { recursive: true });
@@ -52,4 +46,4 @@ Deno.test({
     const reflog = await FsHeadReflog.open(root);
     await assertRejects(() => reflog.headReflog(), Error, REFTABLE);
   },
-});
+);
