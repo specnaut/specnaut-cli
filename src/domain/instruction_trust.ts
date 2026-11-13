@@ -62,7 +62,8 @@ export type InstructionInput = {
   readonly symlinks: boolean;
   /**
    * Reasons judged beside the walk, at HEAD: a shipped skill against the copy Specnaut ships
-   * (`shipped_skills.ts`), the files above a project in a subfolder (`instruction_parents.ts`).
+   * (`shipped_skills.ts`), the files above a project in a subfolder (`instruction_parents.ts`),
+   * what a judged CLAUDE.md imports (`claude_imports.ts`).
    * A path the walk already named keeps the walk's reason.
    */
   readonly extra?: readonly Untrusted[];
@@ -97,10 +98,11 @@ function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   return [...reasons].map(([path, reason]) => ({ path, reason }));
 }
 
-/** `found`, then each of `extra` on a path `found` does not name. */
+/** `found`, then each of `extra` on a path nothing before it names: one line per path. */
 function withExtra(found: Untrusted[], extra: readonly Untrusted[]): Untrusted[] {
   const named = new Set(found.map((u) => u.path));
-  return [...found, ...extra.filter((u) => !named.has(u.path))];
+  const added = extra.filter((u) => !named.has(u.path) && named.add(u.path));
+  return [...found, ...added];
 }
 
 /**

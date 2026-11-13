@@ -10,6 +10,8 @@ import {
   parentReasons,
   type ParentSides,
 } from "../domain/instruction_parents.ts";
+import { importReasons } from "../domain/claude_imports.ts";
+import { importedAtHead, readImports } from "./instruction_imports.ts";
 import { isNested, keptAtHead, nestedRoots } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
@@ -37,8 +39,9 @@ export type InstructionOutcome = {
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
  * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class,
- * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`), and the files above
- * a project in a subfolder (`instruction_parents.ts`).
+ * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`), the files above a
+ * project in a subfolder (`instruction_parents.ts`), and what the judged CLAUDE.md files import
+ * (`instruction_imports.ts`).
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
@@ -51,11 +54,34 @@ export async function verifyInstructions(
   const symlinks = await deps.git.symlinks();
   const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
   const parents = await readParents(deps.git, base);
-  const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
+  const sources = [...files, ...parents.head, ...tip, ...parents.tip, ...tipOverrides(committed)];
+  const imports = await readImports(deps.git, base, sources);
+  const extra = [
+    ...await shippedReasons(files, shipped),
+    ...parentReasons(parents),
+    ...importReasons(imports),
+  ];
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
-  const ends = await linkEnds(deps.git, base.head, files);
+  const landing = [...files, ...parents.head, ...importedAtHead(imports)];
+  return { verdicts, digest: await digestOf(deps.git, base.head, landing, verdicts) };
+}
+
+/** {@link headDigest} of what lands (`landing`, at `head`) and of the reasons `verdicts` show. */
+async function digestOf(
+  git: GitObjectReader,
+  head: string,
+  landing: readonly BaseEntry[],
+  verdicts: readonly ConfigVerdict[],
+): Promise<string> {
   const shown = verdicts.flatMap((v) => v.trusted ? [] : [{ path: v.path, reason: v.reason }]);
-  return { verdicts, digest: await headDigest([...files, ...parents.head], ends, shown) };
+  return await headDigest(landing, await linkEnds(git, head, landing), shown);
+}
+
+/** The committed overrides the tip holds, as entries: a source of imports too. */
+function tipOverrides(committed: readonly CommittedInstruction[]): BaseEntry[] {
+  return committed.flatMap((c) =>
+    c.tip.kind === "file" ? [{ kind: "blob" as const, path: c.path, bytes: c.tip.bytes }] : []
+  );
 }
 
 /** The files above the project ({@link PARENT_INSTRUCTIONS}) at HEAD, the tip and the merge base. */

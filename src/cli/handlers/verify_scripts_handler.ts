@@ -38,8 +38,9 @@ import { findHarness } from "../harnesses.ts";
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
  * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`
  * per path the instruction class names (`instruction_trust.ts`: a path whose work tree or HEAD
- * entry is not the tip's, whose work tree is not HEAD's, or a skill Specnaut ships whose HEAD bytes
- * are not the shipped copy, `shipped_skills.ts`), the `UNTRUSTED` lines, and last
+ * entry is not the tip's, whose work tree is not HEAD's, a skill Specnaut ships whose HEAD bytes
+ * are not the shipped copy, `shipped_skills.ts`, or a file a judged CLAUDE.md imports,
+ * `claude_imports.ts`), the `UNTRUSTED` lines, and last
  * `VERDICT scripts trusted|untrusted`. A class with no `trusted` line, on any exit, is untrusted.
  * Every other exit of this handler, a crash included, ends with `VERDICT scripts untrusted` too. A
  * caller trusts the scripts only on exit 0 with that final `trusted` line and a full `BASE` sha;

@@ -114,11 +114,10 @@ export class GitObjects implements GitObjectReader {
   }
 
   async readFile(commit: string, path: string): Promise<BaseFile> {
-    const [record] = await lsTree(this.#git, this.projectPrefix, commit, [
-      "--",
-      `${this.projectPrefix}${path}`,
-    ]);
-    if (record === undefined || record.path !== path) return { kind: "absent" };
+    const top = fromTop(this.projectPrefix, path);
+    if (top === null) return { kind: "absent" };
+    const [record] = await lsTree(this.#git, "", commit, ["--", top]);
+    if (record === undefined || record.path !== top) return { kind: "absent" };
     if (record.kind !== "blob") return { kind: "not_regular" };
     return { kind: "blob", bytes: (await catFiles(this.#git, commit, [record])).get(record.sha)! };
   }
@@ -127,4 +126,20 @@ export class GitObjects implements GitObjectReader {
     const args = ["-r", "-z", "--name-only", ...PLAIN_DIFF_FLAGS, from, to];
     return decode(await this.#git.run("diff-tree", args)).split("\0").filter(Boolean);
   }
+}
+
+/**
+ * `path`, relative to the project's folder `prefix` and possibly climbing above it with `..`, as a
+ * path from the repository's top; `null` when it climbs above the top. git takes pathspecs
+ * literally here, so `..` is resolved before it is asked.
+ */
+function fromTop(prefix: string, path: string): string | null {
+  const parts: string[] = [];
+  for (const part of `${prefix}${path}`.split("/")) {
+    if (part === "..") {
+      if (parts.length === 0) return null;
+      parts.pop();
+    } else if (part !== "." && part !== "") parts.push(part);
+  }
+  return parts.length === 0 ? null : parts.join("/");
 }

@@ -60,7 +60,10 @@ export interface GitObjectReader {
    * top. Paths are relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.
    */
   listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]>;
-  /** One path at `commit`; a blob over the cap is a throw. */
+  /**
+   * One path at `commit`, `../` climbing above the project's folder up to the repository's top;
+   * absent above it. A blob over the cap is a throw.
+   */
   readFile(commit: string, path: string): Promise<BaseFile>;
   /** The paths changed between two commits, from the repository's top. */
   changedNames(from: string, to: string): Promise<string[]>;
