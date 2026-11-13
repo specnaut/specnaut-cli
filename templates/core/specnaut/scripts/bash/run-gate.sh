@@ -70,6 +70,9 @@ parse_tier() { parse_list "${TIER}_gate:" "$1"; }
 # parse_list <key> <file> - the items under the top-level <key>, one a line.
 parse_list() {
   awk -v key="$1" '
+    # A file saved with Windows line ends is read as if it had none: every
+    # carriage return goes first, or a blank line would read as a key.
+    { gsub(/\r/, "") }
     # A top-level key is a line starting in column 1 with a non-space,
     # non-comment character. Reaching one ends the section we are in.
     /^[^ \t#]/ {

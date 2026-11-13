@@ -18,6 +18,20 @@ const FILES: Record<string, string> = {
   refused: "toolchain:\n  - relative/bin\n  - ~user/bin\n  - /opt/a:/opt/b\n  - ~\n  - /ok\n",
   none: "fast_gate:\n  - /opt/not-a-folder\n",
   empty: "toolchain: []\n",
+  // A file saved with Windows line ends: every line ends in a carriage return.
+  crlf: [
+    "fast_gate:",
+    "  - echo a",
+    "toolchain:",
+    "  # a comment",
+    "",
+    '  - "/opt/a b/bin"',
+    "  - ~/.deno/bin",
+    "  -   /usr/x   ",
+    "full_gate:",
+    "  - /opt/no",
+    "",
+  ].join("\r\n"),
 };
 
 const EXPECTED: Record<string, string[]> = {
@@ -27,6 +41,7 @@ const EXPECTED: Record<string, string[]> = {
   refused: ["/ok"],
   none: [],
   empty: [],
+  crlf: ["/opt/a b/bin", `${HOME}/.deno/bin`, "/usr/x"],
 };
 
 Deno.test("declaredToolchain: the toolchain list, ~/ against the home, a non-folder dropped", () => {
