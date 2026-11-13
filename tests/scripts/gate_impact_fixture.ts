@@ -9,6 +9,9 @@ import {
   type Twin,
   writeFiles,
 } from "./run_gate_fixture.ts";
+import { reportOf } from "./gate_impact_report.ts";
+
+export { labelled, reportOf } from "./gate_impact_report.ts";
 
 /**
  * A synthetic repository holding invented workspaces, with an invented adapter
@@ -103,8 +106,11 @@ export class Repo {
     this.adapterLog = join(outside, "adapter.log");
   }
 
+  /** The scripts drop every GIT_* variable, so global git config is kept out by home folder. */
   env() {
-    return { MARK_FILE: bashPath(this.marks), ADAPTER_LOG: bashPath(this.adapterLog) };
+    const home = join(this.outside, "home"), xdg = join(home, ".config");
+    const logs = { MARK_FILE: bashPath(this.marks), ADAPTER_LOG: bashPath(this.adapterLog) };
+    return { ...logs, HOME: home, XDG_CONFIG_HOME: xdg };
   }
 
   git(...args: string[]): Promise<string> {
@@ -157,22 +163,12 @@ export class Repo {
   }
 }
 
-const LABELS = /^(candidate|scope|fallback|removed|omitted|ran|evidence): /;
-
-export function reportOf(stdout: string): string[] {
-  return stdout.replaceAll("\r\n", "\n").split("\n").filter((l) => LABELS.test(l))
-    .map((l) => l.startsWith("evidence: ") && !l.includes("unwritten") ? "evidence: written" : l);
-}
-
-/** The value of each line with this label. */
-export const labelled = (r: { report: string[] }, label: string) =>
-  r.report.filter((l) => l.startsWith(`${label}: `)).map((l) => l.slice(label.length + 2));
-
 /** A repository on `feature`, branched from a `main` that holds the whole fixture. */
 export async function impactRepo(opts: RepoOptions = {}): Promise<Repo> {
   const root = await tempDir("gate-impact-");
   const outside = await tempDir("gate-impact-out-");
   const repo = new Repo(root, outside);
+  await Deno.mkdir(join(outside, "home"));
   await repo.git("init", "-q", "-b", "main");
   await repo.git("config", "init.defaultBranch", "main");
   await repo.git("config", "core.autocrlf", "false");
