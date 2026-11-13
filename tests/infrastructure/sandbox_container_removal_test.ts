@@ -7,6 +7,7 @@ import {
   fakeLauncher,
   IMAGE,
   type Launch,
+  NO_DROPS,
   withWallClock,
 } from "./sandbox_runner_fixture.ts";
 
@@ -57,7 +58,7 @@ async function quiet<T>(fn: () => Promise<T>): Promise<{ result: T; errors: unkn
 }
 
 const runOn = (launcher: ProcessLauncher, seconds = 60) =>
-  new ContainerRunner("docker", IMAGE, launcher, [], () => NAME).run(
+  new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, () => NAME).run(
     withWallClock(policyOf("container"), seconds),
     COMMAND,
   );
@@ -190,7 +191,7 @@ const removals = (launches: Launch[]) => launches.filter((l) => l.spec.args[0] =
 
 Deno.test("ContainerRunner: a run that ends on its own still has its container removed by name", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  await new ContainerRunner("docker", IMAGE, launcher, [], () => "specnaut-sandbox-x6").run(
+  await new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, () => "specnaut-sandbox-x6").run(
     policyOf("container"),
     COMMAND,
   );
@@ -208,7 +209,13 @@ Deno.test("ContainerRunner: a watchdog that cannot start leaves no container eit
       return launcher.start(spec);
     },
   };
-  const runner = new ContainerRunner("docker", IMAGE, failing, [], () => "specnaut-sandbox-x7");
+  const runner = new ContainerRunner(
+    "docker",
+    IMAGE,
+    failing,
+    NO_DROPS,
+    () => "specnaut-sandbox-x7",
+  );
   await assertRejects(() => runner.run(policyOf("container"), COMMAND), Error, "no /bin/sh");
   assertEquals(launches[0].stopped, 1);
   assertEquals(removals(launches).map((l) => l.spec.args), [
@@ -226,7 +233,13 @@ Deno.test("ContainerRunner: a removal that fails at the timeout is named in the 
       return { ...started, ended: Promise.resolve(1), exited: Promise.resolve(1) };
     },
   };
-  const runner = new ContainerRunner("docker", IMAGE, refusing, [], () => "specnaut-sandbox-x5");
+  const runner = new ContainerRunner(
+    "docker",
+    IMAGE,
+    refusing,
+    NO_DROPS,
+    () => "specnaut-sandbox-x5",
+  );
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, {
     kind: "timed_out",

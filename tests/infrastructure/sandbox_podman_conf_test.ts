@@ -62,7 +62,14 @@ function folderOf(path: string): Handed {
 const read = (path: string) => Deno.readTextFileSync(path);
 
 const runner = (engine: "podman" | "docker", launcher: ProcessLauncher) =>
-  new ContainerRunner(engine, IMAGE, launcher, [], () => "specnaut-sandbox-c1", () => HOST_ENV);
+  new ContainerRunner(
+    engine,
+    IMAGE,
+    launcher,
+    { dropped: [], cpus: null },
+    () => "specnaut-sandbox-c1",
+    () => HOST_ENV,
+  );
 
 /** A list reset to nothing, whatever an earlier containers.conf appended to it. */
 const RESET = [{ append: false }];

@@ -16,6 +16,7 @@ import {
   fakeLauncher,
   IMAGE,
   type Launch,
+  NO_DROPS,
   POSIX,
   withWallClock,
 } from "./sandbox_runner_fixture.ts";
@@ -51,12 +52,18 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs and i
     "podman",
     IMAGE,
     launcher,
-    [],
+    NO_DROPS,
     () => "specnaut-sandbox-x1",
     () => HOST_ENV,
   );
   assertEquals(await runner.run(policy, COMMAND), { kind: "exited", code: 3 });
-  const run = { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman", dropped: [] } as const;
+  const run = {
+    image: IMAGE,
+    name: "specnaut-sandbox-x1",
+    engine: "podman",
+    dropped: [],
+    cpus: null,
+  } as const;
   assertEquals(launches[0].spec, {
     cmd: "podman",
     args: [
@@ -67,11 +74,22 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs and i
   });
 });
 
+Deno.test("ContainerRunner: the run's --cpus is held to the CPUs its engine's host has", async () => {
+  const { launcher, launches } = fakeLauncher(0);
+  const caps = { dropped: [], cpus: 1 };
+  await new ContainerRunner("docker", IMAGE, launcher, caps, () => "specnaut-sandbox-x9").run(
+    policyOf("container"),
+    COMMAND,
+  );
+  const args = launches[0].spec.args;
+  assertEquals(args[args.indexOf("--cpus") + 1], "1");
+});
+
 Deno.test("ContainerRunner: a watchdog beside the run removes the container past the clock and grace", async () => {
   const { launcher, launches } = fakeLauncher(0);
   const policy = withWallClock(policyOf("container"), 60);
   const name = () => "specnaut-sandbox-x4";
-  const runner = new ContainerRunner("docker", IMAGE, launcher, [], name, () => HOST_ENV);
+  const runner = new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, name, () => HOST_ENV);
   await runner.run(policy, COMMAND);
   const removal = ["docker", "rm", "--force", "specnaut-sandbox-x4"];
   const seconds = 60 + DRAIN_GRACE_SECONDS;
@@ -81,7 +99,7 @@ Deno.test("ContainerRunner: a watchdog beside the run removes the container past
 
 Deno.test("ContainerRunner: each run gets a name of its own", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", IMAGE, launcher, []);
+  const runner = new ContainerRunner("docker", IMAGE, launcher, NO_DROPS);
   await runner.run(policyOf("container"), COMMAND);
   await runner.run(policyOf("container"), COMMAND);
   const runs = launches.filter((l) => l.spec.args[0] === "run");
@@ -92,7 +110,7 @@ Deno.test("ContainerRunner: each run gets a name of its own", async () => {
 
 Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", "acme/dev:latest", launcher, []);
+  const runner = new ContainerRunner("docker", "acme/dev:latest", launcher, NO_DROPS);
   let refused = false;
   await runner.run(policyOf("container"), COMMAND).catch(() => (refused = true));
   assert(refused);
@@ -102,7 +120,7 @@ Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async 
 Deno.test("ContainerRunner: past the wall clock the container is removed by name", async () => {
   const { launcher, launches } = fakeLauncher(null);
   const name = () => "specnaut-sandbox-x2";
-  const runner = new ContainerRunner("podman", IMAGE, launcher, [], name, () => HOST_ENV);
+  const runner = new ContainerRunner("podman", IMAGE, launcher, NO_DROPS, name, () => HOST_ENV);
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, { kind: "timed_out", seconds: 0.01 });
   // `--ignore`: podman, unlike docker, fails on a container already gone, as a `--rm` one is.
@@ -140,7 +158,7 @@ Deno.test({
         runSync: (spec) => real.runSync({ ...spec, cmd: engine }),
       };
       const name = () => "specnaut-sandbox-x3";
-      const runner = new ContainerRunner("podman", IMAGE, launcher, [], name);
+      const runner = new ContainerRunner("podman", IMAGE, launcher, NO_DROPS, name);
       const outcome = await runner.run(withWallClock(policyOf("container"), 1), COMMAND);
       assertEquals(outcome, { kind: "timed_out", seconds: 1 });
       assertEquals(out.text(), "from the command\n");

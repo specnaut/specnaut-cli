@@ -103,6 +103,15 @@ Deno.test("probe: a docker daemon that is a podman service is read as one, and n
   assertEquals(chooseBackend(probed).kind, "static");
 });
 
+Deno.test("probe: the CPUs docker's host has are its NCPU, when that is a count", async () => {
+  const cpusOf = async (NCPU: unknown) =>
+    (await prober("linux", { docker: dockerInfo({ NCPU }) }).prober.probe()).dockerCpus;
+  assertEquals(await cpusOf(1), 1);
+  for (const NCPU of [undefined, 0, 1.5, "1", -2]) {
+    assertEquals(await cpusOf(NCPU), null, `${NCPU}`);
+  }
+});
+
 Deno.test("probe: docker's own daemon, or a version that says nothing, is docker's own", async () => {
   const failed = { code: 1, stdout: "", stderr: "" };
   for (const version of [dockerVersion("Engine", "containerd", "runc"), failed, ok("garbled")]) {

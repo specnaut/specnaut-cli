@@ -19,9 +19,11 @@ const PODMAN: BackendProbe = {
   podmanRemote: false,
   podmanVersion: "4.8.0",
   podmanLimits: ALL,
+  podmanCpus: null,
   docker: false,
   dockerOnPodman: false,
   dockerLimits: ALL,
+  dockerCpus: null,
   bwrap: "absent",
   bwrapVersion: "bubblewrap 0.8.0",
   bwrapScope: false,
@@ -29,8 +31,20 @@ const PODMAN: BackendProbe = {
 };
 
 const probe = (over: Partial<BackendProbe>): BackendProbe => ({ ...PODMAN, ...over });
-const ON_PODMAN = { kind: "container", engine: "podman", image: IMAGE, dropped: [] } as const;
-const ON_DOCKER = { kind: "container", engine: "docker", image: IMAGE, dropped: [] } as const;
+const ON_PODMAN = {
+  kind: "container",
+  engine: "podman",
+  image: IMAGE,
+  dropped: [],
+  cpus: null,
+} as const;
+const ON_DOCKER = {
+  kind: "container",
+  engine: "docker",
+  image: IMAGE,
+  dropped: [],
+  cpus: null,
+} as const;
 const REMOTE_WHY =
   "container: podman answers from a remote service, which reads its own containers.conf, " +
   "and no docker";
@@ -124,6 +138,13 @@ Deno.test("container: docker that is a podman service is not offered, and says w
     ].join(", and "),
   );
   assertEquals(chooseBackend(probe(service)), ON_PODMAN);
+});
+
+Deno.test("container: the offered engine carries the CPUs its own host has", () => {
+  const counts = { podmanCpus: 1, dockerCpus: 4 };
+  assertEquals(chooseBackend(probe({ ...counts, docker: true })), { ...ON_PODMAN, cpus: 1 });
+  const docker = probe({ ...counts, docker: true, podmanRemote: true });
+  assertEquals(chooseBackend(docker), { ...ON_DOCKER, cpus: 4 });
 });
 
 const UNCAPPED_WHY =

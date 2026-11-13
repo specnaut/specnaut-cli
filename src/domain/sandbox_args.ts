@@ -21,6 +21,8 @@ export type ContainerRun = {
   readonly engine: Engine;
   /** The caps that engine drops on this host (the offered backend's): see `containerCaps`. */
   readonly dropped: readonly ReportedCap[];
+  /** The CPUs on that engine's host (the offered backend's), or `null`: see `containerCaps`. */
+  readonly cpus: number | null;
 };
 
 /** A name the engines accept that can never be read as a flag. */
@@ -44,7 +46,7 @@ export function containerArgs(
     ...containerNetwork(policy.network),
     ...["--entrypoint", "", "--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
-    ...containerCaps(policy.limits, run.dropped),
+    ...containerCaps(policy.limits, run),
     ...containerFolders(policy),
     ...containerEnv(policy, run.engine),
     image,
@@ -89,9 +91,13 @@ function checkedRun(run: ContainerRun): ContainerRun {
  * The process, memory and CPU caps, the memory cap bounding what is paged out as well. `--cpus` is
  * left out where the engine lacks the CPU quota: docker refuses it outright there ("NanoCPUs can
  * not be set"), so every run would fail, where any other limit its host lacks is only discarded.
+ * It is lowered to the CPUs on the engine's host where it has fewer (one, on a small CI machine):
+ * docker refuses a quota above them ("range of CPUs is from 0.01 to 1.00"), and the run can use
+ * no more than they are anyway, so the cap still holds.
  */
-function containerCaps(limits: SandboxLimits, dropped: readonly ReportedCap[]): string[] {
-  const cpus = dropped.includes("cpus") ? [] : ["--cpus", String(limits.cpus)];
+function containerCaps(limits: SandboxLimits, run: Pick<ContainerRun, "dropped" | "cpus">) {
+  const most = run.cpus === null ? limits.cpus : Math.min(limits.cpus, run.cpus);
+  const cpus = run.dropped.includes("cpus") ? [] : ["--cpus", String(most)];
   return [
     ...["--pids-limit", String(limits.processes), "--memory", String(limits.memoryBytes)],
     ...["--memory-swap", String(limits.memoryBytes), ...cpus],

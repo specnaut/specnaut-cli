@@ -82,7 +82,10 @@ Deno.test({
       };
       const timed = { ...policy, limits: { ...policy.limits, wallClockSeconds: 60 } };
       try {
-        const outcome = await new ContainerRunner(engine, LIVE_IMAGE, killing, [], () => name)
+        const outcome = await new ContainerRunner(engine, LIVE_IMAGE, killing, {
+          dropped: [],
+          cpus: null,
+        }, () => name)
           .run(timed, TICKS);
         assertEquals(outcome, { kind: "exited", code: 137 });
         assertEquals(present(name), false, "the container outlived its client");

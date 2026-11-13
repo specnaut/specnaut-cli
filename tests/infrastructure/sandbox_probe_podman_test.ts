@@ -107,6 +107,13 @@ Deno.test("probe: podman's version is what its report says, or null when it says
   }
 });
 
+Deno.test("probe: the CPUs podman's host has are its host.cpus, when that is a count", async () => {
+  const cpusOf = async (cpus: unknown) =>
+    (await limitsOf(podmanInfo(true, "v2", ALL, { cpus }))).probed.podmanCpus;
+  assertEquals(await cpusOf(1), 1);
+  for (const cpus of [undefined, 0, 2.5, "1"]) assertEquals(await cpusOf(cpus), null, `${cpus}`);
+});
+
 Deno.test("probe: podman whose report is not JSON is not used", async () => {
   const { probed } = await limitsOf(ok("garbled"));
   assertEquals([probed.podman, probed.podmanLimits.memory], ["absent", false]);

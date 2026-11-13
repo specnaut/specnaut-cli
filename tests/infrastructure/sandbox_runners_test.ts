@@ -159,12 +159,20 @@ Deno.test("runnerFor: one runner per backend", () => {
   const { launcher } = fakeLauncher(0);
   const host = { arch: "x86_64", path: "/usr/bin", bus: {} };
   const container = runnerFor(
-    { kind: "container", engine: "docker", image: IMAGE, dropped: ["cpus"] },
+    { kind: "container", engine: "docker", image: IMAGE, dropped: ["cpus"], cpus: null },
     launcher,
     host,
   );
   assert(container instanceof ContainerRunner);
-  assertEquals([container.engine, container.dropped], ["docker", ["cpus"]]);
+  assertEquals([container.engine, container.caps.dropped], ["docker", ["cpus"]]);
+  const oneCpu = {
+    kind: "container",
+    engine: "docker",
+    image: IMAGE,
+    dropped: [],
+    cpus: 1,
+  } as const;
+  assertEquals((runnerFor(oneCpu, launcher, host) as ContainerRunner).caps.cpus, 1);
   assert(runnerFor({ kind: "bwrap", scope: false }, launcher, host) instanceof BwrapRunner);
   assert(runnerFor({ kind: "seatbelt" }, launcher, host) instanceof SeatbeltRunner);
 });

@@ -33,9 +33,11 @@ const LINUX_BWRAP: BackendProbe = {
   podmanRemote: false,
   podmanVersion: null,
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
+  podmanCpus: null,
   docker: false,
   dockerOnPodman: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
+  dockerCpus: null,
   bwrap: "usable",
   bwrapVersion: "bubblewrap 0.9.0",
   bwrapScope: false,
@@ -118,6 +120,7 @@ Deno.test("execInSandbox: a container runner is handed its engine and pinned ima
     engine: "docker",
     image: IMAGE,
     dropped: [],
+    cpus: null,
   });
   assertEquals(seen.runs[0].policy.reads, [FOLDERS.tree]);
 });

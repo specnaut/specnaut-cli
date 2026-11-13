@@ -10,16 +10,25 @@ import type { EngineLimits } from "../domain/sandbox_hosts.ts";
 /** The runner the engines are asked through, and the environment they are asked in. */
 export type Engines = { readonly runner: SubprocessRunner; readonly env: Record<string, string> };
 
-type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits">;
-type Docker = Pick<BackendProbe, "docker" | "dockerOnPodman" | "dockerLimits">;
+type Podman = Pick<
+  BackendProbe,
+  "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits" | "podmanCpus"
+>;
+type Docker = Pick<BackendProbe, "docker" | "dockerOnPodman" | "dockerLimits" | "dockerCpus">;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
 export const NO_PODMAN: Podman = {
   podman: "absent",
   podmanRemote: false,
   podmanVersion: null,
   podmanLimits: NO_LIMITS,
+  podmanCpus: null,
 };
-export const NO_DOCKER: Docker = { docker: false, dockerOnPodman: false, dockerLimits: NO_LIMITS };
+export const NO_DOCKER: Docker = {
+  docker: false,
+  dockerOnPodman: false,
+  dockerLimits: NO_LIMITS,
+  dockerCpus: null,
+};
 
 /**
  * Whether this process's own cgroup (cgroup v2) has the file podman checks before it passes on the
@@ -51,6 +60,7 @@ export async function probePodman({ runner, env }: Engines): Promise<Podman> {
     podmanRemote,
     podmanVersion: typeof version === "string" ? version : null,
     podmanLimits: await podmanLimits(runner, host, podmanRemote),
+    podmanCpus: count(host?.cpus),
   };
 }
 
@@ -87,6 +97,7 @@ export async function probeDocker(engines: Engines): Promise<Docker> {
   return {
     docker: true,
     dockerOnPodman: await dockerOnPodman(engines),
+    dockerCpus: count(info.NCPU),
     dockerLimits: {
       memory: can("MemoryLimit"),
       swap: can("SwapLimit"),
@@ -108,6 +119,11 @@ async function dockerOnPodman({ runner, env }: Engines): Promise<boolean> {
   const components: unknown = parsed(stdout, "docker version")?.Server?.Components;
   if (!Array.isArray(components)) return false;
   return components.some((c) => c?.Name === "Podman Engine");
+}
+
+/** `value` when it is a count (a whole number above zero), else `null`. */
+function count(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 /** `stdout` as JSON, or `undefined` with a warning: a tool that answers garbled is not used. */

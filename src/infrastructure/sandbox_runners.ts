@@ -1,8 +1,7 @@
 import { encodeHex } from "@std/encoding/hex";
 import type { RunnableBackend, RunOutcome, SandboxRunner } from "../application/sandbox_ports.ts";
 import type { Engine, SandboxPolicy } from "../domain/sandbox.ts";
-import { containerArgs } from "../domain/sandbox_args.ts";
-import type { ReportedCap } from "../domain/sandbox_limits.ts";
+import { containerArgs, type ContainerRun } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
@@ -32,8 +31,8 @@ export class ContainerRunner implements SandboxRunner {
     readonly engine: Engine,
     readonly image: string,
     readonly launcher: ProcessLauncher,
-    /** The caps the engine drops on this host, as the offered backend carries them. */
-    readonly dropped: readonly ReportedCap[],
+    /** The caps the engine drops on this host and its CPUs, as the offered backend carries them. */
+    readonly caps: Pick<ContainerRun, "dropped" | "cpus">,
     readonly name: () => string = containerName,
     readonly hostEnv: () => Readonly<Record<string, string>> = () => Deno.env.toObject(),
   ) {}
@@ -45,7 +44,8 @@ export class ContainerRunner implements SandboxRunner {
    */
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
-    const run = { image: this.image, name, engine: this.engine, dropped: this.dropped };
+    const { dropped, cpus } = this.caps;
+    const run = { image: this.image, name, engine: this.engine, dropped, cpus };
     const args = containerArgs(policy, run, command);
     const { env, globals, release } = await engineRunEnv(this.engine, this.hostEnv());
     const remove = removalOf(this.engine, name, env);
@@ -147,7 +147,7 @@ export function runnerFor(
 ): SandboxRunner {
   switch (backend.kind) {
     case "container":
-      return new ContainerRunner(backend.engine, backend.image, launcher, backend.dropped);
+      return new ContainerRunner(backend.engine, backend.image, launcher, backend);
     case "bwrap":
       return new BwrapRunner(host.arch, launcher, host.path, backend.scope, host.bus);
     case "seatbelt":

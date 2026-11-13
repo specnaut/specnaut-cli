@@ -56,3 +56,6 @@ export function seatbeltPolicy(scratch: string): SandboxPolicy {
   const base = policyOf("seatbelt");
   return { ...base, writes: [join(real, "home"), join(real, "tmp")] };
 }
+
+/** A container run's engine caps on a host that can apply every one and did not say its CPUs. */
+export const NO_DROPS = { dropped: [], cpus: null } as const;

@@ -20,7 +20,7 @@ import {
 const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
 const NAME = "specnaut-gate-3f9c2a71";
-const RUN = { image: IMAGE, name: NAME, engine: "docker", dropped: [] } as const;
+const RUN = { image: IMAGE, name: NAME, engine: "docker", dropped: [], cpus: null } as const;
 
 const BLANKED = PROXY_NAMES.map((name) => `${name}=`);
 
@@ -120,6 +120,16 @@ Deno.test("containerArgs: --cpus is left out where the engine lacks the CPU quot
   const args = containerArgs(policyOf("container"), { ...RUN, dropped: ["cpus"] }, COMMAND);
   assertEquals(after(args, "--memory-swap"), [String(LIMITS.memoryBytes)]);
   assertEquals(after(args, "--pids-limit"), [String(LIMITS.processes)]);
+});
+
+Deno.test("containerArgs: --cpus is lowered to the CPUs the engine's host has, and only then", () => {
+  const cpusOn = (cpus: number | null) =>
+    after(containerArgs(policyOf("container"), { ...RUN, cpus }, COMMAND), "--cpus");
+  // A one-CPU host: docker refuses `--cpus 2` there, so the run would never start.
+  assertEquals(cpusOn(1), ["1"]);
+  assertEquals([cpusOn(LIMITS.cpus), cpusOn(64), cpusOn(null)], [["2"], ["2"], ["2"]]);
+  const dropped = { ...RUN, dropped: ["cpus"] as ReportedCap[], cpus: 1 };
+  assertEquals(containerArgs(policyOf("container"), dropped, COMMAND).includes("--cpus"), false);
 });
 
 Deno.test("containerArgs: on either engine, every proxy variable is set empty; podman copies none", () => {

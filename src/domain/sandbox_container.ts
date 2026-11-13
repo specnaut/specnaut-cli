@@ -68,10 +68,12 @@ export function containerEngine(probe: BackendProbe): Engine | null {
 export function containerStatus(probe: BackendProbe): BackendStatus {
   const engine = containerEngine(probe);
   if (probe.image.kind === "pinned" && engine) {
-    const dropped = engineDrops(engine === "podman" ? probe.podmanLimits : probe.dockerLimits);
+    const onPodman = engine === "podman";
+    const dropped = engineDrops(onPodman ? probe.podmanLimits : probe.dockerLimits);
+    const cpus = onPodman ? probe.podmanCpus : probe.dockerCpus;
     return {
       kind: "container",
-      offered: { kind: "container", engine, image: probe.image.ref, dropped },
+      offered: { kind: "container", engine, image: probe.image.ref, dropped, cpus },
     };
   }
   const why = probe.image.kind === "none"

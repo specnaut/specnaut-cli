@@ -21,9 +21,11 @@ const NOTHING: BackendProbe = {
   podmanRemote: false,
   podmanVersion: "4.8.0",
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
+  podmanCpus: null,
   docker: false,
   dockerOnPodman: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
+  dockerCpus: null,
   bwrap: "absent",
   bwrapVersion: "bubblewrap 0.8.0",
   bwrapScope: false,
@@ -31,7 +33,13 @@ const NOTHING: BackendProbe = {
 };
 
 /** A container on docker, as offered on a host that can apply every cap. */
-const ON_DOCKER = { kind: "container", engine: "docker", image: IMAGE.ref, dropped: [] } as const;
+const ON_DOCKER = {
+  kind: "container",
+  engine: "docker",
+  image: IMAGE.ref,
+  dropped: [],
+  cpus: null,
+} as const;
 
 const probe = (over: Partial<BackendProbe>): BackendProbe => ({ ...NOTHING, ...over });
 const ALL = { memory: true, swap: true, pids: true, cpuQuota: true };

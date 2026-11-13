@@ -37,6 +37,8 @@ export type BackendProbe = {
   readonly podmanVersion: string | null;
   /** What podman can limit for the user on cgroup v2; every one false off it or when absent. */
   readonly podmanLimits: EngineLimits;
+  /** The CPUs on podman's host, as it reports them (`host.cpus`), or `null` when it does not. */
+  readonly podmanCpus: number | null;
   /** A docker daemon answers. */
   readonly docker: boolean;
   /**
@@ -46,6 +48,8 @@ export type BackendProbe = {
   readonly dockerOnPodman: boolean;
   /** What that daemon can limit; every one false when none answers. */
   readonly dockerLimits: EngineLimits;
+  /** The CPUs on that daemon's host, as it reports them (`NCPU`), or `null` when it does not. */
+  readonly dockerCpus: number | null;
   /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */
   readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
   /** What `bwrap --version` printed, or `null` when it printed nothing. */

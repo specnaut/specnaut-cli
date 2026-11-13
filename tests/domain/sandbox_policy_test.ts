@@ -119,6 +119,7 @@ Deno.test("sandboxPolicy: no network, loopback included, on every backend", () =
     name: "gate",
     engine: "docker",
     dropped: [],
+    cpus: null,
   }, [
     "true",
   ]);
