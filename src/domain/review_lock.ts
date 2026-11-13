@@ -132,9 +132,9 @@ export function lockedLogOf(tool: string | null, input: unknown): string | null 
 }
 
 /**
- * Why `specnaut sandbox exec` itself refuses a run while `held`, every review its checkout's lock
- * records, is not empty: a run some script starts reaches no hook, so the binary holds the same
- * line. `log` is where its `--log` resolves, `null` for none. With no lock it runs as it always did.
+ * Why `specnaut sandbox exec` itself refuses a run while `held`, the reviews whose logs folder the
+ * run may use (`execLockRefusal` says which), is not empty: a run some script starts reaches no
+ * hook, so the binary holds the same line. `log` is where its `--log` resolves, `null` for none. With no lock it runs as it always did.
  */
 export function lockedExecRefusal(
   held: readonly LockedReview[],

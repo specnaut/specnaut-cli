@@ -86,15 +86,15 @@ Deno.test("a lock that cannot be read refuses the call, naming why", async () =>
 
 Deno.test("sandbox exec under a lock of its checkout logs only where a review's folder is", async () => {
   const run = (toolchain: string[], log: string | null) => ({ toolchain, log });
-  assertEquals(await execLockRefusal(null, run(["/opt"], null)), null);
-  assertEquals(await execLockRefusal(lock([]), run(["/opt"], "/x")), null);
-  assertEquals(await execLockRefusal(lock(["s-1"]), run([], "/real/logs/1.log")), null);
+  assertEquals(await execLockRefusal(null, run(["/opt"], null), null), null);
+  assertEquals(await execLockRefusal(lock([]), run(["/opt"], "/x"), null), null);
+  assertEquals(await execLockRefusal(lock(["s-1"]), run([], "/real/logs/1.log"), null), null);
   const refused = [run([], "/elsewhere/1.log"), run([], null), run(["/opt"], "/real/logs/1.log")];
   for (const request of refused) {
-    const why = await execLockRefusal(lock(["s-1"]), request);
+    const why = await execLockRefusal(lock(["s-1"]), request, null);
     assertStringIncludes(why ?? "ran", "review lock", JSON.stringify(request));
   }
   const unknown: ReviewLock = { ...lock([]), all: () => Promise.resolve([UNKNOWN_REVIEW]) };
-  const why = await execLockRefusal(unknown, run([], "/real/logs/1.log"));
+  const why = await execLockRefusal(unknown, run([], "/real/logs/1.log"), null);
   assertStringIncludes(why ?? "ran", "review lock", "a lock naming no folder");
 });

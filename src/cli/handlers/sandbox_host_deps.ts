@@ -29,8 +29,13 @@ export function sandboxHostDeps(): SandboxDeps {
     err: (s) => console.error(s),
     probe: () => prober.probe(),
     realLog: realLogPath,
+    // The session a run is started from: Claude Code sets it in its shell's environment.
     lockRefusal: async (request) =>
-      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request),
+      await execLockRefusal(
+        await FsReviewLock.open(Deno.cwd()),
+        request,
+        Deno.env.get("CLAUDE_CODE_SESSION_ID") ?? null,
+      ),
     exec: async (request) => {
       const log = request.log === null ? null : await openCappedLog(request.log);
       try {
