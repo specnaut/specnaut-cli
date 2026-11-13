@@ -2,6 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { containerEngine } from "../../src/domain/sandbox_container.ts";
 import { isPinned } from "../../src/domain/sandbox_image.ts";
+import { engineEnv } from "../../src/infrastructure/sandbox_engine_env.ts";
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
 import { live, LIVE_IMAGE, probed, runIn, withEnv, withLayout } from "./sandbox_live_fixture.ts";
 
@@ -74,3 +75,59 @@ Deno.test({
       });
     }),
 });
+
+/**
+ * A rootless podman adds to every container the folders the first mounts.conf it finds names,
+ * the user's own (`$HOME/.config/containers/mounts.conf`) first. The sandbox's podman reads the
+ * empty one beside the CLI's containers.conf instead, so the folder is not in its container; a
+ * plain `podman run` under the same environment, which does see it, shows that file was read.
+ */
+const MOUNTED = "/specnaut-mounts-conf";
+const LOOK = `echo start; if [ -e ${MOUNTED} ]; then echo present; fi`;
+
+Deno.test({
+  name: live("podman conf live: the container starts without what mounts.conf adds", MISSING),
+  ignore: MISSING !== null,
+  fn: () =>
+    withLayout("container", async ({ policy }) => {
+      const real = Deno.env.get("HOME")!;
+      const home = await Deno.makeTempDir({ prefix: "specnaut-podman-home-" });
+      try {
+        const source = join(home, "mounted");
+        await Deno.mkdir(source);
+        await Deno.writeTextFile(join(source, "note"), "from mounts.conf\n");
+        await Deno.mkdir(join(home, ".config", "containers"), { recursive: true });
+        const conf = join(home, ".config", "containers", "mounts.conf");
+        await Deno.writeTextFile(conf, `${source}:${MOUNTED}\n`);
+        // Only the mounts.conf lookup follows HOME here: storage and configuration stay the user's.
+        const vars = {
+          HOME: home,
+          XDG_CONFIG_HOME: Deno.env.get("XDG_CONFIG_HOME") ?? join(real, ".config"),
+          XDG_DATA_HOME: Deno.env.get("XDG_DATA_HOME") ?? join(real, ".local", "share"),
+        };
+        await withEnv(vars, async () => {
+          assertEquals(plainRun(), "start\npresent\n", "a plain run did not read mounts.conf");
+          const { out } = await runIn(
+            (l) => new ContainerRunner("podman", LIVE_IMAGE, l, []),
+            policy,
+            ["/bin/sh", "-c", LOOK],
+          );
+          assertEquals(out, "start\n");
+        });
+      } finally {
+        await Deno.remove(home, { recursive: true });
+      }
+    }),
+});
+
+/** What {@link LOOK} prints in a plain podman run, under the engine environment a run gets. */
+function plainRun(): string {
+  const args = ["run", "--rm", "--pull", "never", "--network", "none", LIVE_IMAGE];
+  const { stdout } = new Deno.Command("podman", {
+    args: [...args, "/bin/sh", "-c", LOOK],
+    env: engineEnv(Deno.env.toObject()),
+    clearEnv: true,
+    stderr: "inherit",
+  }).outputSync();
+  return new TextDecoder().decode(stdout);
+}

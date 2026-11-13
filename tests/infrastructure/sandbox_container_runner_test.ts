@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
+import { podmanGlobals } from "../../src/infrastructure/sandbox_engine_env.ts";
 import {
   DenoProcessLauncher,
   type ProcessLauncher,
@@ -43,7 +44,7 @@ const ENGINE_ENV = {
 const podmanEnv = (l: Launch) => ({ ...ENGINE_ENV, CONTAINERS_CONF_OVERRIDE: overrideOf(l) });
 const overrideOf = (l: Launch) => l.spec.env === "host" ? "" : l.spec.env.CONTAINERS_CONF_OVERRIDE;
 
-Deno.test("ContainerRunner: launches the engine with exactly containerArgs, under a fresh name", async () => {
+Deno.test("ContainerRunner: launches the engine with exactly containerArgs and its options, under a fresh name", async () => {
   const { launcher, launches } = fakeLauncher(3);
   const policy = policyOf("container");
   const runner = new ContainerRunner(
@@ -55,13 +56,13 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
     () => HOST_ENV,
   );
   assertEquals(await runner.run(policy, COMMAND), { kind: "exited", code: 3 });
+  const run = { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman", dropped: [] } as const;
   assertEquals(launches[0].spec, {
     cmd: "podman",
-    args: containerArgs(
-      policy,
-      { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman", dropped: [] },
-      COMMAND,
-    ),
+    args: [
+      ...podmanGlobals(dirname(overrideOf(launches[0]))),
+      ...containerArgs(policy, run, COMMAND),
+    ],
     env: podmanEnv(launches[0]),
   });
 });
@@ -167,6 +168,7 @@ Deno.test("ContainerRunner: past the wall clock the container is removed by name
 
 /** An engine that prints a line and hangs on `run`, and prints the name it removes on `rm`. */
 const FAKE_ENGINE = `#!/bin/sh
+if [ "$1" = --default-mounts-file ]; then shift 2; fi
 case "$1" in
   run) echo "from the command"; exec sleep 30.137 ;;
   rm) echo "removed $3" ;;

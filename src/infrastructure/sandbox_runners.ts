@@ -23,9 +23,9 @@ import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
  * The run's container, named so it can be removed when the wall clock runs out or we are stopped.
- * The engine's client, and each removal, start with `engineRunEnv` of ours, read at the run. What
- * it wrote is released once the run is over; on an interrupt it is left, as the watchdog's removal
- * still reads it.
+ * The engine's client, and each removal, start with `engineRunEnv` of ours, read at the run, the
+ * client with the options it gives before `run`. What it wrote is released once the run is over;
+ * on an interrupt it is left, as the watchdog's removal still reads it.
  */
 export class ContainerRunner implements SandboxRunner {
   constructor(
@@ -47,13 +47,13 @@ export class ContainerRunner implements SandboxRunner {
     const name = this.name();
     const run = { image: this.image, name, engine: this.engine, dropped: this.dropped };
     const args = containerArgs(policy, run, command);
-    const { env, release } = await engineRunEnv(this.engine, this.hostEnv());
+    const { env, globals, release } = await engineRunEnv(this.engine, this.hostEnv());
     const remove = removalOf(this.engine, name, env);
     const disarm = armExitTrap(() => void this.launcher.runSync(remove));
     try {
       const seconds = policy.limits.wallClockSeconds;
       return await thenRemoved(this.launcher, remove, () => {
-        const started = this.launcher.start({ cmd: this.engine, args, env });
+        const started = this.launcher.start({ cmd: this.engine, args: [...globals, ...args], env });
         const halt = () => removed(this.launcher, remove);
         return watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
       });
