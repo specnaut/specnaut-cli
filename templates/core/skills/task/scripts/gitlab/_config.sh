@@ -30,11 +30,16 @@ if [ ! -f "$CONFIG" ]; then
   exit 2
 fi
 
+# Extract a YAML scalar: a quoted value up to its closing quote, or a bare one
+# up to an inline `# comment`, the shape `specnaut init` writes. A CRLF
+# checkout's \r goes with what follows the quote, or with the trailing blanks.
 extract() {
   awk -v key="$1" '
     $0 ~ "^"key":" {
       sub("^"key":[[:space:]]*", "")
-      gsub(/^["'"'"']|["'"'"']$/, "")
+      if ($0 ~ /^"/) { sub(/^"/, ""); sub(/".*$/, "") }
+      else if ($0 ~ /^'"'"'/) { sub(/^'"'"'/, ""); sub(/'"'"'.*$/, "") }
+      else { sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, "") }
       print
       exit
     }
@@ -49,6 +54,23 @@ if [ -z "$HOST" ] || [ -z "$PROJECT_ID" ]; then
   echo "Edit $CONFIG before running this command." >&2
   exit 2
 fi
+
+# glab is handed this host as GITLAB_HOST and signs its requests for it, so
+# it is reached over https only: a bare host (glab's default scheme is https) or an
+# https URL, with a port and a path at most -- plain http only to a loopback
+# host, as for the cloud backend's api_url. LC_ALL=C keeps the classes ASCII
+# whatever the locale.
+if ! printf '%s\n' "$HOST" |
+  LC_ALL=C grep -Eq '^(https?://)?([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*|\[::1\])(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then
+  echo "error: backlog-config.yml host is not a plain host or https URL." >&2
+  exit 2
+fi
+case $HOST in http://*)
+  LC_ALL=C grep -Eq '^http://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|$)' <<<"$HOST" || {
+    echo "error: backlog-config.yml host is plain http; use https (http only to localhost)." >&2
+    exit 2
+  } ;;
+esac
 
 # No `require_project` guard here, and that is deliberate — do not add one to
 # "restore parity" with the GitHub backend.
@@ -131,7 +153,10 @@ item_url() {
       fi
       ;;
   esac
-  echo "${HOST%/}/$path/-/issues/$1"
+  # A bare host is reached over https, glab's default scheme.
+  local base=${HOST%/}
+  case $base in http://* | https://*) ;; *) base="https://$base" ;; esac
+  echo "$base/$path/-/issues/$1"
 }
 
 # Every issue a `glab issue list` query matches, across pages.

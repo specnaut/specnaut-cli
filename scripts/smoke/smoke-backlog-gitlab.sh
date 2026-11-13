@@ -89,6 +89,24 @@ grep -q '\[ -n "\$path" \] || return 0' .specnaut/scripts/backlog/_config.sh \
   || fail "gitlab item_url would emit a URL with an empty path" "$(grep -n 'return 0' .specnaut/scripts/backlog/_config.sh || true)"
 
 echo
+echo "═══ gitlab _config.sh gives glab a host it reaches over https only ═══"
+# A probe beside _config.sh, which finds the project from its own path; the
+# probe is the test's, not a scaffolded file.
+HOST_PROBE="$(dirname "$PWD/.specnaut/scripts/backlog/_config.sh")/host-probe.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'source "$(dirname "$0")/_config.sh"' \
+  'printf "%s\n" "$GITLAB_HOST"' > "$HOST_PROBE"
+check "_config.sh hands glab the host init scaffolded" \
+  '[ "$(bash "$HOST_PROBE")" = gitlab.com ]'
+cp .specnaut/backlog-config.yml "$DIR/backlog-config.scaffolded"
+sed 's|^host:.*|host: http://gitlab.example.com|' "$DIR/backlog-config.scaffolded" \
+  > .specnaut/backlog-config.yml
+check "_config.sh refuses a plain-http host, and glab is never given it" \
+  '! out=$(bash "$HOST_PROBE" 2>&1) &&
+   printf "%s" "$out" | grep -qF "host is plain http" && ! printf "%s" "$out" | grep -qF gitlab.example.com'
+mv "$DIR/backlog-config.scaffolded" .specnaut/backlog-config.yml
+rm "$HOST_PROBE"
+
+echo
 echo "═══ #18  board-drift sweep reports and never moves (gitlab) ═══"
 check "sweep-closed.sh present + executable" \
   '[ -x .specnaut/scripts/backlog/sweep-closed.sh ]'
