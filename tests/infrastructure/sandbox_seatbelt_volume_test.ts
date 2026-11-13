@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
@@ -26,6 +26,7 @@ async function recorded(
   policy: SandboxPolicy,
   events: string[],
   refusal?: string,
+  stuck?: string,
 ) {
   const recording: ProcessLauncher = {
     ...launcher,
@@ -35,7 +36,8 @@ async function recorded(
       return launcher.start(spec);
     },
   };
-  return await new SeatbeltRunner(recording, fakeVolumes(events, refusal)).run(policy, COMMAND);
+  const volumes = fakeVolumes(events, refusal, stuck);
+  return await new SeatbeltRunner(recording, volumes).run(policy, COMMAND);
 }
 
 /** `fn` given a real, empty scratch folder, removed after it. */
@@ -116,5 +118,49 @@ Deno.test({
       assertEquals(launches, []);
       assertEquals(events, [`attach ${scratch} ${policy.limits.scratchBytes}`]);
       assertEquals(policy.writes.filter(exists), [], "a folder was made with no volume under it");
+    }),
+});
+
+const STUCK = "the scratch volume on /s could not be detached: resource busy";
+
+Deno.test({
+  name: "SeatbeltRunner: a volume left after the run is said in its outcome, the code kept",
+  ignore: !POSIX,
+  fn: () =>
+    inScratch(async (scratch) => {
+      const policy = seatbeltPolicy(scratch);
+      const exited = await recorded(fakeLauncher(3).launcher, policy, [], undefined, STUCK);
+      assertEquals(exited, { kind: "exited", code: 3, volumeLeft: STUCK });
+    }),
+});
+
+Deno.test({
+  name: "SeatbeltRunner: a volume left after a run the wall clock stopped is said in its outcome",
+  ignore: !POSIX,
+  fn: () =>
+    inScratch(async (scratch) => {
+      const policy = withWallClock(seatbeltPolicy(scratch), 0.01);
+      const late = await recorded(fakeLauncher(null).launcher, policy, [], undefined, STUCK);
+      assertEquals(late, { kind: "timed_out", seconds: 0.01, volumeLeft: STUCK });
+    }),
+});
+
+Deno.test({
+  name: "SeatbeltRunner: a run that throws and leaves its volume says both",
+  ignore: !POSIX,
+  fn: () =>
+    inScratch(async (scratch) => {
+      const { launcher, launches } = fakeLauncher(null);
+      const noWatchdog: ProcessLauncher = {
+        ...launcher,
+        start: (spec) => {
+          if (launches.length > 0) throw new Error("no /bin/sh");
+          return launcher.start(spec);
+        },
+      };
+      const policy = withWallClock(seatbeltPolicy(scratch), 0.05);
+      const run = () => recorded(noWatchdog, policy, [], undefined, STUCK);
+      const err = await assertRejects(run, Error, "no /bin/sh");
+      assertStringIncludes(err.message, `the scratch volume may be left: ${STUCK}`);
     }),
 });

@@ -88,6 +88,20 @@ Deno.test("sandbox exec: a run that ended with its container left says so once, 
   ]);
 });
 
+Deno.test("sandbox exec: a run that left its scratch volume says so once, with its code", async () => {
+  const left: ExecOutcome = {
+    kind: "ran",
+    backend: "seatbelt",
+    outcome: { kind: "exited", code: 4, volumeLeft: "hdiutil detach exited 16" },
+    unenforced: [],
+  };
+  const { d, err } = deps(MAC, () => Promise.resolve(left));
+  assertEquals(await runSandbox(EXEC, d), 4);
+  assertEquals(err.filter((l) => l.includes("hdiutil detach exited 16")), [
+    "warning: specnaut sandbox exec: the sandbox's scratch volume may be left: hdiutil detach exited 16",
+  ]);
+});
+
 Deno.test("sandbox exec: nothing ran is 125, with the reason", async () => {
   const notRun: ExecOutcome = { kind: "not_run", why: "no backend: no sandbox on Windows" };
   const { d, err } = deps(MAC, () => Promise.resolve(notRun));

@@ -38,7 +38,8 @@ type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
  *          a `--log` below the folder `review start` made, the session's own where
  *          `CLAUDE_CODE_SESSION_ID` names it, and only `--toolchain` folders that review
  *          recorded from the base's `gates.yml`). Every 124 and 125
- *          says why on stderr; the command's own
+ *          says why on stderr; a scratch volume left after a run is warned of there, and the
+ *          command's code stands. The command's own
  *          output is passed through unchanged, or, with `--log <file>`, written to that new file
  *          with every control but tab and line feed dropped, every invisible format character and
  *          line or paragraph separator too (`inert_log.ts`), and cut at `LOG_CAP_BYTES`: a review
@@ -120,6 +121,10 @@ function answer(outcome: ExecOutcome, deps: SandboxDeps): number {
     deps.err(`notice: specnaut sandbox exec: ${line}`);
   }
   const run = outcome.outcome;
+  if (run.volumeLeft !== undefined) {
+    const why = terminalText(run.volumeLeft);
+    deps.err(`warning: specnaut sandbox exec: the sandbox's scratch volume may be left: ${why}`);
+  }
   return run.kind === "exited" ? exited(run, deps) : timedOut(run, deps);
 }
 

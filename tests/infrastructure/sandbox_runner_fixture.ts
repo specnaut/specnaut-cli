@@ -64,14 +64,21 @@ export const VOLUME_REMOVAL = ["/bin/echo", "volume-removal"];
 
 /**
  * Scratch volumes that record `attach <mount> <bytes>` and `detach <mount>` in `events`, and mount
- * nothing; `refusal` makes every attach refuse with it.
+ * nothing; `refusal` makes every attach refuse with it, `stuck` every detach fail with it.
  */
-export function fakeVolumes(events: string[] = [], refusal?: string): ScratchVolumes {
+export function fakeVolumes(
+  events: string[] = [],
+  refusal?: string,
+  stuck?: string,
+): ScratchVolumes {
   return {
     attach(mount, bytes) {
       events.push(`attach ${mount} ${bytes}`);
       if (refusal !== undefined) return Promise.reject(new SandboxRefused(refusal));
-      const detach = () => Promise.resolve(void events.push(`detach ${mount}`));
+      const detach = () => {
+        events.push(`detach ${mount}`);
+        return stuck === undefined ? Promise.resolve() : Promise.reject(new Error(stuck));
+      };
       return Promise.resolve({ removal: VOLUME_REMOVAL, detach });
     },
   };
