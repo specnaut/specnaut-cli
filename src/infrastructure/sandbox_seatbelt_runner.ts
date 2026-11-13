@@ -51,13 +51,8 @@ export class SeatbeltRunner implements SandboxRunner {
       cwd: policy.workdir,
     });
     const seconds = policy.limits.wallClockSeconds;
-    const grace = seconds + DRAIN_GRACE_SECONDS;
-    return await watched(
-      this.launcher,
-      started,
-      seconds,
-      (pid) => watchdogSpec(pid, grace, removal),
-    );
+    const watchdog = (pid: number) => watchdogSpec(pid, seconds + DRAIN_GRACE_SECONDS, removal);
+    return await watched(this.launcher, started, seconds, watchdog);
   }
 }
 
