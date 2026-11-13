@@ -9,10 +9,10 @@ import {
   HARNESSES,
   projectOn71,
   runSpecnaut,
-  snapshot,
   withTempDir,
   write,
 } from "./task_reorg_fixture.ts";
+import { snapshot } from "../helpers/tree_snapshot.ts";
 
 /** Spec 037 — an addendum follows its phase to the address the router now reads. */
 

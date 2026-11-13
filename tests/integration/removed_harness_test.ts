@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl, join, relative } from "@std/path";
-import { exists, walk } from "@std/fs";
+import { fromFileUrl, join } from "@std/path";
+import { exists } from "@std/fs";
+import { snapshot } from "../helpers/tree_snapshot.ts";
 
 /**
  * #659 — a project installed for a harness Specnaut has since removed.
@@ -46,16 +47,6 @@ async function windsurfProject(dir: string): Promise<void> {
   await Deno.mkdir(join(dir, ".windsurf/workflows"), { recursive: true });
   await Deno.writeTextFile(join(dir, ".windsurf/workflows/specnaut-plan.md"), "# plan\n");
   await Deno.writeTextFile(join(dir, "AGENTS.md"), "# AGENTS.md\n\nWe rebase.\n");
-}
-
-async function snapshot(dir: string): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  // Directories too: a command that only creates an empty staging dir has
-  // still changed the project.
-  for await (const e of walk(dir)) {
-    out[relative(dir, e.path)] = e.isDirectory ? "<dir>" : await Deno.readTextFile(e.path);
-  }
-  return out;
 }
 
 async function withProject(fn: (dir: string) => Promise<void>): Promise<void> {

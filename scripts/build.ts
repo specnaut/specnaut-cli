@@ -70,7 +70,7 @@ export const TARGETS: Target[] = [
 // a tampered binary could exfiltrate via a subprocess regardless — the net
 // allowlist was never a real trust boundary. self-update (api.github.com +
 // the release-asset redirect hosts) is covered by the same open grant.
-const PERMISSIONS = [
+export const PERMISSIONS = [
   "--allow-read",
   "--allow-write",
   "--allow-run",

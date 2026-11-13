@@ -1,8 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
-import { walk } from "@std/fs/walk";
-import { fromFileUrl, join, relative } from "@std/path";
-import { sha256Hex } from "../../src/domain/sha256.ts";
+import { fromFileUrl, join } from "@std/path";
+import { snapshot } from "../helpers/tree_snapshot.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -36,19 +35,6 @@ async function runSpecnaut(args: string[], cwd: string) {
 }
 
 const INIT = ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"];
-
-/** Every path under `dir`, with content shas — directory names included. */
-async function snapshot(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  for await (const e of walk(dir, { includeDirs: true, includeFiles: true })) {
-    const rel = relative(dir, e.path);
-    if (rel === "") continue;
-    out.push(
-      e.isDirectory ? `d ${rel}` : `f ${rel} ${await sha256Hex(await Deno.readTextFile(e.path))}`,
-    );
-  }
-  return out.sort();
-}
 
 Deno.test("dry-run on a legacy .specflow/ project moves nothing", async () => {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-dryrun-legacy-" });

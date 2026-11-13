@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { dirname, fromFileUrl, join, relative, SEPARATOR } from "@std/path";
+import { dirname, fromFileUrl, join } from "@std/path";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { destResolver } from "../../src/application/upgrade_renames.ts";
 import { bundleOptionsOf } from "../../src/application/lock_bundle.ts";
@@ -155,16 +155,6 @@ export async function plantRetired(dir: string, rel: string): Promise<void> {
     templatesVersion: "7.1.0",
   });
   await Deno.writeTextFile(lockPath, serializeLock({ ...lock, entries }));
-}
-
-/** Every file under `dir`, `/`-separated, with its content — the whole observable tree. */
-export async function snapshot(dir: string, at = dir, out = new Map<string, string>()) {
-  for await (const e of Deno.readDir(at)) {
-    const abs = join(at, e.name);
-    if (e.isDirectory) await snapshot(dir, abs, out);
-    else out.set(relative(dir, abs).split(SEPARATOR).join("/"), await Deno.readTextFile(abs));
-  }
-  return out;
 }
 
 /**

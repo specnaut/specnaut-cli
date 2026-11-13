@@ -9,9 +9,9 @@ import {
   probeInside,
   probeOnHost,
   sandboxed,
-  snapshot,
   withIsolation,
 } from "./isolation_world.ts";
+import { snapshot } from "../helpers/tree_snapshot.ts";
 
 /**
  * A branch's code reaches nothing outside its run, on each backend this host offers, beside a

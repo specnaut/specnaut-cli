@@ -176,19 +176,3 @@ export async function probeOnHost(iso: Isolation, words: string[]) {
   assertEquals(code, 0, new TextDecoder().decode(stderr));
   return results(new TextDecoder().decode(stdout));
 }
-
-/** Every file below `root` with its bytes, folders and links named: a copy's whole state. */
-export async function snapshot(root: string): Promise<Map<string, string>> {
-  const seen = new Map<string, string>();
-  const walk = async (dir: string, prefix: string) => {
-    for await (const e of Deno.readDir(dir)) {
-      const path = `${prefix}${e.name}`;
-      const full = join(dir, e.name);
-      if (e.isSymlink) seen.set(path, `link ${await Deno.readLink(full)}`);
-      else if (e.isDirectory) (seen.set(path, "folder"), await walk(full, `${path}/`));
-      else seen.set(path, await Deno.readTextFile(full));
-    }
-  };
-  await walk(root, "");
-  return seen;
-}
