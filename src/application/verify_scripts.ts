@@ -1,15 +1,14 @@
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { baseAnchorRef, branchOfOriginHead, plainBranchName } from "../domain/base_branch.ts";
-import { type InstalledLock, parseLock } from "../domain/installed_lock.ts";
 import { projectRelative } from "../domain/project_names.ts";
 import { scriptsDigest } from "../domain/script_digest.ts";
 import {
-  BASE_LOCK,
   type BundleRule,
   judgeScripts,
   SCRIPTS_DIR,
   type ScriptVerdict,
 } from "../domain/script_trust.ts";
+import { baseLock, unavailable } from "./base_lock.ts";
 import { bundledScripts, bundleForLock } from "./lock_bundle.ts";
 import type { Harness } from "./ports.ts";
 import type { GitObjectReader, ScriptTreeWalker } from "./script_trust_ports.ts";
@@ -152,21 +151,3 @@ async function bundleRule(deps: VerifyScriptsDeps, baseTip: string): Promise<Bun
   );
   return { kind: "mapped", files };
 }
-
-/** The lock at the base's tip, parsed, or the rule that applies without one. */
-async function baseLock(
-  git: GitObjectReader,
-  baseTip: string,
-): Promise<InstalledLock | BundleRule> {
-  const file = await git.readFile(baseTip, BASE_LOCK);
-  if (file.kind === "absent") return { kind: "no_lock_at_base" };
-  if (file.kind === "not_regular") return unavailable("is not a regular file");
-  try {
-    return parseLock(new TextDecoder("utf-8", { fatal: true }).decode(file.bytes));
-  } catch (err) {
-    // Reported as the verdict's reason: the caller prints it on the lock's UNTRUSTED line.
-    return unavailable(err instanceof Error ? err.message : String(err));
-  }
-}
-
-const unavailable = (why: string): BundleRule => ({ kind: "unavailable", why });

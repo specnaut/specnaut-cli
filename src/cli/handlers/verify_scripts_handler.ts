@@ -5,6 +5,7 @@ import {
   verifyConfig,
   verifyInstructions,
 } from "../../application/verify_config.ts";
+import { shippedSkills } from "../../application/shipped_copies.ts";
 import type {
   CheckoutTreeWalker,
   GitObjectReader,
@@ -40,7 +41,8 @@ import { findHarness } from "../harnesses.ts";
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
  * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`
  * per path the instruction class names (`instruction_trust.ts`: a path whose work tree or HEAD
- * entry is not the tip's, or whose work tree is not HEAD's), the `UNTRUSTED` lines, and last
+ * entry is not the tip's, whose work tree is not HEAD's, or a skill Specnaut ships whose HEAD bytes
+ * are not the shipped copy, `shipped_skills.ts`), the `UNTRUSTED` lines, and last
  * `VERDICT scripts trusted|untrusted`. A class with no `trusted` line, on any exit, is untrusted.
  * Every other exit of this handler, a crash included, ends with `VERDICT scripts untrusted` too. A
  * caller trusts the scripts only on exit 0 with that final `trusted` line and a full `BASE` sha;
@@ -106,7 +108,8 @@ async function judgeInputs(
 ): Promise<Judged> {
   if (base === null) return { verdicts: [], digest: null };
   const config = await verifyConfig({ git, tree }, base);
-  const instructions = await verifyInstructions({ git, tree }, base);
+  const shipped = await shippedSkills({ git, core: CORE_BUNDLE, findHarness }, base.tip);
+  const instructions = await verifyInstructions({ git, tree }, base, shipped);
   return { verdicts: [...config, ...instructions.verdicts], digest: instructions.digest };
 }
 

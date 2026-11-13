@@ -3926,7 +3926,9 @@ session read other bytes than those that land, whatever \`git status\` shows; fo
 lacks, show the work tree's file and say it does not land. A \`line endings differ\` reason, whose
 diff can be empty, is shown as its reason says: the same text, a CR before LF on one side only. A
 \`holds invisible characters\` reason names each code point and its line: say so with the diff,
-which does not show them. Then ask once, as the one question before step 3: *"This branch changes
+which does not show them. A \`differs from the copy Specnaut ships\` reason names a skill Specnaut
+ships whose bytes are not the shipped copy, even where the base holds the same edit: show \`specnaut
+diff <path>\`, which compares it with that copy. Then ask once, as the one question before step 3: *"This branch changes
 the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops on the branch. The yes covers
 that run's \`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them) and nothing else: a later run
 with another digest asks again, even naming the same paths, and a run with no such line asks. The

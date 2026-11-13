@@ -15,6 +15,7 @@ import {
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
+import { type ShippedCopy, shippedReasons } from "../domain/shipped_skills.ts";
 import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 
@@ -68,18 +69,21 @@ export type InstructionOutcome = {
 
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
- * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class.
+ * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class,
+ * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`).
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
   base: InstructionBase,
+  shipped: ReadonlyMap<string, ShippedCopy> = new Map(),
 ): Promise<InstructionOutcome> {
   const { tree, tip, mergeBase } = await listRoots(deps, base);
   const head = await deps.git.listCommit(base.head, keptAtHead);
   const committed = await readCommitted(deps.git, base);
   const symlinks = await deps.git.symlinks();
-  const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
   const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
+  const extra = await shippedReasons(files, shipped);
+  const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
   return { verdicts, digest: await headDigest(files, await linkEnds(deps.git, base.head, files)) };
 }
 

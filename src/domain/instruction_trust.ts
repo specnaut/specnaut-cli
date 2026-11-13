@@ -60,13 +60,18 @@ export type InstructionInput = {
   readonly committed: readonly CommittedInstruction[];
   /** Whether git checks a link out as a link here (`core.symlinks`). */
   readonly symlinks: boolean;
+  /**
+   * Reasons judged beside the walk, at HEAD: a shipped skill against the copy Specnaut ships
+   * (`shipped_skills.ts`). A path the walk already named keeps the walk's reason.
+   */
+  readonly extra?: readonly Untrusted[];
 };
 
 /** One trusted line, or one untrusted line per path, each with its most specific reason. */
 export function judgeInstructions(input: InstructionInput): ConfigVerdict[] {
   const head = splitHead(input.head, byPath(input.tip));
   const committed = input.committed.flatMap((c) => committedReason(c, head.overrides.get(c.path)));
-  const found = [...treeReasons(input, head), ...committed];
+  const found = withExtra([...treeReasons(input, head), ...committed], input.extra ?? []);
   if (found.length === 0) return [{ class: INSTRUCTION_CLASS, path: ".", trusted: true }];
   return found.map((u) => ({ class: INSTRUCTION_CLASS, ...u, trusted: false }));
 }
@@ -89,6 +94,12 @@ function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   const blocked = input.tree.flatMap((w) => w.kind === "blocked" ? [w.path] : []);
   headReasons(reasons, { ...ctx, blocked, head: byPath(head.entries) }, holds);
   return [...reasons].map(([path, reason]) => ({ path, reason }));
+}
+
+/** `found`, then each of `extra` on a path `found` does not name. */
+function withExtra(found: Untrusted[], extra: readonly Untrusted[]): Untrusted[] {
+  const named = new Set(found.map((u) => u.path));
+  return [...found, ...extra.filter((u) => !named.has(u.path))];
 }
 
 /** HEAD's committed copy against the tip's: none at HEAD is silent, whatever the tree holds. */
