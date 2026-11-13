@@ -24,6 +24,13 @@ Deno.test("under the review lock, Read, Grep and Glob run, and the review seats 
   }
 });
 
+Deno.test("under the review lock, the session's own to-do list runs, a shared task list does not", () => {
+  assertEquals(tool("TodoWrite", { todos: [{ content: "c", status: "pending" }] }), null);
+  for (const name of ["TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TaskStop", "todowrite"]) {
+    assertStringIncludes(tool(name, { subject: "s" }) ?? "allowed", "review lock", name);
+  }
+});
+
 Deno.test("under the review lock, every other tool is refused: MCP tools, WebFetch, edits", () => {
   const tools = [
     "mcp__github__create_issue",

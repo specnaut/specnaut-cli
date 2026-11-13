@@ -28,7 +28,7 @@ ${bold("Usage:")}
                                       Exit 0 let through, 2 refused
   specnaut review guard               Judge, from a Claude Code PreToolUse hook's input on stdin, a tool
                                       call of a session under the review lock: only Read, Grep, Glob,
-                                      the review seats and the review's commands run. Exit 0, 2 refused
+                                      TodoWrite, the review seats and the review's commands run. Exit 0, 2 refused
   specnaut review start <pr|remote/branch>
                                       Once the gate let it through: lock the session until it ends, export
                                       the branch as inert files outside the project, and print where

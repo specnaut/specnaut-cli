@@ -24,6 +24,14 @@ export const REVIEW_SEATS: readonly string[] = [
 /** The tools that only read: what the seats and the session review with. */
 const READ_TOOLS: readonly string[] = ["Read", "Grep", "Glob"];
 
+/**
+ * The harness's bookkeeping that stays in the session: `TodoWrite`'s list lives in the session that
+ * writes it and reaches no one else, so the branch's text cannot carry anything out through it. The
+ * `Task*` tools (`TaskCreate`, `TaskUpdate`, ...) are not here, and so are refused: their list may be
+ * shared with other sessions, a channel out of the one the hook watches.
+ */
+const SESSION_TOOLS: readonly string[] = ["TodoWrite"];
+
 /** The tools that dispatch an agent, `Task` being the name older harness versions give it. */
 const DISPATCH_TOOLS: readonly string[] = ["Agent", "Task"];
 
@@ -41,8 +49,8 @@ const REVIEW_SCRIPTS = new Map<string, readonly string[]>([
 ]);
 
 const LOCKED = "refused under the review lock: this session read a branch it cannot trust, so " +
-  "until it ends only Read, Grep, Glob, the review seats and the review's own commands run; " +
-  "start a new session for anything else";
+  "until it ends only Read, Grep, Glob, TodoWrite, the review seats and the review's own commands " +
+  "run; start a new session for anything else";
 
 /**
  * What a session's lock entry records of its review, each `null` where the entry does not say:
@@ -64,7 +72,7 @@ export function lockedCallRefusal(
   review: LockedReview,
   log: string | null,
 ): string | null {
-  if (tool !== null && READ_TOOLS.includes(tool)) return null;
+  if (tool !== null && (READ_TOOLS.includes(tool) || SESSION_TOOLS.includes(tool))) return null;
   if (tool !== null && DISPATCH_TOOLS.includes(tool)) return dispatchRefusal(input);
   if (tool === "Bash") return commandRefusal(field(input, "command"), review, log);
   return `${tool ?? "a tool call naming no tool"} is ${LOCKED}`;

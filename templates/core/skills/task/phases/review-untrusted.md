@@ -33,8 +33,9 @@ script below takes that `--objects` folder and no other.
 ## The review lock
 
 From the start's exit 0 until this session ends, the `review-lock` hook runs before every tool call:
-only Read, Grep, Glob, a dispatch to a review seat and the commands this file names run, the seats'
-own calls included. **Each command runs alone, its values written out:** `$HEAD`, `$OBJECTS`,
+only Read, Grep, Glob, `TodoWrite`, a dispatch to a review seat and the commands this file names run,
+the seats' own calls included; `TodoWrite`'s list stays in this session, while the `Task*` tools,
+whose list other sessions may share, are refused. **Each command runs alone, its values written out:** `$HEAD`, `$OBJECTS`,
 `$BASE_TIP` and `$LOGS` below stand for the values printed, and a variable, `;`, `&&`, `|`, `$(…)`,
 a redirection or a glob is refused. Every other tool is refused, MCP tools and WebFetch included, and
 so is a push, a tracker write, a merge or the landing script. A refusal is the lock working: never
