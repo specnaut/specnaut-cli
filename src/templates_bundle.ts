@@ -3872,7 +3872,9 @@ none, means the tree's value is never read, and the row below applies:
 
 \`backlog-config\` judges every line of \`.specnaut/backlog-config.yml\` but the columns grooming
 writes (\`intake_column\`, \`ready_column\`), each held to the one quoted value grooming writes: the
-tracker's address on any backend, and the \`remote:\` block. \`linked-issue\` judges the parsed link, and refuses a file its readers could read two ways.
+tracker's address on any backend, and the \`remote:\` block. \`linked-issue\` judges the link as its
+\`sed\` readers take it, raw: one \`"linked_issue"\` key, whose value is \`null\` or a whole number from
+1, compared as written; a file its readers could read two ways is refused.
 `,
     executable: false,
     backend: null,

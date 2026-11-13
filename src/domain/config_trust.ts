@@ -100,7 +100,7 @@ const GROOMING_LINE = /^(?:intake_column|ready_column): "[^"\\\r]*"[ \t]*$/;
 /**
  * What a class's readers take from the file, as bytes to compare, or why it cannot be read.
  * `tracker`: every line but the ones grooming writes, so a key added later (a backend's address, a
- * `remote:` block) is judged without anyone listing it. `linked_issue`: the parsed link.
+ * `remote:` block) is judged without anyone listing it. `linked_issue`: its token, as written.
  */
 function valueOf(input: ConfigInput, bytes: Uint8Array): Uint8Array | Refusal {
   if (input.value === "bytes") return bytes;
@@ -123,26 +123,48 @@ function trackerOf(text: string): Uint8Array | Refusal {
 
 /** A key literal in JSON text, as written, with what follows it up to its colon. */
 const JSON_KEY = /"((?:[^"\\]|\\.)*)"\s*:/g;
+/** The key as the sed readers match it: anywhere in the text, an escaped key's tail included. */
+const RAW_KEY = /"linked_issue"/g;
+/** What they take after it, on its line: the colon, then a token up to a comma, brace or space. */
+const RAW_VALUE = /"linked_issue"[ \t\v\f\r]*:[ \t\v\f\r]*([^,} \t\n\v\f\r]*)/;
+/** The only tokens every reader takes alike: no link, or an issue number as written. */
+const TOKEN = /^(?:null|[1-9][0-9]*)$/;
 
 /**
- * `feature.json`'s `linked_issue`, parsed. Its readers are a line-wise sed (the first key) and jq
- * (the last, with escapes decoded): a file they could read two ways is refused, never compared.
+ * `feature.json`'s `linked_issue`: the token its line-wise sed readers take, compared as written,
+ * never as a parsed number (`1e1` is not `10`: a digit-only sed reads `1`). A file its readers
+ * could read two ways, sed or jq (the last key, escapes decoded), is refused, never compared.
  */
 function linkOf(text: string): Uint8Array | Refusal {
   const keys = [...text.matchAll(JSON_KEY)].filter((m) => decodedKey(m[1]) === "linked_issue");
   if (keys.some((m) => m[1] !== "linked_issue")) return { why: "linked_issue is written escaped" };
-  if (keys.length > 1) return { why: "linked_issue is given twice" };
-  let parsed: unknown;
+  const raw = [...text.matchAll(RAW_KEY)].length;
+  if (raw > 1) return { why: "linked_issue is given twice" };
+  const token = raw === 0 ? "" : RAW_VALUE.exec(text)?.[1] ?? "";
+  if (raw === 1 && !TOKEN.test(token)) return { why: "linked_issue is not null or a number" };
+  const parsed = parseJson(text);
+  if ("why" in parsed) return parsed;
+  if (token !== jqLink(parsed.value)) {
+    return { why: "linked_issue is not read the same way by its readers" };
+  }
+  return new TextEncoder().encode(token);
+}
+
+/** The text parsed as JSON, or why it does not parse. */
+function parseJson(text: string): { readonly value: unknown } | Refusal {
   try {
-    parsed = JSON.parse(text);
+    return { value: JSON.parse(text) };
   } catch (err) {
     // Not swallowed: the parse failure is the reason the verdict reports.
     return { why: `does not parse: ${err instanceof Error ? err.message : String(err)}` };
   }
-  const link = typeof parsed === "object" && parsed !== null && "linked_issue" in parsed
-    ? JSON.stringify((parsed as Record<string, unknown>).linked_issue)
-    : "";
-  return new TextEncoder().encode(link);
+}
+
+/** The top-level link as jq's `.linked_issue` reads it, written back as JSON; none is "". */
+function jqLink(parsed: unknown): string {
+  const top = typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  if (!top || !("linked_issue" in parsed)) return "";
+  return JSON.stringify((parsed as Record<string, unknown>).linked_issue);
 }
 
 /** A key literal's text with its escapes decoded: `\uXXXX` to its character, `\x` to `x`. */
