@@ -1,6 +1,8 @@
-import { SEPARATOR } from "@std/path";
 import { plainWords } from "./plain_command.ts";
+import { isLockedExec } from "./review_lock_exec.ts";
 import { isReviewScript } from "./review_lock_scripts.ts";
+
+export { isInsideFolder, lockedExecRefusal } from "./review_lock_exec.ts";
 
 /**
  * The review lock: once `specnaut review start` has exported a branch this session cannot trust,
@@ -37,7 +39,8 @@ const SESSION_TOOLS: readonly string[] = ["TodoWrite"];
 /** The tools that dispatch an agent, `Task` being the name older harness versions give it. */
 const DISPATCH_TOOLS: readonly string[] = ["Agent", "Task"];
 
-const LOCKED = "refused under the review lock: this session read a branch it cannot trust, so " +
+export const LOCKED =
+  "refused under the review lock: this session read a branch it cannot trust, so " +
   "until it ends only Read, Grep, Glob, TodoWrite, the review seats and the review's own commands " +
   "run; start a new session for anything else";
 
@@ -109,52 +112,12 @@ function isReviewCommand(words: readonly string[], review: LockedReview, log: st
     third === review.head;
 }
 
-/**
- * `specnaut sandbox exec <head> --log <file> -- <command>...`, exactly: the head this session's
- * review exported, a log file below the folder `review start` made for it, and no `--toolchain`,
- * which would mount folders no one recorded. A log anywhere else would be a new file on the host,
- * its content the branch's.
- */
-function isLockedExec(words: readonly string[], review: LockedReview, log: string | null) {
-  const [, , sub, sha, flag, , dash] = words;
-  return sub === "exec" && words.length >= 8 && flag === "--log" && dash === "--" &&
-    review.head !== null && sha === review.head && log !== null && review.logs !== null &&
-    isInsideFolder(log, review.logs);
-}
-
 /** The `--log` file of a call of `sandbox exec`'s locked shape, for the guard to resolve. */
 export function lockedLogOf(tool: string | null, input: unknown): string | null {
   const command = tool === "Bash" ? field(input, "command") : undefined;
   const words = typeof command === "string" ? plainWords(command) : null;
   if (words === null || words.slice(0, 3).join(" ") !== "specnaut sandbox exec") return null;
   return words[4] === "--log" && words[6] === "--" ? words[5] ?? null : null;
-}
-
-/**
- * Why `specnaut sandbox exec` itself refuses a run while `held`, the reviews whose logs folder the
- * run may use (`execLockRefusal` says which), is not empty: a run some script starts reaches no
- * hook, so the binary holds the same line. `log` is where its `--log` resolves, `null` for none.
- * With no lock it runs as it always did.
- */
-export function lockedExecRefusal(
-  held: readonly LockedReview[],
-  toolchain: readonly string[],
-  log: string | null,
-): string | null {
-  if (held.length === 0) return null;
-  if (toolchain.length > 0) return `--toolchain is ${LOCKED}`;
-  if (log !== null && held.some((r) => r.logs !== null && isInsideFolder(log, r.logs))) return null;
-  return "a run with no --log, or a --log outside the folder `specnaut review start` made for " +
-    `the review's logs, is ${LOCKED}`;
-}
-
-/**
- * Whether `path` lies below `folder`, both real paths, by the host's own separator: on POSIX a `\`
- * is a character of a name, so `<logs>\x` is a file beside `<logs>`, not in it.
- */
-export function isInsideFolder(path: string, folder: string): boolean {
-  const base = folder.endsWith(SEPARATOR) ? folder.slice(0, -SEPARATOR.length) : folder;
-  return path.length > base.length + 1 && path.startsWith(base + SEPARATOR);
 }
 
 function field(v: unknown, key: string): unknown {
