@@ -106,7 +106,10 @@ const RET_K = 0x06;
 const RET_KILL_PROCESS = 0x80000000;
 const RET_ERRNO = 0x00050000;
 const RET_ALLOW = 0x7fff0000;
-/** The errno every refusal of both filters fails with: a tool that probes for a call carries on. */
+/**
+ * The errno a refusal fails with, so a tool that probes for a call carries on: every refusal of
+ * bubblewrap's filter, and every one of the container's profile but `clone3`'s, which is ENOSYS.
+ */
 export const EPERM = 1;
 /**
  * `seccomp_data`: the call's number, its architecture, then (past the instruction pointer) its
