@@ -70,8 +70,10 @@ under `--no-close`, once more after the push: there the item's line must read `O
    `phases/auto-chain.md` reads it (its one reader), and a `manual` answer is that question.
    Unless the last run printed `VERDICT instructions trusted`, or only `instructions` lines reading
    `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a missing
-   `instructions` line is an untrusted one. Show the diff of each named path (`git diff <BASE_TIP>
-   -- <path>`; a file the base lacks, in full) and ask once, as the one question before step 3:
+   `instructions` line is an untrusted one. Show the diff of each named path as it lands (`git diff
+   <BASE_TIP> HEAD -- <path>`; a file the base lacks, in full); a `work tree differs from HEAD`
+   reason means the session read other bytes than those that land, whatever `git status` shows.
+   Then ask once, as the one question before step 3:
    *"This branch changes the instructions this session follows. Yes lands them."* A no stops on
    the branch; a later run naming another path asks again. The session read `AGENTS.md` before
    this step ran: this stop is the control, not undoing that read.

@@ -58,7 +58,7 @@ export async function verifyConfig(
 
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
- * both commits, one at a time for the reason above, then judged as one class.
+ * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class.
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
@@ -67,10 +67,12 @@ export async function verifyInstructions(
   const tree: CheckoutWalk[] = [];
   const tip: BaseEntry[] = [];
   const mergeBase: BaseEntry[] = [];
+  const head: BaseEntry[] = [];
   for (const root of INSTRUCTION_SCOPE) {
     tree.push(await deps.tree.walk(root));
     tip.push(...await deps.git.listRoot(base.tip, root));
     mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
+    head.push(...await deps.git.listRoot(base.head, root));
   }
   const committed = [];
   for (const path of COMMITTED_INSTRUCTIONS) {
@@ -84,13 +86,8 @@ export async function verifyInstructions(
       mergeBase: commitFile(await deps.git.readFile(base.mergeBase, path)),
     });
   }
-  return judgeInstructions({
-    tree,
-    tip,
-    mergeBase,
-    committed,
-    symlinks: await deps.git.symlinks(),
-  });
+  const symlinks = await deps.git.symlinks();
+  return judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
 }
 
 /**

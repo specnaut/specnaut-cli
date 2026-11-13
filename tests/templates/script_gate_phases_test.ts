@@ -157,7 +157,8 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
       "reading `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a " +
       "missing `instructions` line is an untrusted one.",
   );
-  assertStringIncludes(said, "`git diff <BASE_TIP> -- <path>`");
+  assertStringIncludes(said, "`git diff <BASE_TIP> HEAD -- <path>`");
+  assertStringIncludes(said, "a `work tree differs from HEAD` reason");
   assertStringIncludes(said, "ask once");
   assertStringIncludes(said, "The session read `AGENTS.md` before this step ran");
   assert(m.indexOf(rule) < m.indexOf("1. **Shape the history.**"), "the rule is not in step 0");

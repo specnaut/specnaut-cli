@@ -1,9 +1,17 @@
 import { sameBytes } from "./bytes.ts";
-import { inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
-import { type CheckoutWalk, configReasons, holdsBytes } from "./checkout_trust.ts";
+import { inCheckoutScope, inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
+import {
+  type CheckoutEntry,
+  type CheckoutWalk,
+  configReasons,
+  holdsBytes,
+} from "./checkout_trust.ts";
 import type { ConfigFile, ConfigVerdict } from "./config_trust.ts";
 import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
+import { headReasons } from "./instruction_head.ts";
+
+export { INSTRUCTION_REASON } from "./instruction_head.ts";
 
 /**
  * Whether the instruction files a session takes as its rules hold, in the work tree, what the base
@@ -12,7 +20,9 @@ import { refinedReason } from "./trust_reason.ts";
  * class, judged by bytes with the checkout check's walk (`configReasons` in `checkout_trust.ts`):
  * a link that is not the tip's own or leads out of `.specnaut/addenda/`'s compared files, a file
  * the tip lacks, a name that differs in case, a hard link, a tip file the tree lacks: each is one
- * untrusted line, named.
+ * untrusted line, named. What lands is HEAD's commit, not the tree, so each path is judged at HEAD
+ * too: a tree that does not hold HEAD's entry is untrusted, so a change committed and then
+ * restored in the tree, or hidden from git by `skip-worktree` or `assume-unchanged`, is named.
  *
  * Its limit: the session has already read `AGENTS.md` (and `CLAUDE.md`) before the merge's step 0
  * runs this check, so the verdict cannot undo that read. The control is the stop it causes: an
@@ -52,6 +62,8 @@ export type InstructionInput = {
   readonly tip: readonly BaseEntry[];
   /** The same roots at the merge base: read only to say a file is behind the base. */
   readonly mergeBase: readonly BaseEntry[];
+  /** The same roots at HEAD: what lands. */
+  readonly head: readonly BaseEntry[];
   readonly committed: readonly CommittedInstruction[];
   /** Whether git checks a link out as a link here (`core.symlinks`). */
   readonly symlinks: boolean;
@@ -69,9 +81,17 @@ const inComparedRoot = (path: string) =>
   INSTRUCTION_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
 
 function treeReasons(input: InstructionInput): Untrusted[] {
-  const ctx = { tree: treeBytes(input.tree), tip: byPath(input.tip), old: byPath(input.mergeBase) };
-  return configReasons(input.tree, input.tip, holdsBytes(input.symlinks), inComparedRoot)
+  const holds = holdsBytes(input.symlinks);
+  const ctx = {
+    tree: treeEntries(input.tree),
+    tip: byPath(input.tip),
+    old: byPath(input.mergeBase),
+  };
+  const found = configReasons(input.tree, input.tip, holds, inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
+  const reasons = new Map(found.map((u) => [u.path, u.reason]));
+  headReasons(reasons, { tree: ctx.tree, head: byPath(input.head), tip: ctx.tip }, holds);
+  return [...reasons].map(([path, reason]) => ({ path, reason }));
 }
 
 /** HEAD's committed copy against the tip's: none at HEAD is silent, whatever the tree holds. */
@@ -88,14 +108,15 @@ function committedReason(c: CommittedInstruction): Untrusted[] {
 }
 
 type Context = {
-  readonly tree: ReadonlyMap<string, Uint8Array>;
+  readonly tree: ReadonlyMap<string, CheckoutEntry>;
   readonly tip: ReadonlyMap<string, BaseEntry>;
   readonly old: ReadonlyMap<string, BaseEntry>;
 };
 
 /** The checkout check's reason, made the script check's where it says more: CRLF, or behind. */
 function refined(u: Untrusted, ctx: Context): string {
-  const mine = ctx.tree.get(u.path);
+  const entry = ctx.tree.get(u.path);
+  const mine = entry?.kind === "file" ? entry.bytes : undefined;
   if (mine && (u.reason === REASON.differs || u.reason === REASON.notOnBase)) {
     const copies = [blobBytes(ctx.tip.get(u.path))];
     return refinedReason(mine, { copies, mergeBase: blobBytes(ctx.old.get(u.path)) }, u.reason);
@@ -105,11 +126,12 @@ function refined(u: Untrusted, ctx: Context): string {
   return u.reason;
 }
 
-function treeBytes(tree: readonly CheckoutWalk[]): ReadonlyMap<string, Uint8Array> {
-  const out = new Map<string, Uint8Array>();
+/** The tree's entries by path, as the tip check takes them: walked roots, checked files. */
+function treeEntries(tree: readonly CheckoutWalk[]): ReadonlyMap<string, CheckoutEntry> {
+  const out = new Map<string, CheckoutEntry>();
   for (const walk of tree) {
     if (walk.kind !== "walked") continue;
-    for (const e of walk.entries) if (e.kind === "file") out.set(e.path, e.bytes);
+    for (const e of walk.entries) if (inCheckoutScope(e.path)) out.set(e.path, e);
   }
   return out;
 }
