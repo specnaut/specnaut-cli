@@ -32,8 +32,12 @@ export async function writeCopies(home: ExportHome, plan: ExportPlan, objects: T
   }
 }
 
-/** Refuses any file of `seats` that differs from the plan, is extra, is missing or is not 0644. */
-export async function verifyCopy(seats: string, plan: ExportPlan): Promise<void> {
+/** The modes of the reviewers' copy as written, and once sealed. */
+export const WRITTEN = 0o644;
+export const SEALED = { file: 0o444, folder: 0o555 } as const;
+
+/** Refuses any file of `seats` that differs from the plan, is extra, is missing or not of `mode`. */
+export async function verifyCopy(seats: string, plan: ExportPlan, mode: number): Promise<void> {
   const expected = new Map(plan.files.map((f) => [join(seats, ...f.names), f]));
   const found = await walkFiles(seats);
   for (const path of found) {
@@ -42,11 +46,47 @@ export async function verifyCopy(seats: string, plan: ExportPlan): Promise<void>
     if (await gitBlobId(await Deno.readFile(path), formatOf(file.sha)) !== file.sha) {
       throw new ExportRefused(`${path} differs from the commit`);
     }
-    if (!windows && ((await Deno.lstat(path)).mode! & 0o777) !== 0o644) {
-      throw new ExportRefused(`${path} is not mode 0644`);
+    if (!windows && ((await Deno.lstat(path)).mode! & 0o777) !== mode) {
+      throw new ExportRefused(`${path} is not mode ${mode.toString(8).padStart(4, "0")}`);
     }
   }
   if (found.length !== expected.size) throw new ExportRefused("a planned file is missing");
+}
+
+/**
+ * Seals the checked copy: files `0444`, folders `0555`, the folders last, so no reviewer's tool
+ * writes to it by mistake while the review reads it. Nothing on Windows, whose modes say nothing.
+ */
+export async function sealCopy(seats: string): Promise<void> {
+  if (windows) return;
+  for await (const entry of Deno.readDir(seats)) {
+    const path = join(seats, entry.name);
+    if (entry.isDirectory) await sealCopy(path);
+    else await Deno.chmod(path, SEALED.file);
+  }
+  await Deno.chmod(seats, SEALED.folder);
+}
+
+/**
+ * Opens every real folder of a sealed copy to its owner again, so it can be removed: `0700`, a
+ * link never followed. Synchronous, as an exit trap waits for nothing; a copy not there is skipped.
+ */
+export function openCopySync(seats: string): void {
+  if (windows || !isFolderSync(seats)) return;
+  Deno.chmodSync(seats, 0o700);
+  for (const entry of Deno.readDirSync(seats)) {
+    if (entry.isDirectory && !entry.isSymlink) openCopySync(join(seats, entry.name));
+  }
+}
+
+/** Whether `path` is a real folder, a link to one not counted; `false` when nothing is there. */
+function isFolderSync(path: string): boolean {
+  try {
+    return Deno.lstatSync(path).isDirectory;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
 }
 
 /** Writes one planned file under `base`, the file created new, its folders made new on the way. */

@@ -96,6 +96,7 @@ Deno.test("tests that did not run cap the verdict, and the review ends with the 
   assertStringIncludes(doc, "never merge, push, close an item or move a card for this head");
   assertStringIncludes(doc, 'run `specnaut review end "$HEAD"`');
   assertStringIncludes(doc, "It removes the export, `$LOGS` with it;");
+  assertStringIncludes(doc, "an exit 1 saying it changed means the seats did not read the commit");
   assertStringIncludes(doc, "under the lock nothing else is removed");
 });
 

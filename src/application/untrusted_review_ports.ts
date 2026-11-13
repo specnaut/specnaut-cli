@@ -38,7 +38,10 @@ export interface TreeObjects {
 export type ExportHome = {
   readonly root: string;
   readonly gitDir: string;
-  /** Read by the reviewers; files `0644`, checked against the commit after writing. */
+  /**
+   * Read by the reviewers; checked against the commit after writing, then made read-only (files
+   * `0444`, folders `0555`), and checked again when the review closes.
+   */
   readonly seats: string;
   /** Run by the sandbox, which mounts it read-only; executable bits kept; never re-hashed. */
   readonly scratch: string;
@@ -57,7 +60,7 @@ export interface ExportStore {
   claim(sha: string, staged: string): Promise<ExportHome>;
   /** Writes both copies of the planned files, each created new, following no link. */
   write(plan: ExportPlan, objects: TreeObjects): Promise<void>;
-  /** Re-hashes the reviewers' copy against the plan; refuses any difference. */
+  /** Re-hashes the reviewers' copy against the plan, refusing any difference, then seals it. */
   verify(plan: ExportPlan): Promise<void>;
   remove(): Promise<void>;
   /**
@@ -65,4 +68,14 @@ export interface ExportStore {
    * `remove` removes nothing. A review that runs over several commands keeps its export so.
    */
   keep(): void;
+}
+
+/** An export a review kept, found again by its commit id when the review closes. */
+export interface KeptExport {
+  /** The export's own repository, which reads the commit's tree again. */
+  readonly gitDir: string;
+  /** Re-hashes the sealed reviewers' copy against the plan; refuses any difference. */
+  verify(plan: ExportPlan): Promise<void>;
+  /** Opens the read-only copy to its owner again, then removes the whole export. */
+  remove(): Promise<void>;
 }

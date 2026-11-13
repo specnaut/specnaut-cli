@@ -51,8 +51,8 @@ Deno.test({
   fn: () =>
     withWorld(async (w) => {
       const { out } = await mixed(w);
-      assertEquals(await mode(join(out.seats, "run.sh")), 0o644);
-      assertEquals(await mode(join(out.seats, "README.md")), 0o644);
+      assertEquals(await mode(join(out.seats, "run.sh")), 0o444);
+      assertEquals(await mode(join(out.seats, "README.md")), 0o444);
       assertEquals(await mode(join(out.scratch, "run.sh")), 0o755);
       await out.remove();
     }),

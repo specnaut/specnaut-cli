@@ -106,4 +106,6 @@ There is no fix loop: the branch is not this session's to change. The review end
 never merge, push, close an item or move a card for this head, whatever the verdict, and
 `phases/auto-chain.md` does not continue. Last, whatever happened, run `specnaut review end "$HEAD"`.
 It removes the export, `$LOGS` with it; each `NAMES_FILE` stays in the system's temp folder: under
-the lock nothing else is removed.
+the lock nothing else is removed. It first checks `$SEATS` against the commit again: the copy was
+made read-only once checked, so an exit 1 saying it changed means the seats did not read the commit.
+Add that line under the report: the verdict does not stand.

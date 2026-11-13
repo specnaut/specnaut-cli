@@ -109,7 +109,7 @@ function checkedHead(sha: string, expected: string | undefined): string {
  * Reads the tree one level at a time, each tree's size charged per occurrence before it is read,
  * so a tree that repeats one subtree a million times stops at a cap instead of in memory.
  */
-async function planTree(
+export async function planTree(
   objects: TreeObjects,
   root: string,
   caps: TreeCaps,

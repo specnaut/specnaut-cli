@@ -4,7 +4,7 @@ import type { BranchFetcher } from "../../src/application/untrusted_review_ports
 import { type BranchSource, FETCHED_REF } from "../../src/domain/branch_source.ts";
 import { isFullSha } from "../../src/domain/commit_sha.ts";
 import { DEFAULT_TREE_CAPS, type TreeCaps } from "../../src/domain/tree_plan.ts";
-import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
+import { FsSandboxHost, reopen } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { FsExportStore } from "../../src/infrastructure/fs_tree_export.ts";
 import { GitTreeObjects } from "../../src/infrastructure/git_tree_objects.ts";
 import { commit, git, initRepo, type RawEntry, tempDir, tree } from "./git_fixture.ts";
@@ -25,6 +25,8 @@ export async function withWorld(fn: (w: World) => Promise<void>): Promise<void> 
     await initRepo(repo);
     await fn({ repo, project, cache });
   } finally {
+    // A test that fails before it removes its export leaves the sealed copy, closed to writes.
+    if (Deno.build.os !== "windows") await reopen(base);
     await Deno.remove(base, { recursive: true });
   }
 }

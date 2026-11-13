@@ -9,7 +9,7 @@ import { isFullSha } from "../domain/commit_sha.ts";
 import type { ExportPlan } from "../domain/tree_plan.ts";
 import { isInside } from "../domain/destination.ts";
 import { armExitTrap } from "./exit_trap.ts";
-import { verifyCopy, writeCopies } from "./fs_export_files.ts";
+import { openCopySync, sealCopy, verifyCopy, writeCopies, WRITTEN } from "./fs_export_files.ts";
 import { securePrivateFolder } from "./private_folder.ts";
 
 /**
@@ -87,12 +87,14 @@ export class FsExportStore implements ExportStore {
   }
 
   async verify(plan: ExportPlan): Promise<void> {
-    await verifyCopy(this.#claimed().seats, plan);
+    await verifyCopy(this.#claimed().seats, plan, WRITTEN);
+    await sealCopy(this.#claimed().seats);
   }
 
   /** Tries every folder this store made, then reports each one it could not remove. */
   async remove(): Promise<void> {
     const failed: unknown[] = [];
+    this.#openSeats((e) => failed.push(e));
     for (const path of this.#made.splice(0).reverse()) {
       await Deno.remove(path, { recursive: true }).catch(ignoreNotFound).catch((e) =>
         failed.push(e)
@@ -113,6 +115,7 @@ export class FsExportStore implements ExportStore {
 
   /** The trap's cleanup: synchronous, since `unload` waits for nothing. */
   #removeSync(): void {
+    this.#openSeats((e) => console.error(`warning: could not open the seats to remove: ${e}`));
     for (const path of this.#made.splice(0).reverse()) {
       try {
         Deno.removeSync(path, { recursive: true });
@@ -121,6 +124,16 @@ export class FsExportStore implements ExportStore {
           console.error(`warning: could not remove ${path}: ${(err as Error).message}`);
         }
       }
+    }
+  }
+
+  /** Opens the sealed copy of an export this store still owns, so its removal can unlink it. */
+  #openSeats(failed: (err: unknown) => void): void {
+    if (this.#home === undefined || !this.#made.includes(this.#home.root)) return;
+    try {
+      openCopySync(this.#home.seats);
+    } catch (err) {
+      failed(err);
     }
   }
 
@@ -148,23 +161,4 @@ async function claimNew(root: string): Promise<void> {
 
 function ignoreNotFound(err: unknown): void {
   if (!(err instanceof Deno.errors.NotFound)) throw err;
-}
-
-/**
- * Removes the kept export of `sha` under `cacheRoot`: `false` when none is there. Only a folder
- * named by a full commit id is removed; a link at that name is refused, never followed.
- */
-export async function removeKeptExport(cacheRoot: string, sha: string): Promise<boolean> {
-  if (!isFullSha(sha)) throw new ExportRefused("not a full commit id");
-  const root = join(cacheRoot, sha);
-  let info: Deno.FileInfo;
-  try {
-    info = await Deno.lstat(root);
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
-    throw err;
-  }
-  if (!info.isDirectory) throw new ExportRefused(`${root} is not a folder: a link is not followed`);
-  await Deno.remove(root, { recursive: true });
-  return true;
 }

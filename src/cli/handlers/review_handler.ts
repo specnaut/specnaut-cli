@@ -9,11 +9,9 @@ import { type BranchExport, exportBranchTree } from "../../application/untrusted
 import { terminalText } from "../../domain/terminal_text.ts";
 import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
 import { checkoutState } from "../../infrastructure/git_checkout_state.ts";
-import {
-  exportCacheRoot,
-  FsExportStore,
-  removeKeptExport,
-} from "../../infrastructure/fs_tree_export.ts";
+import { exportCacheRoot, FsExportStore } from "../../infrastructure/fs_tree_export.ts";
+import { keptExport } from "../../infrastructure/fs_kept_export.ts";
+import { closeExport, type CloseOutcome } from "../../application/untrusted_review_close.ts";
 import { GitBranchFetcher } from "../../infrastructure/git_branch_fetch.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { GitTreeObjects } from "../../infrastructure/git_tree_objects.ts";
@@ -37,7 +35,10 @@ import { runReviewGuard } from "./review_guard_handler.ts";
  *   trust <pr> <sha>
  *                 prints `trusted`, or `untrusted <why>`, for reviewing PR <pr> at commit <sha>
  *                 (review_trust.ts). Exit 0 trusted, 1 untrusted, whatever made it so.
- *   end <sha>     removes the kept export of <sha>. Exit 0 removed or none there, 1 failed.
+ *   end <sha>     checks the reviewers' copy of <sha> against the commit once more, then removes the
+ *                 kept export. Exit 0 removed (`REMOVED <sha>`) or none there (`NONE <sha>`); 1
+ *                 failed, or the copy changed after the start: the review did not read the commit,
+ *                 and the export is removed all the same.
  */
 const EXIT = { done: 0, failed: 1 } as const;
 
@@ -45,7 +46,7 @@ export type ReviewDeps = {
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
   readonly start: () => Promise<StartDeps | null>;
-  readonly end: (sha: string) => Promise<boolean>;
+  readonly end: (sha: string) => Promise<CloseOutcome>;
   readonly gate: () => Promise<number>;
   readonly guard: () => Promise<number>;
   readonly trust: (pr: string, head: string) => Promise<TrustDecision>;
@@ -60,11 +61,7 @@ export async function runReview(intent: ReviewIntent, deps = defaultDeps()): Pro
     return decision.trusted ? EXIT.done : EXIT.failed;
   }
   try {
-    if (intent.sub === "end") {
-      const removed = await deps.end(intent.sha);
-      deps.out(removed ? `REMOVED ${intent.sha}` : `NONE ${intent.sha}`);
-      return EXIT.done;
-    }
+    if (intent.sub === "end") return end(deps, intent.sha);
     return await start(deps, intent.source);
   } catch (err) {
     return fail(deps, intent.sub, err instanceof Error ? err.message : String(err));
@@ -79,6 +76,17 @@ async function start(deps: ReviewDeps, source: string): Promise<number> {
   deps.out(startLines(outcome.exported).join("\n"));
   return EXIT.done;
 }
+
+async function end(deps: ReviewDeps, sha: string): Promise<number> {
+  const closed = await deps.end(sha);
+  if (closed.kind === "changed") return fail(deps, "end", `${CHANGED_COPY}: ${closed.why}`);
+  deps.out(closed.kind === "removed" ? `REMOVED ${sha}` : `NONE ${sha}`);
+  return EXIT.done;
+}
+
+/** Why `end` fails when the reviewers' copy no longer reads as the commit. */
+export const CHANGED_COPY = "the reviewers' copy changed after the start, so the review did not " +
+  "read the commit; the export is removed";
 
 /** What `start` prints: every path and name made inert, one fact per line. */
 export function startLines(exported: BranchExport): string[] {
@@ -110,8 +118,16 @@ function defaultDeps(): ReviewDeps {
       const forge = new GhPullRequests(new DenoSubprocessRunner(), cwd);
       return decideTrust({ pullRequest: (n) => forge.facts(n) }, pr, head);
     },
-    end: (sha) => removeKeptExport(cache(), sha),
+    end: (sha) => closeExport(closeDeps(cache), sha),
     start: () => startDeps(cwd, cache),
+  };
+}
+
+function closeDeps(cache: () => string) {
+  return {
+    kept: (sha: string) => keptExport(cache(), sha),
+    objects: (gitDir: string) => new GitTreeObjects(gitDir),
+    windows: Deno.build.os === "windows",
   };
 }
 

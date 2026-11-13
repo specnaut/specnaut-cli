@@ -1,10 +1,8 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
 import type { BranchExport } from "../../../src/application/untrusted_review.ts";
 import type { TrustDecision } from "../../../src/domain/review_trust.ts";
-import { runReview, startLines } from "../../../src/cli/handlers/review_handler.ts";
-import { removeKeptExport } from "../../../src/infrastructure/fs_tree_export.ts";
-import { exists } from "../../helpers/fs_exists.ts";
+import type { CloseOutcome } from "../../../src/application/untrusted_review_close.ts";
+import { CHANGED_COPY, runReview, startLines } from "../../../src/cli/handlers/review_handler.ts";
 
 const SHA = "c".repeat(40);
 
@@ -35,7 +33,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
     gate: () => Promise.resolve(0),
     guard: () => Promise.resolve(0),
     trust: () => Promise.reject(new Error("unreached")),
-    end: () => Promise.resolve(false),
+    end: () => Promise.reject(new Error("unreached")),
     start: () =>
       Promise.resolve({
         pass: {
@@ -55,23 +53,24 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
   assertStringIncludes(said.join("\n"), "no checkout verdict");
 });
 
-Deno.test("end removes the kept export by its id, and refuses a link at that name", async () => {
-  const cache = await Deno.makeTempDir({ prefix: "review-end-" });
-  try {
-    await Deno.mkdir(join(cache, SHA, "seats"), { recursive: true });
-    assertEquals(await removeKeptExport(cache, SHA), true);
-    assertEquals(await exists(join(cache, SHA)), false);
-    assertEquals(await removeKeptExport(cache, SHA), false);
-    if (Deno.build.os !== "windows") {
-      await Deno.mkdir(join(cache, "elsewhere"));
-      await Deno.symlink(join(cache, "elsewhere"), join(cache, SHA));
-      const err = await removeKeptExport(cache, SHA).catch((e: Error) => e.message);
-      assertStringIncludes(String(err), "a link is not followed");
-      assertEquals(await exists(join(cache, "elsewhere")), true);
-    }
-  } finally {
-    await Deno.remove(cache, { recursive: true });
-  }
+Deno.test("end says whether it removed an export, and fails when the copy changed", async () => {
+  const said: string[] = [];
+  const run = (closed: CloseOutcome) =>
+    runReview({ kind: "review", sub: "end", sha: SHA }, {
+      out: (s) => said.push(`out ${s}`),
+      err: (s) => said.push(`err ${s}`),
+      gate: () => Promise.reject(new Error("unreached")),
+      guard: () => Promise.reject(new Error("unreached")),
+      trust: () => Promise.reject(new Error("unreached")),
+      end: () => Promise.resolve(closed),
+      start: () => Promise.reject(new Error("unreached")),
+    });
+  assertEquals(await run({ kind: "removed" }), 0);
+  assertEquals(await run({ kind: "none" }), 0);
+  assertEquals(await run({ kind: "changed", why: "seats/a differs from the commit" }), 1);
+  assertEquals(said.slice(0, 2), [`out REMOVED ${SHA}`, `out NONE ${SHA}`]);
+  assertStringIncludes(said[2], CHANGED_COPY);
+  assertStringIncludes(said[2], "seats/a differs from the commit");
 });
 
 Deno.test("guard and gate each run their own hook's check, and answer with its exit", async () => {
