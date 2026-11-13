@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import {
   type HostFolders,
   type SandboxHost,
@@ -68,20 +68,26 @@ async function real(path: string, missing: string): Promise<string> {
 }
 
 /**
- * Removes the scratch folder. A run may leave a folder it closed to writes, which stops a plain
- * removal; every folder is opened to its owner again, and the removal retried once.
+ * Removes the scratch folder. It is first moved into a new private folder beside it, so its path no
+ * longer matches the run's write rule and nothing the run left behind can still change it. A run may
+ * leave a folder it closed to writes, which stops a plain removal; every real folder is then opened
+ * to its owner again, a link never followed, and the removal retried once.
  */
 async function removeAll(path: string): Promise<void> {
+  const holder = await Deno.makeTempDir({ dir: dirname(path), prefix: "specnaut-sandbox-done-" });
+  await Deno.rename(path, join(holder, "scratch"));
   try {
-    await Deno.remove(path, { recursive: true });
+    await Deno.remove(holder, { recursive: true });
   } catch (err) {
     if (!(err instanceof Deno.errors.PermissionDenied)) throw err;
-    await reopen(path);
-    await Deno.remove(path, { recursive: true });
+    await reopen(holder);
+    await Deno.remove(holder, { recursive: true });
   }
 }
 
-async function reopen(dir: string): Promise<void> {
+/** Opens `dir` and every real folder under it to its owner; a link is left as it is. */
+export async function reopen(dir: string): Promise<void> {
+  if (!(await Deno.lstat(dir)).isDirectory) return;
   await Deno.chmod(dir, 0o700);
   for await (const entry of Deno.readDir(dir)) {
     if (entry.isDirectory) await reopen(join(dir, entry.name));
