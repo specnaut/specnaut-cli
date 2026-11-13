@@ -21,6 +21,13 @@ import { UntrustedGit } from "./untrusted_git.ts";
  *
  * `.claude/hooks/review-lock.sh` reads the same paths before it starts the binary, and lets a call
  * through only when this class would say no lock holds; a change here is a change there.
+ *
+ * Entries are never pruned, the per-user copies included, though a session past Claude Code's
+ * default thirty days (`RECORD_RETENTION_DAYS`) can no longer be resumed. Kept, they cost one small
+ * file per review: the hook and `held` look up a session's own file by name and never list the
+ * per-user folder, and nothing reads it whole. Pruned by age, they would unlock a session still
+ * alive: `cleanupPeriodDays` is the user's to raise, a lock's age says nothing of its session's
+ * last use, and a lost copy is the one that holds when git cannot find the checkout.
  */
 export class FsReviewLock implements ReviewLock {
   private constructor(
