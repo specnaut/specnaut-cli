@@ -145,3 +145,22 @@ Deno.test("merge settles a link the branch wrote only for the id the run was giv
   assertStringIncludes(m, "the id the chain started with, or the one `/task merge <id>` names");
   assertStringIncludes(m, "With no such id, or any other `linked-issue` line, it settles nothing");
 });
+
+Deno.test("an untrusted instructions line makes merge step 0 manual, shows the diff, asks once", () => {
+  const m = flat(read("phases/merge.md"));
+  const rule = m.slice(
+    m.indexOf("An `instructions` line other than `VERDICT instructions trusted`"),
+  );
+  assert(rule.length < m.length, "merge.md step 0 has no rule for the instructions line");
+  const said = rule.slice(0, rule.indexOf(" read.") + 6);
+  assertStringIncludes(said, "this run's merge mode is `manual`");
+  assertStringIncludes(said, "`git diff <BASE_TIP> -- <path>`");
+  assertStringIncludes(said, "ask once");
+  assertStringIncludes(said, "The session read `AGENTS.md` before this step ran");
+  assert(m.indexOf(rule) < m.indexOf("1. **Shape the history.**"), "the rule is not in step 0");
+  assertStringIncludes(flat(gate()), "| `instructions` |");
+  assertStringIncludes(
+    flat(read("phases/auto-chain.md")),
+    "an `instructions` line other than `VERDICT instructions trusted`",
+  );
+});

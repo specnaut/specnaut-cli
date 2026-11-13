@@ -1697,6 +1697,13 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    rebase this phase runs that changes \`.specnaut/workflow.yml\` (\`git diff --quiet ORIG_HEAD HEAD
    -- .specnaut/workflow.yml\` exits non-zero) re-reads the mode after this step, as
    \`phases/auto-chain.md\` reads it (its one reader), and a \`manual\` answer is that question.
+   An \`instructions\` line other than \`VERDICT instructions trusted\`, on the last run, and not \`behind
+   base: rebase\` (rebased as above), names an instruction file this session follows that the branch
+   changed: this run's merge mode is \`manual\`. Show the diff of each named path (\`git diff
+   <BASE_TIP> -- <path>\`; a file the base lacks, in full) and ask once, as the one question before
+   step 3: *"This branch changes the instructions this session follows. Yes lands them."* A no
+   stops on the branch; a later run naming another path asks again. The session read \`AGENTS.md\`
+   before this step ran: this stop is the control, not undoing that read.
    Every other config line acts where its input is read, per \`phases/script-gate.md\` § The config
    verdicts.
    Each run's \`NAMES_FILE\` is removed (\`rm -f\`) once the next run prints its own, and the last
@@ -3685,7 +3692,9 @@ plan → implement → review → merge → push
    asked twice; anything else stops. A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\` means \`manual\`
    and the script below does not run; so it is, and the script does not run, unless the gate
    printed both \`VERDICT workflow trusted\` and \`VERDICT backlog-config trusted\`
-   (\`phases/script-gate.md\`): a missing line is an untrusted one. A dirty tree (\`git -c core.fsmonitor=false status
+   (\`phases/script-gate.md\`): a missing line is an untrusted one. So it is, too, for an
+   \`instructions\` line other than \`VERDICT instructions trusted\`, but \`behind base: rebase\`: step 0
+   asks its one question. A dirty tree (\`git -c core.fsmonitor=false status
    --porcelain\` prints a line) is never \`auto\`: say so. Otherwise:
 
    \`\`\`
@@ -3891,6 +3900,7 @@ none, means the tree's value is never read, and the row below applies:
 | \`backlog-config\` | every backlog script, and remote mode: \`backlog.md\`, \`groom.md\`, \`resume.md\`, \`phases/auto-chain.md\`, \`phases/merge.md\` step 5 | no backlog script runs: stop and say so (at merge the landing stands); the mode is \`manual\`; remote mode is on if either copy turns it on, and then nothing lands (\`phases/auto-chain.md\`) |
 | \`linked-issue\` | \`.specnaut/feature.json\`'s link: \`resume.md\`, \`phases/plan-reentry.md\`, \`phases/merge.md\` step 5 (whose item \`phases/merge-close.md\` takes) | the link is not read; \`phases/merge.md\` step 5 names its one exception |
 | \`gates\` | \`run-gate.sh\`: \`phases/merge.md\` **The full tier**, \`phases/review-seats.md\`, \`phases/quality-gates.md\` | \`merge\` asks; the review's fast tier is skipped |
+| \`instructions\` | the session itself: \`AGENTS.md\`, \`CLAUDE.md\`, \`.claude/CLAUDE.md\` every turn, \`docs/constitution.md\` and a phase's project additions as it runs | the read already happened: \`phases/merge.md\` step 0 makes the mode \`manual\` and asks; one line per path |
 
 \`backlog-config\` judges every line of \`.specnaut/backlog-config.yml\` but the columns grooming
 writes (\`intake_column\`, \`ready_column\`), each held to the one quoted value grooming writes: the

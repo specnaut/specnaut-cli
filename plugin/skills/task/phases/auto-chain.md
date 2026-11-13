@@ -23,7 +23,9 @@ plan → implement → review → merge → push
    asked twice; anything else stops. A `NAMES_FILE` listing `.specnaut/workflow.yml` means `manual`
    and the script below does not run; so it is, and the script does not run, unless the gate
    printed both `VERDICT workflow trusted` and `VERDICT backlog-config trusted`
-   (`phases/script-gate.md`): a missing line is an untrusted one. A dirty tree (`git -c core.fsmonitor=false status
+   (`phases/script-gate.md`): a missing line is an untrusted one. So it is, too, for an
+   `instructions` line other than `VERDICT instructions trusted`, but `behind base: rebase`: step 0
+   asks its one question. A dirty tree (`git -c core.fsmonitor=false status
    --porcelain` prints a line) is never `auto`: say so. Otherwise:
 
    ```

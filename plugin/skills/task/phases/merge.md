@@ -68,6 +68,13 @@ under `--no-close`, once more after the push: there the item's line must read `O
    rebase this phase runs that changes `.specnaut/workflow.yml` (`git diff --quiet ORIG_HEAD HEAD
    -- .specnaut/workflow.yml` exits non-zero) re-reads the mode after this step, as
    `phases/auto-chain.md` reads it (its one reader), and a `manual` answer is that question.
+   An `instructions` line other than `VERDICT instructions trusted`, on the last run, and not `behind
+   base: rebase` (rebased as above), names an instruction file this session follows that the branch
+   changed: this run's merge mode is `manual`. Show the diff of each named path (`git diff
+   <BASE_TIP> -- <path>`; a file the base lacks, in full) and ask once, as the one question before
+   step 3: *"This branch changes the instructions this session follows. Yes lands them."* A no
+   stops on the branch; a later run naming another path asks again. The session read `AGENTS.md`
+   before this step ran: this stop is the control, not undoing that read.
    Every other config line acts where its input is read, per `phases/script-gate.md` § The config
    verdicts.
    Each run's `NAMES_FILE` is removed (`rm -f`) once the next run prints its own, and the last
