@@ -87,7 +87,7 @@ read_refs() {
 read_base_flag() {
   local commit
   [ -n "$BASE_ARG" ] || { widen "base-empty"; return 0; }
-  if commit="$(gate_git rev-parse --verify --quiet --end-of-options "$BASE_ARG^{commit}" 2>/dev/null)"; then
+  if commit="$(gate_candidate_base_commit "$BASE_ARG")"; then
     add_base "$commit"
   else
     widen "base-unresolved: $BASE_ARG"

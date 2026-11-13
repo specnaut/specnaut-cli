@@ -17672,12 +17672,14 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
 # outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="\$1" line own
+  local file="\$1" line own count
   shift
   [ -e "\$file" ] || [ -L "\$file" ] || return 0
   [ -f "\$file" ] && [ ! -L "\$file" ] || return 1
   # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  [ "\$(LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c | tr -d ' ')" = 0 ] || return 1
+  # A tr that fails prints nothing, which would count as none: its failure refuses.
+  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c)" || return 1
+  [ "\${count//[!0-9]/}" = 0 ] || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in
@@ -30177,7 +30179,7 @@ read_refs() {
 read_base_flag() {
   local commit
   [ -n "\$BASE_ARG" ] || { widen "base-empty"; return 0; }
-  if commit="\$(gate_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)"; then
+  if commit="\$(gate_candidate_base_commit "\$BASE_ARG")"; then
     add_base "\$commit"
   else
     widen "base-unresolved: \$BASE_ARG"
@@ -30466,6 +30468,13 @@ gate_candidate_check_head() {
   [ "\$head" = "\$1" ] || { echo "tree-moved: \$EXPLICIT_HEAD holds \$head"; return 1; }
 }
 
+# gate_candidate_base_commit <rev> - <rev> as a commit id, from this repository's own objects:
+# a base is where the branch will land, so the objects folder a head was read from, which
+# holds the branch's commits, never supplies one.
+gate_candidate_base_commit() {
+  EXPLICIT_OBJECTS="" gate_git rev-parse --verify --quiet --end-of-options "\$1^{commit}" 2>/dev/null
+}
+
 # gate_candidate_merge_base <name> - the merge-base of HEAD, or the head, and the default branch <name>,
 # from the remote's copy when there is one, as that is where the branch will land.
 gate_candidate_merge_base() {
@@ -30529,7 +30538,7 @@ gate_candidate_read_refs() {
       echo "local \$local_sha"
       if [[ \$remote_sha =~ ^0+\$ ]]; then
         echo "zero \$remote_ref"
-      elif commit="\$(gate_git rev-parse --verify --quiet "\$remote_sha^{commit}" 2>/dev/null)"; then
+      elif commit="\$(gate_candidate_base_commit "\$remote_sha")"; then
         echo "base \$commit"
       else
         echo "unfetched \$remote_sha"
@@ -33964,12 +33973,14 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
 # outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="\$1" line own
+  local file="\$1" line own count
   shift
   [ -e "\$file" ] || [ -L "\$file" ] || return 0
   [ -f "\$file" ] && [ ! -L "\$file" ] || return 1
   # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  [ "\$(LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c | tr -d ' ')" = 0 ] || return 1
+  # A tr that fails prints nothing, which would count as none: its failure refuses.
+  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c)" || return 1
+  [ "\${count//[!0-9]/}" = 0 ] || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in

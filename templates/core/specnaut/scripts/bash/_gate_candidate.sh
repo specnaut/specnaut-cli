@@ -79,6 +79,13 @@ gate_candidate_check_head() {
   [ "$head" = "$1" ] || { echo "tree-moved: $EXPLICIT_HEAD holds $head"; return 1; }
 }
 
+# gate_candidate_base_commit <rev> - <rev> as a commit id, from this repository's own objects:
+# a base is where the branch will land, so the objects folder a head was read from, which
+# holds the branch's commits, never supplies one.
+gate_candidate_base_commit() {
+  EXPLICIT_OBJECTS="" gate_git rev-parse --verify --quiet --end-of-options "$1^{commit}" 2>/dev/null
+}
+
 # gate_candidate_merge_base <name> - the merge-base of HEAD, or the head, and the default branch <name>,
 # from the remote's copy when there is one, as that is where the branch will land.
 gate_candidate_merge_base() {
@@ -142,7 +149,7 @@ gate_candidate_read_refs() {
       echo "local $local_sha"
       if [[ $remote_sha =~ ^0+$ ]]; then
         echo "zero $remote_ref"
-      elif commit="$(gate_git rev-parse --verify --quiet "$remote_sha^{commit}" 2>/dev/null)"; then
+      elif commit="$(gate_candidate_base_commit "$remote_sha")"; then
         echo "base $commit"
       else
         echo "unfetched $remote_sha"

@@ -147,12 +147,14 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a `.` or `..` component, a drive letter
 # outside MSYS, a leading `/` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="$1" line own
+  local file="$1" line own count
   shift
   [ -e "$file" ] || [ -L "$file" ] || return 0
   [ -f "$file" ] && [ ! -L "$file" ] || return 1
   # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  [ "$(LC_ALL=C tr -dc '\000-\011\013-\037\177' <"$file" | wc -c | tr -d ' ')" = 0 ] || return 1
+  # A tr that fails prints nothing, which would count as none: its failure refuses.
+  count="$(set -o pipefail && LC_ALL=C tr -dc '\000-\011\013-\037\177' <"$file" | wc -c)" || return 1
+  [ "${count//[!0-9]/}" = 0 ] || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"$file" && [ "$(cat -- "$file")" = "$line" ] || return 1
   case "$line" in
