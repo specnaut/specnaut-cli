@@ -49,11 +49,23 @@ export function terminalJson(value: unknown): string {
 }
 
 /**
+ * A run of backslashes a reader could take for the start of an escape: one right before a `u`, or
+ * before a code point that is about to be shown as `\uXXXX`.
+ */
+const ESCAPE_LIKE = new RegExp(`\\\\+(?=u|[${UNSAFE_CLASS}])`, "gu");
+
+/**
  * One line of human-readable text: every unsafe code point shown as an escape, and a backslash
- * doubled so that a name which already reads `\u001b` cannot pass for an escaped one.
+ * doubled only where it stands before one, or before a `u`, so that a name which already reads
+ * `\u001b` cannot pass for an escaped one. Read back, a run of backslashes before a `u` is literal
+ * when even and starts an escape when odd; any other backslash is literal.
+ *
+ * Doubled only there, not everywhere (cli#785): a path is what a refusal asks the user to act on,
+ * and a Windows path shown as `C:\\Users\\…` is not the one they would type. Where a folder name
+ * starts with a `u`, its separator is still doubled, which Windows reads as the same path.
  */
 export function terminalText(value: string): string {
-  return value.replaceAll("\\", "\\\\").replace(UNSAFE, textEscaped);
+  return value.replace(ESCAPE_LIKE, (run) => run + run).replace(UNSAFE, textEscaped);
 }
 
 /**
