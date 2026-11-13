@@ -17,15 +17,20 @@ export type Forge = {
   readonly close: () => Promise<void>;
 };
 
-/** Each line on its input asks for `settled`, printed once the queue is drained; EOF ends it. */
+/**
+ * Each line on its input asks for `settled`, printed once the queue is drained; EOF ends it.
+ * A wait cut short (a signal, as when a test holds it still) returns nothing and is waited again.
+ */
 const LISTEN = "use IO::Socket::INET; use IO::Select; $| = 1; " +
-  "my $l = IO::Socket::INET->new(Listen => 5, " +
+  "my $l = IO::Socket::INET->new(Listen => SOMAXCONN, " +
   'LocalAddr => "127.0.0.1", ReuseAddr => 1) or die "listen: $!"; $l->blocking(0); ' +
   'print $l->sockport, "\\n"; my $s = IO::Select->new($l, \\*STDIN); ' +
-  "while (my @r = $s->can_read) { " +
+  "while (1) { my @r = $s->can_read; " +
   'while (my $c = $l->accept) { print "accepted\\n"; close $c } ' +
   "next unless grep { $_ != $l } @r; " +
   'sysread(STDIN, my $q, 4096) or exit; print "settled\\n" for $q =~ /\\n/g }';
+
+const QUESTION = new TextEncoder().encode("settled?\n");
 
 const LISTENER: Deno.CommandOptions = {
   args: ["-e", LISTEN],
@@ -61,9 +66,9 @@ function counted(child: Deno.ChildProcess, port: string, lines: AsyncGenerator<s
   return {
     address: `127.0.0.1:${port}`,
     settled: async () => {
-      const answer = answers.next();
-      await ask.write(new TextEncoder().encode("settled?\n"));
-      return await answer;
+      // Both settle together, so a failed write never leaves the answer's rejection unheard.
+      const [count] = await Promise.all([answers.next(), ask.write(QUESTION)]);
+      return count;
     },
     pid: child.pid,
     close: async () => {

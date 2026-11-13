@@ -27,13 +27,16 @@ Deno.test({
       await connect(forge.address, 2);
       assertEquals(await forge.settled(), 2);
       // Held still, the stand-in accepts nothing: the connections wait in its queue, unprinted.
+      // Asked while still held, the answer cannot come before it has drained its queue.
       Deno.kill(forge.pid, "SIGSTOP");
+      let pending: Promise<number>;
       try {
         await connect(forge.address, 3);
+        pending = forge.settled();
       } finally {
         Deno.kill(forge.pid, "SIGCONT");
       }
-      assertEquals(await forge.settled(), 5);
+      assertEquals(await pending, 5);
     } finally {
       await forge.close();
     }
