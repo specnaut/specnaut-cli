@@ -28,7 +28,8 @@ On exit 0 the lines are `HEAD <sha>`, `SEATS <dir>` (the reviewers' read-only co
 (the copy only a sandbox runs), `OBJECTS <dir>`, `LOGS <dir>` (the one folder a sandboxed run logs
 to) and one `LISTED <kind> <blob sha> <path>` per entry the export lists and never writes:
 instruction files, links, submodules. Keep `$HEAD`, `$OBJECTS` and `$LOGS` exactly as printed: every
-script below takes that `--objects` folder and no other.
+script below takes that `--objects` folder and no other. That is a rule you follow: the lock pins a
+script's `--head` and `--evidence`, never its `--objects`.
 
 ## The review lock
 
@@ -79,9 +80,9 @@ bash .specnaut/scripts/bash/run-gate.sh <fast|full> --base "$BASE_TIP" --head "$
 ```
 
 Under the lock `sandbox exec` takes exactly that shape: the start's `$HEAD`, a `--log` file
-inside `$LOGS`, then `--`. Any other commit, a log anywhere else, or a `--toolchain` is refused, by
-the hook and by `sandbox exec` itself, so a command whose tools are not on the sandbox's PATH is NOT
-RUN.
+inside `$LOGS`, then `--`. The hook refuses any other commit, a log anywhere else and a
+`--toolchain`; the hook alone pins the commit, while `sandbox exec` itself judges only the `--log`
+and the `--toolchain`. A command whose tools are not on the sandbox's PATH is NOT RUN.
 
 `run-gate.sh` runs only under `VERDICT gates trusted`, else the tiers are NOT RUN: <the line>. It
 reads this checkout's `gates.yml`, runs each command through `specnaut sandbox exec`

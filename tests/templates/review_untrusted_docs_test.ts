@@ -40,7 +40,11 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   assertStringIncludes(doc, "the configured tiers and the auto-detected table alike");
   assertStringIncludes(doc, 'specnaut sandbox exec "$HEAD" --log "$LOGS/<n>.log" -- <command>');
   assertStringIncludes(doc, "Under the lock `sandbox exec` takes exactly that shape:");
-  assertStringIncludes(doc, "a `--toolchain` is refused, by the hook and by `sandbox exec` itself");
+  assertStringIncludes(doc, "the hook alone pins the commit, while `sandbox exec` itself judges");
+  assertStringIncludes(
+    doc,
+    "the lock pins a script's `--head` and `--evidence`, never its `--objects`",
+  );
   assertStringIncludes(doc, "`LOGS <dir>` (the one folder a sandboxed run logs to)");
   assert(!doc.includes("mktemp"), "the lock refuses mktemp: the start makes the logs folder");
   assertStringIncludes(doc, "run-gate.sh <fast|full> --base");
