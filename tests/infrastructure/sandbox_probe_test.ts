@@ -135,7 +135,12 @@ Deno.test("probe: a user scope with pids, memory and cpu delegated is bubblewrap
   });
   assertEquals((await delegated.prober.probe()).bwrapScope, true);
   const trial = delegated.calls.find((c) => c.cmd === "systemd-run");
-  assertEquals(trial?.args.slice(0, 5), ["--user", "--scope", "--quiet", "--collect", "/bin/sh"]);
+  assertEquals(trial?.args.slice(0, 4), ["--user", "--scope", "--quiet", "--collect"]);
+  // systemd enables a controller in a scope only when the scope sets a limit through it, as a
+  // real run does: a trial scope without them would never see cpu.
+  const props = trial!.args.filter((_, i, a) => a[i - 1] === "-p").map((p) => p.split("=")[0]);
+  assertEquals(props.sort(), ["CPUQuota", "MemoryMax", "TasksMax"]);
+  assertEquals(trial!.args.at(-3), "/bin/sh");
   const partial = prober("linux", { ...USABLE_BWRAP, "systemd-run --user": ok("cpu memory\n") });
   assertEquals((await partial.prober.probe()).bwrapScope, false);
   const refused = { code: 1, stdout: "", stderr: "Failed to connect to bus" };
