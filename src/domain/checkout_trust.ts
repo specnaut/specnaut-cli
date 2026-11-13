@@ -8,7 +8,7 @@ import {
   type Untrusted,
 } from "./script_trust.ts";
 import { sameBytes } from "./bytes.ts";
-import { inCheckoutScope } from "./checkout_scope.ts";
+import { inCheckoutScope, inDeepRoot } from "./checkout_scope.ts";
 import { LINK_REASON, type LinkEnd, linkReason } from "./checkout_link.ts";
 
 /**
@@ -131,11 +131,13 @@ export const holdsBytes: HoldsTip = (file, base) => {
 /**
  * Rule 3: each walk that stopped, each tree entry the tip does not match, each tip entry the tree
  * lacks. `holds` compares a file with the tip: by its bytes, or by the digest a record holds.
+ * `deep` says which folders the caller compares whole, for a link to lead into.
  */
 export function configReasons(
   tree: readonly Walk<CheckoutEntry | RecordedEntry>[],
   tipEntries: readonly BaseEntry[],
   holds: HoldsTip,
+  deep: (path: string) => boolean = inDeepRoot,
 ): Untrusted[] {
   const out: Untrusted[] = [];
   const entries: (CheckoutEntry | RecordedEntry)[] = [];
@@ -147,7 +149,7 @@ export function configReasons(
   const atTip = new Map(tip.map((e) => [e.path, e]));
   const ids = new Set(entries.flatMap((e) => e.kind === "file" && e.id ? [e.id] : []));
   for (const entry of entries) {
-    const reason = entryReason(entry, atTip, ids, holds);
+    const reason = entryReason(entry, atTip, ids, holds, deep);
     if (reason !== null) out.push({ path: entry.path, reason });
   }
   const inTree = new Set(entries.map((e) => e.path));
@@ -163,6 +165,7 @@ function entryReason(
   atTip: ReadonlyMap<string, BaseEntry>,
   ids: ReadonlySet<string>,
   holds: HoldsTip,
+  deep: (path: string) => boolean,
 ): string | null {
   if (entry.kind === "other") return REASON.notRegular;
   if (entry.kind === "unreadable") return `unreadable: ${entry.why}`;
@@ -170,7 +173,7 @@ function entryReason(
   if (base === undefined) {
     return hasCaseTwin(entry.path, atTip) ? REASON.caseDiffers : REASON.notOnBase;
   }
-  if (entry.kind === "link") return linkReason(entry, base, ids);
+  if (entry.kind === "link") return linkReason(entry, base, ids, deep);
   if (entry.links > 1) return REASON.hardLinked;
   return holds(entry, base) ? null : REASON.differs;
 }

@@ -27,13 +27,15 @@ export const LINK_REASON = {
 /**
  * A link holds only as the tip's own link, written with forward slashes and no drive, and only when
  * it leads, on disk, to a file this check compared (the same `dev:ino`) or into a root it walks
- * whole. A link into the project's other files, a subfolder no root walks, or out of the project
- * leads where the check cannot vouch for.
+ * whole (`deep`: by default `CHECKOUT_SCOPE`'s, a narrower check passes its own). A link into the
+ * project's other files, a subfolder no root walks, or out of the project leads where the check
+ * cannot vouch for.
  */
 export function linkReason(
   entry: Extract<CheckoutEntry, { kind: "link" }>,
   base: BaseEntry,
   ids: ReadonlySet<string>,
+  deep: (path: string) => boolean = inDeepRoot,
 ): string | null {
   if (base.kind !== "link" || entry.target === undefined || entry.target !== base.target) {
     return REASON.differs;
@@ -43,5 +45,5 @@ export function linkReason(
   if (end === undefined || end.kind === "outside") return LINK_REASON.linkLeaves;
   if (end.kind === "unresolved") return `${LINK_REASON.linkUnresolved}: ${end.why}`;
   if (end.id !== null && ids.has(end.id)) return null;
-  return inDeepRoot(end.path) ? null : LINK_REASON.linkLeaves;
+  return deep(end.path) ? null : LINK_REASON.linkLeaves;
 }

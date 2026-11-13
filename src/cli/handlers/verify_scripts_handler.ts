@@ -78,7 +78,7 @@ export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()):
     const { git, walker, config } = await deps.open(deps.cwd);
     const outcome = await verifyScripts({ git, walker, core: CORE_BUNDLE, findHarness });
     const base = outcome.kind === "judged"
-      ? { tip: outcome.baseTip, mergeBase: outcome.base }
+      ? { tip: outcome.baseTip, mergeBase: outcome.base, head: outcome.head }
       : null;
     const verdicts = base === null ? [] : [
       ...await verifyConfig({ git, tree: config }, base),
@@ -119,7 +119,7 @@ async function answer(
 
 function configLine(v: ConfigVerdict): string {
   if (v.trusted) return `VERDICT ${v.class} trusted`;
-  return `VERDICT ${v.class} untrusted ${v.path} ${terminalText(v.reason)}`;
+  return `VERDICT ${v.class} untrusted ${terminalText(v.path)} ${terminalText(v.reason)}`;
 }
 
 function refuse(deps: VerifyScriptsDeps, code: number, why: string): number {

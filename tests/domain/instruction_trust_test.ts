@@ -2,10 +2,14 @@ import { assert, assertEquals } from "@std/assert";
 import { inCheckoutScope, inScopeRoot } from "../../src/domain/checkout_scope.ts";
 import type { CheckoutEntry, CheckoutWalk } from "../../src/domain/checkout_trust.ts";
 import {
+  COMMITTED_INSTRUCTIONS,
+  type CommittedInstruction,
   INSTRUCTION_CLASS,
   INSTRUCTION_SCOPE,
   judgeInstructions,
 } from "../../src/domain/instruction_trust.ts";
+import { LINK_REASON } from "../../src/domain/checkout_link.ts";
+import type { ConfigFile } from "../../src/domain/config_trust.ts";
 import { type BaseEntry, REASON } from "../../src/domain/script_trust.ts";
 
 /**
@@ -25,8 +29,13 @@ const file = (path: string, bytes = RULES, links = 1): CheckoutEntry => ({
 const blob = (path: string, bytes = RULES): BaseEntry => ({ kind: "blob", path, bytes });
 const walked = (...entries: CheckoutEntry[]): CheckoutWalk[] => [{ kind: "walked", entries }];
 
-function judge(tree: CheckoutWalk[], tip: BaseEntry[], mergeBase: BaseEntry[] = tip) {
-  return judgeInstructions({ tree, tip, mergeBase }).map((v) =>
+function judge(
+  tree: CheckoutWalk[],
+  tip: BaseEntry[],
+  mergeBase: BaseEntry[] = tip,
+  committed: CommittedInstruction[] = [],
+) {
+  return judgeInstructions({ tree, tip, mergeBase, committed }).map((v) =>
     v.trusted ? "trusted" : `${v.path} ${v.reason}`
   );
 }
@@ -120,4 +129,53 @@ Deno.test("an addendum the branch deleted is missing", () => {
 Deno.test("a copy that differs only in line endings says so", () => {
   const tree = walked(file("AGENTS.md", enc("# Rules\r\n\r\nRun every gate.\r\n")));
   assertEquals(judge(tree, [blob("AGENTS.md")]), [`AGENTS.md ${REASON.lineEndings}`]);
+});
+
+Deno.test("a file the tip lacks whose bytes are the merge base's is behind: the base removed it", () => {
+  const tree = walked(file(".specnaut/addenda/task/old.md"));
+  assertEquals(judge(tree, [], [blob(".specnaut/addenda/task/old.md")]), [
+    `.specnaut/addenda/task/old.md ${REASON.behind}`,
+  ]);
+});
+
+Deno.test("a link both sides hold into a folder this class does not compare is untrusted", () => {
+  const link: CheckoutEntry = {
+    kind: "link",
+    path: ".claude/CLAUDE.md",
+    target: "rules/main.md",
+    end: { kind: "inside", path: ".claude/rules/main.md", id: "5:5" },
+  };
+  const tip: BaseEntry[] = [{ kind: "link", path: ".claude/CLAUDE.md", target: "rules/main.md" }];
+  assertEquals(judge(walked(link), tip), [`.claude/CLAUDE.md ${LINK_REASON.linkLeaves}`]);
+});
+
+const on = (s: string) => ({ kind: "file" as const, bytes: enc(s) });
+const none = { kind: "absent" as const };
+const committed = (path: string, head: ConfigFile, tip: ConfigFile, mergeBase = tip) => [
+  { path, head, tip, mergeBase },
+];
+
+Deno.test("a committed override the tip lacks is named; one only in the work tree is not", () => {
+  for (const path of ["AGENTS.override.md", "CLAUDE.local.md"]) {
+    assertEquals(judge(walked(), [], [], committed(path, on("x"), none)), [
+      `${path} ${REASON.notOnBase}`,
+    ]);
+    assertEquals(judge(walked(), [], [], committed(path, none, none)), ["trusted"]);
+  }
+});
+
+Deno.test("a committed override that differs from the tip's is named; the same one is not", () => {
+  for (const path of ["AGENTS.override.md", "CLAUDE.local.md"]) {
+    assertEquals(judge(walked(), [], [], committed(path, on("y"), on("x"))), [
+      `${path} ${REASON.differs}`,
+    ]);
+    assertEquals(judge(walked(), [], [], committed(path, on("x"), on("x"))), ["trusted"]);
+    assertEquals(judge(walked(), [], [], committed(path, on("y"), on("x"), on("y"))), [
+      `${path} ${REASON.behind}`,
+    ]);
+  }
+});
+
+Deno.test("the committed overrides are the ones a session loads beside the instruction files", () => {
+  assertEquals(COMMITTED_INSTRUCTIONS, ["AGENTS.override.md", "CLAUDE.local.md"]);
 });

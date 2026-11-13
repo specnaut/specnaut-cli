@@ -45,6 +45,8 @@ export type VerifyOutcome = Unknown | {
   readonly base: string;
   /** The base branch's tip: what trust is measured against. */
   readonly baseTip: string;
+  /** The commit HEAD named when the base was resolved. */
+  readonly head: string;
   readonly baseBranch: string;
   /** The changed paths, relative to the project's folder. */
   readonly names: readonly string[];
@@ -77,6 +79,7 @@ function judged(base: Base, prefix: string, names: readonly string[]) {
     kind: "judged" as const,
     base: base.mergeBase,
     baseTip: base.tip,
+    head: base.head,
     baseBranch: base.branch,
     names: projectRelative(names, prefix),
     namesRelativeTo: prefix.replace(/\/$/, "") || ".",

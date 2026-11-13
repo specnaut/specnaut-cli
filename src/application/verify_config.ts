@@ -6,7 +6,11 @@ import {
   type ConfigVerdict,
   judgeConfig,
 } from "../domain/config_trust.ts";
-import { INSTRUCTION_SCOPE, judgeInstructions } from "../domain/instruction_trust.ts";
+import {
+  COMMITTED_INSTRUCTIONS,
+  INSTRUCTION_SCOPE,
+  judgeInstructions,
+} from "../domain/instruction_trust.ts";
 import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 
@@ -58,7 +62,7 @@ export async function verifyConfig(
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
-  base: ConfigBase,
+  base: ConfigBase & { readonly head: string },
 ): Promise<ConfigVerdict[]> {
   const tree: CheckoutWalk[] = [];
   const tip: BaseEntry[] = [];
@@ -68,7 +72,19 @@ export async function verifyInstructions(
     tip.push(...await deps.git.listRoot(base.tip, root));
     mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
   }
-  return judgeInstructions({ tree, tip, mergeBase });
+  const committed = [];
+  for (const path of COMMITTED_INSTRUCTIONS) {
+    const head = await deps.git.readFile(base.head, path);
+    committed.push({
+      path,
+      head: head.kind === "not_regular"
+        ? { kind: "refused", why: REASON.notRegular } as const
+        : commitFile(head),
+      tip: commitFile(await deps.git.readFile(base.tip, path)),
+      mergeBase: commitFile(await deps.git.readFile(base.mergeBase, path)),
+    });
+  }
+  return judgeInstructions({ tree, tip, mergeBase, committed });
 }
 
 /**
