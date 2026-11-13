@@ -35,8 +35,11 @@ const PERL_UNIX = 'unlink "probe.sock"; ' +
 export const PROBE_SH = `#!/bin/sh
 echo "probe started"
 PERL=/usr/bin/perl
-up_interfaces() { for i in /sys/class/net/*; do
-  read -r f 2>/dev/null < "$i/flags" && [ $((f & 1)) -eq 1 ] && printf '%s ' "\${i##*/}"; done; }
+# The interfaces that exist: /sys when the sandbox mounts it, else /proc/net/dev (bubblewrap
+# mounts /proc only); with /sys, only those that are up.
+up_interfaces() { if [ -d /sys/class/net ]; then for i in /sys/class/net/*; do
+  read -r f 2>/dev/null < "$i/flags" && [ $((f & 1)) -eq 1 ] && printf '%s ' "\${i##*/}"; done
+  else sed -n 's/^ *\\([^:]*\\):.*/\\1/p' /proc/net/dev 2>/dev/null | tr '\\n' ' '; fi; }
 folder() { if [ "$1" = TMPDIR ]; then echo "$TMPDIR"; else echo "$1"; fi; }
 # Runs the command; r is ok, or fail with its exit code and what it printed.
 try() { v=$("$@" 2>/dev/null); c=$?; if [ $c -eq 0 ]; then r=ok; else r="fail $c $v"; fi; }
