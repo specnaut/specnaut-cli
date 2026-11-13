@@ -1,7 +1,7 @@
 import { basename, dirname, isAbsolute, join } from "@std/path";
 import type { ReviewLock } from "../application/review_ports.ts";
 import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
-import { entryAt, entryNames, heldIn } from "./fs_review_lock_entries.ts";
+import { entryAt, entryIn, entryNames, heldIn } from "./fs_review_lock_entries.ts";
 import { isSessionId } from "../domain/session_record.ts";
 import { lstatOrNull, realFolder, replaceFile } from "./fs_review_pass.ts";
 import { firstLine } from "./git_text.ts";
@@ -16,7 +16,8 @@ import { UntrustedGit } from "./untrusted_git.ts";
  * them. Anything but a folder where the locks live locks every session, so a guard that cannot
  * tell fails closed. A session whose per-user entry is there while git cannot find this checkout's
  * git directory is refused outright: the lock no longer lets anything through for want of a
- * repository.
+ * repository. Each entry records the per-user folder its copy went to, and a session whose entry
+ * names another folder than the one this lock reads is refused: the hook would not find the copy.
  *
  * `.claude/hooks/review-lock.sh` reads the same paths before it starts the binary, and lets a call
  * through only when this class would say no lock holds; a change here is a change there.
@@ -41,7 +42,8 @@ export class FsReviewLock implements ReviewLock {
 
   async lock(sessionId: string): Promise<void> {
     const [dir, state] = this.#folders(sessionId);
-    const text = `${JSON.stringify({ session: sessionId, locked: this.now() })}\n`;
+    const entry = { session: sessionId, locked: this.now(), state };
+    const text = `${JSON.stringify(entry)}\n`;
     await Deno.mkdir(dirname(state), { recursive: true, mode: 0o700 });
     for (const folder of [state, dir]) {
       await realFolder(dirname(folder));
@@ -51,8 +53,10 @@ export class FsReviewLock implements ReviewLock {
   }
 
   async record(sessionId: string, review: { head: string; logs: string }): Promise<void> {
-    const text = `${JSON.stringify({ session: sessionId, locked: this.now(), ...review })}\n`;
-    for (const folder of this.#folders(sessionId)) {
+    const folders = this.#folders(sessionId);
+    const entry = { session: sessionId, locked: this.now(), state: folders[1], ...review };
+    const text = `${JSON.stringify(entry)}\n`;
+    for (const folder of folders) {
       await replaceFile(join(folder, `${sessionId}.json`), text);
     }
   }
@@ -62,7 +66,12 @@ export class FsReviewLock implements ReviewLock {
     const own = id === null || this.state === null ? null : await heldIn(this.state, id);
     if (own !== null && this.dir === null) throw new Error(NO_GIT_DIR);
     if (own !== null || this.dir === null) return own;
-    return await heldIn(this.dir, id);
+    if (id === null) return await heldIn(this.dir, null);
+    const entry = await entryIn(this.dir, id);
+    if (entry !== null && entry.state !== null && entry.state !== this.state) {
+      throw new Error(otherStateFolder(entry.state, this.state));
+    }
+    return entry?.review ?? null;
   }
 
   async all(): Promise<readonly LockedReview[]> {
@@ -84,6 +93,17 @@ export class FsReviewLock implements ReviewLock {
     }
     return [this.dir, this.state];
   }
+}
+
+/**
+ * Why a session whose entry records its per-user copy in `written` is refused by a lock reading
+ * `read`: the writer (`review start`, in the session's shell) and the hook disagree on the folder,
+ * so the hook cannot find the copy once git no longer finds this checkout.
+ */
+function otherStateFolder(written: string, read: string | null): string {
+  return `this session's review lock keeps its per-user copy in ${written}, and this hook reads ` +
+    `${read ?? "no per-user folder"}: refused until both see the same XDG_STATE_HOME and HOME; ` +
+    "start a new session once they do";
 }
 
 export type LockOptions = { readonly state?: string | null; readonly now?: () => number };
