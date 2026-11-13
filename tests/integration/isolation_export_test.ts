@@ -79,6 +79,7 @@ async function execOnWindows(w: World, head: string) {
     err: (s) => err.push(s),
     probe: () => prober.probe(),
     exec: (request) => execInSandbox(deps, request),
+    lockRefusal: () => Promise.resolve(null),
   });
   return { code, out, err, made };
 }
