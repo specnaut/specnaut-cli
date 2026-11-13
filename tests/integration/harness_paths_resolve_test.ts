@@ -39,6 +39,15 @@ const ALLOWED: Record<string, { reason: string; section?: string }> = {
     reason: "the Claude Code section of the two-harness integrations reference",
     section: "Claude Code",
   },
+  "script-gate .claude/": {
+    reason: "the instruction files the merge judges include Claude Code's `.claude/CLAUDE.md`, " +
+      "whichever harness runs the merge: a branch can change what Claude Code loads",
+    section: "The config verdicts",
+  },
+  "task-script-gate .claude/": {
+    reason: "the same gate doc, under Copilot's flattened instruction name",
+    section: "The config verdicts",
+  },
   "facts-integrations .claude/": {
     reason: "the same reference, under Copilot's flattened instruction name",
     section: "Claude Code",
