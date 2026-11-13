@@ -103,7 +103,8 @@ const RET_K = 0x06;
 const RET_KILL_PROCESS = 0x80000000;
 const RET_ERRNO = 0x00050000;
 const RET_ALLOW = 0x7fff0000;
-const EPERM = 1;
+/** The errno every refusal of both filters fails with: a tool that probes for a call carries on. */
+export const EPERM = 1;
 /**
  * `seccomp_data`: the call's number, its architecture, then (past the instruction pointer) its
  * arguments, 64 bits each, the low half first on both little-endian architectures.
