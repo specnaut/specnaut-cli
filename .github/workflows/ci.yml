@@ -226,6 +226,12 @@ jobs:
           sudo systemctl start "user@${uid}.service"
           echo "XDG_RUNTIME_DIR=/run/user/${uid}" >> "$GITHUB_ENV"
           echo "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid}/bus" >> "$GITHUB_ENV"
+      - name: What a trial user scope sees (diagnostic, never fails)
+        run: |
+          systemctl show "user@$(id -u).service" -p Delegate -p DelegateControllers || true
+          systemd-run --user --scope --quiet --collect /bin/sh -c \
+            'read -r line < /proc/self/cgroup; echo "cgroup: ${line#0::}"; cat "/sys/fs/cgroup${line#0::}/cgroup.controllers"' \
+            || echo "systemd-run exited $?"
       - name: The host offers the container and bubblewrap, bubblewrap in a scope
         run: |
           deno eval --ext=ts '
