@@ -2,12 +2,11 @@ import { assert, assertEquals } from "@std/assert";
 import { encodeHex } from "@std/encoding/hex";
 import { join } from "@std/path";
 import { type ExecDeps, execInSandbox } from "../../src/application/sandbox_exec.ts";
-import { type BranchExport, exportBranchTree } from "../../src/application/untrusted_review.ts";
+import type { BranchExport } from "../../src/application/untrusted_review.ts";
 import type { BackendProbe, SandboxedBackend } from "../../src/domain/sandbox.ts";
-import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
-import { depsOf, fetcherOf } from "../helpers/export_world.ts";
+import { exportHead, hostOf, type World } from "../helpers/export_world.ts";
 import { initRepo, tempDir } from "../helpers/git_fixture.ts";
 import {
   capture,
@@ -26,9 +25,8 @@ import { type Forge, openForge } from "./isolation_forge.ts";
  * (`export_world.ts`); the home is a folder of the test's, so no real secret is ever read.
  */
 
-export type Isolation = {
-  readonly repo: string;
-  readonly cache: string;
+/** The world the branch is exported in: its project is the repository itself. */
+export type Isolation = World & {
   readonly home: string;
   readonly nonce: string;
   /** The planted secret, in every planted file and in our environment. */
@@ -77,19 +75,18 @@ async function exported(
   await initRepo(repo);
   const planted = await plant(repo, home, secret);
   const text = { nonce: fresh("nonce"), canary: fresh("canary"), control: fresh("plain") };
-  const branch = await exportBranch(repo, cache, { ...text, linkTarget: planted.token, lookup });
+  const w = { repo, project: repo, cache };
+  const branch = await exportBranch(w, { ...text, linkTarget: planted.token, lookup });
   try {
-    await fn({ repo, cache, home, secret, planted, exported: branch, ...text });
+    await fn({ ...w, home, secret, planted, exported: branch, ...text });
   } finally {
     await branch.remove();
   }
 }
 
-/** The branch built in `repo`, exported into `cache` by the real export. */
-async function exportBranch(repo: string, cache: string, text: BranchText) {
-  const head = await probingBranch(repo, text);
-  const w = { repo, project: repo, cache };
-  return await exportBranchTree(depsOf(w, fetcherOf(w, head)), { source: "origin/topic" });
+/** The branch built in `w`'s repository, exported into its cache by the real export. */
+async function exportBranch(w: World, text: BranchText) {
+  return await exportHead(w, await probingBranch(w.repo, text));
 }
 
 async function plant(repo: string, home: string, secret: string) {
@@ -126,7 +123,7 @@ export async function sandboxed(kind: SandboxedBackend, iso: Isolation, command:
   const err = capture();
   const deps: ExecDeps = {
     prober: { probe: () => Promise.resolve(only(kind)) },
-    host: new FsSandboxHost(iso.cache, iso.home, () => Promise.resolve(iso.repo)),
+    host: hostOf(iso, iso.home),
     runnerFor: (b) => runnerFor(b, new DenoProcessLauncher(out.stream, err.stream), RUNNER_HOST),
   };
   const outcome = await execInSandbox(deps, { sha: iso.exported.sha, toolchain: [], command });

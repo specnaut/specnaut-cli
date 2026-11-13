@@ -1,14 +1,18 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { type ExecDeps, execInSandbox } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
-import { exportBranchTree } from "../../src/application/untrusted_review.ts";
 import { runSandbox } from "../../src/cli/handlers/sandbox_handler.ts";
 import type { SandboxIntent } from "../../src/cli/intent.ts";
 import { TreeRefused } from "../../src/domain/tree_plan.ts";
 import { DenoSubprocessRunner } from "../../src/infrastructure/deno_subprocess.ts";
-import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { HostBackendProber } from "../../src/infrastructure/sandbox_probe.ts";
-import { cacheEntries, depsOf, fetcherOf, withWorld, type World } from "../helpers/export_world.ts";
+import {
+  cacheEntries,
+  exportHead,
+  hostOf,
+  withWorld,
+  type World,
+} from "../helpers/export_world.ts";
 import { blob, commit, mktree, type RawEntry } from "../helpers/git_fixture.ts";
 import { TEST_SH } from "./isolation_branch.ts";
 
@@ -20,18 +24,13 @@ import { TEST_SH } from "./isolation_branch.ts";
  * live suite's control, where the same test runs on a backend (`isolation_live_test.ts`).
  */
 
-const exportOf = (w: World, head: string) =>
-  exportBranchTree(depsOf(w, fetcherOf(w, head)), { source: "origin/topic" });
-
-const hostOf = (w: World) => new FsSandboxHost(w.cache, w.project, () => Promise.resolve(w.repo));
-
 /** Windows has no sandbox, so no run there ever locates an export (`sandbox_host_test.ts`). */
 const POSIX = Deno.build.os !== "windows";
 
 /** A well-named tree exports, and its scratch copy is the one a run is given. */
 async function assertExports(w: World, id: string): Promise<void> {
   const good = await commit(w.repo, await mktree(w.repo, [["100644", "ok.txt", id]]));
-  const exported = await exportOf(w, good);
+  const exported = await exportHead(w, good);
   if (POSIX) assertEquals((await hostOf(w).locate(good)).tree, exported.scratch);
   await exported.remove();
 }
@@ -45,7 +44,7 @@ Deno.test("isolation: a git mktree tree naming .git, '..' or a control character
     const named: RawEntry[] = [["40000", ".git", dotGit], ["100644", "..", id]];
     named.push(["100644", "a\x01b", id]);
     const bad = await commit(w.repo, await mktree(w.repo, [["100644", "ok.txt", id], ...named]));
-    const err = await assertRejects(() => exportOf(w, bad), TreeRefused);
+    const err = await assertRejects(() => exportHead(w, bad), TreeRefused);
     const reasons = err.faults.map((f) => f.slice(f.lastIndexOf(": ") + 2)).sort();
     assertEquals(reasons, ["a '.' or '..' step", "a control character", "a spelling of .git"]);
     assertEquals(await cacheEntries(w), []);
@@ -88,7 +87,7 @@ Deno.test("isolation: on Windows, the branch's test is not run and the run says 
   withWorld(async (w) => {
     const test = await blob(w.repo, TEST_SH);
     const head = await commit(w.repo, await mktree(w.repo, [["100755", "test.sh", test]]));
-    const exported = await exportOf(w, head);
+    const exported = await exportHead(w, head);
     try {
       const { code, out, err, made } = await execOnWindows(w, head);
       assertEquals(code, 125);
