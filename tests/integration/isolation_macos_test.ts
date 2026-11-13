@@ -3,7 +3,13 @@ import { join } from "@std/path";
 import { ALLOWED_SERVICES, FORBIDDEN_SERVICES } from "../../src/domain/sandbox_hosts.ts";
 import { tempDir } from "../helpers/git_fixture.ts";
 import { live, NO_PERL, probed } from "../infrastructure/sandbox_live_fixture.ts";
-import { probeInside, probeOnHost, withIsolation } from "./isolation_world.ts";
+import {
+  assertRefused,
+  EPERM,
+  probeInside,
+  probeOnHost,
+  withIsolation,
+} from "./isolation_world.ts";
 
 /**
  * On macOS, `sandbox-exec` shares the host's network stack and its session's services, so each is
@@ -63,6 +69,15 @@ function launchd(verb: "list" | "remove", label: string): boolean {
   return run.outputSync().code === 0;
 }
 
+/** Whether launchd lets go of `label` within a few seconds: `remove` returns before it is gone. */
+async function removed(label: string): Promise<boolean> {
+  for (const until = Date.now() + 5_000; Date.now() < until;) {
+    if (!launchd("list", label)) return true;
+    await new Promise((ok) => setTimeout(ok, 100));
+  }
+  return false;
+}
+
 const FORBIDDEN: readonly string[] = Object.values(FORBIDDEN_SERVICES).flat();
 
 /** Every attempt, the launchd job under `label`: the same words inside and on the host. */
@@ -75,9 +90,9 @@ function attempts(label: string): string[] {
 function assertRefusedInside(inside: Map<string, string>, label: string): void {
   for (const s of FORBIDDEN) assertEquals(inside.get(`lookup ${s}`), REFUSED, s);
   for (const s of ALLOWED_SERVICES) assertEquals(inside.get(`lookup ${s}`), "ok", s);
-  assertEquals(inside.get("loopback tcp"), "fail");
-  assertEquals(inside.get("loopback unix"), "fail");
-  assertEquals(inside.get(`job ${label}`), "fail");
+  assertRefused(inside.get("loopback tcp"), "loopback tcp", [EPERM]);
+  assertRefused(inside.get("loopback unix"), "loopback unix", [EPERM]);
+  assertRefused(inside.get(`job ${label}`), "job");
   assert(!launchd("list", label), "the run submitted a launchd job");
 }
 
@@ -113,6 +128,7 @@ Deno.test({
       } finally {
         launchd("remove", label);
       }
+      assert(await removed(label), "the host control's launchd job outlived the test");
     }, lookup);
   },
 });

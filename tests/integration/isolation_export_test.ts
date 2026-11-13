@@ -14,9 +14,9 @@ import { TEST_SH } from "./isolation_branch.ts";
 
 /**
  * What stops a branch before anything of it runs, on every OS: a tree `git mktree` builds with
- * names the path validator refuses, trees that expand past the shipped caps, and a host with no
- * sandbox (Windows), where the branch's tests are reported not run. Each refusal is paired with
- * the same shape, well formed or within the caps, going through; the Windows case's pair is the
+ * names the path validator refuses, and a host with no sandbox (Windows), where the branch's tests
+ * are reported not run (the caps: `isolation_caps_test.ts`). Each refusal is paired with the same
+ * shape going through: a well-formed tree exports, and the Windows case's pair is the
  * live suite's control, where the same test runs on a backend (`isolation_live_test.ts`).
  */
 
@@ -51,47 +51,6 @@ Deno.test("isolation: a git mktree tree naming .git, '..' or a control character
     assertEquals(await cacheEntries(w), []);
     if (POSIX) await assertRejects(() => hostOf(w).locate(bad), SandboxRefused, "no export of");
   }));
-
-/** A tree of `dirs` folders, each the same folder of 1000 files: few objects, many entries. */
-async function wide(repo: string, dirs: number): Promise<string> {
-  const id = await blob(repo, "x\n");
-  const files: RawEntry[] = Array.from({ length: 1000 }, (_, i) => ["100644", `f${i}`, id]);
-  const folder = await mktree(repo, files);
-  return await mktree(repo, Array.from({ length: dirs }, (_, i) => ["40000", `d${i}`, folder]));
-}
-
-/** A tree naming one 1 MiB file `copies` times: one object, many bytes. */
-async function heavy(repo: string, copies: number): Promise<string> {
-  const id = await blob(repo, new Uint8Array(2 ** 20));
-  return await mktree(repo, Array.from({ length: copies }, (_, i) => ["100644", `f${i}`, id]));
-}
-
-/** A file under `depth` nested folders. */
-async function deep(repo: string, depth: number): Promise<string> {
-  let tree = await mktree(repo, [["100644", "leaf", await blob(repo, "x\n")]]);
-  for (let i = 0; i < depth; i++) tree = await mktree(repo, [["40000", "d", tree]]);
-  return tree;
-}
-
-/** Each bomb against the shipped caps, with the same shape within them. */
-const BOMBS = [
-  { what: "entries", build: wide, over: 101, within: 2, fault: "more than 100000 entries" },
-  { what: "bytes", build: heavy, over: 257, within: 2, fault: "more than 268435456 bytes" },
-  { what: "depth", build: deep, over: 40, within: 31, fault: "deeper than 32 folders" },
-] as const;
-
-for (const bomb of BOMBS) {
-  Deno.test(`isolation: a tree that expands past the ${bomb.what} cap exports nothing`, () =>
-    withWorld(async (w) => {
-      const within = await exportOf(w, await commit(w.repo, await bomb.build(w.repo, bomb.within)));
-      await within.remove();
-      const head = await commit(w.repo, await bomb.build(w.repo, bomb.over));
-      const err = await assertRejects(() => exportOf(w, head), TreeRefused);
-      assertEquals(err.faults.length, 1);
-      assert(err.faults[0].endsWith(bomb.fault), err.faults[0]);
-      assertEquals(await cacheEntries(w), []);
-    }));
-}
 
 /** A runner factory that records the backend it is asked for, and makes nothing. */
 function refusing(made: string[]): ExecDeps["runnerFor"] {

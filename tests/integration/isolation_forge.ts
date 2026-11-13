@@ -16,19 +16,26 @@ const LISTEN = "use IO::Socket::INET; $| = 1; my $l = IO::Socket::INET->new(List
   'LocalAddr => "127.0.0.1", ReuseAddr => 1) or die "listen: $!"; print $l->sockport, "\\n"; ' +
   'while (my $c = $l->accept) { print "accepted\\n"; close $c }';
 
+const LISTENER: Deno.CommandOptions = {
+  args: ["-e", LISTEN],
+  stdin: "null",
+  stdout: "piped",
+  stderr: "inherit",
+};
+
 export async function openForge(): Promise<Forge> {
-  const child = new Deno.Command("/usr/bin/perl", {
-    args: ["-e", LISTEN],
-    stdin: "null",
-    stdout: "piped",
-    stderr: "inherit",
-  }).spawn();
+  const child = new Deno.Command("/usr/bin/perl", LISTENER).spawn();
   const lines = linesOf(child.stdout.pipeThrough(new TextDecoderStream()));
   const first = await lines.next();
-  if (first.done || !/^\d+$/.test(first.value)) {
+  if (first.done) {
+    // It ended before listening: its exit code, and the reason it printed on our stderr, stand.
+    const { code } = await child.status;
+    throw new Error(`the forge stand-in exited ${code} before it listened`);
+  }
+  if (!/^\d+$/.test(first.value)) {
     child.kill("SIGKILL");
     await child.status;
-    throw new Error(`the forge stand-in did not listen: ${first.value}`);
+    throw new Error(`the forge stand-in printed ${JSON.stringify(first.value)}, not its port`);
   }
   return counted(child, first.value, lines);
 }

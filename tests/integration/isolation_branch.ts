@@ -5,53 +5,64 @@ import { blob, commit, mktree, type RawEntry } from "../helpers/git_fixture.ts";
  * only a real run of its tree can pass. Built with `git mktree`, as any pushed branch can be.
  *
  * `probe.sh` takes `<kind>=<target>` words and prints `probe started`, then one line per word:
- * `<kind> <target> <result>`. The same file is run inside the sandbox and, as the control, on the
- * host: a probe that cannot succeed anywhere would pass for isolation, so every kind is shown
- * succeeding where access is granted. Kinds: `read` a file, `list` a folder, `env` (the host
- * environment holds the text), `connect` to `host:port`, `rewrite`/`dotgit`/`plantlink` in a folder
- * (`TMPDIR` is the run's temp), `grep` the tree, `ifaces` the network interfaces that are up, `lookup` a macOS
- * service, `job` a launchd submission, `loopback` over `tcp` or `unix`.
+ * `<kind> <target> ok [<what it got>]`, or `<kind> <target> fail <exit code> [<reason>]`. The same
+ * file is run inside the sandbox and, as the control, on the host: a probe that cannot succeed
+ * anywhere would pass for isolation, so every kind is shown succeeding where access is granted.
+ * The code tells a refusal (a tool's own 1 or 2) from a tool the run could not start (126, 127),
+ * so every tool is called by its absolute path, one a macOS host and a merged-`/usr` Linux both
+ * have. Kinds: `read` a file, `list` a folder, `env` (the environment holds the text), `connect`
+ * to `host:port`, `rewrite`/`dotgit`/`plantlink` in a folder (`TMPDIR` is the run's temp), `grep`
+ * the tree, `ifaces` the network interfaces that are up, `lookup` a macOS service, `job` a
+ * launchd submission, `loopback` over `tcp` or `unix`. The socket kinds print the system's reason.
  */
 
 /** What only a real run of this branch's tree prints: the nonce it holds, and the run's home. */
 export const TEST_SH = `#!/bin/sh
-printf 'control ran: %s with home %s\\n' "$(cat nonce.txt)" "$HOME"
+printf 'control ran: %s with home %s\\n' "$(/bin/cat nonce.txt)" "$HOME"
 `;
 
-const PERL_CONNECT = "exit(IO::Socket::INET->new(PeerAddr => $ARGV[0], Timeout => 3) ? 0 : 1)";
+/** Perl snippets: exit 0 on success, else print the reason (`$!`) and exit 1. */
+const PERL_CONNECT =
+  'IO::Socket::INET->new(PeerAddr => $ARGV[0], Timeout => 3) or (print "$!" and exit 1)';
 const PERL_TCP =
-  'my $l = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1") or exit 1; ' +
-  'exit(IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $l->sockport) ? 0 : 1)';
-const PERL_UNIX = 'my $p = "$ENV{TMPDIR}/probe.sock"; unlink $p; ' +
-  "my $l = IO::Socket::UNIX->new(Local => $p, Listen => 1) or exit 1; " +
-  "exit(IO::Socket::UNIX->new(Peer => $p) ? 0 : 1)";
+  'my $l = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1") or (print "$!" and exit 1); ' +
+  'IO::Socket::INET->new(PeerAddr => "127.0.0.1", PeerPort => $l->sockport) or (print "$!" and exit 1)';
+/** A relative name, so the bind cannot fail for the length of the folder's path. */
+const PERL_UNIX = 'unlink "probe.sock"; ' +
+  'my $l = IO::Socket::UNIX->new(Local => "probe.sock", Listen => 1) or (print "$!" and exit 1); ' +
+  'IO::Socket::UNIX->new(Peer => "probe.sock") or (print "$!" and exit 1)';
 
 export const PROBE_SH = `#!/bin/sh
 echo "probe started"
-perl_ok() { perl -MIO::Socket::INET -MIO::Socket::UNIX -e 1 2>/dev/null; }
+PERL=/usr/bin/perl
 up_interfaces() { for i in /sys/class/net/*; do
-  f=$(cat "$i/flags" 2>/dev/null) && [ $((f & 1)) -eq 1 ] && printf '%s ' "\${i##*/}"; done; }
+  read -r f 2>/dev/null < "$i/flags" && [ $((f & 1)) -eq 1 ] && printf '%s ' "\${i##*/}"; done; }
 folder() { if [ "$1" = TMPDIR ]; then echo "$TMPDIR"; else echo "$1"; fi; }
+# Runs the command; r is ok, or fail with its exit code and what it printed.
+try() { v=$("$@" 2>/dev/null); c=$?; if [ $c -eq 0 ]; then r=ok; else r="fail $c $v"; fi; }
 for word in "$@"; do
-  kind=\${word%%=*}; target=\${word#*=}; r=fail
+  kind=\${word%%=*}; target=\${word#*=}; r=
   case $kind in
-    read) if v=$(tr -d '\\n' < "$target" 2>/dev/null); then r="ok $v"; fi ;;
-    list) ls "$target" >/dev/null 2>&1 && r=ok ;;
-    env) env | grep -q -- "$target" && r=ok ;;
-    connect) if ! perl_ok; then r=no-perl
-      elif perl -MIO::Socket::INET -e '${PERL_CONNECT}' "$target" 2>/dev/null; then r=ok; fi ;;
-    rewrite) printf 'rewritten\\n' > "$(folder "$target")/hello.txt" 2>/dev/null && r=ok ;;
-    dotgit) d=$(folder "$target")/.git
-      mkdir "$d" 2>/dev/null && printf '[core]\\n' > "$d/config" 2>/dev/null && r=ok ;;
-    plantlink) ln -s /etc/hosts "$(folder "$target")/planted-link" 2>/dev/null && r=ok ;;
-    grep) r=$(grep -rl -- "$target" . 2>/dev/null | sort | tr '\\n' ' '); r=\${r:-none} ;;
+    read) try /bin/cat -- "$target"
+      [ "$r" = ok ] && r="ok $(printf '%s' "$v" | /usr/bin/tr -d '\\n')" ;;
+    list) try /bin/ls -- "$target" ;;
+    env) try /usr/bin/env
+      [ "$r" = ok ] && { printf '%s\\n' "$v" | /usr/bin/grep -q -- "$target"; c=$?
+        [ $c -eq 0 ] || r="fail $c"; } ;;
+    connect) try $PERL -MIO::Socket::INET -e '${PERL_CONNECT}' "$target" ;;
+    rewrite) try /bin/sh -c 'printf "rewritten\\n" > "$1/hello.txt"' - "$(folder "$target")" ;;
+    dotgit) try /bin/mkdir "$(folder "$target")/.git"
+      [ "$r" = ok ] && try /bin/sh -c 'printf "[core]\\n" > "$1/.git/config"' - "$(folder "$target")" ;;
+    plantlink) try /bin/ln -s /etc/hosts "$(folder "$target")/planted-link" ;;
+    grep) v=$(/usr/bin/grep -rl -- "$target" . 2>/dev/null); c=$?
+      if [ $c -eq 0 ]; then r=$(printf '%s\\n' "$v" | /usr/bin/sort | /usr/bin/tr '\\n' ' ')
+      elif [ $c -eq 1 ]; then r=none; else r="fail $c"; fi ;;
     ifaces) r=$(up_interfaces); r=\${r:-none} ;;
     lookup) r=$(./lookup "$target" 2>/dev/null) || r="fail $?" ;;
-    job) launchctl submit -l "$target" -- /usr/bin/true 2>/dev/null &&
-      launchctl list "$target" >/dev/null 2>&1 && r=ok ;;
-    loopback) if ! perl_ok; then r=no-perl
-      elif [ "$target" = tcp ]; then perl -MIO::Socket::INET -e '${PERL_TCP}' 2>/dev/null && r=ok
-      else perl -MIO::Socket::UNIX -e '${PERL_UNIX}' 2>/dev/null && r=ok; fi ;;
+    job) try /bin/launchctl submit -l "$target" -- /usr/bin/true
+      [ "$r" = ok ] && try /bin/launchctl list "$target" ;;
+    loopback) if [ "$target" = tcp ]; then try $PERL -MIO::Socket::INET -e '${PERL_TCP}'
+      else try /bin/sh -c 'cd "$TMPDIR" && exec "$0" -MIO::Socket::UNIX -e "$1"' $PERL '${PERL_UNIX}'; fi ;;
   esac
   echo "$kind $target $r"
 done

@@ -3,6 +3,8 @@ import { join } from "@std/path";
 import type { SandboxedBackend } from "../../src/domain/sandbox.ts";
 import { live, NO_PERL, skipOf, STATUSES } from "../infrastructure/sandbox_live_fixture.ts";
 import {
+  assertRefused,
+  EPERM,
   type Isolation,
   probeInside,
   probeOnHost,
@@ -68,7 +70,7 @@ eachBackend(
     assertEquals(host.get(`read ${dotenv}`), `ok TOKEN=${iso.secret}`);
     assertEquals(host.get(`env ${iso.secret}`), "ok");
     const inside = await probeInside(kind, iso, words);
-    for (const word of words) assertEquals(inside.get(word.replace("=", " ")), "fail", word);
+    for (const word of words) assertRefused(inside.get(word.replace("=", " ")), word);
   },
 );
 
@@ -77,7 +79,9 @@ eachBackend("the forge stand-in is never reached, and only loopback exists", asy
   assertEquals((await probeOnHost(iso, [word])).get(`connect ${iso.forge.address}`), "ok");
   await iso.forge.reached(1);
   const inside = await probeInside(kind, iso, [word, "ifaces=-"]);
-  assertEquals(inside.get(`connect ${iso.forge.address}`), "fail");
+  // `sandbox-exec` refuses the connect; a namespace of its own has no listener on its loopback.
+  const reasons = kind === "seatbelt" ? [EPERM] : ["Connection refused", "Network is unreachable"];
+  assertRefused(inside.get(`connect ${iso.forge.address}`), word, reasons);
   await new Promise((ok) => setTimeout(ok, 300));
   assertEquals(iso.forge.accepted(), 1, "the forge stand-in accepted the run's connection");
   // Linux backends run in a network namespace of their own: the probe lists its one interface.
@@ -92,7 +96,7 @@ eachBackend(
     const host = await probeOnHost(iso, words);
     for (const word of words) assert(host.get(word.replace("=", " "))?.startsWith("ok"), word);
     const inside = await probeInside(kind, iso, words);
-    for (const word of words) assertEquals(inside.get(word.replace("=", " ")), "fail", word);
+    for (const word of words) assertRefused(inside.get(word.replace("=", " ")), word);
   },
 );
 
@@ -105,7 +109,7 @@ eachBackend(
     const inside = await probeInside(kind, iso, words);
     for (const k of kinds) {
       assertEquals(inside.get(`${k} TMPDIR`), "ok", `${k} fails even where writes are granted`);
-      assertEquals(inside.get(`${k} .`), "fail", `${k} reached the tree`);
+      assertRefused(inside.get(`${k} .`), `${k} in the tree`);
     }
     const after = [await snapshot(iso.exported.scratch), await snapshot(iso.exported.seats)];
     assertEquals(after, before);
@@ -120,7 +124,7 @@ eachBackend(
     assertEquals(inside.get("read hello.txt"), "ok from the branch");
     assertEquals(inside.get(`grep ${iso.control}`), "./sub/notes.md");
     assertEquals(inside.get(`grep ${iso.canary}`), "none");
-    assertEquals(inside.get("read link-to-token"), "fail");
+    assertRefused(inside.get("read link-to-token"), "read link-to-token");
     await assertListedOnly(iso);
   },
 );

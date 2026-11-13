@@ -27,7 +27,6 @@ import { type Forge, openForge } from "./isolation_forge.ts";
  */
 
 export type Isolation = {
-  readonly base: string;
   readonly repo: string;
   readonly cache: string;
   readonly home: string;
@@ -80,7 +79,7 @@ async function exported(
   const text = { nonce: fresh("nonce"), canary: fresh("canary"), control: fresh("plain") };
   const branch = await exportBranch(repo, cache, { ...text, linkTarget: planted.token, lookup });
   try {
-    await fn({ base, repo, cache, home, secret, planted, exported: branch, ...text });
+    await fn({ repo, cache, home, secret, planted, exported: branch, ...text });
   } finally {
     await branch.remove();
   }
@@ -146,6 +145,19 @@ export function results(out: string): Map<string, string> {
     found.set(`${kind} ${target}`, rest.join(" ").trim());
   }
   return found;
+}
+
+/** The reason the system gives a call the sandbox refuses. */
+export const EPERM = "Operation not permitted";
+
+/**
+ * `result` is a refusal: the tool ran and failed with its own code (1 or 2), never a tool the run
+ * could not start (126, 127), which would pass for isolation; with `reasons`, it said one of them.
+ */
+export function assertRefused(result: string | undefined, what: string, reasons?: string[]) {
+  const [, code, reason] = result?.match(/^fail (\d+) ?(.*)$/) ?? [];
+  assert(code === "1" || code === "2", `${what}: not a refusal: ${result}`);
+  if (reasons) assert(reasons.includes(reason), `${what}: refused for another reason: ${reason}`);
 }
 
 /** The probe run inside the sandbox on `kind`. */
