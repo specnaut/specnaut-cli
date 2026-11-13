@@ -38474,12 +38474,15 @@ git_dir=\$(cd "\$dir" && env -i "\${vars[@]}" git rev-parse --absolute-git-dir 2
     refuse "this session is under the review lock, and git cannot find this checkout's git directory"
   exit 0
 }
+# The checkout's lock, or the session's own entry in it, lets the call run
+# only when \`absent\` proves it is not there; what the hook cannot look into
+# goes to the binary.
 if [ "\$mine" = 0 ]; then
   locks="\$git_dir/specnaut/review-lock"
-  [ -e "\$locks" ] || [ -L "\$locks" ] || exit 0
+  [ -e "\$locks" ] || [ -L "\$locks" ] || ! absent "\$locks" || exit 0
   if [ -d "\$locks" ] && [ ! -L "\$locks" ] && [ -n "\$id" ]; then
     own="\$locks/\$id.json"
-    [ -e "\$own" ] || [ -L "\$own" ] || exit 0
+    [ -e "\$own" ] || [ -L "\$own" ] || ! absent "\$own" || exit 0
   fi
 fi
 command -v specnaut >/dev/null 2>&1 ||

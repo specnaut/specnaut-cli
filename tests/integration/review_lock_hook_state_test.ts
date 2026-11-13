@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import { FsReviewLock } from "../../src/infrastructure/fs_review_lock.ts";
 import { inProject, input, runHook } from "./review_lock_hook_fixture.ts";
 
@@ -17,10 +17,15 @@ async function withFolders(fn: (state: string, bare: string) => Promise<void>) {
   try {
     await fn(state, bare);
   } finally {
-    await Deno.chmod(join(state, "specnaut"), 0o700).catch(() => {});
+    await Deno.chmod(join(state, "specnaut"), 0o700).catch(ignoreNotFound);
     await Deno.remove(state, { recursive: true });
     await Deno.remove(bare, { recursive: true });
   }
+}
+
+/** A folder the test never made is nothing to restore; any other failure is the test's. */
+function ignoreNotFound(e: unknown): void {
+  if (!(e instanceof Deno.errors.NotFound)) throw e;
 }
 
 /** Whether `dir` can be looked into all the same, as a privileged user can. */
@@ -40,10 +45,14 @@ async function hookIn(project: string, env: Record<string, string>, more = {}) {
   return { code: run.code, judged: run.called !== null };
 }
 
-/** Whether the binary, its per-user folder below `state`, refuses session s-1 outside git. */
-async function binaryRefuses(bare: string, state: string): Promise<void> {
-  const lock = await FsReviewLock.open(bare, { state: join(state, "specnaut", "review-lock") });
-  await assertRejects(() => lock.held("s-1"));
+/** Whether the binary, in `cwd` with its per-user folder below `state`, refuses session s-1. */
+async function binaryRefuses(
+  cwd: string,
+  state: string,
+  expected: typeof Deno.errors.NotFound,
+): Promise<void> {
+  const lock = await FsReviewLock.open(cwd, { state: join(state, "specnaut", "review-lock") });
+  await assertRejects(() => lock.held("s-1"), expected);
 }
 
 Deno.test({
@@ -54,7 +63,7 @@ Deno.test({
       const env = { XDG_STATE_HOME: state };
       await Deno.writeTextFile(join(state, "specnaut"), "");
       assertEquals(await hookIn(bare, env), { code: 2, judged: false }, "a file as its parent");
-      await binaryRefuses(bare, state);
+      await binaryRefuses(bare, state, Deno.errors.NotADirectory);
       await inProject(async (project) => {
         assertEquals(await hookIn(project, env), { code: 0, judged: true }, "judged in a repo");
       });
@@ -62,9 +71,31 @@ Deno.test({
       await Deno.mkdir(join(state, "specnaut"), { mode: 0o000 });
       if (!await searchable(join(state, "specnaut"))) {
         assertEquals((await hookIn(bare, env)).code, 2, "a parent it may not search");
-        await binaryRefuses(bare, state);
+        await binaryRefuses(bare, state, Deno.errors.PermissionDenied);
       }
     }),
+});
+
+Deno.test({
+  name: "a lock folder in the git dir the hook cannot look into goes to the binary, which refuses",
+  ignore: !POSIX,
+  fn: () =>
+    withFolders((state) =>
+      inProject(async (project, locks) => {
+        const env = { XDG_STATE_HOME: state };
+        await Deno.mkdir(locks, { recursive: true });
+        for (const closed of [dirname(locks), locks]) {
+          await Deno.chmod(closed, 0o000);
+          try {
+            if (await searchable(closed)) continue;
+            assertEquals(await hookIn(project, env), { code: 0, judged: true }, closed);
+            await binaryRefuses(project, state, Deno.errors.PermissionDenied);
+          } finally {
+            await Deno.chmod(closed, 0o700);
+          }
+        }
+      })
+    ),
 });
 
 Deno.test({
