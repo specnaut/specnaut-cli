@@ -5,21 +5,40 @@ import { isLegacyInvocation, LEGACY_INVOCATION_WARNING } from "./domain/deprecat
 import { RemovedHarnessError, removedHarnessInitNotice } from "./domain/installed_lock.ts";
 import { VERSION } from "./domain/version.ts";
 import { TEMPLATES_VERSION } from "./templates_bundle.ts";
-import { errorText } from "./domain/terminal_text.ts";
+import { errorText, uncaughtText } from "./domain/terminal_text.ts";
 
-export async function run(argv: string[]): Promise<number> {
+/**
+ * Runs one command. Nothing it throws reaches Deno's own handler, which prints a message raw
+ * (cli#785): every error leaves through the escaping the lock messages use, and the run exits 1.
+ */
+export async function run(
+  argv: string[],
+  command: (argv: string[]) => Promise<number> = dispatch,
+): Promise<number> {
   try {
-    return await dispatch(argv);
+    return await command(argv);
   } catch (err) {
     // A project installed for a harness Specnaut has since dropped. Every
     // command that loads the lock lands here, so the message is said once
     // and never reaches the user as a stack trace.
-    if (err instanceof RemovedHarnessError) {
-      console.error(red(`error: ${errorText(err)}`));
-      return 1;
-    }
-    throw err;
+    const said = err instanceof RemovedHarnessError ? errorText(err) : uncaughtText(err);
+    console.error(red(`error: ${said}`));
+    return 1;
   }
+}
+
+/**
+ * The same sink for what escapes `run` without passing through it: a rejection nothing awaits, a
+ * throw from a timer. Deno would print either raw and exit 1; this prints it escaped, then exits 1.
+ */
+export function installUncaughtSinks(): void {
+  // Exiting from the listener is what keeps Deno's handler from printing it after.
+  const sink = (err: unknown) => {
+    console.error(red(`error: ${uncaughtText(err)}`));
+    Deno.exit(1);
+  };
+  addEventListener("unhandledrejection", (e) => sink(e.reason));
+  addEventListener("error", (e) => sink(e.error));
 }
 
 /** A handler module is evaluated only when its command runs: `--version` evaluates none. */
@@ -72,6 +91,7 @@ async function dispatch(argv: string[]): Promise<number> {
 }
 
 if (import.meta.main) {
+  installUncaughtSinks();
   // Deprecated-alias notice: warn (don't block) when invoked as `specflow`.
   if (isLegacyInvocation(Deno.execPath())) {
     console.error(yellow(LEGACY_INVOCATION_WARNING));

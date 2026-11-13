@@ -84,6 +84,16 @@ export function errorText(err: unknown): string {
   return inertText(err instanceof Error ? err.message : String(err));
 }
 
+/**
+ * An error no handler caught, as Deno's own handler would show it — name, message and stack — but
+ * made inert like every other error sink (cli#785): its message can carry a repository's path or
+ * a server's text, and the stack is what a bug report needs.
+ */
+export function uncaughtText(err: unknown): string {
+  const said = err instanceof Error ? err.stack ?? `${err.name}: ${err.message}` : String(err);
+  return `Uncaught ${inertText(said)}`;
+}
+
 /** What a Mermaid label may hold as it is: no quote, bracket, `#`, `%`, `<` or backtick. */
 const MERMAID_PLAIN = /^[A-Za-z0-9 _./,:()-]$/;
 
