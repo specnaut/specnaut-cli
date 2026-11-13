@@ -8,7 +8,8 @@
 # and the branch contains it and holds at least one commit origin lacks; the
 # base is checked out and fast-forwarded to the branch; the base is pushed
 # with an explicit refspec and never its tags; the merged branch is deleted
-# with `-d`; HEAD is verified to be the base. The base is base-branch.sh's —
+# with `-d`; HEAD is verified to be the base. No git hook runs at any step.
+# The base is base-branch.sh's —
 # local-only, so origin is asked here, on the path that already talks to it
 # — never an argument. Reaching it is the instruction to land: it reads no mode.
 #
@@ -36,6 +37,11 @@
 # Usage: land-feature.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+# Every git call of the landing runs no hook: the branch being landed could commit hooks and a
+# repository-relative core.hooksPath naming them, and this script fetches, checks out, merges,
+# pushes and deletes for it. A project's own post-merge or pre-push hooks do not run here either.
+# The value is the one the binary's own git wrapper passes on every platform (untrusted_git.ts).
+git() { command git -c core.hooksPath=/dev/null "$@"; }
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # `set -e` alone would exit with git's own code, which no table lists.
 unexpected() { echo "land-feature: unexpected failure (exit $1) of: $2 — nothing was pushed" >&2; exit 12; }

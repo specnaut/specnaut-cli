@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { git, REFUSALS_ON_BASE, run, sandbox } from "./git_sandbox.ts";
+import { shim } from "./git_shim.ts";
 
 /** spec 042 — land-feature.sh is the one home of the mechanical merge. */
 
@@ -172,13 +173,13 @@ Deno.test("an origin that cannot answer is 3: unreachable, or its ls-remote fail
   const sb = await featureBranch();
   try {
     const failing = await sb.scriptWithGit(
-      `[ "$1" = ls-remote ] && exit 128\nexec "$REAL_GIT" "$@"`,
+      shim(`[ "$1" = ls-remote ] && exit 128`),
       "land-feature.sh",
     );
     assertEquals(failing.code, 3, failing.stderr);
     assertStringIncludes(failing.stderr, "ls-remote");
     const silent = await sb.scriptWithGit(
-      `[ "$1" = ls-remote ] && exit 0\nexec "$REAL_GIT" "$@"`,
+      shim(`[ "$1" = ls-remote ] && exit 0`),
       "land-feature.sh",
     );
     assertEquals(silent.code, 3, "an answer naming no default is not a match");
@@ -199,7 +200,7 @@ Deno.test("a branch that will not delete after the push is 11 — landed, not a 
   try {
     const head = await git(sb.work, "rev-parse", "HEAD");
     const r = await sb.scriptWithGit(
-      `[ "$1" = branch ] && [ "$3" = -d ] && exit 1\nexec "$REAL_GIT" "$@"`,
+      shim(`[ "$1" = branch ] && [ "$3" = -d ] && exit 1`),
       "land-feature.sh",
     );
     assertEquals(r.code, 11, r.stderr);
@@ -218,7 +219,7 @@ Deno.test("an unexpected git failure is 12, named — never a raw set -e code", 
   const sb = await featureBranch();
   try {
     const r = await sb.scriptWithGit(
-      `[ "$1" = rev-parse ] && [ "$2" = HEAD ] && exit 128\nexec "$REAL_GIT" "$@"`,
+      shim(`[ "$1" = rev-parse ] && [ "$2" = HEAD ] && exit 128`),
       "land-feature.sh",
     );
     assertEquals(r.code, 12, r.stderr);
