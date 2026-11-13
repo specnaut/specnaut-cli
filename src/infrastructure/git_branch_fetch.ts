@@ -11,10 +11,25 @@ import { GitRefused, UNTRUSTED_GIT_FLAGS, UntrustedGit, untrustedGitEnv } from "
  * is the flag list that turns off each program the repository's configuration could name.
  *
  * The new repository borrows the user's objects through `objects/info/alternates`, so only what
- * the branch adds crosses the network, and its received objects are checked by fsck. It has no
- * template, so no hook; it fetches no tag and no submodule; the remote's URL is read from the
- * user's own configuration and only after `--`, with the transports pinned to an allowlist.
+ * the branch adds crosses the network, and only what crosses it is checked by fsck: an object
+ * borrowed through `alternates` never is. So the tree planner (`tree_plan.ts`) is the gate that
+ * refuses a name such as `..` or `.git` and lists an odd mode unwritten, whichever side the tree
+ * came from; fsck is only the earlier check on what is received. The repository has no template, so no hook; it
+ * fetches no tag, no submodule and no bundle a server advertises; the remote's URL is read from
+ * the user's own configuration and only after `--`, with the transports pinned to an allowlist.
  */
+
+/**
+ * The fsck checks a received tree must pass, each pinned to `error` on the command line, which no
+ * configuration file outranks: a name that is `.`, `..`, `.git`, empty or a path, and a mode git
+ * would not write. git leaves them at a warning (one at `info`), which a `fetch.fsck.<id>` setting
+ * in the user's configuration could lower to `ignore`.
+ */
+// deno-fmt-ignore
+export const PINNED_FSCK_CHECKS: readonly string[] = [
+  "hasDot", "hasDotdot", "hasDotgit", "fullPathname", "emptyName", "badFilemode",
+  "zeroPaddedFilemode",
+];
 
 /** The transports a fetch may use: authenticated ones only, never `file`, `git` or `ext`. */
 export const DEFAULT_PROTOCOLS: readonly string[] = ["https", "ssh"];
@@ -37,6 +52,8 @@ export function fetchArgs(url: string, refspec: string, protocols: readonly stri
     ...protocols.flatMap((p) => ["-c", `protocol.${p}.allow=always`]),
     "-c", "protocol.version=2",
     "-c", "transfer.fsckObjects=true", "-c", "fetch.fsckObjects=true",
+    ...PINNED_FSCK_CHECKS.flatMap((id) => ["-c", `fetch.fsck.${id}=error`]),
+    "-c", "transfer.bundleURI=false",
     "-c", "fetch.recurseSubmodules=false", "-c", "fetch.writeCommitGraph=false",
     "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
     "--no-auto-gc", "--", url, `${refspec}:${FETCHED_REF}`,
