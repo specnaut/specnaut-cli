@@ -34,14 +34,27 @@ export const attachArgs = (mount: string, image: string) => [
   ...["-mountpoint", mount, image],
 ];
 
+/** Each innermost `<dict>` of a property list: one entity of an attach's answer. */
+const ENTITY = /<dict>((?:(?!<\/?dict>)[\s\S])*)<\/dict>/g;
+
 /**
- * The image's own disk in an attach's answer: its first `dev-entry` naming a whole disk
- * (`/dev/diskN`). The disk's slices, and the APFS container made on one of them, are listed after
- * it and go with it on a detach. `null` when the answer names none.
+ * The image's own disk in an attach's answer: the entity whose `dev-entry` names a whole disk
+ * (`/dev/diskN`) and whose `content-hint` is a partition scheme (`GUID_partition_scheme` for the
+ * images made here). The APFS container hdiutil makes on the image's slice is a whole disk too,
+ * hinted by APFS's container type; the answer's order is not relied on to tell them apart. The
+ * image's disk takes its slices and that container with it on a detach. `null` when the answer
+ * names no such disk.
  */
 export function attachedDisk(answer: string): string | null {
-  for (const [, dev] of answer.matchAll(/<key>dev-entry<\/key>\s*<string>([^<]*)<\/string>/g)) {
-    if (/^\/dev\/disk[0-9]+$/.test(dev)) return dev;
+  for (const [, entity] of answer.matchAll(ENTITY)) {
+    const dev = stringOf(entity, "dev-entry") ?? "";
+    const hint = stringOf(entity, "content-hint") ?? "";
+    if (/^\/dev\/disk[0-9]+$/.test(dev) && hint.endsWith("_partition_scheme")) return dev;
   }
   return null;
+}
+
+/** The string `key` holds in `entity`, or `null`. */
+function stringOf(entity: string, key: string): string | null {
+  return new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`).exec(entity)?.[1] ?? null;
 }

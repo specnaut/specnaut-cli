@@ -10,13 +10,28 @@ export const MIB = 1024 ** 2;
 /** How one hdiutil call ends: its exit code and what it wrote to its outputs. */
 export type End = { readonly code: number; readonly stdout?: string; readonly stderr?: string };
 
-/** What `hdiutil attach -plist` answers for an image attached as `disk`: its slices, a container. */
-export const attachAnswer = (disk: string) =>
-  `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n` +
-  `\t<key>system-entities</key>\n\t<array>\n` +
-  [disk, `${disk}s1`, "/dev/disk99", "/dev/disk99s1"].map((dev) =>
-    `\t\t<dict>\n\t\t\t<key>dev-entry</key>\n\t\t\t<string>${dev}</string>\n\t\t</dict>\n`
-  ).join("") + `\t</array>\n</dict>\n</plist>\n`;
+/** APFS's container and volume type ids, as hdiutil names them in an entity's `content-hint`. */
+const [APFS_CONTAINER, APFS_VOLUME] = ["EF57347C", "41504653"]
+  .map((id) => `${id}-0000-11AA-AA11-00306543ECAC`);
+
+/** One entity of an attach's answer: a device node and what it holds. */
+export const entity = (dev: string, hint: string) =>
+  `\t\t<dict>\n\t\t\t<key>content-hint</key>\n\t\t\t<string>${hint}</string>\n` +
+  `\t\t\t<key>dev-entry</key>\n\t\t\t<string>${dev}</string>\n` +
+  `\t\t\t<key>potentially-mountable</key>\n\t\t\t<false/>\n\t\t</dict>\n`;
+
+/**
+ * What `hdiutil attach -plist` answers for an image attached as `disk`: the image's disk and its
+ * slice, then the APFS container hdiutil makes on it (`/dev/disk99`) and its volume, in that order
+ * unless `containerFirst`.
+ */
+export function attachAnswer(disk: string, containerFirst = false): string {
+  const image = [entity(disk, "GUID_partition_scheme"), entity(`${disk}s1`, "Apple_APFS")];
+  const container = [entity("/dev/disk99", APFS_CONTAINER), entity("/dev/disk99s1", APFS_VOLUME)];
+  const entities = containerFirst ? [...container, ...image] : [...image, ...container];
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n` +
+    `\t<key>system-entities</key>\n\t<array>\n${entities.join("")}\t</array>\n</dict>\n</plist>\n`;
+}
 
 /**
  * A launcher standing in for hdiutil: each call ends as the next of `ends[<verb>]` says (a detach
