@@ -47,7 +47,10 @@ const MIB = 1024 ** 2;
 const REMOVAL = 'd=$(/usr/bin/stat -f %d "$1") && p=$(/usr/bin/stat -f %d "$1/..") && ' +
   '[ "$d" != "$p" ] && "$3" detach -force "$1"; /bin/rm -rf -- "$2"';
 
-/** The image's creation: `size` rounded up to whole MiB, so the cap is never below the policy's. */
+/**
+ * The image's creation: the policy's size rounded up to whole MiB. APFS keeps part of the image
+ * for its own metadata, so a run gets somewhat less room than that size, never more.
+ */
 const createArgs = (base: string, bytes: number) => [
   ...["create", "-size", `${Math.ceil(bytes / MIB)}m`, "-type", "SPARSE", "-fs", "APFS"],
   ...["-volname", "specnaut-scratch", base],

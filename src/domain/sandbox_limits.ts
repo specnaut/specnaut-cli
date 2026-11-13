@@ -11,7 +11,10 @@ export type SandboxLimits = {
   readonly memoryBytes: number;
   readonly cpus: number;
   readonly wallClockSeconds: number;
-  /** Per scratch folder. */
+  /**
+   * In a container and under bubblewrap, per scratch folder: home and temp each get this much. On
+   * `sandbox-exec`, home and temp share one volume of this size, the whole scratch together.
+   */
   readonly scratchBytes: number;
 };
 
