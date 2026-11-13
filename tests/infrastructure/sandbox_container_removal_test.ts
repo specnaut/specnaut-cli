@@ -118,3 +118,58 @@ Deno.test("ContainerRunner: a removal's own error text is read, never copied to 
   const removals = launches.filter((l) => l.spec.args[0] === "rm");
   assertEquals(removals.map((l) => l.spec.stderr), ["captured"]);
 });
+
+Deno.test("ContainerRunner: a container whose name starts with this one's is not this one", async () => {
+  const longer = `Error: No such container: ${NAME}-2\n`;
+  const { launcher } = removing(0, [{ code: 1, stderr: longer }]);
+  const { result } = await quiet(() => runOn(launcher));
+  assertEquals(result, {
+    kind: "exited",
+    code: 0,
+    removalFailed: `${RM} exited 1: ${longer.trim()}`,
+  });
+});
+
+Deno.test("ContainerRunner: a removal that cannot start says so in the outcome", async () => {
+  const { launcher: base } = removing(0, []);
+  const launcher: ProcessLauncher = {
+    ...base,
+    start: (spec) => {
+      if (spec.args[0] === "rm") throw new Error("no docker");
+      return base.start(spec);
+    },
+  };
+  const { result, errors } = await quiet(() => runOn(launcher));
+  assertEquals(result, {
+    kind: "exited",
+    code: 0,
+    removalFailed: `${RM} could not start: no docker`,
+  });
+  assertEquals(errors, []);
+});
+
+Deno.test("ContainerRunner: a removal whose end cannot be read is not called one that never started", async () => {
+  const { launcher: base } = removing(0, []);
+  const launcher: ProcessLauncher = {
+    ...base,
+    start: (spec) => {
+      const started = base.start(spec);
+      if (spec.args[0] !== "rm") return started;
+      return { ...started, stderr: Promise.reject(new Error("pipe closed")) };
+    },
+  };
+  const { result } = await quiet(() => runOn(launcher));
+  assertEquals(result, {
+    kind: "exited",
+    code: 0,
+    removalFailed: `${RM} started, but its end could not be read: pipe closed`,
+  });
+});
+
+Deno.test("ContainerRunner: a halt that removed the container drops a later removal's failure", async () => {
+  // The halt at the wall clock succeeded, so the container is gone whatever the last removal says.
+  const { launcher } = removing(null, [{ code: 0 }, { code: 1, stderr: "daemon down\n" }]);
+  const { result, errors } = await quiet(() => runOn(launcher, 0.01));
+  assertEquals(result, { kind: "timed_out", seconds: 0.01 });
+  assertEquals(errors, []);
+});
