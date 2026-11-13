@@ -146,6 +146,10 @@ export const stagedEntryRefusal = (
 /**
  * A staged entry that is not a plain file — a FIFO, a device — or was replaced
  * between its check and its read (cli#776): nothing is read from it.
+ *
+ * Its limit (cli#785): a replacement is recognised by the file's inode. On a
+ * platform that reports none, only by its size and mtime, so a replacement with
+ * the same size and mtime is not refused there (`readSameEntry`).
  */
 export const changedStagedEntryRefusal = (root: string, abs: string) =>
   new ContainmentRefusal(
