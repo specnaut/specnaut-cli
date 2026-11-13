@@ -1,12 +1,13 @@
 import type { ScopeRoot } from "../domain/checkout_scope.ts";
-import type { CheckoutEntry } from "../domain/checkout_trust.ts";
+import type { CheckoutEntry, CheckoutWalk } from "../domain/checkout_trust.ts";
 import {
   CONFIG_INPUTS,
   type ConfigFile,
   type ConfigVerdict,
   judgeConfig,
 } from "../domain/config_trust.ts";
-import { REASON } from "../domain/script_trust.ts";
+import { INSTRUCTION_SCOPE, judgeInstructions } from "../domain/instruction_trust.ts";
+import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 
 /**
@@ -49,6 +50,25 @@ export async function verifyConfig(
     );
   }
   return verdicts;
+}
+
+/**
+ * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
+ * both commits, one at a time for the reason above, then judged as one class.
+ */
+export async function verifyInstructions(
+  deps: VerifyConfigDeps,
+  base: ConfigBase,
+): Promise<ConfigVerdict[]> {
+  const tree: CheckoutWalk[] = [];
+  const tip: BaseEntry[] = [];
+  const mergeBase: BaseEntry[] = [];
+  for (const root of INSTRUCTION_SCOPE) {
+    tree.push(await deps.tree.walk(root));
+    tip.push(...await deps.git.listRoot(base.tip, root));
+    mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
+  }
+  return judgeInstructions({ tree, tip, mergeBase });
 }
 
 /**

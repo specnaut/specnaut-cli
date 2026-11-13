@@ -121,7 +121,7 @@ function scriptReasons(scripts: ScriptVerdict): readonly Untrusted[] {
 }
 
 /** A file the walk read holds the tip's blob, or, where links are off, the tip's link's target. */
-const holdsBytes: HoldsTip = (file, base) => {
+export const holdsBytes: HoldsTip = (file, base) => {
   if (!("bytes" in file)) return false;
   if (base.kind === "blob") return sameBytes(file.bytes, base.bytes);
   return base.kind === "link" && base.target !== undefined &&

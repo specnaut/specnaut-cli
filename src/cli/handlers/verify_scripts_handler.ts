@@ -1,6 +1,6 @@
 import { red } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
-import { verifyConfig } from "../../application/verify_config.ts";
+import { verifyConfig, verifyInstructions } from "../../application/verify_config.ts";
 import type {
   CheckoutTreeWalker,
   GitObjectReader,
@@ -32,7 +32,8 @@ import { findHarness } from "../harnesses.ts";
  * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers), one
  * `VERDICT <class> trusted` or `VERDICT <class> untrusted <path> <reason>` per config input a
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
- * them), the `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. A class with no
+ * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`
+ * per instruction file the branch changed (`instruction_trust.ts`), the `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. A class with no
  * `trusted` line, on any exit, is untrusted. Every other exit of this
  * handler, a crash included, ends with `VERDICT scripts untrusted` too. A caller trusts the scripts
  * only on exit 0 with that final `trusted` line and a full `BASE` sha; anything else, the binary
@@ -79,7 +80,10 @@ export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()):
     const base = outcome.kind === "judged"
       ? { tip: outcome.baseTip, mergeBase: outcome.base }
       : null;
-    const verdicts = base === null ? [] : await verifyConfig({ git, tree: config }, base);
+    const verdicts = base === null ? [] : [
+      ...await verifyConfig({ git, tree: config }, base),
+      ...await verifyInstructions({ git, tree: config }, base),
+    ];
     return await answer(outcome, verdicts, deps);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);

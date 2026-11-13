@@ -36,7 +36,7 @@ const EDITED: Record<string, string> = {
 
 const base = () => ({ ".specnaut/installed.lock": LOCK, [GIT_READ]: bundled(GIT_READ), ...CONFIG });
 const verdicts = (lines: string[]) =>
-  lines.filter((l) => l.startsWith("VERDICT ") && !l.startsWith("VERDICT scripts "));
+  lines.filter((l) => /^VERDICT (?!scripts |instructions )/.test(l));
 
 Deno.test("a branch that leaves its config alone gets one trusted line per class, in order", async () => {
   const { root } = await fixture({ files: base() });
