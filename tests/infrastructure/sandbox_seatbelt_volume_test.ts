@@ -3,6 +3,7 @@ import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { exists } from "./sandbox_live_fixture.ts";
 import {
   COMMAND,
   fakeLauncher,
@@ -35,16 +36,6 @@ async function recorded(
     },
   };
   return await new SeatbeltRunner(recording, fakeVolumes(events, refusal)).run(policy, COMMAND);
-}
-
-function exists(path: string): boolean {
-  try {
-    Deno.statSync(path);
-    return true;
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return false;
-    throw err;
-  }
 }
 
 /** `fn` given a real, empty scratch folder, removed after it. */
