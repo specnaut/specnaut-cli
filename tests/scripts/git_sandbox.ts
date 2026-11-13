@@ -71,7 +71,7 @@ function home(): string {
  * and its session id would let the landing hold decide a case no test set.
  */
 const HARNESS_ENV = /^(GIT_|CLAUDE_CODE_SESSION_ID$|CODEX_SESSION_ID$|CLAUDECODE$|CODEX_SANDBOX)/i;
-function hermetic(): Record<string, string> {
+export function hermetic(): Record<string, string> {
   const base = Object.fromEntries(
     Object.entries(Deno.env.toObject()).filter(([k]) => !HARNESS_ENV.test(k)),
   );

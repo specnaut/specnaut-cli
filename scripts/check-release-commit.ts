@@ -55,6 +55,16 @@ export function versionsIn(content: string): string[] {
   return [...new Set(found)];
 }
 
+/** `path`'s text, or null when it does not exist; any other failure throws. */
+async function readIfPresent(path: string): Promise<string | null> {
+  try {
+    return await Deno.readTextFile(path);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw new Error(`${path} could not be read: ${(err as Error).message}`);
+  }
+}
+
 async function main() {
   const tag = Deno.args[0];
   if (!tag) {
@@ -77,10 +87,8 @@ async function main() {
   }
 
   for (const file of VERSIONED_FILES) {
-    let content: string;
-    try {
-      content = await Deno.readTextFile(file);
-    } catch {
+    const content = await readIfPresent(file);
+    if (content === null) {
       problems.push(`${file} is missing`);
       continue;
     }
@@ -103,19 +111,14 @@ async function main() {
   // so nothing downstream regenerates it — which means nothing downstream
   // notices when it is a release out of date.
   const HIGHLIGHTS = ".specnaut/release/HIGHLIGHTS.md";
-  let highlightsBody = "";
-  try {
-    highlightsBody = await Deno.readTextFile(HIGHLIGHTS);
-  } catch {
-    // Absent is fine: a release with no hand-written lead is the normal case.
-  }
+  // Absent is fine: a release with no hand-written lead is the normal case.
+  // Any other failure to read it is reported, never read as absent.
+  const highlightsBody = await readIfPresent(HIGHLIGHTS) ?? "";
   if (highlightsBody.trim()) {
-    let prevTag = "";
-    try {
-      prevTag = await git("describe", "--tags", "--abbrev=0", "HEAD");
-    } catch {
-      // No previous tag — first release, nothing can be stale yet.
-    }
+    // No tag at all: a first release, nothing can be stale yet. With tags, a
+    // describe that fails is git's failure, reported, never a first release.
+    const anyTag = await git("tag", "--list") !== "";
+    const prevTag = anyTag ? await git("describe", "--tags", "--abbrev=0", "HEAD") : "";
     if (prevTag) {
       // Compare CONTENT against what was published at the previous tag, not the
       // provenance of the last commit that touched the file.
@@ -127,12 +130,10 @@ async function main() {
       // the gate green over that release's own lead, word for word. A guard that
       // reads when a file was touched cannot answer a question about what it
       // says.
-      let published = "";
-      try {
-        published = await git("show", `${prevTag}:${HIGHLIGHTS}`);
-      } catch {
-        // Absent at the previous tag — nothing to have republished.
-      }
+      // Absent at the previous tag: nothing to have republished. `ls-tree`
+      // lists nothing for an absent path and fails only when git does.
+      const there = await git("ls-tree", "--name-only", prevTag, "--", HIGHLIGHTS) !== "";
+      const published = there ? await git("show", `${prevTag}:${HIGHLIGHTS}`) : "";
       const stale = published.trim().length > 0 &&
         flat(published) === flat(highlightsBody);
       if (stale) {
@@ -146,12 +147,7 @@ async function main() {
   }
 
   const record = `.specnaut/release/history/${tag}.md`;
-  let recorded: string | null = null;
-  try {
-    recorded = await Deno.readTextFile(record);
-  } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
-  }
+  const recorded = await readIfPresent(record);
   if (recorded === null) {
     problems.push(`${record} is missing — copy ${HIGHLIGHTS} to it, then bundle and commit`);
   } else if (flat(recorded) !== flat(highlightsBody)) {
@@ -177,4 +173,10 @@ async function main() {
   );
 }
 
-if (import.meta.main) await main();
+if (import.meta.main) {
+  // A failure is reported as one, and refuses the tag: exit 1, never a pass.
+  await main().catch((e: Error) => {
+    console.error(`check-release-commit: ✗ ${e.message} — do NOT tag`);
+    Deno.exit(1);
+  });
+}

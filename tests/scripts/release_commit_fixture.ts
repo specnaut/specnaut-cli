@@ -1,6 +1,7 @@
 import { assert } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { writeVersions } from "../../scripts/bump-version.ts";
+import { hermetic } from "./git_sandbox.ts";
 
 /**
  * Repositories in the states the release scripts judge, and a way to run one
@@ -16,7 +17,9 @@ export function run(cwd: string, tag: string): Promise<{ code: number; err: stri
 
 /**
  * A release script, by absolute path, run in `cwd` with the permissions CI gives
- * it. In the C locale, so git's words a test asserts on hold whatever the host's.
+ * it, in the hermetic environment git_sandbox.ts builds: no `GIT_*` from the
+ * host, no global or system config, an isolated HOME, and the C locale, so
+ * git's words a test asserts on hold whatever the host's.
  */
 export async function runScript(
   script: string,
@@ -26,7 +29,8 @@ export async function runScript(
   const out = await new Deno.Command("deno", {
     args: ["run", "--allow-read", "--allow-run", script, ...args],
     cwd,
-    env: { LC_ALL: "C" },
+    env: hermetic(),
+    clearEnv: true,
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -34,8 +38,14 @@ export async function runScript(
 }
 
 export async function git(cwd: string, ...args: string[]) {
-  const out = await new Deno.Command("git", { args, cwd, stdout: "null", stderr: "piped" })
-    .output();
+  const out = await new Deno.Command("git", {
+    args,
+    cwd,
+    env: hermetic(),
+    clearEnv: true,
+    stdout: "null",
+    stderr: "piped",
+  }).output();
   assert(out.success, `git ${args.join(" ")}: ${new TextDecoder().decode(out.stderr)}`);
 }
 
