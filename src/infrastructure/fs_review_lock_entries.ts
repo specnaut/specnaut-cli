@@ -1,0 +1,47 @@
+import { isAbsolute, join } from "@std/path";
+import { isFullSha } from "../domain/commit_sha.ts";
+import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
+import { lstatOrNull } from "./fs_review_pass.ts";
+
+/**
+ * Reading the review lock's entries (`fs_review_lock.ts`): a folder of `<session id>.json` files,
+ * each locking its session whatever it holds, and anything but a folder locking every session.
+ */
+
+/** What the locks in `dir` record for `id`; for `null`, whether any is there. */
+export async function heldIn(dir: string, id: string | null): Promise<LockedReview | null> {
+  const info = await lstatOrNull(dir);
+  if (info === null) return null;
+  if (!info.isDirectory) return UNKNOWN_REVIEW;
+  if (id === null) return (await entryNames(dir)).length > 0 ? UNKNOWN_REVIEW : null;
+  return await entryAt(join(dir, `${id}.json`));
+}
+
+/** The review the entry at `path` records; `null` when there is none, a link counting as one. */
+export async function entryAt(path: string): Promise<LockedReview | null> {
+  const info = await lstatOrNull(path);
+  if (info === null) return null;
+  return info.isFile ? reviewOf(await Deno.readTextFile(path)) : UNKNOWN_REVIEW;
+}
+
+function reviewOf(text: string): LockedReview {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed === null) return UNKNOWN_REVIEW;
+    const { head, logs } = parsed as Record<string, unknown>;
+    return {
+      head: typeof head === "string" && isFullSha(head) ? head : null,
+      logs: typeof logs === "string" && isAbsolute(logs) ? logs : null,
+    };
+  } catch (err) {
+    // Not swallowed: an entry that is not JSON locks all the same, naming nothing.
+    if (!(err instanceof SyntaxError)) throw err;
+    return UNKNOWN_REVIEW;
+  }
+}
+
+export async function entryNames(dir: string): Promise<string[]> {
+  const names: string[] = [];
+  for await (const entry of Deno.readDir(dir)) names.push(entry.name);
+  return names.sort();
+}

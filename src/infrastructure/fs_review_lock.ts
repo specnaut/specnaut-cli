@@ -1,7 +1,7 @@
 import { basename, dirname, isAbsolute, join } from "@std/path";
 import type { ReviewLock } from "../application/review_ports.ts";
-import { isFullSha } from "../domain/commit_sha.ts";
 import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
+import { entryAt, entryNames, heldIn } from "./fs_review_lock_entries.ts";
 import { isSessionId } from "../domain/session_record.ts";
 import { lstatOrNull, realFolder, replaceFile } from "./fs_review_pass.ts";
 import { firstLine } from "./git_text.ts";
@@ -111,15 +111,6 @@ function defaultStateFolder(): string | null {
   return reviewLockStateFolder((name) => Deno.env.get(name));
 }
 
-/** What the locks in `dir` record for `id`; for `null`, whether any is there. */
-async function heldIn(dir: string, id: string | null): Promise<LockedReview | null> {
-  const info = await lstatOrNull(dir);
-  if (info === null) return null;
-  if (!info.isDirectory) return UNKNOWN_REVIEW;
-  if (id === null) return (await entryNames(dir)).length > 0 ? UNKNOWN_REVIEW : null;
-  return await entryAt(join(dir, `${id}.json`));
-}
-
 /** A new entry at `path`; one already there stays as it is, the outcome sought. */
 async function createEntry(path: string, text: string): Promise<void> {
   try {
@@ -146,33 +137,4 @@ export async function realLogPath(path: string): Promise<string | null> {
     }
     throw err;
   }
-}
-
-/** The review the entry at `path` records; `null` when there is none, a link counting as one. */
-async function entryAt(path: string): Promise<LockedReview | null> {
-  const info = await lstatOrNull(path);
-  if (info === null) return null;
-  return info.isFile ? reviewOf(await Deno.readTextFile(path)) : UNKNOWN_REVIEW;
-}
-
-function reviewOf(text: string): LockedReview {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (typeof parsed !== "object" || parsed === null) return UNKNOWN_REVIEW;
-    const { head, logs } = parsed as Record<string, unknown>;
-    return {
-      head: typeof head === "string" && isFullSha(head) ? head : null,
-      logs: typeof logs === "string" && isAbsolute(logs) ? logs : null,
-    };
-  } catch (err) {
-    // Not swallowed: an entry that is not JSON locks all the same, naming nothing.
-    if (!(err instanceof SyntaxError)) throw err;
-    return UNKNOWN_REVIEW;
-  }
-}
-
-async function entryNames(dir: string): Promise<string[]> {
-  const names: string[] = [];
-  for await (const entry of Deno.readDir(dir)) names.push(entry.name);
-  return names.sort();
 }
