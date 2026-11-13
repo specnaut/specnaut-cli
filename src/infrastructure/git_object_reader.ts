@@ -44,7 +44,10 @@ export class GitObjects implements GitObjectReader {
     return (await this.#git.call("config", ["--get", "remote.origin.url"])).code === 0;
   }
 
-  /** Unset, or not a boolean git reads, is git's default: links are written as links. */
+  /**
+   * Repository and global configuration only, no system file. Unset, or not a boolean git reads,
+   * is git's default: links are written as links.
+   */
   async symlinks(): Promise<boolean> {
     const out = await this.#git.call("config", ["--bool", "--get", "core.symlinks"]);
     return !(out.code === 0 && firstLine(out.stdout) === "false");

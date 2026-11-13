@@ -31,7 +31,12 @@ export interface GitObjectReader {
   /** The user's global `init.defaultBranch`, includes not followed, or `null`. */
   globalDefaultBranch(): Promise<string | null>;
   hasOrigin(): Promise<boolean>;
-  /** Whether git checks a link out as a link here: `core.symlinks`, true unless set false. */
+  /**
+   * Whether git checks a link out as a link here: `core.symlinks` as the repository's and the
+   * user's global configuration set it, true unless set false. The system configuration is not
+   * read (the hardened git turns it off), so a `false` set only there reads as true: a file git
+   * wrote for a link then fails the check, never passes it.
+   */
   symlinks(): Promise<boolean>;
   /** The full sha `ref` names as a commit, or `null`. */
   commitOf(ref: string): Promise<string | null>;

@@ -16,22 +16,36 @@ export const INSTRUCTION_REASON = { notHead: "work tree differs from HEAD" } as 
 /** One path's entry in the tree, at HEAD and at the tip. */
 export type Sides = {
   readonly tree: ReadonlyMap<string, CheckoutEntry>;
+  /** The folders whose walk stopped: the tree's side of a path below one is not known. */
+  readonly blocked: readonly string[];
   readonly head: ReadonlyMap<string, BaseEntry>;
   readonly tip: ReadonlyMap<string, BaseEntry>;
 };
 
 /**
  * Adds to `reasons`, the tip check's by path, each path where the tree is not HEAD's, then each
- * where HEAD is not the tip's though the tree holds both.
+ * where HEAD is not the tip's though the tree holds both. A path below a folder the walk could not
+ * enter is not judged here: the folder's own line already names it.
  */
 export function headReasons(reasons: Map<string, string>, sides: Sides, holds: HoldsTip): void {
   for (const path of new Set([...sides.tree.keys(), ...sides.head.keys()])) {
+    if (sides.blocked.some((b) => path.startsWith(`${b}/`))) continue;
     const off = notHeadReason(sides.tree.get(path), sides.head.get(path), holds);
     const had = reasons.get(path);
-    if (off === null || (had !== undefined && !CONTENT.has(had))) continue;
-    if (had === undefined || off === INSTRUCTION_REASON.notHead) reasons.set(path, off);
+    if (off !== null && replaces(off, had)) reasons.set(path, off);
   }
   landReasons(reasons, sides);
+}
+
+/**
+ * Whether HEAD's reason takes the place of the tip check's: always where there is none, or where
+ * it says `behind` (no rebase settles a tree that is not HEAD's), else only over a reason about
+ * the tree's bytes, and then only `work tree differs from HEAD`: a tree that is HEAD's but for line
+ * endings keeps what HEAD changed against the tip.
+ */
+function replaces(off: string, had: string | undefined): boolean {
+  if (had === undefined || had === REASON.behind) return true;
+  return CONTENT.has(had) && off === INSTRUCTION_REASON.notHead;
 }
 
 /** The reasons that judge only the tree's bytes, which do not land when the tree is not HEAD's. */
@@ -44,10 +58,8 @@ const CONTENT: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Why the tree's entry is not HEAD's, or `null` when it is. The reason replaces one about the
- * tree's bytes alone, `behind` included: a tree at the merge base's bytes over a HEAD that changed
- * them is no lag a rebase settles. A tree that is HEAD's but for line endings says so only where
- * the tip check said nothing: what HEAD changed against the tip is the better reason.
+ * Why the tree's entry is not HEAD's, or `null` when it is; {@link replaces} says which reason
+ * stands.
  */
 function notHeadReason(
   mine: CheckoutEntry | undefined,

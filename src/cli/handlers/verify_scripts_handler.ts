@@ -39,11 +39,13 @@ import { findHarness } from "../harnesses.ts";
  * `VERDICT <class> trusted` or `VERDICT <class> untrusted <path> <reason>` per config input a
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
  * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`
- * per instruction file the branch changed (`instruction_trust.ts`), the `UNTRUSTED` lines, and last `VERDICT scripts trusted|untrusted`. A class with no
- * `trusted` line, on any exit, is untrusted. Every other exit of this
- * handler, a crash included, ends with `VERDICT scripts untrusted` too. A caller trusts the scripts
- * only on exit 0 with that final `trusted` line and a full `BASE` sha; anything else, the binary
- * missing included, is untrusted. `scripts` names the class checked, so others can be added without breaking a caller.
+ * per path the instruction class names (`instruction_trust.ts`: a path whose work tree or HEAD
+ * entry is not the tip's, or whose work tree is not HEAD's), the `UNTRUSTED` lines, and last
+ * `VERDICT scripts trusted|untrusted`. A class with no `trusted` line, on any exit, is untrusted.
+ * Every other exit of this handler, a crash included, ends with `VERDICT scripts untrusted` too. A
+ * caller trusts the scripts only on exit 0 with that final `trusted` line and a full `BASE` sha;
+ * anything else, the binary missing included, is untrusted. `scripts` names the class checked, so
+ * others can be added without breaking a caller.
  */
 const EXIT = { trusted: 0, untrusted: 1, usage: 2, couldNotRun: 3 } as const;
 const UNTRUSTED = "VERDICT scripts untrusted";

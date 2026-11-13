@@ -56,6 +56,23 @@ Deno.test("a work tree at the merge base's bytes over another HEAD is not behind
   ]);
 });
 
+Deno.test("a HEAD that changed only line endings over a tree at the merge base is not behind", () => {
+  const old = enc("# Rules\n");
+  const over = { tip: [blob(A)], mergeBase: [blob(A, old)], tree: walked(file(A, old)) };
+  assertEquals(judge({ ...over, head: [blob(A, enc("# Rules\r\n"))] }), [
+    `${A} ${REASON.lineEndings}`,
+  ]);
+});
+
+Deno.test("HEAD's files under a folder the walk could not enter are not named again", () => {
+  const tree: CheckoutWalk[] = [
+    { kind: "walked", entries: [file(A)] },
+    { kind: "blocked", path: ".specnaut/addenda", why: REASON.link },
+  ];
+  const head = [blob(A), blob(".specnaut/addenda/task/merge.md")];
+  assertEquals(judge({ tree, head, tip: [blob(A)] }), [`.specnaut/addenda ${REASON.link}`]);
+});
+
 Deno.test("a file HEAD commits that the tree lacks, or lacks that the tree holds, is untrusted", () => {
   const addendum = ".specnaut/addenda/task/merge.md";
   assertEquals(judge({ tree: walked(file(A)), head: [blob(A), blob(addendum)] }), [

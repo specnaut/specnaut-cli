@@ -90,7 +90,8 @@ function treeReasons(input: InstructionInput): Untrusted[] {
   const found = configReasons(input.tree, input.tip, holds, inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
   const reasons = new Map(found.map((u) => [u.path, u.reason]));
-  headReasons(reasons, { tree: ctx.tree, head: byPath(input.head), tip: ctx.tip }, holds);
+  const blocked = input.tree.flatMap((w) => w.kind === "blocked" ? [w.path] : []);
+  headReasons(reasons, { ...ctx, blocked, head: byPath(input.head) }, holds);
   return [...reasons].map(([path, reason]) => ({ path, reason }));
 }
 
