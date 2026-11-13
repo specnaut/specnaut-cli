@@ -29,7 +29,7 @@ EXTRA_LABELS="${EXTRA[0]:-}"
 . "$(dirname "$0")/_backlog_plan.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 require_clean_text title "$TITLE"
-if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
+read_body
 # GitLab creates a label it does not know, from its name: a label is text it keeps.
 require_clean_text label "$EXTRA_LABELS"
 
@@ -41,10 +41,8 @@ if [ -n "$PARENT" ]; then
   LABELS="$LABELS,parent::#$PARENT"
 fi
 
-# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
-RESP=$(printf '%s\0' "$TITLE" "$BODY" "$LABELS" |
-  jq_lf -c -Rs 'split("\u0000") as [$t, $d, $l] | {title: $t, description: $d, labels: $l}' |
-  glab_send POST issues)
+RESP=$(texts_json '. as [$t, $d, $l] | {title: $t, description: $d, labels: $l}' \
+  -- "$TITLE" "$BODY" "$LABELS" | glab_send POST issues)
 URL=$(printf '%s' "$RESP" | jq_lf -r '.web_url // empty | strings')
 [ -n "$URL" ] || { echo "error: create failed: GitLab answered no issue URL" >&2; exit 1; }
 echo "✓ created: $URL"

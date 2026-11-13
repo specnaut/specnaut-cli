@@ -19,11 +19,9 @@ parse_comment_args "$@"
 . "$(dirname "$0")/_backlog_plan.sh"
 
 NUM=$(require_issue_number "$NUM_ARG") || exit 2
-
+read_body
 if [ -n "$BODY_FILE" ]; then
-  require_clean_file body "$BODY_FILE"
-  gh issue comment "$NUM" --repo "$REPO" --body-file "$CLEAN_FILE"
+  gh issue comment "$NUM" --repo "$REPO" --body-file "$BODY_FILE"
 else
-  require_clean_text body "$BODY"
   gh issue comment "$NUM" --repo "$REPO" --body "$BODY"
 fi

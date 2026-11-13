@@ -36,7 +36,7 @@ LABELS="${EXTRA[0]:-}"
 . "$(dirname "$0")/_backlog_plan.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 require_clean_text title "$TITLE"
-if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY_FILE=$CLEAN_FILE; else require_clean_text body "$BODY"; fi
+read_body
 require_clean_text label "$LABELS"
 require_project   # a project that does not resolve fails here, not mid-write
 

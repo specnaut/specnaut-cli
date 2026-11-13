@@ -20,13 +20,7 @@ parse_comment_args "$@"
 . "$(dirname "$0")/_backlog_plan.sh"
 
 NUM=$(require_issue_number "$NUM_ARG") || exit 2
-QUESTION=$BODY
-if [ -n "$BODY_FILE" ]; then
-  require_clean_file body "$BODY_FILE"
-  QUESTION=$(cat -- "$CLEAN_FILE")
-else
-  require_clean_text body "$QUESTION"
-fi
+read_body
 
-printf '%s' "$QUESTION" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/$NUM/notes" >/dev/null
+printf '%s' "$BODY" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/$NUM/notes" >/dev/null
 echo "commented on #$NUM"

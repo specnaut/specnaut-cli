@@ -20,13 +20,7 @@ parse_comment_args "$@"
 
 NUM=$(require_issue_number "$NUM_ARG") || exit 2
 NUM=$(printf "%03d" "$NUM")
-QUESTION=$BODY
-if [ -n "$BODY_FILE" ]; then
-  require_clean_file body "$BODY_FILE"
-  QUESTION=$(cat -- "$CLEAN_FILE")
-else
-  require_clean_text body "$QUESTION"
-fi
+read_body
 
 shopt -s nullglob
 matches=("$BACKLOG_DIR/$NUM-"*.md)
@@ -37,6 +31,6 @@ fi
 FILE="${matches[0]}"
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-printf '\n## Clarification (%s)\n\n%s\n' "$NOW" "$QUESTION" >> "$FILE"
+printf '\n## Clarification (%s)\n\n%s\n' "$NOW" "$BODY" >> "$FILE"
 
 echo "✓ added clarification on #$NUM"

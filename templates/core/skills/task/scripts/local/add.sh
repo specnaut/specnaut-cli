@@ -28,7 +28,7 @@ require_clean_text title "$TITLE"
 # The title is written into YAML frontmatter: one line, or it would be a key.
 require_title "$TITLE" || exit 2
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
-if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
+read_body
 RENDER="$(dirname "$0")/render-index.sh"
 mkdir -p "$BACKLOG_DIR"
 

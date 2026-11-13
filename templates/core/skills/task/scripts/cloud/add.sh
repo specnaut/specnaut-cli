@@ -26,14 +26,13 @@ parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <pa
 . "$(dirname "$0")/_cloud_send.sh"
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 require_clean_text title "$TITLE"
-if [ -n "$BODY_FILE" ]; then require_clean_file body "$BODY_FILE"; BODY=$(cat -- "$CLEAN_FILE"); else require_clean_text body "$BODY"; fi
+read_body
 
-# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
-RESP=$(printf '%s\0' "$TITLE" "$BODY" |
-  jq_lf -c -Rs --arg k "$PROJECT_KEY" --arg p "$PARENT" 'split("\u0000") as [$t, $b]
+RESP=$(texts_json '. as [$t, $b]
    | { projectKey: $k, title: $t }
    + (if $b == "" then {} else { body: $b } end)
-   + (if $p == "" then {} else { parentNumber: ($p | tonumber) } end)' |
+   + (if $p == "" then {} else { parentNumber: ($p | tonumber) } end)' \
+  --arg k "$PROJECT_KEY" --arg p "$PARENT" -- "$TITLE" "$BODY" |
   cloud_send POST "$API_BASE/tasks")
 
 KEY=$(echo "$RESP" | jq_lf -r '.task.key // empty')

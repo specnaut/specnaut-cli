@@ -22,15 +22,9 @@ parse_comment_args "$@"
 . "$(dirname "$0")/_cloud_send.sh"
 
 NUM=$(require_issue_number "$NUM_ARG") || exit 2
-QUESTION=$BODY
-if [ -n "$BODY_FILE" ]; then
-  require_clean_file body "$BODY_FILE"
-  QUESTION=$(cat -- "$CLEAN_FILE")
-else
-  require_clean_text body "$QUESTION"
-fi
+read_body
 
-RESP=$(printf '%s' "$QUESTION" |
+RESP=$(printf '%s' "$BODY" |
   jq_lf -c -Rs --arg k "$PROJECT_KEY" --argjson n "$NUM" '{ projectKey: $k, number: $n, body: . }' |
   cloud_send POST "$API_BASE/comments")
 

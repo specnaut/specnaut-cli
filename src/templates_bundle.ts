@@ -7196,7 +7196,7 @@ require_clean_text title "\$TITLE"
 # The title is written into YAML frontmatter: one line, or it would be a key.
 require_title "\$TITLE" || exit 2
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
-if [ -n "\$BODY_FILE" ]; then require_clean_file body "\$BODY_FILE"; BODY=\$(cat -- "\$CLEAN_FILE"); else require_clean_text body "\$BODY"; fi
+read_body
 RENDER="\$(dirname "\$0")/render-index.sh"
 mkdir -p "\$BACKLOG_DIR"
 
@@ -7392,13 +7392,7 @@ parse_comment_args "\$@"
 
 NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
 NUM=\$(printf "%03d" "\$NUM")
-QUESTION=\$BODY
-if [ -n "\$BODY_FILE" ]; then
-  require_clean_file body "\$BODY_FILE"
-  QUESTION=\$(cat -- "\$CLEAN_FILE")
-else
-  require_clean_text body "\$QUESTION"
-fi
+read_body
 
 shopt -s nullglob
 matches=("\$BACKLOG_DIR/\$NUM-"*.md)
@@ -7409,7 +7403,7 @@ fi
 FILE="\${matches[0]}"
 NOW=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-printf '\\n## Clarification (%s)\\n\\n%s\\n' "\$NOW" "\$QUESTION" >> "\$FILE"
+printf '\\n## Clarification (%s)\\n\\n%s\\n' "\$NOW" "\$BODY" >> "\$FILE"
 
 echo "✓ added clarification on #\$NUM"
 `,
@@ -8596,9 +8590,11 @@ require_title() {
     content: `# shellcheck shell=bash
 # The one home of how a backlog writer reads the arguments every backend's
 # add.sh, clarify-comment.sh and close.sh share: a positional body, or
-# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
-# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
-# installed beside it. A usage error ends the calling script with status 2.
+# \`--body-file <path>\` in its place, and \`--parent <num>\`; of how it loads that
+# body (read_body), and how it puts its texts in a JSON request (texts_json).
+# Sourced before \`_config.sh\`, so \`--help\` and a usage error need no configured
+# backend; installed beside it. A usage error ends the calling script with
+# status 2.
 #
 # An argument a writer would not record is refused, never dropped: a caller
 # that passed it must not believe it reached the tracker.
@@ -8620,18 +8616,21 @@ body_file_arg() {
 
 # parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
 # optional body, then at most <extra> more positionals (a backend's labels), and
-# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
-# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+# \`--parent <num>\` and \`--body-file <path>\` anywhere, each at most once. \`--\`
+# ends the options, so a text after it may start with a dash. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`-h\` or \`--help\` as the first argument prints
+# <usage> and ends with status 0; anywhere else \`-h\` is a text like any other.
 parse_add_args() {
-  ARGS_USAGE=\$1
+  ARGS_USAGE=\$1 ARGS_SEEN=" "
   local extra=\$2 pos=()
   shift 2
   PARENT="" BODY_FILE=""
+  case "\${1:-}" in -h | --help) echo "\$ARGS_USAGE"; exit 0 ;; esac
   while [ "\$#" -gt 0 ]; do
     case "\$1" in
-      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
-      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
-      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --) shift; pos+=("\$@"); break ;;
+      --parent) _once "\$1"; [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) _once "\$1"; body_file_arg "\$@"; shift 2 ;;
       --*) args_refuse "unknown flag '\$1'" ;;
       *) pos+=("\$1"); shift ;;
     esac
@@ -8640,6 +8639,13 @@ parse_add_args() {
   _positionals_fit "\$extra" "\${pos[@]}"
   TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
   [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _once <flag> -- a usage error when <flag> was given before: a writer records
+# one, and keeping the last would drop the other without a word.
+_once() {
+  case \$ARGS_SEEN in *" \$1 "*) args_refuse "\$1 given twice; only one would be recorded" ;; esac
+  ARGS_SEEN="\$ARGS_SEEN\$1 "
 }
 
 # _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
@@ -8655,17 +8661,45 @@ _positionals_fit() {
 }
 
 # parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
-# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+# number, then the text, \`-- <text>\` for one that starts with a dash, or
+# \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
 parse_comment_args() {
   ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
   [ "\$#" -ge 2 ] || args_refuse
   NUM_ARG=\$1 BODY="" BODY_FILE=""
-  case "\$#:\$2" in
-    3:--body-file) body_file_arg "\$2" "\$3" ;;
-    *:--body-file) body_file_arg "\$2" ;;
-    2:*) BODY=\$2 ;;
-    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  shift
+  case "\$1" in
+    --body-file) body_file_arg "\$@"; shift 2 ;;
+    --) [ "\$#" -ge 2 ] || args_refuse; BODY=\$2; shift 2 ;;
+    *) BODY=\$1; shift ;;
   esac
+  [ "\$#" -eq 0 ] || args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# read_body -- BODY set to the text the arguments gave, once checked: the file
+# \`--body-file\` named, read, or the positional text. When it was a file,
+# BODY_FILE becomes the checked copy, for a writer that sends a file. Needs
+# _clean_text.sh, sourced by then; a refused text ends the script with status 14.
+read_body() {
+  if [ -n "\$BODY_FILE" ]; then
+    require_clean_file body "\$BODY_FILE"
+    BODY_FILE=\$CLEAN_FILE BODY=\$(cat -- "\$CLEAN_FILE")
+  else
+    require_clean_text body "\$BODY"
+  fi
+}
+
+# texts_json <filter> [<jq option>...] -- <text>... -- the JSON <filter> builds
+# from the <text>s, which it reads as the array \`.\`, in order. Each travels
+# NUL-ended on jq's stdin: the one byte no shell variable holds, so none ends
+# early, and no text is an argument to jq. Needs jq_lf (_config.sh).
+texts_json() {
+  local filter=\$1 opts=()
+  shift
+  while [ "\$#" -gt 0 ] && [ "\$1" != -- ]; do opts+=("\$1"); shift; done
+  [ "\$#" -gt 0 ] || { echo "\${0##*/}: texts_json needs -- before its texts" >&2; exit 2; }
+  shift
+  printf '%s\\0' "\$@" | jq_lf -c -Rs \${opts[@]+"\${opts[@]}"} "split(\\"\\\\u0000\\") | \$filter"
 }
 `,
     executable: true,
@@ -9691,7 +9725,7 @@ LABELS="\${EXTRA[0]:-}"
 . "\$(dirname "\$0")/_backlog_plan.sh"
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 require_clean_text title "\$TITLE"
-if [ -n "\$BODY_FILE" ]; then require_clean_file body "\$BODY_FILE"; BODY_FILE=\$CLEAN_FILE; else require_clean_text body "\$BODY"; fi
+read_body
 require_clean_text label "\$LABELS"
 require_project   # a project that does not resolve fails here, not mid-write
 
@@ -10352,12 +10386,10 @@ parse_comment_args "\$@"
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
 NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
-
+read_body
 if [ -n "\$BODY_FILE" ]; then
-  require_clean_file body "\$BODY_FILE"
-  gh issue comment "\$NUM" --repo "\$REPO" --body-file "\$CLEAN_FILE"
+  gh issue comment "\$NUM" --repo "\$REPO" --body-file "\$BODY_FILE"
 else
-  require_clean_text body "\$BODY"
   gh issue comment "\$NUM" --repo "\$REPO" --body "\$BODY"
 fi
 `,
@@ -11871,9 +11903,11 @@ require_title() {
     content: `# shellcheck shell=bash
 # The one home of how a backlog writer reads the arguments every backend's
 # add.sh, clarify-comment.sh and close.sh share: a positional body, or
-# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
-# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
-# installed beside it. A usage error ends the calling script with status 2.
+# \`--body-file <path>\` in its place, and \`--parent <num>\`; of how it loads that
+# body (read_body), and how it puts its texts in a JSON request (texts_json).
+# Sourced before \`_config.sh\`, so \`--help\` and a usage error need no configured
+# backend; installed beside it. A usage error ends the calling script with
+# status 2.
 #
 # An argument a writer would not record is refused, never dropped: a caller
 # that passed it must not believe it reached the tracker.
@@ -11895,18 +11929,21 @@ body_file_arg() {
 
 # parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
 # optional body, then at most <extra> more positionals (a backend's labels), and
-# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
-# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+# \`--parent <num>\` and \`--body-file <path>\` anywhere, each at most once. \`--\`
+# ends the options, so a text after it may start with a dash. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`-h\` or \`--help\` as the first argument prints
+# <usage> and ends with status 0; anywhere else \`-h\` is a text like any other.
 parse_add_args() {
-  ARGS_USAGE=\$1
+  ARGS_USAGE=\$1 ARGS_SEEN=" "
   local extra=\$2 pos=()
   shift 2
   PARENT="" BODY_FILE=""
+  case "\${1:-}" in -h | --help) echo "\$ARGS_USAGE"; exit 0 ;; esac
   while [ "\$#" -gt 0 ]; do
     case "\$1" in
-      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
-      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
-      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --) shift; pos+=("\$@"); break ;;
+      --parent) _once "\$1"; [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) _once "\$1"; body_file_arg "\$@"; shift 2 ;;
       --*) args_refuse "unknown flag '\$1'" ;;
       *) pos+=("\$1"); shift ;;
     esac
@@ -11915,6 +11952,13 @@ parse_add_args() {
   _positionals_fit "\$extra" "\${pos[@]}"
   TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
   [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _once <flag> -- a usage error when <flag> was given before: a writer records
+# one, and keeping the last would drop the other without a word.
+_once() {
+  case \$ARGS_SEEN in *" \$1 "*) args_refuse "\$1 given twice; only one would be recorded" ;; esac
+  ARGS_SEEN="\$ARGS_SEEN\$1 "
 }
 
 # _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
@@ -11930,17 +11974,45 @@ _positionals_fit() {
 }
 
 # parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
-# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+# number, then the text, \`-- <text>\` for one that starts with a dash, or
+# \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
 parse_comment_args() {
   ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
   [ "\$#" -ge 2 ] || args_refuse
   NUM_ARG=\$1 BODY="" BODY_FILE=""
-  case "\$#:\$2" in
-    3:--body-file) body_file_arg "\$2" "\$3" ;;
-    *:--body-file) body_file_arg "\$2" ;;
-    2:*) BODY=\$2 ;;
-    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  shift
+  case "\$1" in
+    --body-file) body_file_arg "\$@"; shift 2 ;;
+    --) [ "\$#" -ge 2 ] || args_refuse; BODY=\$2; shift 2 ;;
+    *) BODY=\$1; shift ;;
   esac
+  [ "\$#" -eq 0 ] || args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# read_body -- BODY set to the text the arguments gave, once checked: the file
+# \`--body-file\` named, read, or the positional text. When it was a file,
+# BODY_FILE becomes the checked copy, for a writer that sends a file. Needs
+# _clean_text.sh, sourced by then; a refused text ends the script with status 14.
+read_body() {
+  if [ -n "\$BODY_FILE" ]; then
+    require_clean_file body "\$BODY_FILE"
+    BODY_FILE=\$CLEAN_FILE BODY=\$(cat -- "\$CLEAN_FILE")
+  else
+    require_clean_text body "\$BODY"
+  fi
+}
+
+# texts_json <filter> [<jq option>...] -- <text>... -- the JSON <filter> builds
+# from the <text>s, which it reads as the array \`.\`, in order. Each travels
+# NUL-ended on jq's stdin: the one byte no shell variable holds, so none ends
+# early, and no text is an argument to jq. Needs jq_lf (_config.sh).
+texts_json() {
+  local filter=\$1 opts=()
+  shift
+  while [ "\$#" -gt 0 ] && [ "\$1" != -- ]; do opts+=("\$1"); shift; done
+  [ "\$#" -gt 0 ] || { echo "\${0##*/}: texts_json needs -- before its texts" >&2; exit 2; }
+  shift
+  printf '%s\\0' "\$@" | jq_lf -c -Rs \${opts[@]+"\${opts[@]}"} "split(\\"\\\\u0000\\") | \$filter"
 }
 `,
     executable: true,
@@ -13178,7 +13250,7 @@ EXTRA_LABELS="\${EXTRA[0]:-}"
 . "\$(dirname "\$0")/_backlog_plan.sh"
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 require_clean_text title "\$TITLE"
-if [ -n "\$BODY_FILE" ]; then require_clean_file body "\$BODY_FILE"; BODY=\$(cat -- "\$CLEAN_FILE"); else require_clean_text body "\$BODY"; fi
+read_body
 # GitLab creates a label it does not know, from its name: a label is text it keeps.
 require_clean_text label "\$EXTRA_LABELS"
 
@@ -13190,10 +13262,8 @@ if [ -n "\$PARENT" ]; then
   LABELS="\$LABELS,parent::#\$PARENT"
 fi
 
-# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
-RESP=\$(printf '%s\\0' "\$TITLE" "\$BODY" "\$LABELS" |
-  jq_lf -c -Rs 'split("\\u0000") as [\$t, \$d, \$l] | {title: \$t, description: \$d, labels: \$l}' |
-  glab_send POST issues)
+RESP=\$(texts_json '. as [\$t, \$d, \$l] | {title: \$t, description: \$d, labels: \$l}' \\
+  -- "\$TITLE" "\$BODY" "\$LABELS" | glab_send POST issues)
 URL=\$(printf '%s' "\$RESP" | jq_lf -r '.web_url // empty | strings')
 [ -n "\$URL" ] || { echo "error: create failed: GitLab answered no issue URL" >&2; exit 1; }
 echo "✓ created: \$URL"
@@ -13417,15 +13487,9 @@ parse_comment_args "\$@"
 . "\$(dirname "\$0")/_backlog_plan.sh"
 
 NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
-QUESTION=\$BODY
-if [ -n "\$BODY_FILE" ]; then
-  require_clean_file body "\$BODY_FILE"
-  QUESTION=\$(cat -- "\$CLEAN_FILE")
-else
-  require_clean_text body "\$QUESTION"
-fi
+read_body
 
-printf '%s' "\$QUESTION" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/\$NUM/notes" >/dev/null
+printf '%s' "\$BODY" | jq_lf -c -Rs '{body: .}' | glab_send POST "issues/\$NUM/notes" >/dev/null
 echo "commented on #\$NUM"
 `,
     executable: true,
@@ -14074,6 +14138,8 @@ receipt_snapshot() { :; }
 # quick action, which a rewrite would run: nothing sent · other glab's
 set -euo pipefail
 
+# shellcheck source=../_backlog_args.sh
+. "\$(dirname "\$0")/_backlog_args.sh"
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=../_backlog_plan.sh
@@ -14106,12 +14172,11 @@ if [ -n "\$APPEND" ]; then
   ADDED=\$(cat -- "\$APPEND"; printf x)
   if [ -n "\$BODY" ]; then BODY="\$BODY"\$'\\n\\n'"\${ADDED%x}"; else BODY=\${ADDED%x}; fi
 fi
-# Each text NUL-ended, the one byte no shell variable holds; a field the caller
-# did not give is left out of the request.
-printf '%s\\0' "\$TITLE" "\$BODY" |
-  jq_lf -c -Rs --arg t "\$HAS_TITLE" --arg d "\${APPEND:+true}" 'split("\\u0000") as [\$title, \$description]
+# A field the caller did not give is left out of the request.
+texts_json '. as [\$title, \$description]
     | (if \$t == "true" then {title: \$title} else {} end)
-    + (if \$d == "true" then {description: \$description} else {} end)' |
+    + (if \$d == "true" then {description: \$description} else {} end)' \\
+  --arg t "\$HAS_TITLE" --arg d "\${APPEND:+true}" -- "\$TITLE" "\$BODY" |
   glab_send PUT "issues/\$NUM" >/dev/null
 echo "edited #\$NUM"
 `,
@@ -14446,9 +14511,11 @@ require_title() {
     content: `# shellcheck shell=bash
 # The one home of how a backlog writer reads the arguments every backend's
 # add.sh, clarify-comment.sh and close.sh share: a positional body, or
-# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
-# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
-# installed beside it. A usage error ends the calling script with status 2.
+# \`--body-file <path>\` in its place, and \`--parent <num>\`; of how it loads that
+# body (read_body), and how it puts its texts in a JSON request (texts_json).
+# Sourced before \`_config.sh\`, so \`--help\` and a usage error need no configured
+# backend; installed beside it. A usage error ends the calling script with
+# status 2.
 #
 # An argument a writer would not record is refused, never dropped: a caller
 # that passed it must not believe it reached the tracker.
@@ -14470,18 +14537,21 @@ body_file_arg() {
 
 # parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
 # optional body, then at most <extra> more positionals (a backend's labels), and
-# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
-# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+# \`--parent <num>\` and \`--body-file <path>\` anywhere, each at most once. \`--\`
+# ends the options, so a text after it may start with a dash. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`-h\` or \`--help\` as the first argument prints
+# <usage> and ends with status 0; anywhere else \`-h\` is a text like any other.
 parse_add_args() {
-  ARGS_USAGE=\$1
+  ARGS_USAGE=\$1 ARGS_SEEN=" "
   local extra=\$2 pos=()
   shift 2
   PARENT="" BODY_FILE=""
+  case "\${1:-}" in -h | --help) echo "\$ARGS_USAGE"; exit 0 ;; esac
   while [ "\$#" -gt 0 ]; do
     case "\$1" in
-      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
-      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
-      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --) shift; pos+=("\$@"); break ;;
+      --parent) _once "\$1"; [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) _once "\$1"; body_file_arg "\$@"; shift 2 ;;
       --*) args_refuse "unknown flag '\$1'" ;;
       *) pos+=("\$1"); shift ;;
     esac
@@ -14490,6 +14560,13 @@ parse_add_args() {
   _positionals_fit "\$extra" "\${pos[@]}"
   TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
   [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _once <flag> -- a usage error when <flag> was given before: a writer records
+# one, and keeping the last would drop the other without a word.
+_once() {
+  case \$ARGS_SEEN in *" \$1 "*) args_refuse "\$1 given twice; only one would be recorded" ;; esac
+  ARGS_SEEN="\$ARGS_SEEN\$1 "
 }
 
 # _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
@@ -14505,17 +14582,45 @@ _positionals_fit() {
 }
 
 # parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
-# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+# number, then the text, \`-- <text>\` for one that starts with a dash, or
+# \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
 parse_comment_args() {
   ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
   [ "\$#" -ge 2 ] || args_refuse
   NUM_ARG=\$1 BODY="" BODY_FILE=""
-  case "\$#:\$2" in
-    3:--body-file) body_file_arg "\$2" "\$3" ;;
-    *:--body-file) body_file_arg "\$2" ;;
-    2:*) BODY=\$2 ;;
-    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  shift
+  case "\$1" in
+    --body-file) body_file_arg "\$@"; shift 2 ;;
+    --) [ "\$#" -ge 2 ] || args_refuse; BODY=\$2; shift 2 ;;
+    *) BODY=\$1; shift ;;
   esac
+  [ "\$#" -eq 0 ] || args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# read_body -- BODY set to the text the arguments gave, once checked: the file
+# \`--body-file\` named, read, or the positional text. When it was a file,
+# BODY_FILE becomes the checked copy, for a writer that sends a file. Needs
+# _clean_text.sh, sourced by then; a refused text ends the script with status 14.
+read_body() {
+  if [ -n "\$BODY_FILE" ]; then
+    require_clean_file body "\$BODY_FILE"
+    BODY_FILE=\$CLEAN_FILE BODY=\$(cat -- "\$CLEAN_FILE")
+  else
+    require_clean_text body "\$BODY"
+  fi
+}
+
+# texts_json <filter> [<jq option>...] -- <text>... -- the JSON <filter> builds
+# from the <text>s, which it reads as the array \`.\`, in order. Each travels
+# NUL-ended on jq's stdin: the one byte no shell variable holds, so none ends
+# early, and no text is an argument to jq. Needs jq_lf (_config.sh).
+texts_json() {
+  local filter=\$1 opts=()
+  shift
+  while [ "\$#" -gt 0 ] && [ "\$1" != -- ]; do opts+=("\$1"); shift; done
+  [ "\$#" -gt 0 ] || { echo "\${0##*/}: texts_json needs -- before its texts" >&2; exit 2; }
+  shift
+  printf '%s\\0' "\$@" | jq_lf -c -Rs \${opts[@]+"\${opts[@]}"} "split(\\"\\\\u0000\\") | \$filter"
 }
 `,
     executable: true,
@@ -15485,14 +15590,13 @@ parse_add_args 'usage: add.sh "<title>" [body] [--parent <num>] [--body-file <pa
 . "\$(dirname "\$0")/_cloud_send.sh"
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 require_clean_text title "\$TITLE"
-if [ -n "\$BODY_FILE" ]; then require_clean_file body "\$BODY_FILE"; BODY=\$(cat -- "\$CLEAN_FILE"); else require_clean_text body "\$BODY"; fi
+read_body
 
-# Each text NUL-ended: the one byte no shell variable holds, so none ends early.
-RESP=\$(printf '%s\\0' "\$TITLE" "\$BODY" |
-  jq_lf -c -Rs --arg k "\$PROJECT_KEY" --arg p "\$PARENT" 'split("\\u0000") as [\$t, \$b]
+RESP=\$(texts_json '. as [\$t, \$b]
    | { projectKey: \$k, title: \$t }
    + (if \$b == "" then {} else { body: \$b } end)
-   + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)' |
+   + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)' \\
+  --arg k "\$PROJECT_KEY" --arg p "\$PARENT" -- "\$TITLE" "\$BODY" |
   cloud_send POST "\$API_BASE/tasks")
 
 KEY=\$(echo "\$RESP" | jq_lf -r '.task.key // empty')
@@ -16272,9 +16376,11 @@ require_title() {
     content: `# shellcheck shell=bash
 # The one home of how a backlog writer reads the arguments every backend's
 # add.sh, clarify-comment.sh and close.sh share: a positional body, or
-# \`--body-file <path>\` in its place, and \`--parent <num>\`. Sourced before
-# \`_config.sh\`, so \`--help\` and a usage error need no configured backend;
-# installed beside it. A usage error ends the calling script with status 2.
+# \`--body-file <path>\` in its place, and \`--parent <num>\`; of how it loads that
+# body (read_body), and how it puts its texts in a JSON request (texts_json).
+# Sourced before \`_config.sh\`, so \`--help\` and a usage error need no configured
+# backend; installed beside it. A usage error ends the calling script with
+# status 2.
 #
 # An argument a writer would not record is refused, never dropped: a caller
 # that passed it must not believe it reached the tracker.
@@ -16296,18 +16402,21 @@ body_file_arg() {
 
 # parse_add_args <usage> <extra> <args...> -- add.sh's arguments: a title, an
 # optional body, then at most <extra> more positionals (a backend's labels), and
-# \`--parent <num>\` and \`--body-file <path>\` anywhere. Sets TITLE, BODY,
-# BODY_FILE, PARENT and EXTRA. \`--help\` prints <usage> and ends with status 0.
+# \`--parent <num>\` and \`--body-file <path>\` anywhere, each at most once. \`--\`
+# ends the options, so a text after it may start with a dash. Sets TITLE, BODY,
+# BODY_FILE, PARENT and EXTRA. \`-h\` or \`--help\` as the first argument prints
+# <usage> and ends with status 0; anywhere else \`-h\` is a text like any other.
 parse_add_args() {
-  ARGS_USAGE=\$1
+  ARGS_USAGE=\$1 ARGS_SEEN=" "
   local extra=\$2 pos=()
   shift 2
   PARENT="" BODY_FILE=""
+  case "\${1:-}" in -h | --help) echo "\$ARGS_USAGE"; exit 0 ;; esac
   while [ "\$#" -gt 0 ]; do
     case "\$1" in
-      -h | --help) echo "\$ARGS_USAGE"; exit 0 ;;
-      --parent) [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
-      --body-file) body_file_arg "\$@"; shift 2 ;;
+      --) shift; pos+=("\$@"); break ;;
+      --parent) _once "\$1"; [ "\$#" -ge 2 ] || args_refuse; PARENT=\$2; shift 2 ;;
+      --body-file) _once "\$1"; body_file_arg "\$@"; shift 2 ;;
       --*) args_refuse "unknown flag '\$1'" ;;
       *) pos+=("\$1"); shift ;;
     esac
@@ -16316,6 +16425,13 @@ parse_add_args() {
   _positionals_fit "\$extra" "\${pos[@]}"
   TITLE=\${pos[0]} BODY=\${pos[1]:-} EXTRA=("\${pos[@]:2}")
   [ -z "\$BODY_FILE" ] || [ -z "\$BODY" ] || { echo "\${0##*/}: give a body or --body-file, not both" >&2; exit 2; }
+}
+
+# _once <flag> -- a usage error when <flag> was given before: a writer records
+# one, and keeping the last would drop the other without a word.
+_once() {
+  case \$ARGS_SEEN in *" \$1 "*) args_refuse "\$1 given twice; only one would be recorded" ;; esac
+  ARGS_SEEN="\$ARGS_SEEN\$1 "
 }
 
 # _positionals_fit <extra> <title> [<body> ...] -- a usage error when more than
@@ -16331,17 +16447,45 @@ _positionals_fit() {
 }
 
 # parse_comment_args <args...> -- clarify-comment.sh's arguments: an issue
-# number, then the text or \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
+# number, then the text, \`-- <text>\` for one that starts with a dash, or
+# \`--body-file <path>\`. Sets NUM_ARG, BODY and BODY_FILE.
 parse_comment_args() {
   ARGS_USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
   [ "\$#" -ge 2 ] || args_refuse
   NUM_ARG=\$1 BODY="" BODY_FILE=""
-  case "\$#:\$2" in
-    3:--body-file) body_file_arg "\$2" "\$3" ;;
-    *:--body-file) body_file_arg "\$2" ;;
-    2:*) BODY=\$2 ;;
-    *) args_refuse "one argument too many; '\$3' would not be recorded" ;;
+  shift
+  case "\$1" in
+    --body-file) body_file_arg "\$@"; shift 2 ;;
+    --) [ "\$#" -ge 2 ] || args_refuse; BODY=\$2; shift 2 ;;
+    *) BODY=\$1; shift ;;
   esac
+  [ "\$#" -eq 0 ] || args_refuse "one argument too many; '\$1' would not be recorded"
+}
+
+# read_body -- BODY set to the text the arguments gave, once checked: the file
+# \`--body-file\` named, read, or the positional text. When it was a file,
+# BODY_FILE becomes the checked copy, for a writer that sends a file. Needs
+# _clean_text.sh, sourced by then; a refused text ends the script with status 14.
+read_body() {
+  if [ -n "\$BODY_FILE" ]; then
+    require_clean_file body "\$BODY_FILE"
+    BODY_FILE=\$CLEAN_FILE BODY=\$(cat -- "\$CLEAN_FILE")
+  else
+    require_clean_text body "\$BODY"
+  fi
+}
+
+# texts_json <filter> [<jq option>...] -- <text>... -- the JSON <filter> builds
+# from the <text>s, which it reads as the array \`.\`, in order. Each travels
+# NUL-ended on jq's stdin: the one byte no shell variable holds, so none ends
+# early, and no text is an argument to jq. Needs jq_lf (_config.sh).
+texts_json() {
+  local filter=\$1 opts=()
+  shift
+  while [ "\$#" -gt 0 ] && [ "\$1" != -- ]; do opts+=("\$1"); shift; done
+  [ "\$#" -gt 0 ] || { echo "\${0##*/}: texts_json needs -- before its texts" >&2; exit 2; }
+  shift
+  printf '%s\\0' "\$@" | jq_lf -c -Rs \${opts[@]+"\${opts[@]}"} "split(\\"\\\\u0000\\") | \$filter"
 }
 `,
     executable: true,
@@ -16853,15 +16997,9 @@ parse_comment_args "\$@"
 . "\$(dirname "\$0")/_cloud_send.sh"
 
 NUM=\$(require_issue_number "\$NUM_ARG") || exit 2
-QUESTION=\$BODY
-if [ -n "\$BODY_FILE" ]; then
-  require_clean_file body "\$BODY_FILE"
-  QUESTION=\$(cat -- "\$CLEAN_FILE")
-else
-  require_clean_text body "\$QUESTION"
-fi
+read_body
 
-RESP=\$(printf '%s' "\$QUESTION" |
+RESP=\$(printf '%s' "\$BODY" |
   jq_lf -c -Rs --arg k "\$PROJECT_KEY" --argjson n "\$NUM" '{ projectKey: \$k, number: \$n, body: . }' |
   cloud_send POST "\$API_BASE/comments")
 
