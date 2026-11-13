@@ -27,6 +27,15 @@ import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
  * since the start must be the tip's, so a branch checked out and left is seen. No record is a
  * failure, never a check of the checkout as it is now alone. Every way the check cannot conclude is
  * a failure with a reason, never a pass; a throw from git is the caller's to report as one.
+ *
+ * The reflog sees HEAD's moves only. A command that writes another commit's files into the folder
+ * without moving HEAD leaves no entry naming that commit: `git checkout B -- path`, `git restore
+ * --source`, `git stash apply`, and a merge stopped on a conflict, whose `git merge --abort` writes
+ * an entry from HEAD to HEAD alone. A checked file such a command leaves changed is seen, since the
+ * folder is judged as it is now; one changed and put back before the check is not. The checked
+ * files' ctimes are not compared with the record's to close that: a ctime also moves when the same
+ * bytes are written again, as an editor saving an unchanged file or `git stash` and its `pop` do,
+ * and on a change of mode or owner, so it would refuse sessions that changed nothing it reads.
  */
 
 export type VerifyCheckoutDeps = VerifyScriptsDeps & {
