@@ -33,7 +33,8 @@ type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
  *          stdout stays the command's. 124: the wall clock ran out and the run was stopped;
  *          a stop that failed (a container left behind) is said on a second line.
  *          125: nothing ran (static only, no such export, a layout the policy refuses, a
- *          launcher that could not start, or a run the checkout's review lock refuses: under it,
+ *          launcher that could not start, a `--log` whose folder does not resolve, or a run the
+ *          checkout's review lock refuses: under it,
  *          a `--log` below the folder `review start` made and no `--toolchain`). Every 124 and 125
  *          says why on stderr; the command's own
  *          output is passed through unchanged, or, with `--log <file>`, written to that new file
@@ -48,6 +49,9 @@ export type SandboxDeps = {
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
   readonly probe: () => Promise<BackendProbe>;
+  /** Where a `--log` file would be made (`realLogPath`), `null` when its folder does not resolve. */
+  readonly realLog: (path: string) => Promise<string | null>;
+  /** Runs the request; its `log` is the resolved path the lock judged. */
   readonly exec: (request: ExecRequest & { readonly log: string | null }) => Promise<ExecOutcome>;
   /** Why the checkout's review lock refuses the run (`execLockRefusal`), or `null`. */
   readonly lockRefusal: (request: SandboxExecIntent) => Promise<string | null>;
@@ -59,12 +63,27 @@ export async function runSandbox(
 ): Promise<number> {
   if (intent.sub === "probe") return probe(deps);
   try {
-    const locked = await deps.lockRefusal(intent);
+    const request = await resolvedLog(intent, deps.realLog);
+    const locked = await deps.lockRefusal(request);
     if (locked !== null) return notRun(deps, locked);
-    return answer(await deps.exec(intent), deps);
+    return answer(await deps.exec(request), deps);
   } catch (err) {
     return notRun(deps, err instanceof Error ? err.message : String(err));
   }
+}
+
+/**
+ * The request with its `--log` resolved once, to the one path the lock judges and the run opens:
+ * a folder link repointed between the two cannot move the file somewhere the lock did not judge.
+ */
+async function resolvedLog(
+  intent: SandboxExecIntent,
+  realLog: SandboxDeps["realLog"],
+): Promise<SandboxExecIntent> {
+  if (intent.log === null) return intent;
+  const log = await realLog(intent.log);
+  if (log === null) throw new Error(`--log ${intent.log}: its folder does not resolve`);
+  return { ...intent, log };
 }
 
 async function probe(deps: SandboxDeps): Promise<number> {

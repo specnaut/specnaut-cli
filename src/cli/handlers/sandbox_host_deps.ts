@@ -28,8 +28,9 @@ export function sandboxHostDeps(): SandboxDeps {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     probe: () => prober.probe(),
+    realLog: realLogPath,
     lockRefusal: async (request) =>
-      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request, realLogPath),
+      await execLockRefusal(await FsReviewLock.open(Deno.cwd()), request),
     exec: async (request) => {
       const log = request.log === null ? null : await openCappedLog(request.log);
       try {

@@ -58,15 +58,13 @@ export async function guardToolCall(
 
 /**
  * Why `specnaut sandbox exec` refuses to run while its checkout is locked (`lockedExecRefusal`),
- * or `null`; `lock` is `null` outside a repository.
+ * or `null`; `lock` is `null` outside a repository. The request's `log` is already resolved: the
+ * path judged here is the one the run opens.
  */
 export async function execLockRefusal(
   lock: ReviewLock | null,
   request: { readonly toolchain: readonly string[]; readonly log: string | null },
-  realLog: RealLog,
 ): Promise<string | null> {
   const held = lock === null ? [] : await lock.all();
-  if (held.length === 0) return null;
-  const log = request.log === null ? null : await realLog(request.log);
-  return lockedExecRefusal(held, request.toolchain, log);
+  return lockedExecRefusal(held, request.toolchain, request.log);
 }

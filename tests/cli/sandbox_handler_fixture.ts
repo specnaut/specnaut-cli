@@ -32,6 +32,7 @@ export function deps(
     out: (s) => out.push(s),
     err: (s) => err.push(s),
     probe: () => Promise.resolve(probe),
+    realLog: (path) => Promise.resolve(path),
     exec: () => exec(),
     lockRefusal: () => Promise.resolve(lockRefusal),
   };
