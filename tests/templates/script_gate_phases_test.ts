@@ -159,6 +159,10 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
   );
   assertStringIncludes(said, "`git diff <BASE_TIP> HEAD -- <path>`");
   assertStringIncludes(said, "a `work tree differs from HEAD` reason");
+  assertStringIncludes(
+    said,
+    "a `line endings differ` reason, whose diff can be empty, is shown as its reason says",
+  );
   assertStringIncludes(said, "ask once");
   assertStringIncludes(
     said,

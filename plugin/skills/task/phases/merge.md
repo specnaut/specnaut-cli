@@ -72,8 +72,9 @@ under `--no-close`, once more after the push: there the item's line must read `O
    `behind base: rebase` (rebased as above), this run's merge mode is `manual`: a missing
    `instructions` line is an untrusted one. Show the diff of each named path as it lands (`git diff
    <BASE_TIP> HEAD -- <path>`; a file the base lacks, in full); a `work tree differs from HEAD`
-   reason means the session read other bytes than those that land, whatever `git status` shows.
-   Then ask once, as the one question before step 3:
+   reason means the session read other bytes than those that land, whatever `git status` shows;
+   a `line endings differ` reason, whose diff can be empty, is shown as its reason says: the same
+   text, a CR before LF on one side only. Then ask once, as the one question before step 3:
    *"This branch changes the instructions this session follows. Yes lands them."* A no stops on
    the branch. The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them)
    and nothing else: a later run with another digest asks again, even naming the same paths, and

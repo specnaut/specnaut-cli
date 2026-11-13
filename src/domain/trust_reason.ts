@@ -15,7 +15,8 @@ export const REASON = {
   missing: "on base, missing from the tree",
   submodule: "a submodule on base",
   caseDiffers: "name differs in case from base",
-  lineEndings: "line endings differ",
+  // The text is the same, so a diff of it can be empty: the reason itself says what differs.
+  lineEndings: "line endings differ: the same text but for a CR before LF; a diff can be empty",
   behind: "behind base: rebase",
   differs: "differs from base",
   baseNotRegular: "not a regular file on base",

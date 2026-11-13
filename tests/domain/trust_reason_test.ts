@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { REASON, refinedReason } from "../../src/domain/trust_reason.ts";
 
 /**
@@ -33,4 +33,10 @@ Deno.test("behind compares raw bytes: the merge base's text with other line endi
 
 Deno.test("anything else keeps the caller's reason", () => {
   assertEquals(refinedReason(enc("z\n"), { copies: [LF], mergeBase: LF }, "y"), "y");
+});
+
+Deno.test("the line-endings reason says what differs, since a diff of it can show nothing", () => {
+  assert(REASON.lineEndings.startsWith("line endings differ"), REASON.lineEndings);
+  assert(REASON.lineEndings.includes("CR before LF"), REASON.lineEndings);
+  assert(REASON.lineEndings.includes("a diff can be empty"), REASON.lineEndings);
 });
