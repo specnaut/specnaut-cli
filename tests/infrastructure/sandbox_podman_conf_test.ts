@@ -42,14 +42,17 @@ const read = (path: string) => Deno.readTextFileSync(path);
 const runner = (engine: "podman" | "docker", launcher: ProcessLauncher) =>
   new ContainerRunner(engine, IMAGE, launcher, [], () => "specnaut-sandbox-c1", () => HOST_ENV);
 
-Deno.test("podman conf: the override turns env_host off and empties what a containers.conf adds", () => {
+/** A list reset to nothing, whatever an earlier containers.conf appended to it. */
+const RESET = [{ append: false }];
+
+Deno.test("podman conf: the override turns env_host off and resets each list a containers.conf adds to", () => {
   assertEquals(parse(PODMAN_OVERRIDE), {
     containers: {
       env_host: false,
-      env: [],
-      volumes: [],
-      mounts: [],
-      devices: [],
+      env: RESET,
+      volumes: RESET,
+      mounts: RESET,
+      devices: RESET,
       pidns: "private",
       ipcns: "private",
       utsns: "private",

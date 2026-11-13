@@ -52,14 +52,15 @@ export function engineEnv(host: Readonly<Record<string, string>>): Record<string
  * adds to every container; its process, IPC, host-name and cgroup namespaces are its own. Every
  * other setting of the user's containers.conf (storage, runtime, connection) still applies, as it
  * does to the probe.
+ *
+ * Each list is written `[{append=false}]`: a plain `[]` is appended to, not set, where an earlier
+ * file marked that list `{append=true}`, which stays in force for every file loaded after it. A
+ * podman older than 4.8 cannot read that syntax, and is not offered (`sandbox_container.ts`).
  */
 export const PODMAN_OVERRIDE = [
   "[containers]",
   "env_host = false",
-  "env = []",
-  "volumes = []",
-  "mounts = []",
-  "devices = []",
+  ...["env", "volumes", "mounts", "devices"].map((list) => `${list} = [{append=false}]`),
   'pidns = "private"',
   'ipcns = "private"',
   'utsns = "private"',
