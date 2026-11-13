@@ -147,7 +147,14 @@ async function startOver(argv: string[], exportBranch: ReturnType<typeof branchE
   const said: string[] = [];
   const judged = { head: "e".repeat(40), ref: null, reflog: null };
   const tip = "d".repeat(40);
-  const pass = { granted: Date.now() - 1000, baseTip: tip, checkout: judged, session: "s-1" };
+  const nonce = "a".repeat(32);
+  const pass = {
+    granted: Date.now() - 1000,
+    baseTip: tip,
+    checkout: judged,
+    session: "s-1",
+    nonce,
+  };
   const code = await runReview(parseArgs(["review", "start", ...argv]) as ReviewIntent, {
     out: (s) => said.push(`out ${s}`),
     err: (s) => said.push(`err ${s}`),
@@ -158,6 +165,7 @@ async function startOver(argv: string[], exportBranch: ReturnType<typeof branchE
     start: () =>
       Promise.resolve({
         pass: { take: () => Promise.resolve(pass), grant: unreached, revoke: unreached },
+        nonce,
         now: Date.now,
         baseTip: () => Promise.resolve(tip),
         checkout: () => Promise.resolve(judged),
