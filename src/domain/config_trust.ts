@@ -1,5 +1,5 @@
 import { sameBytes } from "./bytes.ts";
-import { REASON, withoutCr } from "./script_trust.ts";
+import { REASON, withoutCr } from "./trust_reason.ts";
 
 /**
  * Whether the config inputs a branch can edit hold, in the work tree, what the base branch's tip

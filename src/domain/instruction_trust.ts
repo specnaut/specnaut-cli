@@ -2,7 +2,8 @@ import { sameBytes } from "./bytes.ts";
 import { inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
 import { type CheckoutWalk, configReasons, holdsBytes } from "./checkout_trust.ts";
 import type { ConfigFile, ConfigVerdict } from "./config_trust.ts";
-import { type BaseEntry, REASON, type Untrusted, withoutCr } from "./script_trust.ts";
+import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
+import { withoutCr } from "./trust_reason.ts";
 
 /**
  * Whether the instruction files a session takes as its rules hold, in the work tree, what the base
