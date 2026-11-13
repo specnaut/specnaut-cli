@@ -14,8 +14,8 @@ env:
   MACOS_TEAM_ID: H87Y8Z6YPS
   MACOS_IDENTIFIER: com.specnaut.cli
   # rcodesign, pinned by version and sha256 (release_downloads_pinned_test.ts).
-  RCODESIGN_URL: https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign/0.29.0/apple-codesign-0.29.0-x86_64-unknown-linux-musl.tar.gz
-  RCODESIGN_SHA256: dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002
+  APPLE_CODESIGN_TARBALL_URL: https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign/0.29.0/apple-codesign-0.29.0-x86_64-unknown-linux-musl.tar.gz
+  APPLE_CODESIGN_TARBALL_SHA256: dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002
 
 jobs:
   # Hybrid security gate (#188's sibling): checks GitHub-side alert state
@@ -186,8 +186,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/rcodesign" && cd "$RUNNER_TEMP/rcodesign"
-          curl -fsSLo rcodesign.tar.gz "$RCODESIGN_URL"
-          echo "$RCODESIGN_SHA256  rcodesign.tar.gz" | sha256sum -c -
+          curl -fsSLo rcodesign.tar.gz "$APPLE_CODESIGN_TARBALL_URL"
+          echo "$APPLE_CODESIGN_TARBALL_SHA256  rcodesign.tar.gz" | sha256sum -c -
           tar -xzf rcodesign.tar.gz --strip-components=1
           chmod +x rcodesign
           echo "$PWD" >> "$GITHUB_PATH"
@@ -338,8 +338,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/rcodesign" && cd "$RUNNER_TEMP/rcodesign"
-          curl -fsSLo rcodesign.tar.gz "$RCODESIGN_URL"
-          echo "$RCODESIGN_SHA256  rcodesign.tar.gz" | sha256sum -c -
+          curl -fsSLo rcodesign.tar.gz "$APPLE_CODESIGN_TARBALL_URL"
+          echo "$APPLE_CODESIGN_TARBALL_SHA256  rcodesign.tar.gz" | sha256sum -c -
           tar -xzf rcodesign.tar.gz --strip-components=1
           chmod +x rcodesign
           echo "$PWD" >> "$GITHUB_PATH"
