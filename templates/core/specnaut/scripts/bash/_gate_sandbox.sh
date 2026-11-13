@@ -61,7 +61,8 @@ gate_sandbox_start() {
 
 # gate_sandbox_gates - points GATES at a copy of the --base commit's gates.yml, kept beside
 # the logs. The base is read from this repository's own objects, never the export's, so a
-# commit only the branch carries cannot be named as the base. A base with no regular
+# commit only the branch carries cannot be named as the base; under the review lock,
+# `--base` is also pinned to the base tip `review start` recorded. A base with no regular
 # gates.yml leaves GATES naming no file: no tier is declared, which is NOT RUN. Exit 3 for
 # a base this repository does not hold as a commit, or one git cannot list, with its reason.
 gate_sandbox_gates() {

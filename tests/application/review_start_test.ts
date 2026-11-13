@@ -53,8 +53,8 @@ function deps(
     baseTip: () => Promise.resolve(tip),
     checkout: () => Promise.resolve(now),
     lock: (id: string) => Promise.resolve(void done.push(`lock ${id}`)),
-    record: (id: string, review: { head: string; logs: string }) =>
-      Promise.resolve(void done.push(`record ${id} ${review.head} ${review.logs}`)),
+    record: (id: string, review: { head: string; logs: string; base?: string }) =>
+      Promise.resolve(void done.push(`record ${id} ${review.head} ${review.logs} ${review.base}`)),
     exportBranch: (source: string, expected?: string) =>
       Promise.resolve(void done.push(`export ${[source, expected].filter(Boolean).join(" ")}`))
         .then(() => exported),
@@ -77,7 +77,7 @@ Deno.test("a start on a fresh pass takes it, exports the source and keeps the ex
     "taken",
     "lock s-1",
     "export origin/topic",
-    `record s-1 ${"a".repeat(40)} /cache/a/logs`,
+    `record s-1 ${"a".repeat(40)} /cache/a/logs ${TIP}`,
     "kept",
   ]);
 });

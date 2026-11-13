@@ -47,7 +47,8 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   assertStringIncludes(doc, "the hook alone pins the commit, while `sandbox exec` itself judges");
   assertStringIncludes(
     doc,
-    "the lock pins a script's `--head` and `--evidence`, never its `--objects`",
+    "the lock pins a script's `--head`, `--evidence` and `--base` (the base tip the start was " +
+      "judged against, the `BASE_TIP` step 1 prints), never its `--objects`",
   );
   assertStringIncludes(doc, "`LOGS <dir>` (the one folder a sandboxed run logs to)");
   assert(!doc.includes("mktemp"), "the lock refuses mktemp: the start makes the logs folder");

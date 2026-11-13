@@ -35,7 +35,8 @@ On exit 0 the lines are `HEAD <sha>`, `SEATS <dir>` (the reviewers' read-only co
 to) and one `LISTED <kind> <blob sha> <path>` per entry the export lists and never writes:
 instruction files, links, submodules. Keep `$HEAD`, `$OBJECTS` and `$LOGS` exactly as printed: every
 script below takes that `--objects` folder and no other. That is a rule you follow: the lock pins a
-script's `--head` and `--evidence`, never its `--objects`.
+script's `--head`, `--evidence` and `--base` (the base tip the start was judged against, the
+`BASE_TIP` step 1 prints), never its `--objects`.
 
 ## The review lock
 

@@ -1,6 +1,6 @@
 import { type CheckoutState, isPassNonce, passHolds, sameCheckout } from "../domain/review_gate.ts";
 import { isSessionId } from "../domain/session_record.ts";
-import type { ReviewPass } from "./review_ports.ts";
+import type { RecordedReview, ReviewPass } from "./review_ports.ts";
 import type { BranchExport } from "./untrusted_review.ts";
 import { UnexpectedHead } from "./untrusted_review_ports.ts";
 
@@ -29,7 +29,7 @@ export type StartDeps = {
   /** Locks the session `sessionId` until it ends. */
   readonly lock: (sessionId: string) => Promise<void>;
   /** Records in the session's lock the head exported and the folder for its logs. */
-  readonly record: (sessionId: string, review: { head: string; logs: string }) => Promise<void>;
+  readonly record: (sessionId: string, review: RecordedReview) => Promise<void>;
   /** Exports `source`; a fetched head other than `expectedSha`, when given, is refused. */
   readonly exportBranch: (source: string, expectedSha?: string) => Promise<BranchExport>;
 };
@@ -82,7 +82,8 @@ export async function startReview(
   await deps.lock(granted.session);
   const exported = await exportOrRefusal(deps, source, expectedSha);
   if (typeof exported === "string") return { kind: "refused", why: exported };
-  await deps.record(granted.session, { head: exported.sha, logs: exported.logs });
+  const review = { head: exported.sha, logs: exported.logs, base: granted.baseTip };
+  await deps.record(granted.session, review);
   exported.keep();
   return { kind: "started", exported };
 }

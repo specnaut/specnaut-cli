@@ -45,6 +45,19 @@ Deno.test("the entry records the review's head and logs folder once the branch i
   });
 });
 
+Deno.test("the entry records the base tip the start was judged against; a malformed one names none", async () => {
+  await inRepository(async (dir, lock) => {
+    const base = "b".repeat(40);
+    await lock.lock("s-1");
+    await lock.record("s-1", { head: SHA, logs: "/c/logs", base });
+    assertEquals(await lock.held("s-1"), { head: SHA, logs: "/c/logs", base });
+    await Deno.remove(join(dir, "state", "review-lock", "s-1.json"));
+    const file = join(dir, ".git", "specnaut", "review-lock", "s-1.json");
+    await Deno.writeTextFile(file, JSON.stringify({ head: SHA, logs: "/c/logs", base: "main" }));
+    assertEquals(await lock.held("s-1"), { head: SHA, logs: "/c/logs", base: null });
+  });
+});
+
 Deno.test("a lock is the entry's being there: a file emptied, or replaced by a folder, still holds", async () => {
   await inRepository(async (dir, lock) => {
     await lock.lock("s-1");

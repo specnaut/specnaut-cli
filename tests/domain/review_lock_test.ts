@@ -7,7 +7,7 @@ import {
 } from "../../src/domain/review_lock.ts";
 
 const SHA = "a".repeat(40);
-const REVIEW: LockedReview = { head: SHA, logs: "/c/logs" };
+const REVIEW: LockedReview = { head: SHA, logs: "/c/logs", base: SHA };
 const LOG = "/c/logs/1.log";
 const bash = (command: string, review = REVIEW, log: string | null = LOG) =>
   lockedCallRefusal("Bash", { command }, review, log);

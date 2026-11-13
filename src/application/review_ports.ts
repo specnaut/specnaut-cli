@@ -45,7 +45,7 @@ export interface ReviewLock {
   /** Locks the session `sessionId`; a lock already there stays as it is. */
   lock(sessionId: string): Promise<void>;
   /** Records in the session's entry the head its review exported and the folder for its logs. */
-  record(sessionId: string, review: { head: string; logs: string }): Promise<void>;
+  record(sessionId: string, review: RecordedReview): Promise<void>;
   /**
    * What the lock of the session `sessionId` records (`UNKNOWN_REVIEW` where it names nothing), or
    * `null` when it is not locked; for `null`, `UNKNOWN_REVIEW` when any session is.
@@ -54,3 +54,11 @@ export interface ReviewLock {
   /** What every lock of this checkout records, whichever session holds it. */
   all(): Promise<readonly LockedReview[]>;
 }
+
+/** What `review start` records in a session's lock once the branch is exported. */
+export type RecordedReview = {
+  readonly head: string;
+  readonly logs: string;
+  /** The base branch's tip the start was judged against: the one `--base` a script may name. */
+  readonly base?: string;
+};

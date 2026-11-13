@@ -48,10 +48,14 @@ function entryOf(text: string): LockEntry {
   try {
     const parsed: unknown = JSON.parse(text);
     if (typeof parsed !== "object" || parsed === null) return UNKNOWN_ENTRY;
-    const { head, logs, state } = parsed as Record<string, unknown>;
+    const { head, logs, base, state } = parsed as Record<string, unknown>;
     const review = {
       head: typeof head === "string" && isFullSha(head) ? head : null,
       logs: typeof logs === "string" && isAbsolute(logs) ? logs : null,
+      // Only an entry that records a base names one: an earlier entry pins `--base` to nothing.
+      ...(base === undefined
+        ? {}
+        : { base: typeof base === "string" && isFullSha(base) ? base : null }),
     };
     return { review, state: typeof state === "string" ? state : null };
   } catch (err) {

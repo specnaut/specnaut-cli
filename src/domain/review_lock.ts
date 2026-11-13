@@ -42,12 +42,17 @@ const LOCKED = "refused under the review lock: this session read a branch it can
   "run; start a new session for anything else";
 
 /**
- * What a session's lock entry records of its review, each `null` where the entry does not say:
- * the head `specnaut review start` exported, and the folder it made for the review's logs (its
- * real path). An entry written before the export, or one that cannot be read, says neither, and
+ * What a session's lock entry records of its review, each `null` (or absent) where the entry does
+ * not say: the head `specnaut review start` exported, the folder it made for the review's logs (its
+ * real path), and the base branch's tip the start was judged against, the one `--base` a review
+ * script may name. An entry written before the export, or one that cannot be read, says none, and
  * then no command that needs them runs.
  */
-export type LockedReview = { readonly head: string | null; readonly logs: string | null };
+export type LockedReview = {
+  readonly head: string | null;
+  readonly logs: string | null;
+  readonly base?: string | null;
+};
 
 export const UNKNOWN_REVIEW: LockedReview = { head: null, logs: null };
 

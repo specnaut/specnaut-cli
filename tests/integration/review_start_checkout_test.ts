@@ -70,7 +70,8 @@ Deno.test("a start in the checkout its gate judged starts; one after the checkou
   assertEquals(await gate(root, "control-session"), 0);
   assertEquals((await start(root)).kind, "started", "the control: an unchanged checkout starts");
   const lock = await FsReviewLock.open(root, { state: join(root, ".state") });
-  const recorded = { head: "a".repeat(40), logs: "/cache/logs" };
+  const base = await baseTipOf(await GitObjects.open(root));
+  const recorded = { head: "a".repeat(40), logs: "/cache/logs", base };
   assertEquals(await lock.held("control-session"), recorded, "the start locks the session judged");
   assertEquals(await lock.held("moved-session-0"), null, "and no other");
 

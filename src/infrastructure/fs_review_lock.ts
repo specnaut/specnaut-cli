@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, join } from "@std/path";
-import type { ReviewLock } from "../application/review_ports.ts";
+import type { RecordedReview, ReviewLock } from "../application/review_ports.ts";
 import { type LockedReview, UNKNOWN_REVIEW } from "../domain/review_lock.ts";
 import { entryAt, entryIn, entryNames, heldIn } from "./fs_review_lock_entries.ts";
 import { isSessionId } from "../domain/session_record.ts";
@@ -59,7 +59,7 @@ export class FsReviewLock implements ReviewLock {
     }
   }
 
-  async record(sessionId: string, review: { head: string; logs: string }): Promise<void> {
+  async record(sessionId: string, review: RecordedReview): Promise<void> {
     const folders = this.#folders(sessionId);
     const entry = { session: sessionId, locked: this.now(), state: folders[1], ...review };
     const text = `${JSON.stringify(entry)}\n`;
