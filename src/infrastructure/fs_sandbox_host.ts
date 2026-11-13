@@ -19,12 +19,17 @@ import { securePrivateFolder } from "./private_folder.ts";
 export class FsSandboxHost implements SandboxHost {
   constructor(
     readonly cacheRoot: string,
+    /** The user's home, as HOME names it: empty when HOME is unset or empty, which is refused. */
     readonly home: string,
     readonly checkout: () => Promise<string>,
   ) {}
 
   async locate(sha: string): Promise<HostFolders> {
     if (!isFullSha(sha)) throw new SandboxRefused(`${JSON.stringify(sha)} is not a full commit id`);
+    // Resolved, an empty home is the working folder: the layout would keep the wrong folder out.
+    if (this.home === "") {
+      throw new SandboxRefused("HOME is unset or empty: the home folder to keep out is unknown");
+    }
     const missing = `no export of ${sha}: export the branch first`;
     const root = await real(this.cacheRoot, missing);
     await securePrivateFolder(root);

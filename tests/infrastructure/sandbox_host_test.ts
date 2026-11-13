@@ -50,6 +50,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "locate: an empty HOME, as an unset one reaches it, is refused before it is resolved",
+  ignore: !posix,
+  fn: () =>
+    withTemp(async (dir) => {
+      const root = await exportIn(dir);
+      // Resolved, "" is the working folder: the home the layout keeps out would be the wrong one.
+      const host = new FsSandboxHost(root, "", () => Promise.resolve(join(dir, "checkout")));
+      await assertRejects(() => host.locate(SHA), SandboxRefused, "HOME is unset or empty");
+    }),
+});
+
+Deno.test({
   name: "locate: no export of that commit is refused",
   ignore: !posix,
   fn: () =>
