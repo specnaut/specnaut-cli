@@ -45,7 +45,8 @@ Deno.test("sandbox exec refuses its session a log in another session's folder", 
     assertEquals(mine.code, 125);
     assert(mine.err.includes("review lock"), mine.err);
     const unknown = await exec(repo, log, { XDG_STATE_HOME: xdg });
-    assert(unknown.err.includes(`no export of ${SHA}`), `past the lock: ${unknown.err}`);
+    const past = Deno.build.os === "windows" ? "no sandbox on Windows" : `no export of ${SHA}`;
+    assert(unknown.err.includes(past), `past the lock: ${unknown.err}`);
   } finally {
     await Deno.remove(repo, { recursive: true });
   }
