@@ -17,25 +17,16 @@
 
 import { SemVer } from "../src/domain/release.ts";
 import { flat } from "./check-release-commit.ts";
+import { git } from "./git.ts";
 
 const HISTORY = ".specnaut/release/history";
 const HIGHLIGHTS = ".specnaut/release/HIGHLIGHTS.md";
-
-/** `git <args>`'s output; throws with git's own message when it fails. */
-async function git(...args: string[]): Promise<string> {
-  const out = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
-  if (!out.success) {
-    const said = new TextDecoder().decode(out.stderr).trim();
-    throw new Error(`git ${args.join(" ")} failed: ${said}`);
-  }
-  return new TextDecoder().decode(out.stdout);
-}
 
 /** What `tag` published as its highlights: `""` when the file did not exist at the tag. */
 async function publishedAt(tag: string): Promise<string> {
   // `ls-tree` lists nothing for an absent path and fails only when git does, so
   // a git failure is never read as a missing file, whatever git's locale.
-  if ((await git("ls-tree", "--name-only", tag, "--", HIGHLIGHTS)).trim() === "") return "";
+  if (await git("ls-tree", "--name-only", tag, "--", HIGHLIGHTS) === "") return "";
   return await git("show", `${tag}:${HIGHLIGHTS}`);
 }
 
@@ -65,21 +56,27 @@ export async function historyRecordProblems(): Promise<string[]> {
   const cut = beingCut(records, tags);
   const problems: string[] = [];
   for (const name of records) {
-    const tag = name.slice(0, -".md".length);
-    if (!tags.has(tag)) {
-      if (name !== cut) {
-        problems.push(
-          `${HISTORY}/${name} has no tag ${tag}, and only the release being cut may lack one`,
-        );
-      }
-    } else if (!(await matchesItsTag(name, tag))) {
-      problems.push(
-        `${HISTORY}/${name} differs from ${HIGHLIGHTS} as ${tag} published it — ` +
-          `a history record is never edited after its release`,
-      );
-    }
+    const problem = await recordProblem(name, tags, cut);
+    if (problem !== null) problems.push(problem);
   }
   return problems;
+}
+
+/** What is wrong with record `name`, or null: it lacks its tag and is not `cut`, or differs from it. */
+async function recordProblem(
+  name: string,
+  tags: Set<string>,
+  cut: string | undefined,
+): Promise<string | null> {
+  const tag = name.slice(0, -".md".length);
+  if (!tags.has(tag)) {
+    return name === cut
+      ? null
+      : `${HISTORY}/${name} has no tag ${tag}, and only the release being cut may lack one`;
+  }
+  if (await matchesItsTag(name, tag)) return null;
+  return `${HISTORY}/${name} differs from ${HIGHLIGHTS} as ${tag} published it — ` +
+    `a history record is never edited after its release`;
 }
 
 /**

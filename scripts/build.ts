@@ -10,9 +10,11 @@
 // a workflow builds its matrix and its expected asset list from it
 // (`fromJSON`) instead of naming an asset itself.
 
+import { fromFileUrl } from "@std/path";
+
 const ROOT = new URL("..", import.meta.url);
 const OUT = new URL("dist/", ROOT);
-const ENTRY = new URL("src/main.ts", ROOT).pathname;
+const ENTRY = fromFileUrl(new URL("src/main.ts", ROOT));
 
 /**
  * `goos`/`goarch` are the Go port's coordinates for the same target; `runner`
@@ -95,7 +97,7 @@ async function ensureOutDir(): Promise<void> {
 }
 
 async function compile(target: Target): Promise<void> {
-  const out = new URL(target.outName, OUT).pathname;
+  const out = fromFileUrl(new URL(target.outName, OUT));
   console.log(`→ ${target.triple}  (${target.outName})`);
   const cmd = new Deno.Command("deno", {
     args: [

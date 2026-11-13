@@ -15,9 +15,9 @@
 // A shim resolves at run time, so it survives any move of the checkout without
 // being reinstalled.
 
-import { resolve } from "@std/path";
+import { fromFileUrl, resolve } from "@std/path";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+const ROOT = fromFileUrl(new URL("..", import.meta.url));
 
 /**
  * How the installer recognises a hook it wrote. A shim is a regular file, so

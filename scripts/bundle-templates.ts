@@ -6,7 +6,7 @@
 //   - RELEASE_HISTORY: ReleaseHistory (from .specnaut/release/history/, cli#759)
 // Runtime code reads nothing from disk.
 
-import { relative } from "@std/path";
+import { fromFileUrl, relative } from "@std/path";
 import { managedSectionLabels, type MergeJsonFlavor } from "../src/domain/template.ts";
 import { contentField, fmtLineWidth } from "./bundle-content-field.ts";
 import { assertLinkEntries } from "./bundle-link-entries.ts";
@@ -253,7 +253,7 @@ ${releaseHistoryEntries(history, FMT_LINE_WIDTH)}];
   await Deno.writeTextFile(OUTPUT_PATH, src);
   console.log(
     `Bundled ${manifest.core.length} core entries + ${manifest.harness_static.length} harness-specific → ${
-      relative(Deno.cwd(), OUTPUT_PATH.pathname)
+      relative(Deno.cwd(), fromFileUrl(OUTPUT_PATH))
     }`,
   );
 }

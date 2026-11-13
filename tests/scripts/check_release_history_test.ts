@@ -9,6 +9,7 @@ import {
   LEAD,
   type Repo,
   runScript,
+  setUp,
 } from "./release_commit_fixture.ts";
 
 /**
@@ -26,15 +27,14 @@ function run(cwd: string): Promise<{ code: number; err: string }> {
 
 /** A repo whose `v1.0.0` tag published `published` (`null`: no highlights file) and recorded `record`. */
 async function released(published: string | null, record: string): Promise<Repo> {
-  const repo = await emptyRepo("specnaut-history-check-");
-  const { dir } = repo;
-  await Deno.mkdir(join(dir, HISTORY), { recursive: true });
-  if (published !== null) await Deno.writeTextFile(join(dir, H), published);
-  await Deno.writeTextFile(join(dir, HISTORY, "v1.0.0.md"), record);
-  await git(dir, "add", "-A");
-  await git(dir, "commit", "-q", "-m", "chore: release v1.0.0");
-  await git(dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0");
-  return repo;
+  return await setUp(await emptyRepo("specnaut-history-check-"), async (dir) => {
+    await Deno.mkdir(join(dir, HISTORY), { recursive: true });
+    if (published !== null) await Deno.writeTextFile(join(dir, H), published);
+    await Deno.writeTextFile(join(dir, HISTORY, "v1.0.0.md"), record);
+    await git(dir, "add", "-A");
+    await git(dir, "commit", "-q", "-m", "chore: release v1.0.0");
+    await git(dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0");
+  });
 }
 
 /** Rewrites a file in the repo and commits it after the tag. */
@@ -97,7 +97,8 @@ Deno.test("a git failure refuses with git's message, never reads as an absent fi
   await git(repo.dir, "tag", "-f", "v1.0.0", "HEAD:.specnaut/release/history/v1.0.0.md");
   const { code, err } = await run(repo.dir);
   assertEquals(code, 1);
-  assert(err.includes("git ls-tree") && err.includes("not a tree object"), err);
+  // Git's own words, in the C locale the run sets: in German "fatal:" reads "Schwerwiegend:".
+  assert(err.includes("git ls-tree") && err.includes("fatal: not a tree object"), err);
 });
 
 Deno.test("a git that cannot list the tags refuses with its message", async () => {

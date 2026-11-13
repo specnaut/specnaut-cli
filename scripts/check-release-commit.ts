@@ -32,6 +32,7 @@
 
 import { VERSIONED_FILES } from "./bump-version.ts";
 import { releaseRefProblems } from "./catalog-refs.ts";
+import { git } from "./git.ts";
 
 const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
 
@@ -40,14 +41,6 @@ const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
  * that must NOT count as rewriting, and `deno fmt` performs it unasked.
  */
 export const flat = (t: string) => t.replace(/\s+/g, " ").trim();
-
-async function git(...args: string[]): Promise<string> {
-  const out = await new Deno.Command("git", { args, stdout: "piped", stderr: "piped" }).output();
-  if (!out.success) {
-    throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(out.stderr).trim()}`);
-  }
-  return new TextDecoder().decode(out.stdout).trim();
-}
 
 /**
  * Every place a version can hide in these files: a JSON `"version": "x"` field

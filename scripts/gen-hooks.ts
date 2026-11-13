@@ -22,7 +22,7 @@ import { encodeHex } from "@std/encoding/hex";
 import { fromFileUrl, join } from "@std/path";
 import { type CodexHookCall, codexHookCommand } from "../src/domain/hook_command.ts";
 
-// fromFileUrl, not `.pathname`: on Windows that is `/D:/…`, which no API opens.
+// fromFileUrl, not the URL's path: on Windows that is `/D:/…`, which no API opens.
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
 const HOOKS = join(ROOT, "templates/harness-specific/shared/hooks");
 const CODEX_HOOKS_JSON = join(ROOT, "templates/harness-specific/codex/hooks.json");
