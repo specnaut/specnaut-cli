@@ -39,7 +39,8 @@ type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
  *          `CLAUDE_CODE_SESSION_ID` names it, and no `--toolchain`). Every 124 and 125
  *          says why on stderr; the command's own
  *          output is passed through unchanged, or, with `--log <file>`, written to that new file
- *          with every control but tab and line feed dropped and cut at `LOG_CAP_BYTES`: a review
+ *          with every control but tab and line feed dropped, every invisible format character and
+ *          line or paragraph separator too (`inert_log.ts`), and cut at `LOG_CAP_BYTES`: a review
  *          briefs the file by path, and reads the result from the exit code alone.
  *
  * Usage errors are the parser's: exit 2 with the help, before anything is probed.

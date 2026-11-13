@@ -2,7 +2,8 @@
  * What a sandboxed run's output becomes before anyone reads it: a file the review briefs by path,
  * never text pasted into a session. Every control byte but tab and line feed is dropped (C0, DEL,
  * and C1 as UTF-8 spells it, `C2 80`..`C2 9F`), so no escape sequence or carriage return reaches a
- * terminal or a reader, judged on the decoded code points; and the bytes kept stop at a cap, so
+ * terminal or a reader, judged on the decoded code points, and so is every invisible format
+ * character and line or paragraph separator (`CONTROLS`); and the bytes kept stop at a cap, so
  * a run cannot fill the disk. The run's result is its exit code, never anything read here.
  */
 
@@ -46,6 +47,11 @@ export class LogFilter {
   }
 }
 
-/** C0 but tab and line feed, DEL, and C1. */
+/**
+ * C0 but tab and line feed, DEL, and C1; then, by Unicode property, every format character (bidi
+ * overrides and isolates, zero-width characters, tag characters) and the line and paragraph
+ * separators: each changes how a reader sees the text around it, or where a line ends, while it
+ * shows as nothing. Combining marks and variation selectors stay: they belong to the letter before.
+ */
 // deno-lint-ignore no-control-regex
-const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\p{Cf}\p{Zl}\p{Zp}]/gu;

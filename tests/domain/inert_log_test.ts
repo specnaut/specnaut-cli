@@ -52,3 +52,23 @@ Deno.test("a sequence cut at the end of the run is kept as a replacement, never 
   assertEquals(dec(f.push(Uint8Array.from([0x61, 0xc2]))), "a");
   assertEquals(dec(f.end()), "�");
 });
+
+Deno.test("a log drops bidi controls, zero-width and tag characters, and line and paragraph separators", () => {
+  const classes: Record<string, string> = {
+    "bidi overrides and isolates": "‪‫‬‭‮⁦⁧⁨⁩‎‏",
+    "zero-width characters": "​‌‍⁠﻿",
+    "tag characters": "\u{e0001}\u{e0041}\u{e007f}",
+    "line and paragraph separators": "  ",
+  };
+  const kept = Object.fromEntries(
+    Object.entries(classes).map((
+      [name, chars],
+    ) => [name, dec(new LogFilter().push(enc(`a${chars}b`)))]),
+  );
+  assertEquals(kept, Object.fromEntries(Object.keys(classes).map((name) => [name, "ab"])));
+});
+
+Deno.test("a log keeps the letters and marks a format character could be mistaken for", () => {
+  const f = new LogFilter();
+  assertEquals(dec(f.push(enc("é́ ü ∑ 😀"))), "é́ ü ∑ 😀");
+});
