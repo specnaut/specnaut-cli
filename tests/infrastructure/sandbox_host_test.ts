@@ -101,13 +101,14 @@ Deno.test({
 });
 
 Deno.test({
-  name: "real: a --toolchain link to the home or into the checkout is refused, never bound",
+  name: "real: a --toolchain link to the home, a credential folder or the checkout is refused",
   ignore: !posix,
   fn: () =>
     withTemp(async (dir) => {
       const root = await exportIn(dir);
-      await Deno.mkdir(join(dir, "home"));
+      await Deno.mkdir(join(dir, "home", ".cargo"), { recursive: true });
       await Deno.mkdir(join(dir, "checkout", "bin"), { recursive: true });
+      await Deno.symlink(join(dir, "home", ".cargo"), join(dir, "tools-cargo"));
       await Deno.mkdir(join(dir, "tools"));
       await Deno.symlink(join(dir, "home"), join(dir, "tools", "to-home"));
       await Deno.symlink(join(dir, "checkout", "bin"), join(dir, "tools", "to-checkout"));
@@ -117,8 +118,12 @@ Deno.test({
         host: hostOver(root, dir),
         runnerFor: () => ({ run: () => (runs.push("ran"), Promise.reject(new Error("ran"))) }),
       };
-      for (const [link, why] of [["to-home", "holds the home"], ["to-checkout", "overlaps"]]) {
-        const toolchain = [join(dir, "tools", link)];
+      const links = [["tools/to-home", "holds the home"], ["tools/to-checkout", "overlaps"], [
+        "tools-cargo",
+        "is or holds ~/.cargo",
+      ]];
+      for (const [link, why] of links) {
+        const toolchain = [join(dir, link)];
         const result = await execInSandbox(deps, { sha: SHA, toolchain, command: ["make"] });
         assertEquals(result.kind, "not_run", link);
         assert(result.kind === "not_run" && result.why.includes(why), JSON.stringify(result));

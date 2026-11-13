@@ -57,14 +57,22 @@ Deno.test("safePath: hands a plain path back, and throws with the reason otherwi
 const CREDENTIALS = [
   ".ssh",
   ".aws",
+  ".azure",
   ".gnupg",
+  ".password-store",
   ".cargo",
   ".config",
   ".docker",
   ".kube",
+  ".gradle",
+  ".m2",
+  ".gem",
+  ".terraform.d",
   ".netrc",
   ".npmrc",
   ".git-credentials",
+  ".local/share/keyrings",
+  "Library/Keychains",
 ];
 
 const readOnly = (folder: string) => layoutProblem(PATHS, [PATHS.tree, folder], []);
@@ -82,6 +90,13 @@ for (const location of CREDENTIALS) {
 Deno.test("layoutProblem: the credential list is the one stated, and a folder inside one is read", () => {
   assertEquals([...CREDENTIAL_LOCATIONS].sort(), [...CREDENTIALS].sort());
   assertEquals(readOnly(`${PATHS.home}/.cargo/bin`), null);
+  assertEquals(readOnly(`${PATHS.home}/.local/bin`), null);
+  for (
+    const [folder, held] of [[".local", ".local/share/keyrings"], ["Library", "Library/Keychains"]]
+  ) {
+    const p = `${PATHS.home}/${folder}`;
+    assertEquals(readOnly(p), `${p} is or holds ~/${held}, where credentials are kept`);
+  }
   assertEquals(readOnly(`${PATHS.home}/.sshd`), null, "a sibling sharing a prefix");
   assertEquals(readOnly(`${PATHS.home}/.deno/bin`), null);
 });

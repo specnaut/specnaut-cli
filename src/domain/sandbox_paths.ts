@@ -70,27 +70,22 @@ export function ancestors(paths: readonly string[]): string[] {
 }
 
 /**
- * Where a home keeps credentials: keys, cloud and registry tokens, the git and network logins.
- * A read-only folder that is or holds one is refused, so a credential folder is never mounted; a
- * folder inside one (`~/.cargo/bin`) is still a toolchain the sandbox may read.
+ * Where a home keeps credentials: keys, cloud and registry tokens, the git and network logins,
+ * password stores and keychains. A read-only folder that is or holds one is refused, so a
+ * credential folder is never mounted; a folder inside one (`~/.cargo/bin`) is still a toolchain
+ * the sandbox may read. Paths under the home, `/`-separated.
  */
+// deno-fmt-ignore
 export const CREDENTIAL_LOCATIONS: readonly string[] = [
-  ".ssh",
-  ".aws",
-  ".gnupg",
-  ".cargo",
-  ".config",
-  ".docker",
-  ".kube",
-  ".netrc",
-  ".npmrc",
-  ".git-credentials",
+  ".ssh", ".aws", ".azure", ".gnupg", ".password-store", ".cargo", ".config", ".docker",
+  ".kube", ".gradle", ".m2", ".gem", ".terraform.d", ".netrc", ".npmrc", ".git-credentials",
+  ".local/share/keyrings", "Library/Keychains",
 ];
 
 /**
  * The first reason a layout would expose the home, a credential location in it, the checkout or a
  * read-only folder: `readOnly` is every folder the sandbox only reads, `path` the PATH entries
- * searched before the system's.
+ * searched before the system's. Every path is a real path: the caller resolves links first.
  */
 export function layoutProblem(
   paths: SandboxPaths,
@@ -103,13 +98,20 @@ export function layoutProblem(
     if (problem !== null) return `${JSON.stringify(p)} ${problem}`;
   }
   for (const p of [...readOnly, paths.scratch]) {
-    if (within(paths.home, p)) return `${p} is or holds the home folder`;
-    const held = CREDENTIAL_LOCATIONS.find((c) => within(`${paths.home}/${c}`, p));
-    if (held) return `${p} is or holds ~/${held}, where credentials are kept`;
-    if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
+    const exposed = exposureOf(p, paths);
+    if (exposed !== null) return exposed;
   }
   const shared = readOnly.find((p) => overlaps(p, paths.scratch));
   if (shared) return `the scratch folder overlaps ${shared}, which is only read`;
   const stray = path.find((p) => !readOnly.some((r) => within(p, r)));
   return stray ? `PATH entry ${stray} is in no folder the sandbox reads` : null;
+}
+
+/** What the visible folder `p` would expose: the home, a credential location, the checkout. */
+function exposureOf(p: string, paths: SandboxPaths): string | null {
+  if (within(paths.home, p)) return `${p} is or holds the home folder`;
+  const held = CREDENTIAL_LOCATIONS.find((c) => within(`${paths.home}/${c}`, p));
+  if (held) return `${p} is or holds ~/${held}, where credentials are kept`;
+  if (overlaps(p, paths.checkout)) return `${p} overlaps the checkout`;
+  return null;
 }
