@@ -4,6 +4,7 @@ import type { Engine, SandboxPolicy } from "../domain/sandbox.ts";
 import { containerArgs } from "../domain/sandbox_args.ts";
 import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
+import { removalOf, removed } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import { engineEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
@@ -56,33 +57,10 @@ export class ContainerRunner implements SandboxRunner {
   }
 }
 
-/**
- * Removes the named container; what the engine prints (the name) never passes for the run's.
- * Podman, unlike docker, fails on a container already gone, as a `--rm` one is once it ended.
- */
-function removalOf(engine: Engine, name: string, env: Record<string, string>): ProcessSpec {
-  const ignore = engine === "podman" ? ["--ignore"] : [];
-  return { cmd: engine, args: ["rm", "--force", ...ignore, name], env, stdout: "discarded" };
-}
-
 /** The watchdog of a container's run: it ends with `remove`, in the removal's environment. */
 function watchdogOf(remove: ProcessSpec, seconds: number): (pid: number) => ProcessSpec {
   const removal = [remove.cmd, ...remove.args];
   return (pid) => watchdogSpec(pid, seconds + DRAIN_GRACE_SECONDS, removal, remove.env);
-}
-
-/**
- * Runs `remove` to its end: `null` once done, else what failed. A removal that cannot start is a
- * failure reported to the caller, not raised: the run it follows has already ended.
- */
-async function removed(launcher: ProcessLauncher, remove: ProcessSpec): Promise<string | null> {
-  const what = [remove.cmd, ...remove.args].join(" ");
-  try {
-    const code = await launcher.start(remove).exited;
-    return code === 0 ? null : `${what} exited ${code}`;
-  } catch (err) {
-    return `${what} could not start: ${(err as Error).message}`;
-  }
 }
 
 function containerName(): string {
