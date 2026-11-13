@@ -1,6 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { CHANGED_PASS, startReview } from "../../src/application/review_start.ts";
+import {
+  CHANGED_PASS,
+  NO_PASS,
+  NOT_THIS_COMMAND,
+  startReview,
+} from "../../src/application/review_start.ts";
 import type { BranchExport } from "../../src/application/untrusted_review.ts";
 import { baseTipOf } from "../../src/application/verify_scripts.ts";
 import { openGate, runReviewGate } from "../../src/cli/handlers/review_gate_handler.ts";
@@ -21,17 +26,27 @@ import { git } from "./verify_scripts_fixture.ts";
 const hook = (sessionId: string) =>
   JSON.stringify({ session_id: sessionId, tool_input: { command: "specnaut review start 12" } });
 
+/** The gate's exit; the nonce on the line it passed goes to {@link passed}. */
 async function gate(root: string, sessionId: string): Promise<number> {
   const input = () => Promise.resolve(hook(sessionId));
-  return await runReviewGate({ cwd: root, input, err: () => {}, open: openGate });
+  const out = (s: string) => {
+    const line: string = JSON.parse(s).hookSpecificOutput.updatedInput.command;
+    passed = line.match(/^export SPECNAUT_REVIEW_PASS=([0-9a-f]{32}); /)?.[1] ?? null;
+  };
+  passed = null;
+  return await runReviewGate({ cwd: root, input, out, err: () => {}, open: openGate });
 }
 
-/** The start as `specnaut review start` runs it in `root`, the export stood in for. */
-async function start(root: string) {
+/** The nonce on the line the last gate passed. */
+let passed: string | null = null;
+
+/** The start as `specnaut review start` runs it in `root`, carrying `nonce`; the export stood in for. */
+async function start(root: string, nonce: string | null = passed) {
   const exported = { sha: "a".repeat(40), logs: "/cache/logs", keep: () => {} } as BranchExport;
   const lock = await FsReviewLock.open(root, { state: join(root, ".state") });
   return await startReview({
     pass: (await FsReviewPass.open(root))!,
+    nonce,
     now: Date.now,
     baseTip: async () => await baseTipOf(await GitObjects.open(root)),
     checkout: () => checkoutState(root),
@@ -86,4 +101,30 @@ Deno.test("the checkout reads as git tells it: HEAD's commit, its branch or none
     ref: null,
     reflog: await reflog(),
   });
+});
+
+Deno.test("a start takes only the pass its own line was passed with: not one run outside the hook, nor in another checkout", async () => {
+  const [{ root: here }, { root: there }] = [await setUp(), await setUp()];
+  await startSession(here, "startup", "here-session");
+  await startSession(there, "startup", "there-session");
+  assertEquals(await gate(here, "here-session"), 0);
+  const ours = passed;
+  assertEquals(await gate(there, "there-session"), 0);
+  assertEquals(
+    await start(there, ours),
+    { kind: "refused", why: NOT_THIS_COMMAND },
+    "a line passed here",
+  );
+  assertEquals(await gate(there, "there-session"), 0);
+  assertEquals(
+    await start(there, null),
+    { kind: "refused", why: NOT_THIS_COMMAND },
+    "outside the hook",
+  );
+  assertEquals(
+    await start(there, null),
+    { kind: "refused", why: NO_PASS },
+    "the pass is taken once",
+  );
+  assertEquals((await start(here, ours)).kind, "started", "the line the gate passed starts");
 });

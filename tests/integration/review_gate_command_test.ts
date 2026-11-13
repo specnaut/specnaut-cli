@@ -5,6 +5,7 @@ import { verifyCheckout } from "../../src/application/verify_checkout.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { openGate, runReviewGate } from "../../src/cli/handlers/review_gate_handler.ts";
 import { CHECKOUT_REASON } from "../../src/domain/checkout_trust.ts";
+import { PASS_REASON } from "../../src/domain/review_gate.ts";
 import { SESSION_REASON } from "../../src/domain/session_record.ts";
 import { FsHeadReflog } from "../../src/infrastructure/fs_head_reflog.ts";
 import { FsReviewPass } from "../../src/infrastructure/fs_review_pass.ts";
@@ -31,10 +32,11 @@ const hook = (sessionId: string, command = START) => ({
 });
 
 async function gate(cwd: string, input: unknown, open: (cwd: string) => GateDeps = openGate) {
-  const said: string[] = [];
+  const [said, out]: string[][] = [[], []];
   const text = () => Promise.resolve(JSON.stringify(input));
-  const code = await runReviewGate({ cwd, input: text, err: (s) => said.push(s), open });
-  return { code, err: said.join("\n") };
+  const io = { out: (s: string) => out.push(s), err: (s: string) => said.push(s) };
+  const code = await runReviewGate({ cwd, input: text, ...io, open });
+  return { code, err: said.join("\n"), out: out.join("\n") };
 }
 
 const passFile = (root: string) => join(root, ".git", "specnaut", "review-pass.json");
@@ -69,6 +71,26 @@ Deno.test("the gate judges the record of the hook's session id, never the one SP
   }
 });
 
+Deno.test("a holding checkout answers the hook with the line carrying the pass's nonce, the rest of its input kept", async () => {
+  const { root } = await setUp();
+  await startSession(root, "startup", "clean-session");
+  const tool_input = { command: START, description: "start the review", timeout: 5000 };
+  const run = await gate(root, { ...hook("clean-session"), tool_input });
+  assertEquals(run.code, 0, run.err);
+  const nonce = (await (await FsReviewPass.open(root))!.take())?.nonce ?? "";
+  assert(/^[0-9a-f]{32}$/.test(nonce), `the pass names a nonce: ${nonce}`);
+  const command = `export SPECNAUT_REVIEW_PASS=${nonce}; ${START}`;
+  assertEquals(JSON.parse(run.out), {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      // `updatedInput` applies under a documented decision; `ask` shows the user the passed line.
+      permissionDecision: "ask",
+      permissionDecisionReason: PASS_REASON,
+      updatedInput: { ...tool_input, command },
+    },
+  });
+});
+
 Deno.test("a record read that throws is a refusal with exit 2, never a pass", async () => {
   const { root } = await setUp();
   const real = openGate(root);
@@ -89,6 +111,7 @@ Deno.test("a record read that throws is a refusal with exit 2, never a pass", as
     "earlier",
     { head: null, ref: null, reflog: null },
     "s",
+    "e".repeat(32),
   );
   const run = await gate(root, hook("any-session"), throwing);
   assertEquals(run.code, 2);
@@ -117,8 +140,8 @@ Deno.test({
 Deno.test("a command that starts no review passes untouched, even outside a repository", async () => {
   const dir = await Deno.makeTempDir({ prefix: "gate-none-" });
   try {
-    assertEquals(await gate(dir, hook("s", "ls -la")), { code: 0, err: "" });
-    assertEquals(await gate(dir, { not: "a hook's input" }), { code: 0, err: "" });
+    assertEquals(await gate(dir, hook("s", "ls -la")), { code: 0, err: "", out: "" });
+    assertEquals(await gate(dir, { not: "a hook's input" }), { code: 0, err: "", out: "" });
     const run = await gate(dir, hook("s"));
     assertEquals(run.code, 2);
     assertStringIncludes(run.err, "in no git repository");
@@ -130,7 +153,8 @@ Deno.test("a command that starts no review passes untouched, even outside a repo
 Deno.test("a gate given no input on stdin refuses", async () => {
   const said: string[] = [];
   const input = () => Promise.resolve(null);
-  const code = await runReviewGate({ cwd: ".", input, err: (s) => said.push(s), open: openGate });
+  const err = (s: string) => said.push(s);
+  const code = await runReviewGate({ cwd: ".", input, out: err, err, open: openGate });
   assertEquals(code, 2);
   assertStringIncludes(said.join(""), "reads a PreToolUse hook's input on stdin");
 });

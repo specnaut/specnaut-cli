@@ -8,22 +8,24 @@ import type { LockedReview } from "../domain/review_lock.ts";
  */
 
 /**
- * A pass as the gate left it: `granted` is `NaN`, `baseTip` and `session` empty and `checkout`
- * `null` where the file did not say. `session` is the id on the hook's input the gate judged.
+ * A pass as the gate left it: `granted` is `NaN`, `baseTip`, `session` and `nonce` empty and
+ * `checkout` `null` where the file did not say. `session` is the id on the hook's input the gate
+ * judged; `nonce` is the one the gate put on the line it let through.
  */
 export type GrantedPass = {
   readonly granted: number;
   readonly baseTip: string;
   readonly checkout: CheckoutState | null;
   readonly session: string;
+  readonly nonce: string;
 };
 
 export interface ReviewPass {
   /**
-   * Leaves a pass for `checkout`, judged against `baseTip` for the session `session`, replacing
-   * any earlier one.
+   * Leaves a pass for `checkout`, judged against `baseTip` for the session `session`, taken only
+   * by the line that carries `nonce`, replacing any earlier one.
    */
-  grant(baseTip: string, checkout: CheckoutState, session: string): Promise<void>;
+  grant(baseTip: string, checkout: CheckoutState, session: string, nonce: string): Promise<void>;
   /** Removes the pass, if there is one. */
   revoke(): Promise<void>;
   /**

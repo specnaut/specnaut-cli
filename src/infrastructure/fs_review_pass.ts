@@ -20,10 +20,14 @@ export class FsReviewPass implements ReviewPass {
     return new FsReviewPass(join(firstLine(out.stdout), "specnaut", "review-pass.json"), now);
   }
 
-  async grant(baseTip: string, checkout: CheckoutState, session: string): Promise<void> {
-    const dir = dirname(this.path);
-    await realFolder(dir);
-    const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout, session })}\n`;
+  async grant(
+    baseTip: string,
+    checkout: CheckoutState,
+    session: string,
+    nonce: string,
+  ): Promise<void> {
+    await realFolder(dirname(this.path));
+    const text = `${JSON.stringify({ granted: this.now(), baseTip, checkout, session, nonce })}\n`;
     await replaceFile(this.path, text);
   }
 
@@ -48,24 +52,25 @@ export class FsReviewPass implements ReviewPass {
 
 /**
  * The pass the file holds; `NaN`, `""` and `null` for what it does not say: a pass that never
- * holds.
+ * holds, or one no line carries.
  */
 function passOf(text: string): GrantedPass {
   try {
     const parsed: unknown = JSON.parse(text);
     const fields = typeof parsed === "object" && parsed !== null ? parsed : {};
-    const { granted, baseTip, checkout, session } = fields as Record<string, unknown>;
+    const { granted, baseTip, checkout, session, nonce } = fields as Record<string, unknown>;
     const said = (v: unknown) => typeof v === "string" ? v : "";
     return {
       granted: typeof granted === "number" ? granted : NaN,
       baseTip: said(baseTip),
       checkout: checkoutOf(checkout),
       session: said(session),
+      nonce: said(nonce),
     };
   } catch (err) {
     // Not swallowed: a pass that is not JSON is one that never holds.
     if (!(err instanceof SyntaxError)) throw err;
-    return { granted: NaN, baseTip: "", checkout: null, session: "" };
+    return { granted: NaN, baseTip: "", checkout: null, session: "", nonce: "" };
   }
 }
 

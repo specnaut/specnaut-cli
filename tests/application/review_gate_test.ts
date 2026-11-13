@@ -2,13 +2,15 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { CHECK_PATH, gateReview } from "../../src/application/review_gate.ts";
 import type { GrantedPass, ReviewPass } from "../../src/application/review_ports.ts";
 import type { CheckoutOutcome } from "../../src/application/verify_checkout.ts";
-import type { CheckoutState } from "../../src/domain/review_gate.ts";
+import { type CheckoutState, REVIEW_PASS_VAR } from "../../src/domain/review_gate.ts";
 
 /** A pass that records what the gate did with it. */
 function pass(said: string[]): ReviewPass {
   return {
-    grant: (tip, at, session) =>
-      Promise.resolve(void said.push(`grant ${tip} ${session}${at === JUDGED ? "" : " ?"}`)),
+    grant: (tip, at, session, nonce) =>
+      Promise.resolve(
+        void said.push(`grant ${tip} ${session} ${nonce}${at === JUDGED ? "" : " ?"}`),
+      ),
     revoke: () => Promise.resolve(void said.push("revoke")),
     take: () => Promise.reject(new Error("the gate never takes a pass")),
   };
@@ -18,12 +20,14 @@ const TIP = "a".repeat(40);
 const JUDGED: CheckoutState = { head: "b".repeat(40), ref: "refs/heads/topic", reflog: "c0" };
 const checkout = () => Promise.resolve(JUDGED);
 const START = "specnaut review start 12";
+const NONCE = "0123456789abcdef".repeat(2);
+const nonce = () => NONCE;
 
 Deno.test("a command that starts no review is not gated: nothing is checked, and any pass goes", async () => {
   const said: string[] = [];
   const verify = () => Promise.reject(new Error("not reached"));
   for (const command of ["git status", null]) {
-    const outcome = await gateReview({ verify, checkout, pass: pass(said) }, {
+    const outcome = await gateReview({ verify, checkout, pass: pass(said), nonce }, {
       sessionId: "s",
       command,
     });
@@ -35,37 +39,40 @@ Deno.test("a command that starts no review is not gated: nothing is checked, and
 Deno.test("a pass lives only until the next command: one that starts no review leaves none", async () => {
   let held: GrantedPass | null = null;
   const memory: ReviewPass = {
-    grant: (baseTip, at, session) =>
-      Promise.resolve(void (held = { granted: 1, baseTip, checkout: at, session })),
+    grant: (baseTip, at, session, nonce) =>
+      Promise.resolve(void (held = { granted: 1, baseTip, checkout: at, session, nonce })),
     revoke: () => Promise.resolve(void (held = null)),
     take: () => Promise.resolve(held).finally(() => held = null),
   };
   const verify = () => Promise.resolve<CheckoutOutcome>({ kind: "trusted", baseTip: TIP });
-  await gateReview({ verify, checkout, pass: memory }, {
+  await gateReview({ verify, checkout, pass: memory, nonce }, {
     sessionId: "s",
     command: "echo review start",
   });
-  await gateReview({ verify, checkout, pass: memory }, {
+  await gateReview({ verify, checkout, pass: memory, nonce }, {
     sessionId: "s",
     command: "specnaut review --force start 12",
   });
   assertEquals(await memory.take(), null);
 });
 
-Deno.test("a start is checked for the session the hook names, and a holding checkout leaves a pass", async () => {
+Deno.test("a start is checked for the session the hook names; a holding checkout leaves a pass and passes the line with its nonce", async () => {
   const said: string[] = [];
   const asked: string[] = [];
   const verify = (id: string) => {
     asked.push(id);
     return Promise.resolve<CheckoutOutcome>({ kind: "trusted", baseTip: TIP });
   };
-  const outcome = await gateReview({ verify, checkout, pass: pass(said) }, {
+  const outcome = await gateReview({ verify, checkout, pass: pass(said), nonce }, {
     sessionId: "s-9",
     command: START,
   });
-  assertEquals(outcome.kind, "trusted");
+  assertEquals(outcome, {
+    kind: "passed",
+    command: `export ${REVIEW_PASS_VAR}=${NONCE}; ${START}`,
+  });
   assertEquals(asked, ["s-9"]);
-  assertEquals(said, ["revoke", `grant ${TIP} s-9`], "the pass names the session judged");
+  assertEquals(said, ["revoke", `grant ${TIP} s-9 ${NONCE}`], "the pass names the session judged");
 });
 
 Deno.test("a gated command removes any pass, then reads the checkout its check is taken on, then checks", async () => {
@@ -76,11 +83,11 @@ Deno.test("a gated command removes any pass, then reads the checkout its check i
       baseTip: TIP,
     }));
   const read = () => Promise.resolve(void said.push("checkout")).then(() => JUDGED);
-  await gateReview({ verify, checkout: read, pass: pass(said) }, {
+  await gateReview({ verify, checkout: read, pass: pass(said), nonce }, {
     sessionId: "s",
     command: START,
   });
-  assertEquals(said, ["revoke", "checkout", "verify", `grant ${TIP} s`]);
+  assertEquals(said, ["revoke", "checkout", "verify", `grant ${TIP} s ${NONCE}`]);
 });
 
 Deno.test("a checkout that does not hold removes any pass, and so does no session id", async () => {
@@ -88,7 +95,10 @@ Deno.test("a checkout that does not hold removes any pass, and so does no sessio
   const restart: CheckoutOutcome = { kind: "restart", reasons: [], advice: "restart" };
   const asked: string[] = [];
   const verify = (id: string) => Promise.resolve(void asked.push(id)).then(() => restart);
-  await gateReview({ verify, checkout, pass: pass(said) }, { sessionId: null, command: START });
+  await gateReview({ verify, checkout, pass: pass(said), nonce }, {
+    sessionId: null,
+    command: START,
+  });
   assertEquals(asked, [""]);
   assertEquals(said, ["revoke"]);
 });
@@ -98,7 +108,7 @@ Deno.test("a check that throws, or a checkout that cannot be read, is a refusal 
   const lstat = () => Promise.reject(new Deno.errors.PermissionDenied("EACCES: lstat"));
   for (const [verify, read] of [[lstat, checkout], [trusted, lstat]] as const) {
     const said: string[] = [];
-    const outcome = await gateReview({ verify, checkout: read, pass: pass(said) }, {
+    const outcome = await gateReview({ verify, checkout: read, pass: pass(said), nonce }, {
       sessionId: "s",
       command: START,
     });

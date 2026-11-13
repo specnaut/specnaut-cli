@@ -7,6 +7,7 @@ import { GhPullRequests } from "../../infrastructure/gh_pull_request.ts";
 import { baseTipOf } from "../../application/verify_scripts.ts";
 import { type BranchExport, exportBranchTree } from "../../application/untrusted_review.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
+import { REVIEW_PASS_VAR } from "../../domain/review_gate.ts";
 import { FsReviewPass } from "../../infrastructure/fs_review_pass.ts";
 import { checkoutState } from "../../infrastructure/git_checkout_state.ts";
 import { exportCacheRoot, FsExportStore } from "../../infrastructure/fs_tree_export.ts";
@@ -25,8 +26,9 @@ import { runReviewGuard } from "./review_guard_handler.ts";
  *
  *   gate          the PreToolUse hook's check (review_gate_handler.ts)
  *   guard         the PreToolUse hook's review lock (review_guard_handler.ts)
- *   start <src>   takes the gate's pass, locks the session it names, exports the branch (a PR number or `<remote>/<branch>`)
- *                 as inert files outside the project, and keeps it. On stdout: `HEAD <sha>`,
+ *   start <src>   takes the gate's pass, only the one `SPECNAUT_REVIEW_PASS` names, locks the
+ *                 session it names, exports the branch (a PR number or `<remote>/<branch>`) as
+ *                 inert files outside the project, and keeps it. On stdout: `HEAD <sha>`,
  *                 `SEATS <dir>` (the reviewers' copy), `SCRATCH <dir>` (the copy a sandbox runs),
  *                 `OBJECTS <dir>` (the objects folder the explicit-head scripts take), `LOGS <dir>` (the
  *                 one folder a sandboxed run may log to under the lock), then one
@@ -146,6 +148,7 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
   const checkout = () => checkoutState(cwd);
   return {
     pass,
+    nonce: Deno.env.get(REVIEW_PASS_VAR) ?? null,
     now: Date.now,
     baseTip,
     checkout,

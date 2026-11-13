@@ -4,6 +4,7 @@ import {
   MOVED_PASS,
   NO_PASS,
   NO_SESSION,
+  NOT_THIS_COMMAND,
   STALE_PASS,
   startReview,
 } from "../../src/application/review_start.ts";
@@ -11,6 +12,7 @@ import type { BranchExport } from "../../src/application/untrusted_review.ts";
 import { type CheckoutState, PASS_TTL_MS } from "../../src/domain/review_gate.ts";
 
 const NOW = 5_000_000;
+const NONCE = "0123456789abcdef".repeat(2);
 const TIP = "c".repeat(40);
 const JUDGED: CheckoutState = { head: "e".repeat(40), ref: "refs/heads/topic", reflog: "f0" };
 
@@ -33,11 +35,14 @@ function deps(
     keep: () => void done.push("kept"),
   } as BranchExport;
   return {
+    nonce: NONCE as string | null,
     pass: {
       take: () =>
         Promise.resolve(void done.push("taken"))
           .then(() =>
-            granted === null ? null : { granted, baseTip: TIP, checkout: judged, session }
+            granted === null
+              ? null
+              : { granted, baseTip: TIP, checkout: judged, session, nonce: NONCE }
           ),
       grant: () => Promise.reject(new Error("unreached")),
       revoke: () => Promise.reject(new Error("unreached")),
@@ -122,4 +127,20 @@ Deno.test("a pass for a checkout that no longer reads the same, or for none, sta
     assertEquals(outcome, { kind: "refused", why: CHANGED_PASS }, JSON.stringify(now));
     assertEquals(done, ["taken"]);
   }
+});
+
+Deno.test("a start that carries no nonce, as one run outside the hook, takes no pass", async () => {
+  for (const nonce of [null, "", "not a nonce"]) {
+    const done: string[] = [];
+    const outcome = await startReview({ ...deps(NOW - 1000, done), nonce }, "12");
+    assertEquals(outcome, { kind: "refused", why: NOT_THIS_COMMAND }, String(nonce));
+    assertEquals(done, ["taken"], "nothing is locked or fetched");
+  }
+});
+
+Deno.test("a start carrying the nonce another line was passed with takes no pass", async () => {
+  const done: string[] = [];
+  const other = { ...deps(NOW - 1000, done), nonce: "f".repeat(32) };
+  assertEquals(await startReview(other, "12"), { kind: "refused", why: NOT_THIS_COMMAND });
+  assertEquals(done, ["taken"]);
 });

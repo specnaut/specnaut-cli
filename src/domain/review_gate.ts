@@ -13,9 +13,9 @@
  * check. A pass lives only until the next command, every other one removing it, and the start
  * refuses any option or `--`, so a line the gate misses meets a start that finds no pass.
  *
- * Known limit: while a pass exists, this pattern is load-bearing. A line that starts a review
- * under a spelling it does not match, run right after a line it did match, would take that pass.
- * The gate stops a mistaken start; a session that writes the pass file itself is out of reach.
+ * A line it matches and lets through is rewritten to carry the pass's nonce ({@link passedCommand}),
+ * and the start takes only the pass its nonce names: a start the gate never saw carries none. The
+ * gate stops a mistaken start; a session that writes the pass file itself is out of reach.
  */
 export function startsReview(command: string): boolean {
   return /(^|[^\w-])review\s+start($|[^\w-])/.test(command);
@@ -76,3 +76,49 @@ export function toolCallOf(payload: unknown): {
     command: text(field(field(payload, "tool_input"), "command")),
   };
 }
+
+/** The variable a passed line exports for the start: the nonce of the pass it was let through on. */
+export const REVIEW_PASS_VAR = "SPECNAUT_REVIEW_PASS";
+
+/** A pass nonce as the gate makes one: 32 lowercase hex digits; anything else names no pass. */
+export function isPassNonce(value: string | null): value is string {
+  return value !== null && /^[0-9a-f]{32}$/.test(value);
+}
+
+/**
+ * The line the gate lets through: the pass's nonce exported first, so the start carries it however
+ * the line runs it (a command substitution included). The start takes only the pass that names its
+ * nonce, so a start run outside the hook, or from a checkout whose pass another line was given,
+ * takes nothing. A line that cannot follow `export …;` fails to parse and starts nothing.
+ */
+export function passedCommand(command: string, nonce: string): string {
+  return `export ${REVIEW_PASS_VAR}=${nonce}; ${command}`;
+}
+
+/**
+ * The hook's answer that runs the passed line instead: the tool's input as the harness gave it,
+ * its `command` replaced, and the decision `ask`. Claude Code documents `updatedInput` with an
+ * `allow` or `ask` decision; with none, whether the rewritten input runs is not stated, and a
+ * line that ran unrewritten would carry no nonce and take no pass. `ask` shows the user the line
+ * as it will run, at the cost of one prompt per untrusted review start; `allow` would skip the
+ * user's own permission rules for that line.
+ */
+export function passedHookOutput(payload: unknown, command: string): string {
+  const input = record(record(payload).tool_input);
+  const updatedInput = { ...input, command };
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: PASS_REASON,
+      updatedInput,
+    },
+  });
+}
+
+/** What the prompt says of the passed line. */
+export const PASS_REASON =
+  "specnaut review start, with the review pass's nonce exported first: confirm to start the review";
+
+const record = (v: unknown): Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v) ? v as Record<string, unknown> : {};

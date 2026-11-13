@@ -5,7 +5,10 @@
 # took: the binary does the work (`specnaut review gate` reads this hook's
 # input on stdin, and says which commands it judges); this script only calls it.
 #
-# Exit 2 stops the command and shows the session why; 0 lets it run. Input that
+# Exit 2 stops the command and shows the session why; 0 lets it run, and what
+# the gate prints is this hook's answer: for a line it passes, the line
+# rewritten to carry the pass's nonce, the one line the start takes it from.
+# Input that
 # never mentions a review is let through without starting the binary. With no
 # `specnaut` on PATH, `specnaut review start` cannot run either, so nothing is
 # stopped here. Before any of that, every time, the pass a gated line left is

@@ -20,8 +20,11 @@ Run this block as written, from the project's root, with the argument the review
 out=$(specnaut review start "<pr number or remote/branch>"); rc=$?; printf '%s\n' "$out"
 ```
 
-The `review-gate` hook judges this session's checkout before the command runs. **A refusal, or any
-exit but 0, stops the review:** quote its reasons and its advice. Never switch branches, reset or
+The `review-gate` hook judges this session's checkout before the command runs, and the line it lets
+through runs with `SPECNAUT_REVIEW_PASS` exported first: the start takes only the pass that names it,
+so run the line above alone, never from another folder. Claude Code asks the user to confirm that
+rewritten line once. **A refusal, or any exit but 0, stops the
+review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 
 On exit 0 the lines are `HEAD <sha>`, `SEATS <dir>` (the reviewers' read-only copy), `SCRATCH <dir>`

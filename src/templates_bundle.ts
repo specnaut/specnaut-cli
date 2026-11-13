@@ -1529,8 +1529,11 @@ Run this block as written, from the project's root, with the argument the review
 out=\$(specnaut review start "<pr number or remote/branch>"); rc=\$?; printf '%s\\n' "\$out"
 \`\`\`
 
-The \`review-gate\` hook judges this session's checkout before the command runs. **A refusal, or any
-exit but 0, stops the review:** quote its reasons and its advice. Never switch branches, reset or
+The \`review-gate\` hook judges this session's checkout before the command runs, and the line it lets
+through runs with \`SPECNAUT_REVIEW_PASS\` exported first: the start takes only the pass that names it,
+so run the line above alone, never from another folder. Claude Code asks the user to confirm that
+rewritten line once. **A refusal, or any exit but 0, stops the
+review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 
 On exit 0 the lines are \`HEAD <sha>\`, \`SEATS <dir>\` (the reviewers' read-only copy), \`SCRATCH <dir>\`
@@ -38370,7 +38373,10 @@ exit 0
 # took: the binary does the work (\`specnaut review gate\` reads this hook's
 # input on stdin, and says which commands it judges); this script only calls it.
 #
-# Exit 2 stops the command and shows the session why; 0 lets it run. Input that
+# Exit 2 stops the command and shows the session why; 0 lets it run, and what
+# the gate prints is this hook's answer: for a line it passes, the line
+# rewritten to carry the pass's nonce, the one line the start takes it from.
+# Input that
 # never mentions a review is let through without starting the binary. With no
 # \`specnaut\` on PATH, \`specnaut review start\` cannot run either, so nothing is
 # stopped here. Before any of that, every time, the pass a gated line left is

@@ -23,7 +23,7 @@ async function runHook(input: string, stubExit: number, path?: string, project?:
     const held = join(dir, "held");
     const stub = `#!/usr/bin/env bash\n{ echo "$*"; cat; } >"${seen}"\n` +
       `[ -e "$CLAUDE_PROJECT_DIR/.git/specnaut/review-pass.json" ] && : >"${held}"\n` +
-      `exit ${stubExit}\n`;
+      `printf '%s' '{"answer":"from the gate"}'\nexit ${stubExit}\n`;
     await Deno.writeTextFile(join(dir, "specnaut"), stub, { mode: 0o755 });
     const out = await new Deno.Command("bash", {
       args: [HOOK],
@@ -35,9 +35,10 @@ async function runHook(input: string, stubExit: number, path?: string, project?:
     const writer = out.stdin.getWriter();
     await writer.write(new TextEncoder().encode(input));
     await writer.close();
-    const { code } = await out.output();
+    const { code, stdout } = await out.output();
     const called = await Deno.readTextFile(seen).catch(() => null);
-    return { code, called, held: await Deno.lstat(held).then(() => true, () => false) };
+    const said = new TextDecoder().decode(stdout);
+    return { code, called, held: await Deno.lstat(held).then(() => true, () => false), said };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -49,16 +50,18 @@ const START = JSON.stringify({
 });
 
 Deno.test({
-  name: "the hook hands a review's input to the gate, and any refusal stops the command",
+  name:
+    "the hook hands a review's input to the gate, answers with what the gate printed, and any refusal stops the command",
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const allowed = await runHook(START, 0);
     assertEquals(allowed.code, 0);
     assertEquals(allowed.called, `review gate\n${START}`);
+    assertEquals(allowed.said, `{"answer":"from the gate"}`, "the gate's answer is the hook's");
     assertEquals((await runHook(START, 2)).code, 2);
     assertEquals((await runHook(START, 1)).code, 2, "every failure of the gate stops it");
     const other = await runHook(JSON.stringify({ tool_input: { command: "ls" } }), 2);
-    assertEquals(other, { code: 0, called: null, held: false });
+    assertEquals(other, { code: 0, called: null, held: false, said: "" });
   },
 });
 
@@ -103,7 +106,7 @@ Deno.test({
         await Deno.writeTextFile(join(project, ".git"), `${named}\n`);
         for (const input of [ls, START]) {
           const run = await runHook(input, 0, undefined, project);
-          assertEquals(run, { code: 2, called: null, held: false }, `${named}: ${input}`);
+          assertEquals(run, { code: 2, called: null, held: false, said: "" }, `${named}: ${input}`);
         }
       }
       const gone = join(project, "gone");

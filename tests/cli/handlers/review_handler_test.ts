@@ -36,6 +36,7 @@ Deno.test("start without a pass fails with exit 1 and fetches nothing", async ()
     end: () => Promise.reject(new Error("unreached")),
     start: () =>
       Promise.resolve({
+        nonce: null,
         pass: {
           take: () => Promise.resolve(null),
           grant: () => Promise.resolve(),

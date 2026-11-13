@@ -1,4 +1,4 @@
-import { type CheckoutState, passHolds, sameCheckout } from "../domain/review_gate.ts";
+import { type CheckoutState, isPassNonce, passHolds, sameCheckout } from "../domain/review_gate.ts";
 import { isSessionId } from "../domain/session_record.ts";
 import type { ReviewPass } from "./review_ports.ts";
 import type { BranchExport } from "./untrusted_review.ts";
@@ -6,7 +6,8 @@ import type { BranchExport } from "./untrusted_review.ts";
 /**
  * Starts a review that cannot trust its branch: takes the pass the checkout gate left, then
  * exports the branch as inert files (`untrusted_review.ts`) and keeps the export for the
- * review's later commands. No pass, one past its time, one granted for a base tip that is no
+ * review's later commands. No pass, one the gate gave another line (its nonce is not the one this
+ * command carries), one past its time, one granted for a base tip that is no
  * longer the base's, or for a checkout that no longer reads the same, starts nothing and fetches
  * nothing: the verdict was taken on that checkout, against that tip. The session the gate judged
  * is locked before the branch is fetched (`review_lock.ts` in the domain), so nothing of the branch
@@ -17,6 +18,8 @@ import type { BranchExport } from "./untrusted_review.ts";
 
 export type StartDeps = {
   readonly pass: ReviewPass;
+  /** The nonce this command carries (`REVIEW_PASS_VAR`), or `null` when it carries none. */
+  readonly nonce: string | null;
   readonly now: () => number;
   /** The base branch's tip now, as the checkout check resolves it; `null` when it cannot. */
   readonly baseTip: () => Promise<string | null>;
@@ -38,6 +41,9 @@ export const NO_PASS = "no checkout verdict: `specnaut review gate` runs as a Cl
   "PreToolUse hook and lets this command through only when the session's checkout holds; run " +
   "`specnaut upgrade` to install the hook, or start a new session as its refusal says";
 
+export const NOT_THIS_COMMAND = "the checkout verdict was given to another command line: run " +
+  "`specnaut review start` alone, as its own command, so the review-gate hook passes that line";
+
 export const STALE_PASS = "the checkout verdict is out of date: run this command again";
 
 export const MOVED_PASS =
@@ -50,6 +56,9 @@ export const NO_SESSION = "the checkout verdict names no session to lock: run th
 export async function startReview(deps: StartDeps, source: string): Promise<StartOutcome> {
   const granted = await deps.pass.take();
   if (granted === null) return { kind: "refused", why: NO_PASS };
+  if (!isPassNonce(deps.nonce) || granted.nonce !== deps.nonce) {
+    return { kind: "refused", why: NOT_THIS_COMMAND };
+  }
   if (!passHolds(granted.granted, deps.now())) return { kind: "refused", why: STALE_PASS };
   if (granted.baseTip !== await deps.baseTip()) return { kind: "refused", why: MOVED_PASS };
   const judged = granted.checkout;
