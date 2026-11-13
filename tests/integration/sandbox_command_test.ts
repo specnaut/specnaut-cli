@@ -55,7 +55,8 @@ Deno.test("sandbox exec on a commit never exported exits 125, runs nothing, writ
     assertEquals(code, 125, stderr);
     // The command's own output is passed through: `hi` here would mean echo ran.
     assertEquals(stdout, "");
-    assertMatch(stderr, new RegExp(`not run: (no export of ${SHA}|no backend)`));
+    // The export is looked up before any engine, so the reason is the same on every host.
+    assertMatch(stderr, new RegExp(`not run: no export of ${SHA}`));
     assertEquals(await snapshot(root), before);
   } finally {
     await Deno.remove(root, { recursive: true });

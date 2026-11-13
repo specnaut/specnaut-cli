@@ -119,13 +119,13 @@ Deno.test("execInSandbox: a container runner is handed its engine and pinned ima
   assertEquals(seen.runs[0].policy.reads, [FOLDERS.tree]);
 });
 
-Deno.test("execInSandbox: static only runs nothing, locates nothing, and says why", async () => {
+Deno.test("execInSandbox: static only runs nothing, makes no scratch, and says why", async () => {
   const { deps, seen } = world({ ...LINUX_BWRAP, bwrap: "absent" });
   assertEquals(await execInSandbox(deps, REQUEST), {
     kind: "not_run",
     why: "no backend: no container image: no devcontainer; bubblewrap: not installed",
   });
-  assertEquals(seen, { located: [], removed: 0, runs: [] });
+  assertEquals(seen, { located: [SHA], removed: 0, runs: [] });
 });
 
 Deno.test("execInSandbox: a layout the policy refuses runs nothing, and the scratch goes", async () => {
@@ -147,10 +147,11 @@ Deno.test("execInSandbox: a runner that throws still has the scratch removed", a
   assertEquals(seen.removed, 1);
 });
 
-Deno.test("execInSandbox: an export that is not there is refused before any scratch", async () => {
+Deno.test("execInSandbox: an export that is not there is refused before any probe or scratch", async () => {
   const { deps, seen } = world(LINUX_BWRAP);
   const locate = () => Promise.reject(new SandboxRefused("no export of that commit"));
-  const run = () => execInSandbox({ ...deps, host: { ...deps.host, locate } }, REQUEST);
+  const prober = { probe: () => Promise.reject(new Error("an engine was asked")) };
+  const run = () => execInSandbox({ ...deps, prober, host: { ...deps.host, locate } }, REQUEST);
   await assertRejects(run, SandboxRefused, "no export");
   assertEquals(seen.removed, 0);
 });

@@ -42,11 +42,13 @@ export type ExecOutcome =
   | { readonly kind: "not_run"; readonly why: string };
 
 export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promise<ExecOutcome> {
+  // The export first: a commit never exported is refused before any engine is asked anything,
+  // so the refusal is the same on every host and no probe leaves an engine's state behind.
+  const folders = await deps.host.locate(request.sha);
   const backend = chooseBackend(await deps.prober.probe());
   if (backend.kind === "static") {
     return { kind: "not_run", why: `no backend: ${backend.why.join("; ")}` };
   }
-  const folders = await deps.host.locate(request.sha);
   const toolchain = await deps.host.real(request.toolchain);
   const scratch = await deps.host.scratch();
   try {
