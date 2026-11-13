@@ -1,7 +1,7 @@
 import { dirname, join } from "@std/path";
 import { SandboxRefused } from "../application/sandbox_ports.ts";
 import { armExitTrap } from "./exit_trap.ts";
-import { attachArgs, createArgs, HDIUTIL, REMOVAL } from "./sandbox_hdiutil.ts";
+import { attachArgs, attachedDisk, createArgs, HDIUTIL, REMOVAL } from "./sandbox_hdiutil.ts";
 import type { ProcessLauncher } from "./sandbox_process.ts";
 
 /**
@@ -75,17 +75,40 @@ export class HdiutilVolumes implements ScratchVolumes {
     const base = join(folder, "scratch");
     await this.#refusedUnless("create", createArgs(base, bytes));
     await Deno.chmod(mount, 0o500);
-    await this.#refusedUnless("attach", attachArgs(mount, `${base}.sparseimage`));
+    const answer = await this.#refusedUnless("attach", attachArgs(mount, `${base}.sparseimage`));
     if (!this.host.mounted(mount)) {
+      await this.#diskDetached(attachedDisk(answer));
       throw new SandboxRefused(`the scratch volume is not mounted on ${mount} after its attach`);
     }
     await Deno.chmod(mount, 0o700);
   }
 
-  /** Runs hdiutil `args`; one that cannot start or fails refuses the run with what it said. */
-  async #refusedUnless(verb: string, args: string[]): Promise<void> {
-    const failed = await this.#hdiutil(args);
+  /**
+   * Runs hdiutil `args` and gives its answer; one that cannot start or fails refuses the run with
+   * what it said.
+   */
+  async #refusedUnless(verb: string, args: string[]): Promise<string> {
+    const { failed, answer } = await this.#answered(args);
     if (failed !== null) throw new SandboxRefused(`the scratch volume: hdiutil ${verb} ${failed}`);
+    return answer;
+  }
+
+  /**
+   * The disk an attach made but did not mount where asked, detached by its device node, by force
+   * if need be. A forced detach is safe here as it names the attach's own disk, never a folder;
+   * left attached, the disk would outlive its deleted image until a restart. One that stays
+   * attached is warned of: the run is refused either way.
+   */
+  async #diskDetached(disk: string | null): Promise<void> {
+    if (disk === null) {
+      console.error("warning: the scratch image's attach named no disk to detach");
+      return;
+    }
+    const plain = await this.#hdiutil(["detach", disk]);
+    const forced = plain === null ? null : await this.#hdiutil(["detach", "-force", disk]);
+    if (forced !== null) {
+      console.error(`warning: the scratch image's disk ${disk} could not be detached: ${forced}`);
+    }
   }
 
   /**
@@ -108,20 +131,20 @@ export class HdiutilVolumes implements ScratchVolumes {
 
   /** `null` once hdiutil `args` exited 0; else how it failed, with what it said. */
   async #hdiutil(args: string[]): Promise<string | null> {
+    return (await this.#answered(args)).failed;
+  }
+
+  /** What hdiutil `args` answered on its output, and `failed` as `#hdiutil` gives it. */
+  async #answered(args: string[]): Promise<{ failed: string | null; answer: string }> {
     try {
-      const started = this.launcher.start({
-        cmd: HDIUTIL,
-        args,
-        env: "host",
-        stdout: "discarded",
-        stderr: "captured",
-      });
+      const spec = { cmd: HDIUTIL, args, env: "host" } as const;
+      const started = this.launcher.start({ ...spec, stdout: "captured", stderr: "captured" });
       const code = await started.exited;
-      const said = (await started.stderr).trim();
-      if (code === 0) return null;
-      return said === "" ? `exited ${code}` : `exited ${code}: ${said}`;
+      const [answer, said] = [await started.stdout, (await started.stderr).trim()];
+      if (code === 0) return { failed: null, answer };
+      return { failed: said === "" ? `exited ${code}` : `exited ${code}: ${said}`, answer };
     } catch (err) {
-      return `could not start: ${(err as Error).message}`;
+      return { failed: `could not start: ${(err as Error).message}`, answer: "" };
     }
   }
 

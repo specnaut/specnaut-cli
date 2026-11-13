@@ -7,13 +7,21 @@ import { HdiutilVolumes } from "../../src/infrastructure/sandbox_scratch_volume.
 export const HDIUTIL = "/usr/bin/hdiutil";
 export const MIB = 1024 ** 2;
 
-/** How one hdiutil call ends: its exit code and what it wrote to its standard error. */
-export type End = { readonly code: number; readonly stderr?: string };
+/** How one hdiutil call ends: its exit code and what it wrote to its outputs. */
+export type End = { readonly code: number; readonly stdout?: string; readonly stderr?: string };
+
+/** What `hdiutil attach -plist` answers for an image attached as `disk`: its slices, a container. */
+export const attachAnswer = (disk: string) =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n` +
+  `\t<key>system-entities</key>\n\t<array>\n` +
+  [disk, `${disk}s1`, "/dev/disk99", "/dev/disk99s1"].map((dev) =>
+    `\t\t<dict>\n\t\t\t<key>dev-entry</key>\n\t\t\t<string>${dev}</string>\n\t\t</dict>\n`
+  ).join("") + `\t</array>\n</dict>\n</plist>\n`;
 
 /**
  * A launcher standing in for hdiutil: each call ends as the next of `ends[<verb>]` says (a detach
- * forced is `detach -force`, one the exit trap runs synchronously `sync`), else with 0;
- * `missing` makes every start throw.
+ * forced is `detach -force`, one the exit trap runs synchronously `sync`), else with 0, an attach
+ * answering it made `/dev/disk9`; `missing` makes every start throw.
  */
 export function hdiutil(ends: Record<string, End[]> = {}, missing = false) {
   const calls: string[][] = [];
@@ -25,8 +33,9 @@ export function hdiutil(ends: Record<string, End[]> = {}, missing = false) {
       const verb = spec.args.includes("-force") ? `${spec.args[0]} -force` : spec.args[0];
       const end = ends[verb]?.shift() ?? { code: 0 };
       const ended = Promise.resolve(end.code);
-      const stderr = Promise.resolve(end.stderr ?? "");
-      return { pid: 1, ended, exited: ended, stderr, stop() {}, release() {} };
+      const said = end.stdout ?? (verb === "attach" ? attachAnswer("/dev/disk9") : "");
+      const [stdout, stderr] = [Promise.resolve(said), Promise.resolve(end.stderr ?? "")];
+      return { pid: 1, ended, exited: ended, stdout, stderr, stop() {}, release() {} };
     },
     runSync(spec) {
       synced.push([spec.cmd, ...spec.args]);

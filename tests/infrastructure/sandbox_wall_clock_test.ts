@@ -24,6 +24,7 @@ function fakeProcess(code: number | null, held = false) {
     pid: 4242,
     ended,
     exited: Promise.all([ended, drained]).then(([c]) => c),
+    stdout: Promise.resolve(""),
     stderr: Promise.resolve(""),
     stop: () => {
       seen.stops++;

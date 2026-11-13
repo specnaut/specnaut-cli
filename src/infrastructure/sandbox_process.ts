@@ -17,8 +17,11 @@ export type ProcessSpec = {
   readonly env: Readonly<Record<string, string>> | "host";
   readonly cwd?: string;
   readonly stdin?: Uint8Array;
-  /** `discarded` for a helper whose output must never pass for the command's own; `copied` else. */
-  readonly stdout?: "copied" | "discarded";
+  /**
+   * `discarded` for a helper whose output must never pass for the command's own, `captured` for
+   * one whose answer is read: `Started.stdout` holds it; `copied` else.
+   */
+  readonly stdout?: "copied" | "discarded" | "captured";
   /** `captured` for a helper whose failure is read, not shown: `Started.stderr` holds it. */
   readonly stderr?: "copied" | "captured";
 };
@@ -30,6 +33,8 @@ export type Started = {
   readonly ended: Promise<number>;
   /** The exit code, once the process has ended and its output is copied, or let go by `release`. */
   readonly exited: Promise<number>;
+  /** What it wrote to its standard output, by `exited`, when its spec `captured` it; else empty. */
+  readonly stdout: Promise<string>;
   /** What it wrote to its standard error, by `exited`, when its spec `captured` it; else empty. */
   readonly stderr: Promise<string>;
   /**
@@ -73,21 +78,24 @@ export class DenoProcessLauncher implements ProcessLauncher {
       return code;
     });
     const release = () => released.abort();
-    return { pid: child.pid, ended, exited, stderr: output.stderr, stop, release };
+    const { stdout, stderr } = output;
+    return { pid: child.pid, ended, exited, stdout, stderr, stop, release };
   }
 
   /**
-   * Copies the child's output to ours (its stdout unless discarded, its stderr unless captured)
-   * until `released`; what it captured is `stderr`.
+   * Copies the child's output to ours (its stdout unless discarded or captured, its stderr unless
+   * captured) until `released`; what it captured is `stdout` and `stderr`.
    */
   #copy(child: Deno.ChildProcess, spec: ProcessSpec, released: AbortSignal) {
     const sinks = this.#sinks ??= { out: this.out.getWriter(), err: this.err.getWriter() };
-    const captured = spec.stderr === "captured" ? textOf(child.stderr, released) : null;
+    const stdout = spec.stdout === "captured" ? textOf(child.stdout, released) : null;
+    const stderr = spec.stderr === "captured" ? textOf(child.stderr, released) : null;
     const copied = Promise.all([
-      spec.stdout === "discarded" ? undefined : copy(child.stdout, sinks.out, released),
-      captured ?? copy(child.stderr, sinks.err, released),
+      stdout ?? (spec.stdout === "discarded" ? undefined : copy(child.stdout, sinks.out, released)),
+      stderr ?? copy(child.stderr, sinks.err, released),
     ]);
-    return { copied, stderr: captured ?? Promise.resolve("") };
+    const none = Promise.resolve("");
+    return { copied, stdout: stdout ?? none, stderr: stderr ?? none };
   }
 
   runSync(spec: ProcessSpec): number {

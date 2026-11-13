@@ -166,3 +166,19 @@ Deno.test({
     assertEquals([await copied.stderr, err.text()], ["", "gone\n"]);
   },
 });
+
+Deno.test({
+  name: "DenoProcessLauncher: a standard output that is captured is read, never copied to ours",
+  ignore: !POSIX,
+  fn: async () => {
+    const out = capture();
+    const launcher = new DenoProcessLauncher(out.stream, capture().stream);
+    const spec = { cmd: "/bin/sh", args: ["-c", "echo kept"], env: {} };
+    const captured = launcher.start({ ...spec, stdout: "captured" });
+    assertEquals(await captured.exited, 0);
+    assertEquals([await captured.stdout, out.text()], ["kept\n", ""]);
+    const copied = launcher.start(spec);
+    assertEquals(await copied.exited, 0);
+    assertEquals([await copied.stdout, out.text()], ["", "kept\n"]);
+  },
+});

@@ -26,9 +26,22 @@ export const createArgs = (base: string, bytes: number) => [
 
 /**
  * The attach: owners honoured, so the root's mode keeps other users out as the folder's did,
- * kept out of the Finder and Spotlight, mounted on the scratch folder itself.
+ * kept out of the Finder and Spotlight, mounted on the scratch folder itself. Its answer is a
+ * property list naming the disks it made (`attachedDisk`).
  */
-export const attachArgs = (
-  mount: string,
-  image: string,
-) => ["attach", "-owners", "on", "-nobrowse", "-noautoopen", "-mountpoint", mount, image];
+export const attachArgs = (mount: string, image: string) => [
+  ...["attach", "-plist", "-owners", "on", "-nobrowse", "-noautoopen"],
+  ...["-mountpoint", mount, image],
+];
+
+/**
+ * The image's own disk in an attach's answer: its first `dev-entry` naming a whole disk
+ * (`/dev/diskN`). The disk's slices, and the APFS container made on one of them, are listed after
+ * it and go with it on a detach. `null` when the answer names none.
+ */
+export function attachedDisk(answer: string): string | null {
+  for (const [, dev] of answer.matchAll(/<key>dev-entry<\/key>\s*<string>([^<]*)<\/string>/g)) {
+    if (/^\/dev\/disk[0-9]+$/.test(dev)) return dev;
+  }
+  return null;
+}
