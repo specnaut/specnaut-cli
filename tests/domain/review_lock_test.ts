@@ -60,6 +60,17 @@ Deno.test("under the review lock, a dispatch names a review seat or is refused",
   }
 });
 
+Deno.test("under the review lock, a dispatch carries a seat, a description and a prompt, nothing else", () => {
+  const seat = { subagent_type: "code-reviewer", description: "d", prompt: "p" };
+  assertEquals(tool("Agent", seat), null);
+  assertEquals(tool("Agent", { subagent_type: "code-reviewer" }), null);
+  for (const key of ["isolation", "run_in_background", "model", "cwd", "__proto__x"]) {
+    const why = tool("Agent", { ...seat, [key]: "x" });
+    assertStringIncludes(why ?? "allowed", "review lock", key);
+    assertStringIncludes(why ?? "", key, key);
+  }
+});
+
 Deno.test("under the review lock, the review's own commands run, each alone", () => {
   const allowed = [
     "specnaut verify-scripts",

@@ -71,10 +71,20 @@ export function lockedCallRefusal(
   return `${tool ?? "a tool call naming no tool"} is ${LOCKED}`;
 }
 
+/**
+ * What a dispatch under the lock may carry: the seat, and what it is told. Anything else (where it
+ * runs, in the background, on which model) is a way out of the session the hook watches.
+ */
+const DISPATCH_KEYS: readonly string[] = ["subagent_type", "description", "prompt"];
+
 function dispatchRefusal(input: unknown): string | null {
   const seat = field(input, "subagent_type");
-  if (typeof seat === "string" && REVIEW_SEATS.includes(seat)) return null;
-  return `a dispatch to anything but a review seat (${REVIEW_SEATS.join(", ")}) is ${LOCKED}`;
+  if (typeof seat !== "string" || !REVIEW_SEATS.includes(seat)) {
+    return `a dispatch to anything but a review seat (${REVIEW_SEATS.join(", ")}) is ${LOCKED}`;
+  }
+  const extra = Object.keys(input as object).filter((k) => !DISPATCH_KEYS.includes(k));
+  if (extra.length === 0) return null;
+  return `a dispatch carrying ${extra.join(", ")} (only ${DISPATCH_KEYS.join(", ")}) is ${LOCKED}`;
 }
 
 function commandRefusal(command: unknown, review: LockedReview, log: string | null) {
