@@ -113,6 +113,11 @@ export type SandboxPolicy = {
   /** The only writable folders, empty at the start and discarded after. */
   readonly writes: readonly string[];
   /**
+   * The folder the writes are made in. On macOS, where `sandbox-exec` has no size option, the
+   * runner mounts a volume of `limits.scratchBytes` on it for the run (`CAP_ENFORCEMENT`).
+   */
+  readonly scratch: string;
+  /**
    * Folders whose own entry may be stat'ed, on macOS: those above a visible folder, which
    * resolving its path walks through. A file's existence elsewhere stays hidden too.
    */
@@ -146,6 +151,7 @@ export function sandboxPolicy(backend: SandboxedBackend, paths: SandboxPaths): P
     workdir: paths.tree,
     env: environment(inContainer, paths.path, visible.writes),
     ...visible,
+    scratch: paths.scratch,
     ...(onMac ? SEATBELT_RULES : NO_SEATBELT_RULES),
     lookups: onMac ? ancestors([...visible.system, ...visible.reads, ...visible.writes]) : [],
     devices: DEVICES,

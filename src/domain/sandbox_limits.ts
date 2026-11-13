@@ -28,19 +28,11 @@ export const LIMITS: SandboxLimits = {
 
 /**
  * Who applies a cap: the backend's own arguments, the launcher around it, a systemd user scope
- * around it when the host offers one (and nobody when it does not), or nobody. A cap a backend
- * cannot enforce is named as such here, never claimed: the run goes ahead without it.
+ * around it when the host offers one (and nobody when it does not), a volume of the cap's size
+ * the runner mounts on the scratch folder for the run, or nobody. A cap a backend cannot enforce
+ * is named as such here, never claimed: the run goes ahead without it.
  */
-export type CapEnforcer = "arguments" | "launcher" | "scope" | "unenforced";
-
-/** What a backend with no resource options gets: the launcher's wall clock, and nothing else. */
-const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
-  processes: "unenforced",
-  memoryBytes: "unenforced",
-  cpus: "unenforced",
-  wallClockSeconds: "launcher",
-  scratchBytes: "unenforced",
-};
+export type CapEnforcer = "arguments" | "launcher" | "scope" | "volume" | "unenforced";
 
 /**
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
@@ -48,7 +40,8 @@ const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
  * host cannot apply ({@link engineDrops}), and the run goes without it. Neither bubblewrap nor
  * `sandbox-exec` can cap processes, memory or CPU; bubblewrap caps its scratch tmpfs by size, and
  * gets the other three from a systemd user scope where cgroups are delegated (`scopeArgs`).
- * Nothing does so around `sandbox-exec`.
+ * Nothing does so around `sandbox-exec`, which has no size option either: its scratch folder is
+ * the mount point of a disk image of the cap's size, made for the run and deleted after it.
  */
 export const CAP_ENFORCEMENT: Readonly<
   Record<SandboxedBackend, Readonly<Record<keyof SandboxLimits, CapEnforcer>>>
@@ -67,7 +60,13 @@ export const CAP_ENFORCEMENT: Readonly<
     wallClockSeconds: "launcher",
     scratchBytes: "arguments",
   },
-  seatbelt: WALL_CLOCK_ONLY,
+  seatbelt: {
+    processes: "unenforced",
+    memoryBytes: "unenforced",
+    cpus: "unenforced",
+    wallClockSeconds: "launcher",
+    scratchBytes: "volume",
+  },
 };
 
 /**

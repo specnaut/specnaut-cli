@@ -31,7 +31,7 @@ const scope = () => after(scopeArgs(policyOf("bwrap")), "-p");
 
 /** What the table must say of `cap`, given where the arguments were found to carry it. */
 function enforcer(cap: string, by: boolean | string): string {
-  if (by === "scope") return "scope";
+  if (by === "scope" || by === "volume") return by;
   return by ? "arguments" : cap === "wallClockSeconds" ? "launcher" : "unenforced";
 }
 
@@ -53,12 +53,14 @@ Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and
       wallClockSeconds: wall(bwrap()),
       scratchBytes: after(bwrap(), "--size").length === after(bwrap(), "--tmpfs").length,
     },
+    // `sandbox-exec` has no resource option: its scratch is a volume of the cap's size that the
+    // runner mounts on the scratch folder (`sandbox_seatbelt_volume_test.ts`).
     seatbelt: {
       processes: false,
       memoryBytes: false,
       cpus: false,
       wallClockSeconds: false,
-      scratchBytes: false,
+      scratchBytes: "volume",
     },
   };
   for (const [backend, caps] of Object.entries(carried)) {
@@ -72,7 +74,7 @@ Deno.test("CAP_ENFORCEMENT: a cap the data puts in the arguments is in them, and
 Deno.test("unenforcedCaps: the container runs with every cap; the others name what they lack", () => {
   assertEquals(unenforcedCaps("container"), []);
   assertEquals(unenforcedCaps("bwrap"), ["processes", "memoryBytes", "cpus"]);
-  assertEquals(unenforcedCaps("seatbelt"), ["processes", "memoryBytes", "cpus", "scratchBytes"]);
+  assertEquals(unenforcedCaps("seatbelt"), ["processes", "memoryBytes", "cpus"]);
 });
 
 Deno.test("unenforcedCaps: bubblewrap in a user scope lacks none; a scope means nothing elsewhere", () => {

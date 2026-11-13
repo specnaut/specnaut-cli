@@ -46,6 +46,8 @@ Deno.test("sandboxPolicy: reads are system and toolchain folders and the tree; w
   const policy = policyOf("seatbelt");
   assertEquals(policy.reads, ["/home/dev/.deno/bin", PATHS.tree]);
   assertEquals(policy.writes, [SCRATCH_HOME, SCRATCH_TMP]);
+  // The folder the writes are made in: where macOS mounts the volume that caps them.
+  assertEquals(policy.scratch, PATHS.scratch);
   assertEquals(policy.workdir, PATHS.tree);
   assert(policy.system.includes("/usr/bin") && policy.system.includes("/System"));
   assert(policyOf("bwrap").system.includes("/usr"));

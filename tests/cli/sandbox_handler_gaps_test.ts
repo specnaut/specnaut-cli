@@ -85,3 +85,10 @@ Deno.test("sandbox probe: docker on a host that cannot apply a limit runs UNCAPP
   const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
   assertEquals(lines, ["UNCAPPED container processes,memory-swap"]);
 });
+
+Deno.test("sandbox probe: sandbox-exec's scratch is capped; processes, memory and CPU are not", async () => {
+  const { d, out } = deps(MAC, () => Promise.reject(new Error("unused")));
+  await runSandbox(PROBE, d);
+  const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
+  assertEquals(lines, ["UNCAPPED seatbelt processes,memory,cpu"]);
+});

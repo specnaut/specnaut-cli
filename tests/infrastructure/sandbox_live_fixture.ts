@@ -173,6 +173,14 @@ export async function runIn(
   return { outcome, out: out.text(), err: err.text() };
 }
 
+/** Whether a volume is mounted on `path`, as the system's `mount` lists them. */
+export function mountedOn(path: string): boolean {
+  const mount = new Deno.Command("/sbin/mount", { stdout: "piped" }).outputSync();
+  return new TextDecoder().decode(mount.stdout).split("\n").some((l) =>
+    l.includes(` on ${path} (`)
+  );
+}
+
 export function processesNamed(marker: string): string[] {
   const ps = new Deno.Command("/bin/ps", { args: ["-axo", "command"] }).outputSync();
   return new TextDecoder().decode(ps.stdout).split("\n").filter((l) => l.startsWith(marker));

@@ -1,12 +1,13 @@
 import { assert, assertEquals } from "@std/assert";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
-import { fromFileUrl } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import {
   detaching,
   killNamed,
   live,
+  mountedOn,
   NO_PERL,
   probed,
   processesNamed,
@@ -151,6 +152,10 @@ Deno.test({
       const limit = seen + (1 + DRAIN_GRACE_SECONDS + 2) * 1000;
       while (processesNamed(marker).length > 0 && Date.now() < limit) await later(200, 0);
       assertEquals(processesNamed(marker), [], "the sandboxed command outlived its wall clock");
+      // The watchdog then ends the scratch volume no exit trap of the killed launcher could.
+      const scratch = join(base, "scratch");
+      for (let i = 0; i < 50 && mountedOn(scratch); i++) await later(200, 0);
+      assertEquals(mountedOn(scratch), false, "the scratch volume outlived its launcher");
     } finally {
       killNamed(marker);
       killNamed("/bin/sh -c exec </dev/null");

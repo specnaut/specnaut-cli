@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStrictEquals, assertThrows } from "@std/assert";
 import { bwrapArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
@@ -9,15 +9,18 @@ import {
   runnerFor,
   SeatbeltRunner,
 } from "../../src/infrastructure/sandbox_runners.ts";
+import { HdiutilVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 import {
   COMMAND,
   fakeLauncher,
+  fakeVolumes,
   IMAGE,
   POSIX,
   seatbeltPolicy,
+  VOLUME_REMOVAL,
   withWallClock,
 } from "./sandbox_runner_fixture.ts";
 
@@ -67,7 +70,7 @@ Deno.test({
     try {
       const { launcher, launches } = fakeLauncher(9);
       const policy = seatbeltPolicy(scratch);
-      assertEquals(await new SeatbeltRunner(launcher).run(policy, COMMAND), {
+      assertEquals(await new SeatbeltRunner(launcher, fakeVolumes()).run(policy, COMMAND), {
         kind: "exited",
         code: 9,
       });
@@ -77,9 +80,11 @@ Deno.test({
         env: policy.env,
         cwd: policy.workdir,
       });
-      // Its watchdog kills the group past the clock and the grace, and is stopped after the run.
+      // Its watchdog kills the group past the clock and the grace, then ends the scratch volume,
+      // and is stopped after the run.
       const wall = policy.limits.wallClockSeconds;
-      assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, wall + DRAIN_GRACE_SECONDS));
+      const watchdog = watchdogSpec(launches[0].pid, wall + DRAIN_GRACE_SECONDS, VOLUME_REMOVAL);
+      assertEquals(launches[1].spec, watchdog);
       assertEquals([launches.length, launches[1].stopped], [2, 1]);
     } finally {
       await Deno.remove(scratch, { recursive: true });
@@ -104,7 +109,7 @@ Deno.test({
       };
       const policy = seatbeltPolicy(scratch);
       const policyWrites = policy.writes;
-      await new SeatbeltRunner(recording).run(policy, COMMAND);
+      await new SeatbeltRunner(recording, fakeVolumes()).run(policy, COMMAND);
       assertEquals(seen[0], policy.writes as string[]);
     } finally {
       await Deno.remove(scratch, { recursive: true });
@@ -120,7 +125,7 @@ Deno.test({
     try {
       const { launcher, launches } = fakeLauncher(null);
       const policy = withWallClock(seatbeltPolicy(scratch), 0.01);
-      assertEquals(await new SeatbeltRunner(launcher).run(policy, COMMAND), {
+      assertEquals(await new SeatbeltRunner(launcher, fakeVolumes()).run(policy, COMMAND), {
         kind: "timed_out",
         seconds: 0.01,
       });
@@ -146,7 +151,7 @@ Deno.test({
         },
       };
       const policy = withWallClock(seatbeltPolicy(scratch), 0.05);
-      const run = () => new SeatbeltRunner(failing).run(policy, COMMAND);
+      const run = () => new SeatbeltRunner(failing, fakeVolumes()).run(policy, COMMAND);
       await assertRejects(run, Error, "no /bin/sh");
       assertEquals(launches[0].stopped, 1);
     } finally {
@@ -174,5 +179,9 @@ Deno.test("runnerFor: one runner per backend", () => {
   } as const;
   assertEquals((runnerFor(oneCpu, launcher, host) as ContainerRunner).caps.cpus, 1);
   assert(runnerFor({ kind: "bwrap", scope: false }, launcher, host) instanceof BwrapRunner);
-  assert(runnerFor({ kind: "seatbelt" }, launcher, host) instanceof SeatbeltRunner);
+  const seatbelt = runnerFor({ kind: "seatbelt" }, launcher, host);
+  assert(seatbelt instanceof SeatbeltRunner);
+  // Its scratch is capped by a disk image, made through the run's own launcher.
+  assert(seatbelt.volumes instanceof HdiutilVolumes);
+  assertStrictEquals(seatbelt.volumes.launcher, launcher);
 });

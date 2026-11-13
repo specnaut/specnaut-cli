@@ -1,10 +1,12 @@
 import { join } from "@std/path";
+import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import type {
   ProcessLauncher,
   ProcessSpec,
   Started,
 } from "../../src/infrastructure/sandbox_process.ts";
+import type { ScratchVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 
 /** What the runner tests share: a launcher that records what it is asked to start. */
@@ -54,7 +56,25 @@ export const withWallClock = (policy: SandboxPolicy, seconds: number): SandboxPo
 export function seatbeltPolicy(scratch: string): SandboxPolicy {
   const real = Deno.realPathSync(scratch);
   const base = policyOf("seatbelt");
-  return { ...base, writes: [join(real, "home"), join(real, "tmp")] };
+  return { ...base, scratch: real, writes: [join(real, "home"), join(real, "tmp")] };
+}
+
+/** The removal a {@link fakeVolumes} volume gives the run's watchdog. */
+export const VOLUME_REMOVAL = ["/bin/echo", "volume-removal"];
+
+/**
+ * Scratch volumes that record `attach <mount> <bytes>` and `detach <mount>` in `events`, and mount
+ * nothing; `refusal` makes every attach refuse with it.
+ */
+export function fakeVolumes(events: string[] = [], refusal?: string): ScratchVolumes {
+  return {
+    attach(mount, bytes) {
+      events.push(`attach ${mount} ${bytes}`);
+      if (refusal !== undefined) return Promise.reject(new SandboxRefused(refusal));
+      const detach = () => Promise.resolve(void events.push(`detach ${mount}`));
+      return Promise.resolve({ removal: VOLUME_REMOVAL, detach });
+    },
+  };
 }
 
 /** A container run's engine caps on a host that can apply every one and did not say its CPUs. */
