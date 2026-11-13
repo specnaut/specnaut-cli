@@ -216,6 +216,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq bubblewrap catatonit
           bwrap --version
+          # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor; bubblewrap needs
+          # one. The VM is single-use and the job already holds root, so lifting it grants nothing new.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: A systemd user manager, for bubblewrap's capped scope
         run: |
           uid=$(id -u)
