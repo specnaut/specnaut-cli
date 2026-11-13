@@ -43,9 +43,10 @@ export type BackendProbe = {
   readonly docker: boolean;
   /**
    * That daemon is a podman service (`docker version` names a `Podman Engine` component), reached
-   * by a docker client on its socket: it starts a container from its own containers.conf.
+   * by a docker client on its socket: it starts a container from its own containers.conf. `null`
+   * when its components could not be read, so it could be either.
    */
-  readonly dockerOnPodman: boolean;
+  readonly dockerOnPodman: boolean | null;
   /** What that daemon can limit; every one false when none answers. */
   readonly dockerLimits: EngineLimits;
   /** The CPUs on that daemon's host, as it reports them (`NCPU`), or `null` when it does not. */

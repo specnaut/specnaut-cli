@@ -23,6 +23,16 @@ const dockerInfo = (over: Record<string, unknown> = {}) =>
     ...over,
   }));
 
+/** What `docker version` prints of a server made of the components `names`. */
+const dockerVersion = (...names: string[]) =>
+  ok(JSON.stringify({ Server: { Components: names.map((Name) => ({ Name, Version: "1" })) } }));
+
+/** A docker daemon of its own answering `info`, and its version naming docker's components. */
+const daemon = (info: ReturnType<typeof ok>) => ({
+  "docker info": info,
+  "docker version": dockerVersion("Engine", "containerd", "runc"),
+});
+
 /** The cap a run goes without when `docker info` says its host lacks each limit. */
 const DOCKER_FLAGS = {
   MemoryLimit: "memoryBytes",
@@ -39,10 +49,10 @@ function capsLacking(probed: BackendProbe) {
 }
 
 Deno.test("probe: docker counts only when its daemon answers with a version", async () => {
-  const { prober: up, calls } = prober("linux", { docker: dockerInfo() });
+  const { prober: up, calls } = prober("linux", daemon(dockerInfo()));
   assertEquals((await up.probe()).docker, true);
   assertEquals(calls.find((c) => c.cmd === "docker")?.args, ["info", "--format", "{{json .}}"]);
-  const noVersion = prober("linux", { docker: dockerInfo({ ServerVersion: "" }) });
+  const noVersion = prober("linux", daemon(dockerInfo({ ServerVersion: "" })));
   assertEquals((await noVersion.prober.probe()).docker, false);
   assertEquals((await prober("linux", { docker: ok("garbled") }).prober.probe()).docker, false);
   const down = { code: 1, stdout: "", stderr: "Cannot connect to the Docker daemon" };
@@ -50,25 +60,25 @@ Deno.test("probe: docker counts only when its daemon answers with a version", as
 });
 
 Deno.test("probe: docker's daemon reports which limits its host can apply", async () => {
-  const all = await prober("linux", { docker: dockerInfo() }).prober.probe();
+  const all = await prober("linux", daemon(dockerInfo())).prober.probe();
   assertEquals(all.dockerLimits, { memory: true, swap: true, pids: true, cpuQuota: true });
   const some = dockerInfo({ SwapLimit: false, PidsLimit: undefined });
-  const lacking = await prober("linux", { docker: some }).prober.probe();
+  const lacking = await prober("linux", daemon(some)).prober.probe();
   assertEquals(lacking.dockerLimits, { memory: true, swap: false, pids: false, cpuQuota: true });
 });
 
 Deno.test("probe: a limit docker's host lacks, false or left out, is a cap the run goes without", async () => {
-  assertEquals(capsLacking(await prober("linux", { docker: dockerInfo() }).prober.probe()), []);
+  assertEquals(capsLacking(await prober("linux", daemon(dockerInfo())).prober.probe()), []);
   for (const [flag, cap] of Object.entries(DOCKER_FLAGS)) {
     for (const lacking of [{ [flag]: false }, { [flag]: undefined }]) {
-      const probed = await prober("linux", { docker: dockerInfo(lacking) }).prober.probe();
+      const probed = await prober("linux", daemon(dockerInfo(lacking))).prober.probe();
       assertEquals(capsLacking(probed), [cap], JSON.stringify(lacking));
     }
   }
 });
 
 Deno.test("probe: docker without a CPU quota runs without --cpus, and reports the CPU cap", async () => {
-  const probed = await prober("linux", { docker: dockerInfo({ CpuCfsQuota: false }) }).prober
+  const probed = await prober("linux", daemon(dockerInfo({ CpuCfsQuota: false }))).prober
     .probe();
   const backend = chooseBackend(probed);
   if (backend.kind !== "container") throw new Error(`not a container: ${backend.kind}`);
@@ -81,13 +91,9 @@ Deno.test("probe: docker without a CPU quota runs without --cpus, and reports th
 });
 
 Deno.test("probe: docker without the paged-out bound keeps the memory cap, reported apart", async () => {
-  const probed = await prober("linux", { docker: dockerInfo({ SwapLimit: false }) }).prober.probe();
+  const probed = await prober("linux", daemon(dockerInfo({ SwapLimit: false }))).prober.probe();
   assertEquals(capsLacking(probed), ["memorySwap"]);
 });
-
-/** What `docker version` prints of a server made of the components `names`. */
-const dockerVersion = (...names: string[]) =>
-  ok(JSON.stringify({ Server: { Components: names.map((Name) => ({ Name, Version: "1" })) } }));
 
 /** The probe of a docker daemon answering `version` to `docker version`. */
 const withVersion = (version: ReturnType<typeof ok>) =>
@@ -105,17 +111,33 @@ Deno.test("probe: a docker daemon that is a podman service is read as one, and n
 
 Deno.test("probe: the CPUs docker's host has are its NCPU, when that is a count", async () => {
   const cpusOf = async (NCPU: unknown) =>
-    (await prober("linux", { docker: dockerInfo({ NCPU }) }).prober.probe()).dockerCpus;
+    (await prober("linux", daemon(dockerInfo({ NCPU }))).prober.probe()).dockerCpus;
   assertEquals(await cpusOf(1), 1);
   for (const NCPU of [undefined, 0, 1.5, "1", -2]) {
     assertEquals(await cpusOf(NCPU), null, `${NCPU}`);
   }
 });
 
-Deno.test("probe: docker's own daemon, or a version that says nothing, is docker's own", async () => {
-  const failed = { code: 1, stdout: "", stderr: "" };
-  for (const version of [dockerVersion("Engine", "containerd", "runc"), failed, ok("garbled")]) {
-    const probed = await withVersion(version).prober.probe();
-    assertEquals([probed.docker, probed.dockerOnPodman], [true, false], version.stdout);
-  }
+Deno.test("probe: docker's own daemon is one whose components can be read and name no podman", async () => {
+  const probed = await withVersion(dockerVersion("Engine", "containerd", "runc")).prober.probe();
+  assertEquals([probed.docker, probed.dockerOnPodman], [true, false]);
+  assertEquals(chooseBackend(probed).kind, "container");
 });
+
+const UNREAD_WHY = "container: no rootless podman, and docker's components could not be read, " +
+  "so it may be a podman service";
+
+for (
+  const [what, version] of [
+    ["fails", { code: 1, stdout: "", stderr: "Error response from daemon" }],
+    ["is not JSON", ok("garbled")],
+    ["has no component list", ok(JSON.stringify({ Server: { Version: "27.1.0" } }))],
+  ] as const
+) {
+  Deno.test(`probe: docker whose version ${what} may be a podman service, and is not run on`, async () => {
+    const probed = await withVersion(version).prober.probe();
+    assertEquals([probed.docker, probed.dockerOnPodman], [true, null]);
+    const chosen = chooseBackend(probed);
+    assertEquals(chosen.kind === "static" && chosen.why[0], UNREAD_WHY);
+  });
+}

@@ -109,15 +109,15 @@ export async function probeDocker(engines: Engines): Promise<Docker> {
 
 /**
  * Whether the daemon docker reaches is a podman service: its version names a `Podman Engine`
- * component, which a docker daemon's never does. A version that cannot be read says nothing, and
- * docker is taken as its own: `docker info` has already answered as a docker daemon does.
+ * component, which a docker daemon's never does. Only a component list that can be read and names
+ * none is docker's own; a version that fails, is not JSON, or has no such list is `null`, unknown.
  */
-async function dockerOnPodman({ runner, env }: Engines): Promise<boolean> {
+async function dockerOnPodman({ runner, env }: Engines): Promise<boolean | null> {
   const args = ["version", "--format", "{{json .}}"];
   const { code, stdout } = await runner.run("docker", args, { env });
-  if (code !== 0) return false;
+  if (code !== 0) return null;
   const components: unknown = parsed(stdout, "docker version")?.Server?.Components;
-  if (!Array.isArray(components)) return false;
+  if (!Array.isArray(components)) return null;
   return components.some((c) => c?.Name === "Podman Engine");
 }
 

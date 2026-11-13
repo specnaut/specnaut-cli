@@ -12,6 +12,7 @@ const REMOTE = "podman answers from a remote service, which reads its own contai
 const UNREAD = "podman's version could not be read";
 const DOCKER_ON_PODMAN =
   "docker answers from a podman service, which reads its own containers.conf";
+const DOCKER_UNREAD = "docker's components could not be read, so it may be a podman service";
 const OLD = "podman older than 4.8, whose containers.conf cannot empty a list";
 
 /**
@@ -52,9 +53,11 @@ function podmanWhy(probe: BackendProbe): string | null {
  * Why docker cannot run the sandbox's container, or `null` when it can. Its daemon discards a
  * limit its host cannot apply and runs, so docker is taken as it is, unless that daemon is a
  * podman service: it starts the container from its own containers.conf, as a remote podman does.
+ * One whose components could not be read is not offered either: it may be such a service.
  */
 function dockerWhy(probe: BackendProbe): string | null {
   if (!probe.docker) return "no docker";
+  if (probe.dockerOnPodman === null) return DOCKER_UNREAD;
   return probe.dockerOnPodman ? DOCKER_ON_PODMAN : null;
 }
 
