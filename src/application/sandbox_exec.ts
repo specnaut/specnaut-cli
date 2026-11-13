@@ -1,5 +1,5 @@
 import { chooseBackend, type SandboxedBackend, sandboxPolicy } from "../domain/sandbox.ts";
-import { capsWithout, type SandboxLimits } from "../domain/sandbox_limits.ts";
+import { capsWithout, type ReportedCap } from "../domain/sandbox_limits.ts";
 import type { SandboxPaths } from "../domain/sandbox_paths.ts";
 import type {
   BackendProber,
@@ -37,7 +37,7 @@ export type ExecOutcome =
     readonly backend: SandboxedBackend;
     readonly outcome: RunOutcome;
     /** The caps the run went without (`capsWithout`): reported, never a reason not to run. */
-    readonly unenforced: readonly (keyof SandboxLimits)[];
+    readonly unenforced: readonly ReportedCap[];
   }
   | { readonly kind: "not_run"; readonly why: string };
 

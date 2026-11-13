@@ -2,16 +2,11 @@ import { assertEquals } from "@std/assert";
 import { ENGINE_ENV, IMAGE, ok, prober } from "./sandbox_probe_fixture.ts";
 
 /**
- * What the host offers a sandbox, read from the tools themselves: podman's own report of rootless
- * and delegated cgroups, bubblewrap's version and a trial run, and a trial `sandbox-exec`.
- * Nothing is asked on Windows, and nothing is asked of a tool on an OS where the domain would not
- * use it. Docker's report, and the limits it can apply, are `sandbox_probe_docker_test.ts`'s.
+ * What the host offers a sandbox, read from the tools themselves: bubblewrap's version and a trial
+ * run, and a trial `sandbox-exec`. Nothing is asked on Windows, and nothing is asked of a tool on
+ * an OS where the domain would not use it. Podman's and docker's reports, and the limits each can
+ * apply, are `sandbox_probe_podman_test.ts`'s and `sandbox_probe_docker_test.ts`'s.
  */
-
-const podmanInfo = (rootless: boolean, version: string, controllers: string[]) =>
-  ok(JSON.stringify({
-    host: { security: { rootless }, cgroupVersion: version, cgroupControllers: controllers },
-  }));
 
 Deno.test("probe: nothing installed on Linux reads as nothing offered", async () => {
   const { prober: p } = prober("linux", {});
@@ -20,7 +15,7 @@ Deno.test("probe: nothing installed on Linux reads as nothing offered", async ()
     arch: "x86_64",
     image: IMAGE,
     podman: "absent",
-    podmanCgroups: false,
+    podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
     docker: false,
     dockerLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
     bwrap: "absent",
@@ -28,24 +23,6 @@ Deno.test("probe: nothing installed on Linux reads as nothing offered", async ()
     bwrapScope: false,
     sandboxExec: false,
   });
-});
-
-Deno.test("probe: rootless podman with pids, memory and cpu delegated on cgroup v2", async () => {
-  const all = prober("linux", { podman: podmanInfo(true, "v2", ["cpu", "memory", "pids", "io"]) });
-  const probed = await all.prober.probe();
-  assertEquals([probed.podman, probed.podmanCgroups], ["rootless", true]);
-  const partial = prober("linux", { podman: podmanInfo(true, "v2", ["cpu", "memory"]) });
-  assertEquals((await partial.prober.probe()).podmanCgroups, false);
-  const v1 = prober("linux", { podman: podmanInfo(true, "v1", ["cpu", "memory", "pids"]) });
-  assertEquals((await v1.prober.probe()).podmanCgroups, false);
-  const root = prober("linux", { podman: podmanInfo(false, "v2", ["cpu", "memory", "pids"]) });
-  assertEquals((await root.prober.probe()).podman, "root");
-});
-
-Deno.test("probe: podman whose report is not JSON is not used", async () => {
-  const { prober: p } = prober("linux", { podman: ok("garbled") });
-  const probed = await p.probe();
-  assertEquals([probed.podman, probed.podmanCgroups], ["absent", false]);
 });
 
 Deno.test("probe: bubblewrap's version, and a trial run that passes", async () => {

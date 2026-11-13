@@ -1,6 +1,7 @@
 import type { SubprocessRunner } from "../application/ports.ts";
 import type { BackendProber } from "../application/sandbox_ports.ts";
 import type { BackendProbe } from "../domain/sandbox.ts";
+import type { EngineLimits } from "../domain/sandbox_hosts.ts";
 import type { ImageSource } from "../domain/sandbox_image.ts";
 import { engineEnv } from "./sandbox_engine_env.ts";
 
@@ -22,14 +23,22 @@ const USERNS_REFUSED = /namespace|uid map|Permission denied|Operation not permit
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
-type Podman = Pick<BackendProbe, "podman" | "podmanCgroups">;
+type Podman = Pick<BackendProbe, "podman" | "podmanLimits">;
 type Docker = Pick<BackendProbe, "docker" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
-const NO_PODMAN: Podman = { podman: "absent", podmanCgroups: false };
-const NO_DOCKER: Docker = {
-  docker: false,
-  dockerLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
-};
+const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
+const NO_PODMAN: Podman = { podman: "absent", podmanLimits: NO_LIMITS };
+const NO_DOCKER: Docker = { docker: false, dockerLimits: NO_LIMITS };
+
+/**
+ * Whether this process's own cgroup (cgroup v2) has the file podman checks before it passes on the
+ * memory cap's bound on what is paged out: without it podman drops that bound, warning, and runs.
+ * A podman in a VM (macOS) is not read here, so its bound counts as missing.
+ */
+const PAGING_TRIAL = [
+  "-c",
+  'read -r line < /proc/self/cgroup && test -e "/sys/fs/cgroup${line#0::}/memory.swap.max"',
+];
 const NO_BWRAP: Bwrap = { bwrap: "absent", bwrapVersion: null, bwrapScope: false };
 
 /**
@@ -71,20 +80,31 @@ export class HostBackendProber implements BackendProber {
     return { os, arch, image, ...podman, ...docker, ...bwrap, sandboxExec };
   }
 
-  /** Podman's own report: whether it runs as the user, and which cgroup controllers it holds. */
+  /** Podman's own report: whether it runs as the user, and what it can limit on its host. */
   async #podman(): Promise<Podman> {
     const args = ["info", "--format", "json"];
     const { code, stdout } = await this.runner.run("podman", args, { env: this.engineVars() });
     if (code !== 0) return NO_PODMAN;
     const host = parsed(stdout, "podman info")?.host;
     if (host === undefined) return NO_PODMAN;
-    const controllers: unknown = host?.cgroupControllers;
-    const delegated = Array.isArray(controllers) &&
-      NEEDED_CONTROLLERS.every((c) => controllers.includes(c));
     return {
       podman: host?.security?.rootless === true ? "rootless" : "root",
-      podmanCgroups: host?.cgroupVersion === "v2" && delegated,
+      podmanLimits: await this.#podmanLimits(host),
     };
+  }
+
+  /**
+   * The limits podman can apply, as docker reports its own: one per cgroup v2 controller it holds,
+   * and the memory cap's bound on what is paged out where the host has it ({@link PAGING_TRIAL}).
+   */
+  // deno-lint-ignore no-explicit-any
+  async #podmanLimits(host: any): Promise<EngineLimits> {
+    const controllers: unknown = host?.cgroupControllers;
+    if (host?.cgroupVersion !== "v2" || !Array.isArray(controllers)) return NO_LIMITS;
+    const memory = controllers.includes("memory");
+    const paging = memory && (await this.runner.run("/bin/sh", PAGING_TRIAL)).code === 0;
+    const pids = controllers.includes("pids");
+    return { memory, swap: paging, pids, cpuQuota: controllers.includes("cpu") };
   }
 
   /**

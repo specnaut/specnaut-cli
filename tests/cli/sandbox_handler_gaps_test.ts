@@ -83,5 +83,5 @@ Deno.test("sandbox probe: docker on a host that cannot apply a limit runs UNCAPP
   const { d, out } = deps(docker, () => Promise.reject(new Error("unused")));
   await runSandbox(PROBE, d);
   const lines = out.join("\n").split("\n").filter((l) => l.startsWith("UNCAPPED"));
-  assertEquals(lines, ["UNCAPPED container processes,memory"]);
+  assertEquals(lines, ["UNCAPPED container processes,memory-swap"]);
 });

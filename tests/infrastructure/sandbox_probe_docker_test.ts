@@ -1,7 +1,9 @@
 import { assertEquals } from "@std/assert";
 import { chooseBackend } from "../../src/domain/sandbox.ts";
 import type { BackendProbe } from "../../src/domain/sandbox.ts";
+import { containerArgs } from "../../src/domain/sandbox_args.ts";
 import { capsWithout } from "../../src/domain/sandbox_limits.ts";
+import { policyOf } from "../domain/sandbox_fixture.ts";
 import { ok, prober } from "./sandbox_probe_fixture.ts";
 
 /**
@@ -24,7 +26,7 @@ const dockerInfo = (over: Record<string, unknown> = {}) =>
 /** The cap a run goes without when `docker info` says its host lacks each limit. */
 const DOCKER_FLAGS = {
   MemoryLimit: "memoryBytes",
-  SwapLimit: "memoryBytes",
+  SwapLimit: "memorySwap",
   PidsLimit: "processes",
   CpuCfsQuota: "cpus",
 } as const;
@@ -63,4 +65,22 @@ Deno.test("probe: a limit docker's host lacks, false or left out, is a cap the r
       assertEquals(capsLacking(probed), [cap], JSON.stringify(lacking));
     }
   }
+});
+
+Deno.test("probe: docker without a CPU quota runs without --cpus, and reports the CPU cap", async () => {
+  const probed = await prober("linux", { docker: dockerInfo({ CpuCfsQuota: false }) }).prober
+    .probe();
+  const backend = chooseBackend(probed);
+  if (backend.kind !== "container") throw new Error(`not a container: ${backend.kind}`);
+  assertEquals(capsLacking(probed), ["cpus"]);
+  // Docker refuses `--cpus` outright on such a host, so a run carrying it would never start.
+  const run = { ...backend, name: "specnaut-sandbox-c" };
+  const args = containerArgs(policyOf("container"), run, ["true"]);
+  assertEquals(args.includes("--cpus"), false);
+  assertEquals(args.includes("--memory"), true);
+});
+
+Deno.test("probe: docker without the paged-out bound keeps the memory cap, reported apart", async () => {
+  const probed = await prober("linux", { docker: dockerInfo({ SwapLimit: false }) }).prober.probe();
+  assertEquals(capsLacking(probed), ["memorySwap"]);
 });

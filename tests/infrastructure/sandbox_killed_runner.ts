@@ -36,6 +36,6 @@ if (backend === "seatbelt") {
 } else {
   const [engine, image, name] = rest;
   const ticks = "i=0; while [ $i -lt 150 ]; do echo tick; sleep 0.2; i=$((i+1)); done";
-  const runner = new ContainerRunner(engine as Engine, image, launcher, () => name);
+  const runner = new ContainerRunner(engine as Engine, image, launcher, [], () => name);
   await runner.run(timed(60), ["/bin/sh", "-c", ticks]);
 }

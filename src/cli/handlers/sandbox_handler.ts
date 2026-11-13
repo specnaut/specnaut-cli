@@ -10,7 +10,7 @@ import {
 import {
   CAP_NAMES,
   capsWithout,
-  type SandboxLimits,
+  type ReportedCap,
   STOP_LIMIT,
 } from "../../domain/sandbox_limits.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
@@ -103,7 +103,7 @@ async function probe(deps: SandboxDeps): Promise<number> {
  * What a run on `backend` goes without, one line each, the same on probe and after exec: the caps
  * it runs without (`UNCAPPED`), then what stopping it cannot reach (`LIMIT`).
  */
-function gaps(backend: SandboxedBackend, unenforced: readonly (keyof SandboxLimits)[]): string[] {
+function gaps(backend: SandboxedBackend, unenforced: readonly ReportedCap[]): string[] {
   const caps = unenforced.map((cap) => CAP_NAMES[cap]).join(",");
   const limit = STOP_LIMIT[backend];
   return [

@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
+import { containerEngine } from "../../src/domain/sandbox_container.ts";
 import { isPinned } from "../../src/domain/sandbox_image.ts";
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
 import { live, LIVE_IMAGE, probed, runIn, withEnv, withLayout } from "./sandbox_live_fixture.ts";
@@ -20,7 +21,7 @@ const UMASK = "0027";
 
 const MISSING = Deno.build.os !== "linux"
   ? "a local podman on Linux, as a remote client applies its machine's containers.conf"
-  : probed.podman !== "rootless" || !probed.podmanCgroups
+  : containerEngine(probed) !== "podman"
   ? "a rootless podman holding the pids, memory and cpu controllers, the podman a run is offered"
   : isPinned(LIVE_IMAGE)
   ? null
@@ -53,7 +54,7 @@ Deno.test({
       const [name, value] = LEFT.split("=");
       await withEnv({ [name]: value, CONTAINERS_CONF: conf }, async () => {
         const { out } = await runIn(
-          (l) => new ContainerRunner("podman", LIVE_IMAGE, l),
+          (l) => new ContainerRunner("podman", LIVE_IMAGE, l, []),
           policy,
           ["/bin/sh", "-c", SCRIPT],
         );

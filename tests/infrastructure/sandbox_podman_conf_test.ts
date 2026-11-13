@@ -40,7 +40,7 @@ function reading(code: number | null = 0) {
 const read = (path: string) => Deno.readTextFileSync(path);
 
 const runner = (engine: "podman" | "docker", launcher: ProcessLauncher) =>
-  new ContainerRunner(engine, IMAGE, launcher, () => "specnaut-sandbox-c1", () => HOST_ENV);
+  new ContainerRunner(engine, IMAGE, launcher, [], () => "specnaut-sandbox-c1", () => HOST_ENV);
 
 Deno.test("podman conf: the override turns env_host off and empties what a containers.conf adds", () => {
   assertEquals(parse(PODMAN_OVERRIDE), {

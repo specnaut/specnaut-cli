@@ -7,10 +7,11 @@
 import type { ImageSource } from "./sandbox_image.ts";
 
 /**
- * The limits docker's daemon reports it can apply on its host (`docker info`): one whose cgroup
- * controller the host lacks is discarded from a run, whatever its arguments say.
+ * The limits a container engine can apply on its host, read the same way for both: docker's daemon
+ * reports them (`docker info`), podman's come from its cgroup v2 controllers and a trial of the
+ * user's own cgroup. One the host lacks is discarded from a run, whatever its arguments say.
  */
-export type DockerLimits = {
+export type EngineLimits = {
   readonly memory: boolean;
   readonly swap: boolean;
   readonly pids: boolean;
@@ -26,12 +27,12 @@ export type BackendProbe = {
   readonly image: ImageSource;
   /** Podman running as the user, as root (passed over), or not installed. */
   readonly podman: "rootless" | "root" | "absent";
-  /** Rootless podman can cap a run: cgroup v2, with pids, memory and cpu delegated to the user. */
-  readonly podmanCgroups: boolean;
+  /** What podman can limit for the user on cgroup v2; every one false off it or when absent. */
+  readonly podmanLimits: EngineLimits;
   /** A docker daemon answers. */
   readonly docker: boolean;
   /** What that daemon can limit; every one false when none answers. */
-  readonly dockerLimits: DockerLimits;
+  readonly dockerLimits: EngineLimits;
   /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */
   readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
   /** What `bwrap --version` printed, or `null` when it printed nothing. */

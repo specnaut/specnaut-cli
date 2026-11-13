@@ -4,7 +4,7 @@ import {
   CAP_ENFORCEMENT,
   CAP_NAMES,
   capsWithout,
-  dockerDrops,
+  engineDrops,
   LIMITS,
   STOP_LIMIT,
   unenforcedCaps,
@@ -21,6 +21,7 @@ const RUN = {
   image: `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`,
   name: "specnaut-gate-3f9c2a71",
   engine: "docker",
+  dropped: [],
 } as const;
 const container = () => containerArgs(policyOf("container"), RUN, COMMAND);
 const bwrap = () => bwrapArgs(policyOf("bwrap"), COMMAND);
@@ -80,13 +81,14 @@ Deno.test("unenforcedCaps: bubblewrap in a user scope lacks none; a scope means 
 
 const ALL = { memory: true, swap: true, pids: true, cpuQuota: true };
 
-Deno.test("dockerDrops: each limit docker's host lacks drops its cap; memory needs swap too", () => {
-  assertEquals(dockerDrops(ALL), []);
-  assertEquals(dockerDrops({ ...ALL, memory: false }), ["memoryBytes"]);
-  assertEquals(dockerDrops({ ...ALL, swap: false }), ["memoryBytes"]);
-  assertEquals(dockerDrops({ ...ALL, memory: false, swap: false }), ["memoryBytes"]);
-  assertEquals(dockerDrops({ ...ALL, pids: false }), ["processes"]);
-  assertEquals(dockerDrops({ ...ALL, cpuQuota: false }), ["cpus"]);
+Deno.test("engineDrops: each limit an engine's host lacks drops its own cap, and only that", () => {
+  assertEquals(engineDrops(ALL), []);
+  assertEquals(engineDrops({ ...ALL, memory: false }), ["memoryBytes"]);
+  // The memory a run holds stays bound: only the bound on what it pages out is reported.
+  assertEquals(engineDrops({ ...ALL, swap: false }), ["memorySwap"]);
+  assertEquals(engineDrops({ ...ALL, memory: false, swap: false }), ["memoryBytes", "memorySwap"]);
+  assertEquals(engineDrops({ ...ALL, pids: false }), ["processes"]);
+  assertEquals(engineDrops({ ...ALL, cpuQuota: false }), ["cpus"]);
 });
 
 Deno.test("capsWithout: a container lacks what its engine drops, in the table's order", () => {
@@ -103,7 +105,7 @@ Deno.test("STOP_LIMIT: only sandbox-exec's stop misses a process that left the r
 });
 
 Deno.test("CAP_NAMES: one plain, distinct name per cap, as the probe prints it", () => {
-  assertEquals(Object.keys(CAP_NAMES).sort(), Object.keys(LIMITS).sort());
+  assertEquals(Object.keys(CAP_NAMES).sort(), [...Object.keys(LIMITS), "memorySwap"].sort());
   const names = Object.values(CAP_NAMES);
   assertEquals(new Set(names).size, names.length);
   for (const name of names) assertEquals(/^[a-z][a-z-]*$/.test(name), true, name);

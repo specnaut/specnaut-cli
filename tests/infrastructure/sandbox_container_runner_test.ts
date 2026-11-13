@@ -50,6 +50,7 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
     "podman",
     IMAGE,
     launcher,
+    [],
     () => "specnaut-sandbox-x1",
     () => HOST_ENV,
   );
@@ -58,7 +59,7 @@ Deno.test("ContainerRunner: launches the engine with exactly containerArgs, unde
     cmd: "podman",
     args: containerArgs(
       policy,
-      { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman" },
+      { image: IMAGE, name: "specnaut-sandbox-x1", engine: "podman", dropped: [] },
       COMMAND,
     ),
     env: podmanEnv(launches[0]),
@@ -69,7 +70,8 @@ Deno.test("ContainerRunner: a watchdog beside the run removes the container past
   const { launcher, launches } = fakeLauncher(0);
   const policy = withWallClock(policyOf("container"), 60);
   const name = () => "specnaut-sandbox-x4";
-  await new ContainerRunner("docker", IMAGE, launcher, name, () => HOST_ENV).run(policy, COMMAND);
+  const runner = new ContainerRunner("docker", IMAGE, launcher, [], name, () => HOST_ENV);
+  await runner.run(policy, COMMAND);
   const removal = ["docker", "rm", "--force", "specnaut-sandbox-x4"];
   const seconds = 60 + DRAIN_GRACE_SECONDS;
   assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, seconds, removal, ENGINE_ENV));
@@ -81,7 +83,7 @@ const removals = (launches: Launch[]) => launches.filter((l) => l.spec.args[0] =
 
 Deno.test("ContainerRunner: a run that ends on its own still has its container removed by name", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  await new ContainerRunner("docker", IMAGE, launcher, () => "specnaut-sandbox-x6").run(
+  await new ContainerRunner("docker", IMAGE, launcher, [], () => "specnaut-sandbox-x6").run(
     policyOf("container"),
     COMMAND,
   );
@@ -99,7 +101,7 @@ Deno.test("ContainerRunner: a watchdog that cannot start leaves no container eit
       return launcher.start(spec);
     },
   };
-  const runner = new ContainerRunner("docker", IMAGE, failing, () => "specnaut-sandbox-x7");
+  const runner = new ContainerRunner("docker", IMAGE, failing, [], () => "specnaut-sandbox-x7");
   await assertRejects(() => runner.run(policyOf("container"), COMMAND), Error, "no /bin/sh");
   assertEquals(launches[0].stopped, 1);
   assertEquals(removals(launches).map((l) => l.spec.args), [
@@ -117,7 +119,7 @@ Deno.test("ContainerRunner: a removal that fails at the timeout is named in the 
       return { ...started, ended: Promise.resolve(1), exited: Promise.resolve(1) };
     },
   };
-  const runner = new ContainerRunner("docker", IMAGE, refusing, () => "specnaut-sandbox-x5");
+  const runner = new ContainerRunner("docker", IMAGE, refusing, [], () => "specnaut-sandbox-x5");
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, {
     kind: "timed_out",
@@ -128,7 +130,7 @@ Deno.test("ContainerRunner: a removal that fails at the timeout is named in the 
 
 Deno.test("ContainerRunner: each run gets a name of its own", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", IMAGE, launcher);
+  const runner = new ContainerRunner("docker", IMAGE, launcher, []);
   await runner.run(policyOf("container"), COMMAND);
   await runner.run(policyOf("container"), COMMAND);
   const runs = launches.filter((l) => l.spec.args[0] === "run");
@@ -139,7 +141,7 @@ Deno.test("ContainerRunner: each run gets a name of its own", async () => {
 
 Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", "acme/dev:latest", launcher);
+  const runner = new ContainerRunner("docker", "acme/dev:latest", launcher, []);
   let refused = false;
   await runner.run(policyOf("container"), COMMAND).catch(() => (refused = true));
   assert(refused);
@@ -149,7 +151,7 @@ Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async 
 Deno.test("ContainerRunner: past the wall clock the container is removed by name", async () => {
   const { launcher, launches } = fakeLauncher(null);
   const name = () => "specnaut-sandbox-x2";
-  const runner = new ContainerRunner("podman", IMAGE, launcher, name, () => HOST_ENV);
+  const runner = new ContainerRunner("podman", IMAGE, launcher, [], name, () => HOST_ENV);
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, { kind: "timed_out", seconds: 0.01 });
   // `--ignore`: podman, unlike docker, fails on a container already gone, as a `--rm` one is.
@@ -185,7 +187,8 @@ Deno.test({
         start: (spec) => real.start({ ...spec, cmd: engine }),
         runSync: (spec) => real.runSync({ ...spec, cmd: engine }),
       };
-      const runner = new ContainerRunner("podman", IMAGE, launcher, () => "specnaut-sandbox-x3");
+      const name = () => "specnaut-sandbox-x3";
+      const runner = new ContainerRunner("podman", IMAGE, launcher, [], name);
       const outcome = await runner.run(withWallClock(policyOf("container"), 1), COMMAND);
       assertEquals(outcome, { kind: "timed_out", seconds: 1 });
       assertEquals(out.text(), "from the command\n");

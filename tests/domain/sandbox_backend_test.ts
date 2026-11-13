@@ -19,7 +19,7 @@ const NOTHING: BackendProbe = {
   arch: "x86_64",
   image: IMAGE,
   podman: "absent",
-  podmanCgroups: false,
+  podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "absent",
@@ -33,14 +33,15 @@ const ON_PODMAN = { kind: "container", engine: "podman", image: IMAGE.ref, dropp
 const ON_DOCKER = { kind: "container", engine: "docker", image: IMAGE.ref, dropped: [] } as const;
 
 const probe = (over: Partial<BackendProbe>): BackendProbe => ({ ...NOTHING, ...over });
+const ALL = { memory: true, swap: true, pids: true, cpuQuota: true };
 
 Deno.test("chooseBackend: rootless podman comes first, ahead of docker and bubblewrap", () => {
-  const all = probe({ podman: "rootless", podmanCgroups: true, docker: true, bwrap: "usable" });
+  const all = probe({ podman: "rootless", podmanLimits: ALL, docker: true, bwrap: "usable" });
   assertEquals(chooseBackend(all), ON_PODMAN);
 });
 
 Deno.test("chooseBackend: podman running as root is passed over for docker", () => {
-  const rooted = probe({ podman: "root", podmanCgroups: true, docker: true, bwrap: "usable" });
+  const rooted = probe({ podman: "root", podmanLimits: ALL, docker: true, bwrap: "usable" });
   assertEquals(chooseBackend(rooted), ON_DOCKER);
 });
 
@@ -56,8 +57,8 @@ Deno.test("chooseBackend: rootless podman without delegated cgroups cannot cap a
 Deno.test("chooseBackend: docker carries the caps its host cannot apply; podman runs only capped", () => {
   const lacking = { memory: true, swap: false, pids: false, cpuQuota: true };
   const docker = chooseBackend(probe({ docker: true, dockerLimits: lacking }));
-  assertEquals(docker, { ...ON_DOCKER, dropped: ["memoryBytes", "processes"] });
-  const podman = probe({ podman: "rootless", podmanCgroups: true, dockerLimits: lacking });
+  assertEquals(docker, { ...ON_DOCKER, dropped: ["memorySwap", "processes"] });
+  const podman = probe({ podman: "rootless", podmanLimits: ALL, dockerLimits: lacking });
   assertEquals(chooseBackend(podman), ON_PODMAN);
 });
 
@@ -70,7 +71,7 @@ Deno.test("chooseBackend: no digest-pinned image means no container, whatever en
   const engines = probe({
     image: NO_IMAGE,
     podman: "rootless",
-    podmanCgroups: true,
+    podmanLimits: ALL,
     docker: true,
     bwrap: "usable",
   });
@@ -117,7 +118,7 @@ Deno.test("chooseBackend: sandbox-exec is a macOS backend only", () => {
 });
 
 Deno.test("chooseBackend: Windows is static only, even with an engine and a pinned image", () => {
-  const win = probe({ os: "windows", podman: "rootless", podmanCgroups: true, docker: true });
+  const win = probe({ os: "windows", podman: "rootless", podmanLimits: ALL, docker: true });
   assertEquals(chooseBackend(win), { kind: "static", why: ["no sandbox on Windows"] });
 });
 

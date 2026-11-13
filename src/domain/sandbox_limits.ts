@@ -4,7 +4,7 @@
  */
 
 import type { OfferedBackend, SandboxedBackend } from "./sandbox.ts";
-import type { DockerLimits } from "./sandbox_hosts.ts";
+import type { EngineLimits } from "./sandbox_hosts.ts";
 
 export type SandboxLimits = {
   readonly processes: number;
@@ -44,9 +44,9 @@ const WALL_CLOCK_ONLY: Readonly<Record<keyof SandboxLimits, CapEnforcer>> = {
 
 /**
  * Where each cap is applied, per backend. The wall clock is always the launcher's: no backend
- * option ends a run on time. A container's arguments carry its caps, but docker's daemon drops
- * one its host cannot apply ({@link dockerDrops}), and the run goes without it. Neither bubblewrap nor `sandbox-exec` can cap processes, memory or
- * CPU; bubblewrap caps its scratch tmpfs by size, and gets the other three from a systemd user
+ * option ends a run on time. A container's arguments carry its caps, but its engine drops one its
+ * host cannot apply ({@link engineDrops}), and the run goes without it. Neither bubblewrap nor
+ * `sandbox-exec` can cap processes, memory or CPU; bubblewrap caps its scratch tmpfs by size, and gets the other three from a systemd user
  * scope where cgroups are delegated (`scopeArgs`). Nothing does so around `sandbox-exec`.
  */
 export const CAP_ENFORCEMENT: Readonly<
@@ -69,10 +69,18 @@ export const CAP_ENFORCEMENT: Readonly<
   seatbelt: WALL_CLOCK_ONLY,
 };
 
-/** Each cap by the name the probe and a run's notice give it. */
-export const CAP_NAMES: Readonly<Record<keyof SandboxLimits, string>> = {
+/**
+ * A cap a run can be reported without: one of its limits, or the half of the memory cap that
+ * bounds what a run pages out to disk. An engine whose host lacks it still binds the
+ * memory a run holds, so that half is reported on its own rather than the whole memory cap.
+ */
+export type ReportedCap = keyof SandboxLimits | "memorySwap";
+
+/** Each cap by the name the probe and a run's notice give it, in the order they are listed. */
+export const CAP_NAMES: Readonly<Record<ReportedCap, string>> = {
   processes: "processes",
   memoryBytes: "memory",
+  memorySwap: "memory-swap",
   cpus: "cpu",
   wallClockSeconds: "wall-clock",
   scratchBytes: "scratch",
@@ -88,28 +96,28 @@ export function unenforcedCaps(backend: SandboxedBackend, scope = false): (keyof
  * The caps a chosen backend runs without: bubblewrap in a user scope lacks none of the three, and
  * a container lacks those its engine drops on this host.
  */
-export function capsWithout(backend: OfferedBackend): (keyof SandboxLimits)[] {
-  const without = unenforcedCaps(backend.kind, backend.kind === "bwrap" && backend.scope);
+export function capsWithout(backend: OfferedBackend): ReportedCap[] {
+  const without: readonly ReportedCap[] = unenforcedCaps(
+    backend.kind,
+    backend.kind === "bwrap" && backend.scope,
+  );
   const dropped = backend.kind === "container" ? backend.dropped : [];
-  return (Object.keys(CAP_NAMES) as (keyof SandboxLimits)[])
+  return (Object.keys(CAP_NAMES) as ReportedCap[])
     .filter((cap) => without.includes(cap) || dropped.includes(cap));
 }
 
-/**
- * The cap each limit docker reports carries. The memory cap counts swap in it (`--memory-swap`),
- * so it holds only where both the memory and the swap limit do.
- */
-const DOCKER_CAPS: Readonly<Record<keyof DockerLimits, keyof SandboxLimits>> = {
+/** The cap each limit an engine reports carries: one limit, one cap, for podman and docker. */
+export const ENGINE_CAPS: Readonly<Record<keyof EngineLimits, ReportedCap>> = {
   memory: "memoryBytes",
-  swap: "memoryBytes",
+  swap: "memorySwap",
   pids: "processes",
   cpuQuota: "cpus",
 };
 
-/** The caps docker's daemon drops from a run on a host that can apply only `limits`. */
-export function dockerDrops(limits: DockerLimits): (keyof SandboxLimits)[] {
-  const lacking = (Object.keys(DOCKER_CAPS) as (keyof DockerLimits)[]).filter((l) => !limits[l]);
-  return [...new Set(lacking.map((l) => DOCKER_CAPS[l]))];
+/** The caps an engine drops from a run on a host that can apply only `limits`. */
+export function engineDrops(limits: EngineLimits): ReportedCap[] {
+  const lacking = (Object.keys(ENGINE_CAPS) as (keyof EngineLimits)[]).filter((l) => !limits[l]);
+  return lacking.map((l) => ENGINE_CAPS[l]);
 }
 
 /**

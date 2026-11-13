@@ -22,7 +22,7 @@ import {
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
 import { containerStatus } from "./sandbox_container.ts";
-import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
+import { LIMITS, type ReportedCap, type SandboxLimits } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
 import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
 
@@ -36,7 +36,7 @@ export type Backend =
     readonly engine: Engine;
     readonly image: string;
     /** The caps its engine drops on this host: the run goes without them, and says so. */
-    readonly dropped: readonly (keyof SandboxLimits)[];
+    readonly dropped: readonly ReportedCap[];
   }
   /** `scope`: run inside a systemd user scope that caps memory, processes and CPU. */
   | { readonly kind: "bwrap"; readonly scope: boolean }

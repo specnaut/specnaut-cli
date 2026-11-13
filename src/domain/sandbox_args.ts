@@ -7,7 +7,7 @@
  */
 
 import type { Engine, SandboxPolicy } from "./sandbox.ts";
-import type { SandboxLimits } from "./sandbox_limits.ts";
+import type { ReportedCap, SandboxLimits } from "./sandbox_limits.ts";
 import { isPinned } from "./sandbox_image.ts";
 import { safePath } from "./sandbox_paths.ts";
 import { SECCOMP_FD } from "./sandbox_seccomp.ts";
@@ -20,6 +20,8 @@ export type ContainerRun = {
   readonly image: string;
   readonly name: string;
   readonly engine: Engine;
+  /** The caps that engine drops on this host (the offered backend's): see `containerCaps`. */
+  readonly dropped: readonly ReportedCap[];
 };
 
 /** A name the engines accept that can never be read as a flag. */
@@ -43,7 +45,7 @@ export function containerArgs(
     ...containerNetwork(policy.network),
     ...["--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
-    ...containerCaps(policy.limits),
+    ...containerCaps(policy.limits, run.dropped),
     ...containerFolders(policy),
     ...containerEnv(policy, run.engine),
     image,
@@ -84,11 +86,16 @@ function checkedRun(run: ContainerRun): ContainerRun {
   return run;
 }
 
-/** The process, memory and CPU caps; swap is set to the memory cap, so none is added. */
-function containerCaps(limits: SandboxLimits): string[] {
+/**
+ * The process, memory and CPU caps, the memory cap bounding what is paged out as well. `--cpus` is
+ * left out where the engine lacks the CPU quota: docker refuses it outright there ("NanoCPUs can
+ * not be set"), so every run would fail, where any other limit its host lacks is only discarded.
+ */
+function containerCaps(limits: SandboxLimits, dropped: readonly ReportedCap[]): string[] {
+  const cpus = dropped.includes("cpus") ? [] : ["--cpus", String(limits.cpus)];
   return [
     ...["--pids-limit", String(limits.processes), "--memory", String(limits.memoryBytes)],
-    ...["--memory-swap", String(limits.memoryBytes), "--cpus", String(limits.cpus)],
+    ...["--memory-swap", String(limits.memoryBytes), ...cpus],
   ];
 }
 

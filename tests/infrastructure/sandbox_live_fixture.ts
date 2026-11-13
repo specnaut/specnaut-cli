@@ -14,6 +14,7 @@ import { DenoSubprocessRunner } from "../../src/infrastructure/deno_subprocess.t
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { HostBackendProber } from "../../src/infrastructure/sandbox_probe.ts";
+import { liveEngine } from "./sandbox_live_engine.ts";
 
 /**
  * What the live sandbox tests share: the host's backends as the real probe finds them, a layout
@@ -28,12 +29,8 @@ export const probed = await new HostBackendProber(
   () => Promise.resolve({ kind: "none", why: "not read here" }),
 ).probe();
 
-/** The engine a live container test runs on: docker when its daemon answers, else podman. */
-export const ENGINE: Engine | null = probed.docker
-  ? "docker"
-  : probed.podman !== "absent"
-  ? "podman"
-  : null;
+/** The engine a live container test runs on (`liveEngine`). */
+export const ENGINE: Engine | null = liveEngine(probed);
 
 /**
  * The image a live container test runs: a digest-pinned one already on the host (a run never

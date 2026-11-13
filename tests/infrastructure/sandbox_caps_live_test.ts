@@ -8,7 +8,12 @@ import type {
   SandboxedBackend,
   SandboxPolicy,
 } from "../../src/domain/sandbox.ts";
-import { CAP_NAMES, capsWithout, type SandboxLimits } from "../../src/domain/sandbox_limits.ts";
+import {
+  CAP_NAMES,
+  capsWithout,
+  ENGINE_CAPS,
+  type ReportedCap,
+} from "../../src/domain/sandbox_limits.ts";
 import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
 import { deps, EXEC, MAC } from "../cli/sandbox_handler_fixture.ts";
 import { PATHS } from "../domain/sandbox_fixture.ts";
@@ -66,7 +71,7 @@ async function reported(probe: BackendProbe, outcome: RunOutcome): Promise<strin
 }
 
 /** Asserts `lines` report `cap` UNCAPPED on `backend`, on probe and in the exec notice. */
-function assertUncapped(lines: string[], backend: string, cap: keyof SandboxLimits): void {
+function assertUncapped(lines: string[], backend: string, cap: ReportedCap): void {
   const uncapped = (prefix: string) =>
     lines.some((l) =>
       l.startsWith(`${prefix}UNCAPPED ${backend} `) &&
@@ -85,16 +90,8 @@ const DOCKER_HOST: BackendProbe = {
   image: { kind: "pinned", ref: `acme/dev@sha256:${"e".repeat(64)}` },
 };
 
-/** The cap each limit docker reports carries. */
-const DOCKER_CAPS = {
-  memory: "memoryBytes",
-  swap: "memoryBytes",
-  pids: "processes",
-  cpuQuota: "cpus",
-} as const;
-
 Deno.test("caps: on docker whose host cannot apply a limit, its cap is reported UNCAPPED", async () => {
-  for (const [limit, cap] of Object.entries(DOCKER_CAPS)) {
+  for (const [limit, cap] of Object.entries(ENGINE_CAPS)) {
     const probe = { ...DOCKER_HOST, dockerLimits: { ...DOCKER_HOST.dockerLimits, [limit]: false } };
     assertUncapped(await reported(probe, { kind: "exited", code: 0 }), "container", cap);
   }

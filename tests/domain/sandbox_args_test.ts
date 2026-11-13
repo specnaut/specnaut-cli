@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { bwrapArgs, containerArgs } from "../../src/domain/sandbox_args.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
-import { LIMITS } from "../../src/domain/sandbox_limits.ts";
+import { LIMITS, type ReportedCap } from "../../src/domain/sandbox_limits.ts";
 import {
   after,
   PATHS,
@@ -19,7 +19,7 @@ import {
 const IMAGE = `ghcr.io/acme/dev@sha256:${"b".repeat(64)}`;
 const COMMAND = ["deno", "task", "test"];
 const NAME = "specnaut-gate-3f9c2a71";
-const RUN = { image: IMAGE, name: NAME, engine: "docker" } as const;
+const RUN = { image: IMAGE, name: NAME, engine: "docker", dropped: [] } as const;
 
 const BLANKED = PROXY_NAMES.map((name) => `${name}=`);
 
@@ -99,6 +99,17 @@ Deno.test("containerArgs: every variable carries its value; none is inherited fr
   const args = container();
   assertEquals(after(args, "--env"), [...BLANKED, `HOME=${SCRATCH_HOME}`, `TMPDIR=${SCRATCH_TMP}`]);
   assertEquals(args.filter((a) => a === "-e" || a.startsWith("--env-file")), []);
+});
+
+Deno.test("containerArgs: --cpus is left out where the engine lacks the CPU quota, and only there", () => {
+  const without = (dropped: ReportedCap[]) =>
+    containerArgs(policyOf("container"), { ...RUN, dropped }, COMMAND).includes("--cpus");
+  assertEquals(without(["cpus"]), false);
+  assertEquals(without(["memorySwap", "processes", "memoryBytes"]), true);
+  // Every other limit an engine lacks is discarded by it, so its option stays.
+  const args = containerArgs(policyOf("container"), { ...RUN, dropped: ["cpus"] }, COMMAND);
+  assertEquals(after(args, "--memory-swap"), [String(LIMITS.memoryBytes)]);
+  assertEquals(after(args, "--pids-limit"), [String(LIMITS.processes)]);
 });
 
 Deno.test("containerArgs: on either engine, every proxy variable is set empty; podman copies none", () => {
