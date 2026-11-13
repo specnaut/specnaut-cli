@@ -68,3 +68,18 @@ Deno.test("HEAD's digest frames a link with its end's bytes, and a submodule wit
   const sub = (commit: string): HeadEntry => ({ kind: "submodule", path: ".claude", commit });
   assertNotEquals(await headDigest([sub("a".repeat(40))]), await headDigest([sub("b".repeat(40))]));
 });
+
+Deno.test("HEAD's digest binds the reasons shown: another reason or path is another digest", async () => {
+  const files = [blob("AGENTS.md", "a")];
+  const said = [{ path: "AGENTS.md", reason: "differs from base" }];
+  const shown = await headDigest(files, new Map(), said);
+  assertNotEquals(shown, await headDigest(files, new Map()));
+  const added = [...said, { path: ".claude/x.md", reason: "not on base" }];
+  assertNotEquals(shown, await headDigest(files, new Map(), added));
+  const other = [{ path: "AGENTS.md", reason: "line endings differ" }];
+  assertNotEquals(shown, await headDigest(files, new Map(), other));
+  assertEquals(
+    await headDigest(files, new Map(), added),
+    await headDigest(files, new Map(), [...added].reverse()),
+  );
+});

@@ -185,8 +185,9 @@ Deno.test("an untrusted instructions line makes merge step 0 manual, shows the d
   assertStringIncludes(said, "ask once");
   assertStringIncludes(
     said,
-    "The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them) and " +
-      "nothing else: a later run with another digest asks again, even naming the same paths",
+    "The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them and the " +
+      "reasons shown) and nothing else: a later run with another digest asks again, even naming " +
+      "the same paths, or with a new reason",
   );
   assertStringIncludes(said, "The session read `AGENTS.md` before step 0 ran");
   assertStringIncludes(g, "| `instructions` |");

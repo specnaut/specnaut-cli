@@ -67,6 +67,7 @@ which does not show them. A `differs from the copy Specnaut ships` reason names 
 ships whose bytes are not the shipped copy, even where the base holds the same edit: show `specnaut
 diff <path>`, which compares it with that copy. Then ask once, as the one question before step 3: *"This branch changes
 the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops on the branch. The yes covers
-that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them) and nothing else: a later run
-with another digest asks again, even naming the same paths, and a run with no such line asks. The
+that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them and the reasons shown) and
+nothing else: a later run with another digest asks again, even naming the same paths, or with a
+new reason, and a run with no such line asks. The
 session read `AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.

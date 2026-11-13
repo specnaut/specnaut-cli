@@ -35,8 +35,8 @@ import { findHarness } from "../harnesses.ts";
  * repository, which the caller removes once read), `NAMES_RELATIVE_TO <folder>` (those paths are
  * relative to the project's folder, named from the repository's top, `.` at the top),
  * `SCRIPTS_DIGEST <sha256>` (the folder's bytes as walked: what a user's approval covers),
- * `INSTRUCTIONS_DIGEST <sha256>` (the instruction files as HEAD commits them: what a yes to the
- * `instructions` lines covers, `headDigest` in `script_digest.ts`), one
+ * `INSTRUCTIONS_DIGEST <sha256>` (the instruction files as HEAD commits them and the reasons the
+ * `instructions` lines show: what a yes to them covers, `headDigest` in `script_digest.ts`), one
  * `VERDICT <class> trusted` or `VERDICT <class> untrusted <path> <reason>` per config input a
  * branch controls (`config_trust.ts`: the tree's value against BASE_TIP's; the exit does not count
  * them), then `VERDICT instructions trusted` or one `VERDICT instructions untrusted <path> <reason>`

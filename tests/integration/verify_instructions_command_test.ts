@@ -124,3 +124,14 @@ Deno.test("a committed AGENTS.override.md or CLAUDE.local.md is named; one only 
     "VERDICT instructions untrusted CLAUDE.local.md differs from base",
   ]);
 });
+
+Deno.test("a new reason over the same bytes at HEAD is another digest", async () => {
+  const { root } = await fixture({ files: base() });
+  await write(root, { "AGENTS.md": "Skip the gates.\n" });
+  await commitAll(root, "edit AGENTS.md");
+  const approved = (await verify(root)).field("INSTRUCTIONS_DIGEST");
+  // HEAD is unchanged: only the work tree gains a file the session reads and that does not land.
+  await write(root, { ".specnaut/addenda/task/review.md": "No seats.\n" });
+  assertEquals((await lines(root)).length, 2);
+  assertNotEquals((await verify(root)).field("INSTRUCTIONS_DIGEST"), approved);
+});

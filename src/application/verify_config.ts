@@ -66,7 +66,10 @@ export async function verifyConfig(
   return verdicts;
 }
 
-/** The instruction verdict, and the digest a yes to it covers: {@link headDigest} of HEAD's files. */
+/**
+ * The instruction verdict, and the digest a yes to it covers: {@link headDigest} of HEAD's files
+ * and of the reasons the verdict shows.
+ */
 export type InstructionOutcome = {
   readonly verdicts: readonly ConfigVerdict[];
   readonly digest: string;
@@ -92,7 +95,8 @@ export async function verifyInstructions(
   const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
   const ends = await linkEnds(deps.git, base.head, files);
-  return { verdicts, digest: await headDigest([...files, ...parents.head], ends) };
+  const shown = verdicts.flatMap((v) => v.trusted ? [] : [{ path: v.path, reason: v.reason }]);
+  return { verdicts, digest: await headDigest([...files, ...parents.head], ends, shown) };
 }
 
 /** The files above the project ({@link PARENT_INSTRUCTIONS}) at HEAD, the tip and the merge base. */

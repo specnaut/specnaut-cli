@@ -1,5 +1,5 @@
 import { sha256HexBytes } from "./sha256.ts";
-import type { BaseEntry, TreeEntry, TreeWalk } from "./script_trust.ts";
+import type { BaseEntry, TreeEntry, TreeWalk, Untrusted } from "./script_trust.ts";
 
 /**
  * One digest of the scripts folder as the walk found it: what a user's approval of an untrusted
@@ -28,11 +28,14 @@ export type HeadEntry = BaseEntry;
  * a path already approved digests otherwise and asks again. Framed as {@link scriptsDigest} frames
  * a walk: a link by its target and the bytes HEAD holds where it leads (`ends`, by the link's
  * path; none when it leads to no file), so a commit to a file outside the class that a link
- * reaches asks again too; a submodule by its commit.
+ * reaches asks again too; a submodule by its commit. The yes is given to the reasons shown as well
+ * (`reasons`, each path with its reason, in path order after the files): a new reason, or the same
+ * path for another reason, is a question nobody answered, even over the same bytes.
  */
 export async function headDigest(
   entries: readonly HeadEntry[],
   ends: ReadonlyMap<string, Uint8Array> = new Map(),
+  reasons: readonly Untrusted[] = [],
 ): Promise<string> {
   const enc = new TextEncoder();
   const sorted = [...entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
@@ -43,7 +46,8 @@ export async function headDigest(
     const size = e.kind === "link" && end === undefined ? "-" : `${bytes.length}`;
     return [enc.encode(`${e.kind}\0${e.path}\0${what}\0${size}\0`), bytes];
   });
-  return await sha256HexBytes(concat(parts));
+  const said = reasons.map((u) => `reason\0${u.path}\0${u.reason}\0`).sort();
+  return await sha256HexBytes(concat([...parts, ...said.map((r) => enc.encode(r))]));
 }
 
 function frame(entry: TreeEntry, enc: TextEncoder): Uint8Array[] {
