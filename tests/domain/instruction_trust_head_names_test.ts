@@ -104,6 +104,7 @@ Deno.test("HEAD's listing keeps the instruction paths, overrides and folders in 
       "src/a.ts",
       ".specnaut/workflow.yml",
       "docs/other.md",
+      ".claude/worktrees/x/README.md",
     ]
   ) {
     assert(!keptAtHead(dropped), dropped);

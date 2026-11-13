@@ -55,7 +55,24 @@ export function inDeepRoot(path: string): boolean {
     CHECKOUT_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
 }
 
-/** Whether `path` is one of the checked files. */
+/** The instruction files Claude Code and Codex read in any folder of the project, not only its root. */
+export const INSTRUCTION_NAMES = [
+  "AGENTS.md",
+  "AGENTS.override.md",
+  "CLAUDE.md",
+  "CLAUDE.local.md",
+] as const;
+
+const FOLDED_NAMES = INSTRUCTION_NAMES.map((n) => n.toLowerCase());
+
+/** Whether `path` is one of {@link INSTRUCTION_NAMES} in a folder below the root, case aside. */
+export function isInstructionFile(path: string): boolean {
+  const at = path.lastIndexOf("/");
+  return at >= 0 && FOLDED_NAMES.includes(path.slice(at + 1).toLowerCase());
+}
+
+/** Whether `path` is one of the checked files: in a root, or an instruction file at any depth. */
 export function inCheckoutScope(path: string): boolean {
-  return !path.startsWith(`${SCRIPTS_DIR}/`) && CHECKOUT_SCOPE.some((r) => inScopeRoot(r, path));
+  return !path.startsWith(`${SCRIPTS_DIR}/`) &&
+    (CHECKOUT_SCOPE.some((r) => inScopeRoot(r, path)) || isInstructionFile(path));
 }

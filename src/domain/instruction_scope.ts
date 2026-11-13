@@ -1,4 +1,9 @@
-import { inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
+import {
+  inScopeRoot,
+  INSTRUCTION_NAMES,
+  isInstructionFile,
+  type ScopeRoot,
+} from "./checkout_scope.ts";
 import type { ConfigFile } from "./config_trust.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 
@@ -59,16 +64,36 @@ const FOLDERS: readonly string[] = [
 
 const OVERRIDES = COMMITTED_INSTRUCTIONS.map((p) => p.toLowerCase());
 
+/** Whether a root of {@link INSTRUCTION_SCOPE} holds `path`, its letter case aside. */
+const inRoots = (path: string) => INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path.toLowerCase()));
+
+/**
+ * Whether `path` is an instruction file below the root that no root of the class holds: a harness
+ * reads one in whatever folder it finds it (`isInstructionFile` in `checkout_scope.ts`).
+ */
+export const isNested = (path: string): boolean => isInstructionFile(path) && !inRoots(path);
+
 /** Whether `path` is an instruction path, its letter case aside. */
-const foldedInScope = (path: string) =>
-  INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path.toLowerCase()));
+const foldedInScope = (path: string) => inRoots(path) || isNested(path);
 
 /** Whether `path` is an instruction path as written: a root's own folder and a listed name. */
 export function exactlyInScope(path: string): boolean {
   const name = path.slice(path.lastIndexOf("/") + 1);
+  if (isNested(path)) return (INSTRUCTION_NAMES as readonly string[]).includes(name);
   return INSTRUCTION_SCOPE.some((r) =>
     inScopeRoot(r, path) && (r.names === undefined || r.names.includes(name))
   );
+}
+
+/**
+ * The folders holding nested instruction files (`paths`, at HEAD, the tip or the merge base), each
+ * once, as roots the work tree's walk reads for the four names alone. A file only the work tree
+ * holds, in a folder where no commit holds one, is not walked: the landing refuses a tree with an
+ * untracked file, and git keeps out only what the project ignores.
+ */
+export function nestedRoots(paths: readonly string[]): ScopeRoot[] {
+  const dirs = new Set(paths.filter(isNested).map((p) => p.slice(0, p.lastIndexOf("/"))));
+  return [...dirs].sort().map((dir) => ({ dir, deep: false, names: [...INSTRUCTION_NAMES] }));
 }
 
 /** A link counts only into a folder this class compares whole: `.specnaut/addenda/`. */
