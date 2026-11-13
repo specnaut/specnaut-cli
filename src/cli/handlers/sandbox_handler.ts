@@ -50,7 +50,7 @@ export type SandboxDeps = {
   readonly out: (s: string) => void;
   readonly err: (s: string) => void;
   readonly probe: () => Promise<BackendProbe>;
-  /** Where a `--log` file would be made (`realLogPath`), `null` when its folder does not resolve. */
+  /** Where a `--log` file would be made (`realLogPath`); `null` if its folder does not resolve. */
   readonly realLog: (path: string) => Promise<string | null>;
   /** Runs the request; its `log` is the resolved path the lock judged. */
   readonly exec: (request: ExecRequest & { readonly log: string | null }) => Promise<ExecOutcome>;

@@ -38,7 +38,7 @@ const NAMES: ReadonlySet<string> = new Set([
   "DOCKER_TLS_VERIFY",
 ]);
 
-/** The variables of `host` an engine's client is started with; one `host` does not set is left out. */
+/** The variables of `host` an engine's client starts with; one `host` does not set is left out. */
 export function engineEnv(host: Readonly<Record<string, string>>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(host).filter(([name]) => NAMES.has(name)),

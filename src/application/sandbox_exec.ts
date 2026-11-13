@@ -59,7 +59,7 @@ export async function execInSandbox(deps: ExecDeps, request: ExecRequest): Promi
   }
 }
 
-/** Runs `command` on `backend` under its policy over `paths`, or nothing when the layout is refused. */
+/** Runs `command` on `backend` under its policy over `paths`; nothing if the layout is refused. */
 async function runUnder(
   deps: ExecDeps,
   backend: RunnableBackend,

@@ -23,7 +23,7 @@ async function withTemp(fn: (dir: string) => Promise<void>): Promise<void> {
   }
 }
 
-/** A cache folder holding an export of `SHA` with its scratch copy, as the export store makes it. */
+/** A cache folder holding an export of `SHA` and its scratch copy, as the export store makes it. */
 async function exportIn(dir: string): Promise<string> {
   const root = join(dir, "cache");
   await Deno.mkdir(join(root, SHA, "scratch"), { recursive: true, mode: 0o700 });

@@ -27,7 +27,8 @@ export const DENIED_SYSCALLS = [
   // The whole host: power, swap, accounting, clock, kernel log, quotas, the terminal.
   ...["reboot", "swapon", "swapoff", "acct", "settimeofday", "clock_settime", "syslog"],
   ...["quotactl", "quotactl_fd", "vhangup", "nfsservctl", "lookup_dcookie"],
-  // Kernel surfaces no build needs: BPF, perf, userfaultfd, io_uring, handles, other processes' pages.
+  // Kernel surfaces no build needs: BPF, perf, userfaultfd, io_uring, handles, other processes'
+  // pages.
   ...["bpf", "perf_event_open", "userfaultfd", "io_uring_setup", "io_uring_enter"],
   ...["io_uring_register", "name_to_handle_at", "open_by_handle_at", "move_pages"],
   "migrate_pages",

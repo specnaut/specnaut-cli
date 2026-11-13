@@ -21,7 +21,8 @@ import {
   SYSTEM,
   SYSTEM_PATH,
 } from "./sandbox_hosts.ts";
-import { dockerDrops, LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
+import { containerStatus } from "./sandbox_container.ts";
+import { LIMITS, type SandboxLimits } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
 import { ancestors, layoutProblem, type SandboxPaths } from "./sandbox_paths.ts";
 
@@ -53,8 +54,6 @@ export type BackendStatus =
   | { readonly kind: SandboxedBackend; readonly offered: OfferedBackend }
   | { readonly kind: SandboxedBackend; readonly why: string; readonly onThisOs: boolean };
 
-const UNCAPPED_PODMAN =
-  "container: rootless podman without cgroup v2 pids, memory and cpu delegated, and no docker";
 const WINDOWS = "no sandbox on Windows";
 
 /** The best backend `probe` offers: the first {@link assessBackends} offers, else static only. */
@@ -88,25 +87,6 @@ export function assessBackends(probe: BackendProbe): BackendStatus[] {
 
 const KINDS: readonly SandboxedBackend[] = ["container", "bwrap", "seatbelt"];
 const OFFERED = { seatbelt: { kind: "seatbelt", offered: { kind: "seatbelt" } } } as const;
-
-/** The container backend `probe` offers, or why there is none. */
-function containerStatus(probe: BackendProbe): BackendStatus {
-  const podman = probe.podman === "rootless" && probe.podmanCgroups;
-  const engine = podman ? "podman" : probe.docker ? "docker" : null;
-  if (probe.image.kind === "pinned" && engine) {
-    const dropped = engine === "docker" ? dockerDrops(probe.dockerLimits) : [];
-    return {
-      kind: "container",
-      offered: { kind: "container", engine, image: probe.image.ref, dropped },
-    };
-  }
-  const why = probe.image.kind === "none"
-    ? `no container image: ${probe.image.why}`
-    : probe.podman === "rootless"
-    ? UNCAPPED_PODMAN
-    : "container: no rootless podman and no docker";
-  return { kind: "container", why, onThisOs: true };
-}
 
 /** Why bubblewrap cannot run on this Linux host, or `null` when it can. */
 function bwrapWhy(probe: BackendProbe): string | null {

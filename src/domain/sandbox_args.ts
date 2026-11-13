@@ -2,7 +2,8 @@
  * The arguments that launch a command under a {@link SandboxPolicy}: for `podman run` /
  * `docker run`, and for `bwrap`. They translate the policy and add nothing to it: every folder
  * mounted is one it names, every variable set is one of its own with its value (or a proxy one an
- * engine would add, set empty), and every isolation flag is always present. Pure — the caller runs the launcher.
+ * engine would add, set empty), and every isolation flag is always present. Pure — the caller
+ * runs the launcher.
  */
 
 import type { Engine, SandboxPolicy } from "./sandbox.ts";

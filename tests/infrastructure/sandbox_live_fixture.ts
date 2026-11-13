@@ -64,7 +64,7 @@ export const RUNNER_HOST = {
   bus: userBus(Deno.env.get),
 };
 
-/** A live test's name: what it shows, then why it is skipped when `missing` names what is absent. */
+/** A live test's name: what it shows, then why it is skipped where `missing` names a lack. */
 export function live(title: string, missing: string | null): string {
   return missing === null ? title : `${title} (skipped: needs ${missing})`;
 }
@@ -146,20 +146,23 @@ export async function withLayout(backend: SandboxedBackend, fn: (run: Run) => Pr
   const scratch = await new FsSandboxHost("/nowhere", "/", () => Promise.resolve("/")).scratch();
   const home = await Deno.realPath(Deno.env.get("HOME")!);
   try {
-    const result = sandboxPolicy(backend, {
-      tree,
-      scratch: scratch.path,
-      toolchain: [],
-      path: [],
-      home,
-      checkout: join(base, "checkout"),
-    });
-    if (!result.ok) throw new Error(result.why);
-    await fn({ policy: result.policy, scratch: scratch.path, tree, home });
+    const policy = layoutPolicy(backend, { base, tree, scratch: scratch.path, home });
+    await fn({ policy, scratch: scratch.path, tree, home });
   } finally {
     await scratch.remove();
     await Deno.remove(base, { recursive: true });
   }
+}
+
+/** The policy of `backend` over a layout with no toolchain; a refused one is thrown. */
+function layoutPolicy(
+  backend: SandboxedBackend,
+  { base, tree, scratch, home }: { base: string; tree: string; scratch: string; home: string },
+): SandboxPolicy {
+  const checkout = join(base, "checkout");
+  const result = sandboxPolicy(backend, { tree, scratch, toolchain: [], path: [], home, checkout });
+  if (!result.ok) throw new Error(result.why);
+  return result.policy;
 }
 
 export async function runIn(

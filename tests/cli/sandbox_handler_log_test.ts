@@ -16,7 +16,7 @@ const POSIX = Deno.build.os !== "windows";
 /** The fixture's run, logging to `log`. */
 const logged = (log: string) => ({ ...EXEC, log }) as SandboxIntent;
 
-/** Deps whose lock check repoints `link` at `elsewhere` once it has judged, then lets the run go. */
+/** Deps whose lock check repoints `link` at `elsewhere` once it judged, then lets the run go. */
 function relinkingDeps(link: string, elsewhere: string, judged: (string | null)[]): SandboxDeps {
   return {
     out: () => {},
