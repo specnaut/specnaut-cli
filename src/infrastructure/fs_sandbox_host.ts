@@ -47,7 +47,7 @@ export class FsSandboxHost implements SandboxHost {
 
   async scratch(): Promise<ScratchFolder> {
     const path = await Deno.realPath(await Deno.makeTempDir({ prefix: "specnaut-sandbox-" }));
-    const disarm = armExitTrap(() => removeSync(path));
+    const disarm = armExitTrap(() => removeScratchSync(path));
     return {
       path,
       remove: async () => {
@@ -68,12 +68,17 @@ async function real(path: string, missing: string): Promise<string> {
 }
 
 /**
- * Removes the scratch folder. It is first moved into a new private folder beside it, so its path no
- * longer matches the run's write rule and nothing the run left behind can still change it. A run may
+ * Removes the scratch folder. An empty one goes in place: on macOS it is the mount point a volume
+ * left closed to writes (`sandbox_scratch_volume.ts`), so nothing the run left behind could put
+ * anything in it, and removing it needs no more than the folder above. One that holds something
+ * is opened to its owner, then moved into a new private folder beside it, so its path no longer
+ * matches the run's write rule and nothing the run left behind can still change it. A run may
  * leave a folder it closed to writes, which stops a plain removal; every real folder is then opened
  * to its owner again, a link never followed, and the removal retried once.
  */
 async function removeAll(path: string): Promise<void> {
+  if (await removedIfEmpty(path)) return;
+  await Deno.chmod(path, 0o700);
   const holder = await Deno.makeTempDir({ dir: dirname(path), prefix: "specnaut-sandbox-done-" });
   await Deno.rename(path, join(holder, "scratch"));
   try {
@@ -108,10 +113,36 @@ export async function reopen(dir: string, run: ChmodRun = systemChmod): Promise<
   if (code !== 0) throw new Error(`chmod could not open ${dir} to its owner: ${stderr.trim()}`);
 }
 
-/** The trap's removal: synchronous, as `unload` waits for nothing; a failure is reported. */
-function removeSync(path: string): void {
+/** Whether `path` was an empty folder, now removed; one that holds something is left as it was. */
+async function removedIfEmpty(path: string): Promise<boolean> {
   try {
-    Deno.removeSync(path, { recursive: true });
+    await Deno.remove(path);
+    return true;
+  } catch (err) {
+    if (notEmpty(err)) return false;
+    throw err;
+  }
+}
+
+/** Whether `err` is a folder's removal refused because it still holds something. */
+function notEmpty(err: unknown): boolean {
+  return (err as { code?: string }).code === "ENOTEMPTY";
+}
+
+/**
+ * The exit trap's removal of the scratch folder: synchronous, as `unload` waits for nothing. An
+ * empty one goes in place, as {@link removeAll}'s does; one that holds something is opened to its
+ * owner and removed with what it holds. A failure is reported.
+ */
+export function removeScratchSync(path: string): void {
+  try {
+    try {
+      Deno.removeSync(path);
+    } catch (err) {
+      if (!notEmpty(err)) throw err;
+      Deno.chmodSync(path, 0o700);
+      Deno.removeSync(path, { recursive: true });
+    }
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) {
       console.error(`warning: could not remove ${path}: ${(err as Error).message}`);

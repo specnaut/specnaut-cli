@@ -91,10 +91,16 @@ export class HdiutilVolumes implements ScratchVolumes {
     }
   }
 
-  /** The image made in `folder`, attached on `mount`, and its root closed to all but its owner. */
+  /**
+   * The image made in `folder` and attached on `mount`, its root closed to all but its owner. The
+   * folder under it is closed to writes first, its owner's included: once the volume is detached
+   * the path is that folder again, and the profile's write rule still matches it, so a process the
+   * run left behind could otherwise make home or temp there and write to the host's disk uncapped.
+   */
   async #made(mount: string, folder: string, bytes: number): Promise<void> {
     const base = join(folder, "scratch");
     await this.#refusedUnless("create", createArgs(base, bytes));
+    await Deno.chmod(mount, 0o500);
     await this.#refusedUnless("attach", attachArgs(mount, `${base}.sparseimage`));
     if (!this.host.mounted(mount)) {
       throw new SandboxRefused(`the scratch volume is not mounted on ${mount} after its attach`);

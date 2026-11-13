@@ -2,6 +2,7 @@ import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/
 import { join } from "@std/path";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import { within } from "../../src/domain/sandbox_paths.ts";
+import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { HdiutilVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { exists } from "./sandbox_live_fixture.ts";
 import { POSIX } from "./sandbox_runner_fixture.ts";
@@ -108,4 +109,21 @@ test("a refused attach whose volume cannot be detached is warned of, its trap ke
     } finally {
       await Deno.remove(imageFolder(calls), { recursive: true });
     }
+  }));
+
+test("the scratch folder is closed to writes under the volume, so none lands there after it", () =>
+  onMount(async (mount) => {
+    const { launcher } = hdiutil();
+    const modes: number[] = [];
+    const watching: ProcessLauncher = {
+      ...launcher,
+      start: (spec) => {
+        if (spec.args[0] === "attach") modes.push(Deno.statSync(mount).mode! & 0o777);
+        return launcher.start(spec);
+      },
+    };
+    const volumes = new HdiutilVolumes(watching, host(true).volumeHost);
+    const volume = await volumes.attach(mount, 8 * MIB);
+    await volume.detach();
+    assertEquals(modes, [0o500]);
   }));

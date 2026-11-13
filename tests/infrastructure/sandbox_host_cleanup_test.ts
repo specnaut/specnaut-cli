@@ -1,6 +1,10 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { dirname, join } from "@std/path";
-import { FsSandboxHost, reopen } from "../../src/infrastructure/fs_sandbox_host.ts";
+import {
+  FsSandboxHost,
+  removeScratchSync,
+  reopen,
+} from "../../src/infrastructure/fs_sandbox_host.ts";
 import type { ChmodRun } from "../../src/infrastructure/fs_sandbox_host.ts";
 
 const posix = Deno.build.os !== "windows";
@@ -84,4 +88,54 @@ Deno.test("reopen: the walk is the system chmod's, recursive and physical, never
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+/** The `specnaut-sandbox-done-` folders a removal left beside `path`. */
+async function holdersBeside(path: string): Promise<string[]> {
+  const left: string[] = [];
+  for await (const e of Deno.readDir(dirname(path))) {
+    if (e.name.startsWith("specnaut-sandbox-done-")) left.push(e.name);
+  }
+  return left;
+}
+
+Deno.test({
+  name: "scratch: one closed to writes and empty, as a volume leaves it, is removed where it is",
+  ignore: !posix,
+  fn: async () => {
+    const scratch = await new FsSandboxHost("/nowhere", "/home/dev", () => Promise.resolve("/src"))
+      .scratch();
+    await Deno.chmod(scratch.path, 0o500);
+    await scratch.remove();
+    await assertRejects(() => Deno.lstat(scratch.path), Deno.errors.NotFound);
+    assertEquals(await holdersBeside(scratch.path), []);
+  },
+});
+
+Deno.test({
+  name: "scratch: one closed to writes that still holds something is opened and removed",
+  ignore: !posix,
+  fn: async () => {
+    const scratch = await new FsSandboxHost("/nowhere", "/home/dev", () => Promise.resolve("/src"))
+      .scratch();
+    await Deno.writeTextFile(join(scratch.path, "left"), "x");
+    await Deno.chmod(scratch.path, 0o500);
+    await scratch.remove();
+    await assertRejects(() => Deno.lstat(scratch.path), Deno.errors.NotFound);
+    assertEquals(await holdersBeside(scratch.path), []);
+  },
+});
+
+Deno.test({
+  name: "removeScratchSync: the exit trap's removal takes a closed folder, empty or not",
+  ignore: !posix,
+  fn: async () => {
+    for (const content of [false, true]) {
+      const dir = await Deno.makeTempDir({ prefix: "specnaut-trap-scratch-" });
+      if (content) await Deno.writeTextFile(join(dir, "left"), "x");
+      await Deno.chmod(dir, 0o500);
+      removeScratchSync(dir);
+      await assertRejects(() => Deno.lstat(dir), Deno.errors.NotFound, undefined, `${content}`);
+    }
+  },
 });

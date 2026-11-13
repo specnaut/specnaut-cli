@@ -5,7 +5,17 @@ import {
   HdiutilVolumes,
   type ScratchVolumes,
 } from "../../src/infrastructure/sandbox_scratch_volume.ts";
-import { exists, live, mountedOn, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
+import {
+  exists,
+  killNamed,
+  live,
+  mountedOn,
+  NO_PERL,
+  probed,
+  processesNamed,
+  runIn,
+  withLayout,
+} from "./sandbox_live_fixture.ts";
 
 /**
  * The scratch cap of `sandbox-exec` on a real macOS host: a write past it fails for want of space,
@@ -64,5 +74,45 @@ Deno.test({
       const { outcome, out } = await runIn(mac, capped, ["/bin/sh", "-c", fill]);
       assertEquals(outcome, { kind: "exited", code: 0 });
       assertEquals(out.trim(), "4194304");
+    }),
+});
+
+/**
+ * A shell line that leaves behind, out of the run's process group and its output, a process that
+ * waits for `$TMPDIR` to vanish with the volume, then makes it again and writes there, and last
+ * becomes `sleep <marker>`, the sign it tried.
+ */
+function outliving(marker: string): string {
+  const after = `while [ -d "$TMPDIR" ]; do sleep 0.1; done; ` +
+    `mkdir "$TMPDIR" && echo past > "$TMPDIR/fill"; exec sleep ${marker}`;
+  const perl = "use POSIX; pipe(R, W); if (fork) { close W; <R>; exit } " +
+    'close R; setsid(); close W; open(STDOUT, ">/dev/null"); open(STDERR, ">/dev/null"); ' +
+    'exec "/bin/sh", "-c", $ARGV[0]';
+  return `/usr/bin/perl -e '${perl}' '${after}'`;
+}
+
+const OUTLIVING = MISSING ?? NO_PERL;
+
+Deno.test({
+  name: live(
+    "seatbelt live: what a run leaves behind cannot write where its volume was",
+    OUTLIVING,
+  ),
+  ignore: OUTLIVING !== null,
+  fn: () =>
+    withLayout("seatbelt", async ({ policy, scratch }) => {
+      const marker = "38.471";
+      try {
+        const mac = (l: DenoProcessLauncher) => new SeatbeltRunner(l);
+        const { outcome } = await runIn(mac, policy, ["/bin/sh", "-c", outliving(marker)]);
+        assertEquals(outcome, { kind: "exited", code: 0 });
+        for (let i = 0; i < 100 && processesNamed(`sleep ${marker}`).length === 0; i++) {
+          await new Promise((ok) => setTimeout(ok, 100));
+        }
+        assertEquals(processesNamed(`sleep ${marker}`).length, 1, "it never tried");
+        assertEquals([...Deno.readDirSync(scratch)], [], "it wrote where the volume was");
+      } finally {
+        killNamed(`sleep ${marker}`);
+      }
     }),
 });
