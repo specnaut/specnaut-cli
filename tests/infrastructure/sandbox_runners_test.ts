@@ -4,11 +4,8 @@ import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
 import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
-import {
-  ContainerRunner,
-  runnerFor,
-  SeatbeltRunner,
-} from "../../src/infrastructure/sandbox_runners.ts";
+import { ContainerRunner, runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
+import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 import { HdiutilVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";

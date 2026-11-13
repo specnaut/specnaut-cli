@@ -2,14 +2,14 @@ import { encodeHex } from "@std/encoding/hex";
 import type { RunnableBackend, RunOutcome, SandboxRunner } from "../application/sandbox_ports.ts";
 import type { Engine, SandboxPolicy } from "../domain/sandbox.ts";
 import { containerArgs, type ContainerRun } from "../domain/sandbox_args.ts";
-import { seatbeltProfile } from "../domain/sandbox_seatbelt.ts";
 import { armExitTrap } from "./exit_trap.ts";
 import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import { engineRunEnv } from "./sandbox_engine_env.ts";
-import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts";
-import { HdiutilVolumes, type ScratchVolumes } from "./sandbox_scratch_volume.ts";
-import { DRAIN_GRACE_SECONDS, type Halt, untilWallClock } from "./sandbox_wall_clock.ts";
+import type { ProcessLauncher, ProcessSpec } from "./sandbox_process.ts";
+import { SeatbeltRunner } from "./sandbox_seatbelt_runner.ts";
+import { DRAIN_GRACE_SECONDS } from "./sandbox_wall_clock.ts";
+import { watched } from "./sandbox_watched.ts";
 import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
@@ -73,78 +73,6 @@ function watchdogOf(remove: ProcessSpec, seconds: number): (pid: number) => Proc
 
 function containerName(): string {
   return `specnaut-sandbox-${encodeHex(crypto.getRandomValues(new Uint8Array(8)))}`;
-}
-
-/**
- * `sandbox-exec` with the policy's profile, in its working folder, with its environment only. The
- * sandbox's home and temp are host folders here, so they are made, new and empty, before the run,
- * on the volume that caps the scratch (`CAP_ENFORCEMENT`): it is attached on the policy's scratch
- * folder first, and detached after the run however it ended. The watchdog that ends a run we no
- * longer watch ends its volume after it.
- */
-export class SeatbeltRunner implements SandboxRunner {
-  constructor(
-    readonly launcher: ProcessLauncher,
-    readonly volumes: ScratchVolumes = new HdiutilVolumes(launcher),
-  ) {}
-
-  async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
-    const volume = await this.volumes.attach(policy.scratch, policy.limits.scratchBytes);
-    try {
-      for (const folder of policy.writes) await Deno.mkdir(folder, { mode: 0o700 });
-      const started = this.launcher.start({
-        cmd: "/usr/bin/sandbox-exec",
-        args: ["-p", seatbeltProfile(policy), "--", ...command],
-        env: policy.env,
-        cwd: policy.workdir,
-      });
-      const seconds = policy.limits.wallClockSeconds;
-      const grace = seconds + DRAIN_GRACE_SECONDS;
-      return await watched(
-        this.launcher,
-        started,
-        seconds,
-        (pid) => watchdogSpec(pid, grace, volume.removal),
-      );
-    } finally {
-      await volume.detach();
-    }
-  }
-}
-
-/**
- * `started` run to its end under the wall clock, beside its watchdog (`watchdog` of its pid), which
- * is stopped once the run has ended. A watchdog that cannot start stops the run: it never goes
- * unwatched.
- */
-async function watched(
-  launcher: ProcessLauncher,
-  started: Started,
-  seconds: number,
-  watchdogOf: (pid: number) => ProcessSpec,
-  halt?: Halt,
-): Promise<RunOutcome> {
-  const watchdog = startWatchdog(launcher, started, watchdogOf);
-  try {
-    return await untilWallClock(started, seconds, halt);
-  } finally {
-    watchdog.stop();
-    await watchdog.exited;
-  }
-}
-
-/** The watchdog of `started`; if it cannot start, the run is stopped and the failure raised. */
-function startWatchdog(
-  launcher: ProcessLauncher,
-  started: Started,
-  watchdogOf: (pid: number) => ProcessSpec,
-): Started {
-  try {
-    return launcher.start(watchdogOf(started.pid));
-  } catch (err) {
-    started.stop();
-    throw err;
-  }
 }
 
 /**

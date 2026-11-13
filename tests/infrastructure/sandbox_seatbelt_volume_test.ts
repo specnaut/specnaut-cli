@@ -2,7 +2,7 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
 import type { SandboxPolicy } from "../../src/domain/sandbox.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 import { exists } from "./sandbox_live_fixture.ts";
 import {
   COMMAND,

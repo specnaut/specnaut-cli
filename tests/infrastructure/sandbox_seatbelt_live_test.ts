@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 import { fromFileUrl, join } from "@std/path";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import {

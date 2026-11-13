@@ -1,7 +1,8 @@
 import { join } from "@std/path";
 import { type Engine, type SandboxedBackend, sandboxPolicy } from "../../src/domain/sandbox.ts";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { ContainerRunner, SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 
 /**
  * A stand-in for the CLI, for the live tests that kill it with SIGKILL, in folders made under

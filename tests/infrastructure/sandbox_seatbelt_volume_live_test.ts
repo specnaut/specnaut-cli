@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { SeatbeltRunner } from "../../src/infrastructure/sandbox_runners.ts";
+import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 import {
   HdiutilVolumes,
   type ScratchVolumes,
