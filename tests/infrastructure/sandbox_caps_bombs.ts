@@ -64,9 +64,9 @@ const times = (n: number, body: string) =>
 /**
  * The barrier the units wait on: a FIFO held open on descriptor 3, so a unit blocks in `read`
  * without a process or a timer of its own, until {@link release} writes it a line. Every unit is
- * then alive at once, however slowly the host started them. `go` and `ev` are made in the scratch.
+ * then alive at once, however slowly the host started them. `go` is made in the scratch.
  */
-const BARRIER = 'exec 2>&1; cd "$TMPDIR" && mkfifo go ev && exec 3<>go 4<>ev || exit 4; ';
+const BARRIER = 'exec 2>&1; cd "$TMPDIR" && mkfifo go && exec 3<>go || exit 4; ';
 const AWAIT = "read -r g <&3";
 /** One line on the barrier per unit: each unit takes one, whenever it reaches it. */
 const release = (n: number) => `{ ${times(n, "echo;")} >&3; }`;
@@ -82,16 +82,23 @@ export const STOP_BY = WALL + DRAIN_GRACE_SECONDS + 30;
 export const HANG = STOP_BY + 30;
 
 /**
- * Each unit holds 32 MiB in its shell, checks it holds it all, says so (`held`), and waits at the
- * barrier; a wrapper reports its exit status. The barrier opens once every unit held or ended:
- * `seen` counts each unit once, so one ended after it held cannot open it early.
+ * Each unit holds 32 MiB in its shell, checks it holds it all, says so on a FIFO of its own, and
+ * waits at the barrier; a wrapper prints its exit status. The bomb's shell holds only the read end
+ * of each unit's FIFO (descriptor 5 + i): the unit and its wrapper hold the write end, so a read
+ * there returns once the unit has held, or once every process of the unit has ended, however it
+ * ended and whether or not it said anything. The barrier opens when every unit has done one or the
+ * other, then `wait` ends with the last wrapper: nothing the run waits on waits for the wall
+ * clock, and a unit lost without its status (its wrapper killed) leaves its line out, which the
+ * verdict counts.
  */
+const MEMORY_UNITS = 4;
+const unitFd = (i: number) => 5 + i;
 const HOLD = "( (x=$(head -c 33554432 /dev/zero | tr '\\0' a) || exit $?; " +
-  `[ "\${#x}" -eq 33554432 ] || exit 3; echo "held $i" >&4; ${AWAIT}); echo "unit $i $?" >&4) &`;
-const SETTLE = 'n=0; e=0; seen=" "; while [ $e -lt 4 ] && read -r w u s <&4; do ' +
-  '[ "$w" = unit ] && { echo "unit $u $s"; e=$((e+1)); }; [ "$s" != 0 ] || continue; ' +
-  `case "$seen" in *" $u "*) ;; *) seen="$seen$u "; n=$((n+1)); ` +
-  `[ $n -eq 4 ] && ${release(4)};; esac; done`;
+  `[ "\${#x}" -eq 33554432 ] || exit 3; echo held >&9; ${AWAIT}); echo "unit $i $?") &`;
+const UNIT_IDS = Array.from({ length: MEMORY_UNITS }, (_, i) => i);
+const MEMORY_BOMB = BARRIER + `mkfifo ${UNIT_IDS.map((i) => `s${i}`).join(" ")} || exit 4; ` +
+  UNIT_IDS.map((i) => `exec 9<>s${i} ${unitFd(i)}<s${i}; i=${i}; ${HOLD} exec 9>&-; `).join("") +
+  UNIT_IDS.map((i) => `read -r h <&${unitFd(i)}; `).join("") + `${release(MEMORY_UNITS)}; wait`;
 
 /** What `head` prints when its write to a full scratch file fails, in GNU and in busybox. */
 const FULL = /No space left on device|^head: standard output: I\/O error$/;
@@ -100,7 +107,7 @@ export const BOMBS: Readonly<Record<Cap, Bomb>> = {
   memoryBytes: {
     what: "a multi-process memory bomb (4 x 32 MiB held at once, cap 64 MiB)",
     limits: { memoryBytes: 64 * MIB },
-    command: `${BARRIER}${times(4, HOLD)}; ${SETTLE}`,
+    command: MEMORY_BOMB,
     // A unit the cap ends is killed (137); a shell may also say so of its job. At most one unit
     // fits in the cap with its shell. A host OOM kill that leaves no more than one is not told
     // from the cap's: the memory cgroup's own count of kills is out of the run's reach.

@@ -64,7 +64,7 @@ Deno.test("memory and fork bombs: the units wait on a barrier, never on a timed 
   for (const cap of ["memoryBytes", "processes"] as const) {
     const { command } = BOMBS[cap];
     assert(!/\bsleep\b/.test(command), command);
-    assert(command.includes("mkfifo go ev && exec 3<>go 4<>ev"), command);
+    assert(command.includes("mkfifo go && exec 3<>go"), command);
     assert(command.includes("read -r g <&3"), command);
   }
 });
