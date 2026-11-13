@@ -8,27 +8,12 @@ import {
 } from "../../src/domain/instruction_trust.ts";
 import { LINK_REASON } from "../../src/domain/checkout_link.ts";
 import { type BaseEntry, REASON } from "../../src/domain/script_trust.ts";
+import { blob, enc, file, RULES, walked } from "./instruction_trust_fixture.ts";
 
 /**
  * The instruction files a session follows, judged as one class by bytes against the base's tip,
  * with the script check's walk: a link, an extra file and a name that differs in case all count.
  */
-
-const enc = (s: string) => new TextEncoder().encode(s);
-const RULES = enc("# Rules\n\nRun every gate.\n");
-const file = (path: string, bytes = RULES, links = 1): CheckoutEntry => ({
-  kind: "file",
-  path,
-  bytes,
-  links,
-  id: `1:${path}`,
-});
-const blob = (path: string, bytes: Uint8Array = RULES): BaseEntry => ({
-  kind: "blob",
-  path,
-  bytes,
-});
-const walked = (...entries: CheckoutEntry[]): CheckoutWalk[] => [{ kind: "walked", entries }];
 
 /** HEAD as a branch that committed its work tree holds it: its files as blobs, its links. */
 const committedTree = (tree: CheckoutWalk[]): BaseEntry[] =>

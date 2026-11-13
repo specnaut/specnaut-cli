@@ -1,38 +1,10 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { CHECKOUT_REASON, type CheckoutWalk } from "../../src/domain/checkout_trust.ts";
-import { type BaseEntry, REASON } from "../../src/domain/script_trust.ts";
 import { sha256HexBytes } from "../../src/domain/sha256.ts";
-import {
-  isSessionId,
-  judgeRecord,
-  RECORDED_SOURCES,
-  recordOf,
-  SESSION_REASON,
-  startReasons,
-  tipDigests,
-} from "../../src/domain/session_record.ts";
+import { isSessionId, RECORDED_SOURCES, recordOf } from "../../src/domain/session_record.ts";
 import { parseRecord, recordText, sessionStartOf } from "../../src/domain/session_record_json.ts";
+import { enc, HEAD, INSIDE, L, MARK, S, WALK } from "./session_record_fixture.ts";
 
-/** The record a session start takes, and the rule that judges it against the base's tip. */
-
-const enc = (s: string) => new TextEncoder().encode(s);
-const S = ".claude/settings.json";
-const L = ".claude/skills/x";
-const HEAD = "c".repeat(40);
-const OUTSIDE = "a".repeat(40);
-/** HEAD's reflog at session start: its length and digest. */
-const MARK = { bytes: 120, sha256: "e".repeat(64) };
-const blob = (path: string, text: string): BaseEntry => ({ kind: "blob", path, bytes: enc(text) });
-const TIP: BaseEntry[] = [blob(S, "{}\n"), { kind: "link", path: L, target: "../x" }];
-/** Where the link leads: a root the check walks whole. */
-const INSIDE = { kind: "inside", path: ".claude/x", id: null } as const;
-const WALK: CheckoutWalk[] = [{
-  kind: "walked",
-  entries: [
-    { kind: "file", path: S, bytes: enc("{}\n"), links: 1, id: "1:2" },
-    { kind: "link", path: L, target: "../x", end: INSIDE },
-  ],
-}];
+/** The record a session start takes; session_record_judge_test.ts judges it against the tip. */
 
 Deno.test("startup, resume and fork take the record; clear, compact and any other source never do", () => {
   for (const source of ["startup", "resume", "fork"]) {
@@ -137,70 +109,4 @@ Deno.test("a SessionStart payload names its session and its source", () => {
   ) {
     assertEquals(sessionStartOf(bad), null, JSON.stringify(bad));
   }
-});
-
-async function judge(
-  record: Awaited<ReturnType<typeof recordOf>>,
-  headCommits: string[] = [],
-  symlinks = true,
-) {
-  return judgeRecord({
-    headCommits,
-    untrustedCommits: [OUTSIDE],
-    tree: record.tree,
-    tip: TIP,
-    tipDigests: await tipDigests(TIP, symlinks),
-  });
-}
-
-Deno.test("a record of the tip holds", async () => {
-  assertEquals(await judge(await recordOf(HEAD, MARK, WALK)), { holds: true, reasons: [] });
-});
-
-Deno.test("a record whose HEAD holds a commit the tip lacks fails, by rule 1", async () => {
-  const verdict = await judge(await recordOf(HEAD, MARK, WALK), [OUTSIDE]);
-  assertEquals(verdict.reasons, [{ path: OUTSIDE, reason: CHECKOUT_REASON.headHolds }]);
-});
-
-Deno.test("a recorded file whose digest is not the tip's fails, as differing", async () => {
-  const walk: CheckoutWalk[] = [{
-    kind: "walked",
-    entries: [{ kind: "file", path: S, bytes: enc('{"hooks":{}}\n'), links: 1 }],
-  }];
-  const verdict = await judge(await recordOf(HEAD, MARK, walk));
-  assertEquals(verdict.reasons, [
-    { path: S, reason: REASON.differs },
-    { path: L, reason: REASON.missing },
-  ]);
-});
-
-Deno.test("a recorded file holding the tip's link target holds, as on disk where links are off", async () => {
-  const walk: CheckoutWalk[] = [{
-    kind: "walked",
-    entries: [
-      { kind: "file", path: S, bytes: enc("{}\n"), links: 1 },
-      { kind: "file", path: L, bytes: enc("../x"), links: 1 },
-    ],
-  }];
-  assertEquals((await judge(await recordOf(HEAD, MARK, walk), [], false)).holds, true);
-});
-
-Deno.test("where git writes links as links, a recorded file holding the tip's link target differs", async () => {
-  const walk: CheckoutWalk[] = [{
-    kind: "walked",
-    entries: [
-      { kind: "file", path: S, bytes: enc("{}\n"), links: 1 },
-      { kind: "file", path: L, bytes: enc("../x"), links: 1 },
-    ],
-  }];
-  const verdict = await judge(await recordOf(HEAD, MARK, walk), [], true);
-  assertEquals(verdict.reasons, [{ path: L, reason: REASON.differs }]);
-});
-
-Deno.test("what the record found that the checkout now does not show is marked as found at session start", () => {
-  const now = [{ path: S, reason: REASON.differs }];
-  const atStart = [{ path: S, reason: REASON.differs }, { path: OUTSIDE, reason: "x" }];
-  assertEquals(startReasons(now, atStart), [
-    { path: OUTSIDE, reason: `${SESSION_REASON.atStart}: x` },
-  ]);
 });

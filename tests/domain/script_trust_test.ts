@@ -2,51 +2,24 @@ import { assertEquals } from "@std/assert";
 import {
   BASE_LOCK,
   type BaseEntry,
-  type BundleRule,
   judgeScripts,
   REASON,
   type TreeEntry,
-  type TrustInput,
 } from "../../src/domain/script_trust.ts";
+import {
+  BASE,
+  blob,
+  file,
+  judge,
+  mapped,
+  OTHER_BUNDLE,
+  P,
+  Q,
+  TRUSTED,
+  untrusted,
+} from "./script_trust_fixture.ts";
 
 /** One row of the decision table per test: the input that differs from a clean base, and its verdict. */
-
-const enc = (s: string) => new TextEncoder().encode(s);
-const P = ".specnaut/scripts/bash/git-read.sh";
-const Q = ".specnaut/scripts/bash/size-ratchet.sh";
-const BASE = "echo base\n";
-
-const file = (path: string, text: string, links = 1): TreeEntry => ({
-  kind: "file",
-  path,
-  bytes: enc(text),
-  links,
-});
-const blob = (path: string, text: string): BaseEntry => ({ kind: "blob", path, bytes: enc(text) });
-const mapped = (files: Record<string, string> = {}): BundleRule => ({
-  kind: "mapped",
-  files: new Map(Object.entries(files).map(([p, t]) => [p, enc(t)])),
-});
-
-function judge(over: Partial<TrustInput> & { entries?: TreeEntry[] } = {}) {
-  const input: TrustInput = {
-    tree: { kind: "walked", entries: over.entries ?? [file(P, BASE)] },
-    tip: over.tip ?? [blob(P, BASE)],
-    mergeBase: over.mergeBase ?? [blob(P, BASE)],
-    bundle: over.bundle ?? mapped({ [P]: BASE }),
-    ...(over.tree ? { tree: over.tree } : {}),
-  };
-  return judgeScripts(input);
-}
-
-/** A bundle whose copy of P is neither the tree's nor the base's. */
-const OTHER_BUNDLE = mapped({ [P]: "echo bundled\n" });
-
-const untrusted = (path: string, reason: string) => ({
-  trusted: false,
-  untrusted: [{ path, reason }],
-});
-const TRUSTED = { trusted: true, untrusted: [] };
 
 Deno.test("bytes equal to the base tip's blob are trusted: a customised script the base already has", () => {
   const custom = "echo customised by the project\n";
