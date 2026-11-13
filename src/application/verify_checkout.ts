@@ -60,8 +60,23 @@ export async function verifyCheckout(
     return restart("head", "names no commit in this repository: fetch it first", tip);
   }
   const record = await startRecord(deps);
-  if (record.kind === "refused") return restart(SESSION_REASON.path, record.reason, tip);
+  if (record.kind === "refused") return await noRecord(deps, record.reason, tip);
   return await judged(deps, { tip, untrustedHead, scripts: scripts.verdict }, record.record);
+}
+
+/**
+ * No record to judge by: its reason, and the reflog's when that cannot be read either, since a
+ * repository with no reflog to read (one whose refs are in a reftable) never takes a record.
+ */
+async function noRecord(
+  deps: VerifyCheckoutDeps,
+  why: string,
+  tip: string,
+): Promise<CheckoutOutcome> {
+  const log = await readReflog(deps);
+  const reasons: Untrusted[] = [{ path: SESSION_REASON.path, reason: why }];
+  if (log.kind === "unreadable") reasons.push({ path: "HEAD", reason: log.reason });
+  return { kind: "restart", reasons, advice: restartAdvice(tip) };
 }
 
 /** The checkout judged as it is now, then its start record's reasons the folder does not give. */

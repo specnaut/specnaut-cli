@@ -50,7 +50,10 @@ export interface GitObjectReader {
 
 /** HEAD's reflog, read only: never a ref moved, never an entry expired. */
 export interface HeadReflogReader {
-  /** The reflog's bytes, oldest entry first, or `null` when git keeps none for HEAD. */
+  /**
+   * The reflog's bytes, oldest entry first, or `null` when git keeps none for HEAD; a throw when
+   * there is one it cannot read, as in a repository whose refs are in a reftable.
+   */
   headReflog(): Promise<Uint8Array | null>;
 }
 

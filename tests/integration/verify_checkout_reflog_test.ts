@@ -1,7 +1,8 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { CHECKOUT_REASON } from "../../src/domain/checkout_trust.ts";
 import { SESSION_REASON } from "../../src/domain/session_record.ts";
+import { REFTABLE } from "../../src/infrastructure/fs_head_reflog.ts";
 import { check, reasons, setUp, startSession } from "./verify_checkout_fixture.ts";
 import { git } from "./verify_scripts_fixture.ts";
 
@@ -83,5 +84,29 @@ Deno.test({
     assertEquals(found.path, "HEAD");
     assertStringIncludes(found.reason, `${SESSION_REASON.reflogUnreadable}: `);
     assertStringIncludes(found.reason, "a link is not followed");
+  },
+});
+
+/** Whether this git moves a repository's refs, reflogs included, to a reftable: git 2.48's. */
+const MIGRATES = await (async () => {
+  const out = await new Deno.Command("git", { args: ["version"], stdout: "piped" }).output();
+  const [major, minor] = (/(\d+)\.(\d+)/.exec(new TextDecoder().decode(out.stdout)) ?? [])
+    .slice(1).map(Number);
+  return major > 2 || (major === 2 && minor >= 48);
+})();
+
+Deno.test({
+  name: "a repository whose refs are in a reftable takes no record, and the check says why",
+  ignore: !MIGRATES,
+  fn: async () => {
+    const { root, head } = await setUp();
+    await git(root, "refs", "migrate", "--ref-format=reftable");
+    const why = { path: "HEAD", reason: `${SESSION_REASON.reflogUnreadable}: ${REFTABLE}` };
+    assertEquals(reasons(await check(root, head)), [why], "a session started before the move");
+    await assertRejects(() => startSession(root, "startup", "fixture-reftable"), Error, REFTABLE);
+    assertEquals(reasons(await check(root, head, { id: "fixture-reftable" })), [
+      { path: SESSION_REASON.path, reason: SESSION_REASON.missing },
+      why,
+    ]);
   },
 });
