@@ -104,11 +104,12 @@ export class FsReviewLock implements ReviewLock {
 
 /**
  * Why a session whose entry records its per-user copy in `written` is refused by a lock reading
- * `read`: the writer (`review start`, in the session's shell) and the hook disagree on the folder,
- * so the hook cannot find the copy once git no longer finds this checkout.
+ * `read`: the writer (`review start`, in the session's shell) and this check (the hook's guard, or
+ * `sandbox exec`'s own) disagree on the folder, so the hook cannot find the copy once git no
+ * longer finds this checkout.
  */
 function otherStateFolder(written: string, read: string | null): string {
-  return `this session's review lock keeps its per-user copy in ${written}, and this hook reads ` +
+  return `this session's review lock keeps its per-user copy in ${written}, and this check reads ` +
     `${read ?? "no per-user folder"}: refused until both see the same XDG_STATE_HOME and HOME; ` +
     "start a new session once they do";
 }
