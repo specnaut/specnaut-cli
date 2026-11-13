@@ -1,4 +1,4 @@
-import { armExitTrap } from "./exit_trap.ts";
+import { groupStop, LEADS_A_GROUP } from "./sandbox_process_group.ts";
 
 /**
  * How a sandbox's launcher process is started and stopped. The process gets no terminal: its
@@ -49,8 +49,6 @@ export interface ProcessLauncher {
   /** Runs `spec` to its end, synchronously: for the cleanup an interrupt runs. */
   runSync(spec: ProcessSpec): number;
 }
-
-const GROUPS = Deno.build.os !== "windows";
 
 export class DenoProcessLauncher implements ProcessLauncher {
   #sinks?: Sinks;
@@ -107,28 +105,6 @@ type Sinks = {
   readonly err: WritableStreamDefaultWriter<Uint8Array>;
 };
 
-/**
- * How `child`'s group is stopped, and its retirement once the child has ended: the group's last
- * kill, after which it is never signalled again, as its id may be reused by a stranger's group.
- * The retirement holds even when that kill throws, the error raised after it.
- */
-function groupStop(child: Deno.ChildProcess): { stop: () => void; retire: () => void } {
-  let gone = false;
-  const stop = () => {
-    if (!gone) killGroup(child);
-  };
-  const disarm = armExitTrap(stop);
-  const retire = () => {
-    try {
-      stop();
-    } finally {
-      gone = true;
-      disarm();
-    }
-  };
-  return { stop, retire };
-}
-
 /** What `from` holds, as text, once it ends or is `released`. */
 async function textOf(from: ReadableStream<Uint8Array>, released: AbortSignal): Promise<string> {
   const chunks: Uint8Array<ArrayBuffer>[] = [];
@@ -169,24 +145,8 @@ function command(spec: ProcessSpec, stdin: "piped" | "null"): Deno.Command {
     stdin,
     stdout: spec.stdout === "discarded" ? "null" : "piped",
     stderr: "piped",
-    detached: GROUPS,
+    detached: LEADS_A_GROUP,
   });
-}
-
-/**
- * Kills the child's process group (POSIX), or the child alone (Windows). A group already gone is
- * not an error: `NotFound` once it is reaped, and on macOS `PermissionDenied` while its leader has
- * ended but is not yet reaped, the only member left; no live process of ours is spared by either.
- */
-function killGroup(child: Deno.ChildProcess): void {
-  try {
-    if (GROUPS) Deno.kill(-child.pid, "SIGKILL");
-    else child.kill("SIGKILL");
-  } catch (err) {
-    if (err instanceof Deno.errors.NotFound) return;
-    if (err instanceof Deno.errors.PermissionDenied && Deno.build.os === "darwin") return;
-    throw err;
-  }
 }
 
 /** Writes `bytes` to the child's input and closes it; a child that ended first is reported. */
