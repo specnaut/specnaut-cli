@@ -21,21 +21,26 @@ export const REFTABLE = "this repository keeps its refs in a reftable, where HEA
  * read through git, which would leave the check telling entries apart by their commits alone.
  */
 export class FsHeadReflog implements HeadReflogReader {
-  private constructor(readonly path: string, private readonly git: UntrustedGit) {}
+  private constructor(readonly path: string, private readonly reftable: boolean) {}
 
+  /**
+   * The reader for `cwd`'s repository. Whether its refs are in a reftable is asked once, here,
+   * and before the file is looked at: a `logs/HEAD` left in such a repository (by a copy, or by a
+   * tool that predates reftables) is one git no longer appends to, never HEAD's reflog.
+   */
   static async open(cwd: string): Promise<FsHeadReflog> {
     const git = new UntrustedGit(cwd);
     const out = await git.run("rev-parse", ["--absolute-git-dir"]);
-    return new FsHeadReflog(join(firstLine(out), "logs", "HEAD"), git);
+    return new FsHeadReflog(join(firstLine(out), "logs", "HEAD"), await reftable(git));
   }
 
   async headReflog(): Promise<Uint8Array | null> {
+    if (this.reftable) throw new Error(REFTABLE);
     let info: Deno.FileInfo;
     try {
       info = await Deno.lstat(this.path);
     } catch (err) {
       if (!(err instanceof Deno.errors.NotFound)) throw err;
-      if (await this.#reftable()) throw new Error(REFTABLE);
       return null;
     }
     if (!info.isFile) throw new Error(`${this.path} is not a regular file: a link is not followed`);
@@ -44,10 +49,16 @@ export class FsHeadReflog implements HeadReflogReader {
     }
     return await Deno.readFile(this.path);
   }
+}
 
-  /** Whether the repository's own configuration puts its refs in a reftable. */
-  async #reftable(): Promise<boolean> {
-    const out = await this.git.call("config", ["--local", "--get", "extensions.refStorage"]);
-    return out.code === 0 && firstLine(out.stdout).trim().toLowerCase() === "reftable";
-  }
+/**
+ * Whether the repository's own configuration puts its refs in a reftable. `git config --get`
+ * exits 1 for a key that is not set; any other failure (a configuration git cannot read) is
+ * raised with git's own reason rather than read as no reftable.
+ */
+async function reftable(git: UntrustedGit): Promise<boolean> {
+  const out = await git.call("config", ["--local", "--get", "extensions.refStorage"]);
+  if (out.code === 1) return false;
+  if (out.code !== 0) throw new Error(`git config exited ${out.code}: ${out.why}`);
+  return firstLine(out.stdout).trim().toLowerCase() === "reftable";
 }

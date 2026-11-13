@@ -82,7 +82,8 @@ export const SESSION_REASON = {
    */
   reflogRewritten: "HEAD's reflog no longer begins with the entries it held when the session " +
     "started, or what follows them is not a reflog git wrote: `git gc` expires entries older " +
-    "than `gc.reflogExpire` (90 days unless set), and `git reflog expire` or `git reflog " +
+    "than `gc.reflogExpire` (90 days unless set), or than `gc.reflogExpireUnreachable` (30 " +
+    "days) for commits no branch holds, and `git reflog expire` or `git reflog " +
     "delete` removes them; what HEAD was on since cannot be told, so start a new session",
 } as const;
 

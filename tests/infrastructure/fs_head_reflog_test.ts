@@ -40,3 +40,16 @@ Deno.test({
     assertEquals(await (await FsHeadReflog.open(root)).headReflog(), null);
   },
 });
+
+Deno.test({
+  name: "a logs/HEAD left in a reftable repository is refused, never read as its reflog",
+  ignore: !REFTABLE_GIT,
+  fn: async () => {
+    const root = await repository("reftable");
+    const z = "0".repeat(40);
+    await Deno.mkdir(`${root}/.git/logs`, { recursive: true });
+    await Deno.writeTextFile(`${root}/.git/logs/HEAD`, `${z} ${z} A <a@b> 0 +0000\tleft\n`);
+    const reflog = await FsHeadReflog.open(root);
+    await assertRejects(() => reflog.headReflog(), Error, REFTABLE);
+  },
+});

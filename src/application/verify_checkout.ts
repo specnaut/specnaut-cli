@@ -36,6 +36,11 @@ import { verifyScripts, type VerifyScriptsDeps } from "./verify_scripts.ts";
  * files' ctimes are not compared with the record's to close that: a ctime also moves when the same
  * bytes are written again, as an editor saving an unchanged file or `git stash` and its `pop` do,
  * and on a change of mode or owner, so it would refuse sessions that changed nothing it reads.
+ *
+ * Nor does the reflog keep what git expires. A visit to a commit no branch holds is expired as
+ * unreachable once older than `gc.reflogExpireUnreachable` (30 days unless set); when a `git gc`
+ * during the session removes the session's own entries and keeps every older one, the mark still
+ * matches and the visit is not seen. One that removes entries from before the start is refused.
  */
 
 export type VerifyCheckoutDeps = VerifyScriptsDeps & {
