@@ -782,7 +782,8 @@ imports break it are the project's to write: Specnaut ships no copy of that
 file and no default pattern, because a guessed one would report a pass that
 checked nothing.
 
-- **Exit 0** — every file was checked and none matches. Report it as a pass.
+- **Exit 0** — every file was checked and none matches. Each is read byte for
+  byte, one holding a NUL included: no file passes unread. Report it as a pass.
 - **Exit 1** — a forbidden import, printed as \`path:line: pattern\`. A failure
   of the tier it follows, fixed the same way.
 - **Exit 2** — the check could not run: an unreadable config, a pattern that
@@ -17343,10 +17344,14 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
 #                                     exist: no signature program, for any format
 #   -c submodule.recurse=false -c diff.submodule=short
-#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none
+#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text
 #                                     on every form that diffs: a rename is its delete
-#                                     and its add, and a gitlink change is listed
-#                                     whatever the submodule's own \`ignore\` says
+#                                     and its add, a gitlink change is listed whatever
+#                                     the submodule's own \`ignore\` says, and every
+#                                     changed line is shown, in a file git, an attribute
+#                                     or core.bigFileThreshold would call binary
+#   -c diff.relative=false            every path, not only those under the current folder
+#   grep -a                           every file's lines, binary-looking ones included
 #   -c core.commitGraph=false -c core.multiPackIndex=false, given an objects folder
 #                                     (_explicit_head.sh): its own graph and index
 #                                     are never read in place of its objects
@@ -17427,10 +17432,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  local name
-  for name in \$(compgen -e); do
-    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
-  done
+  explicit_head_clear_env
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "\$@"
@@ -17448,12 +17450,14 @@ _gu_git() {
     -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
     -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
     -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
-    -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "\$@"
+    -c submodule.recurse=false -c diff.submodule=short -c diff.relative=false \\
+    --no-replace-objects "\$@"
 }
 
 # The flags every form that diffs carries: no textconv, no external diff, no color; and
-# every changed path counted, a renamed one under both names and an ignored gitlink too.
-_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none)
+# every changed path counted, a renamed one under both names and an ignored gitlink too, and
+# every changed line shown as text.
+_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text)
 
 gu_names() {
   [ \$# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
@@ -17506,7 +17510,7 @@ gu_grep() {
   _gu_need_rev "\$2" || return 2
   local pattern="\$1" rev="\$2" && shift 2
   _gu_need_paths "\$@" || return 2
-  _gu_git grep -n -I -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
+  _gu_git grep -n -a -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
 }
 
 gu_base() {
@@ -17578,6 +17582,8 @@ gu_base() {
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
+# explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -17632,6 +17638,13 @@ explicit_head_take() {
 explicit_head_is_id() {
   local re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
   [[ \$1 =~ \$re ]]
+}
+
+explicit_head_clear_env() {
+  local name
+  for name in \$(compgen -e); do
+    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+  done
 }
 
 explicit_head_env() {
@@ -33479,8 +33492,12 @@ exit 0
 # The tracked files are listed by git, never by a glob or a walk, so an
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
-# the work tree, could point anywhere on the disk. Binary files are skipped.
-# Given a head, its tree is listed and each blob read by id: no work tree file is.
+# the work tree, could point anywhere on the disk. Grep reads every file as bytes
+# (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
+# passed that was not read. A conflicted path is read
+# when any of its stages is a regular file. Given a head, its tree is listed and each
+# blob read by id: no work tree file is. No GIT_* variable the script inherits is
+# kept: a hook's GIT_DIR or index names another view of the repository.
 #
 # Exit codes — a skip is never a pass, and neither is a check that broke:
 #   0   every tracked file under \`domain:\` was checked and none matches
@@ -33506,6 +33523,10 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "\$@"; }
+explicit_head_clear_env
+# Bytes, not characters: under a locale that cannot decode a byte, no \`.\` of a pattern
+# matches it, and an import spelled around it goes unreported.
+export LC_ALL=C
 
 rc=0 && explicit_head_options "\$@" || rc=\$?
 [ "\$rc" -ne 2 ] || fail "\$EXPLICIT_REFUSAL"
@@ -33566,12 +33587,12 @@ for i in "\${!domains[@]}"; do
   found=0 prev=""
   # Each record: \`<mode> <object> <stage>\\t<path>\` from the index, or \`<mode> blob
   # <object>\\t<path>\` from a head's tree. A conflicted path comes once per stage,
-  # adjacent; it is checked once.
+  # adjacent; it is checked once, at its first stage that is a regular file.
   while IFS= read -r -d '' rec; do
     path="\${rec#*\$'\\t'}"
+    case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     [ "\$path" != "\$prev" ] || continue
     prev="\$path"
-    case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=\$((tracked + 1))
     if [ -z "\$EXPLICIT_HEAD" ] && [ -L "\$path" ]; then continue; fi
     meta="\${rec%%\$'\\t'*}" && meta="\${meta#* }"
@@ -33596,17 +33617,18 @@ for i in "\${!files[@]}"; do
     src="\$blob"
   fi
   # One pass with every pattern; only a file that matches is read again, per
-  # pattern, to say which one.
-  grep -E -I -q "\${grep_args[@]}" -- "\$src"
+  # pattern, to say which one. -a: a file holding a NUL is read as text, never skipped.
+  grep -E -a -q "\${grep_args[@]}" -- "\$src"
   status=\$?
   [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
   [ "\$status" = 0 ] || continue
   for pat in "\${patterns[@]}"; do
-    hits="\$(grep -E -I -n -e "\$pat" -- "\$src")"
+    # Only the line numbers: a line's own bytes, a NUL among them, never reach a variable.
+    hits="\$(grep -E -a -n -e "\$pat" -- "\$src" | cut -d: -f1)"
     status=\$?
     [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
     while IFS= read -r hit; do
-      [ -n "\$hit" ] && violations+=("\$file:\${hit%%:*}: \$pat")
+      [ -n "\$hit" ] && violations+=("\$file:\$hit: \$pat")
     done <<<"\$hits"
   done
 done
@@ -33644,10 +33666,14 @@ exit 0
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
 #                                     exist: no signature program, for any format
 #   -c submodule.recurse=false -c diff.submodule=short
-#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none
+#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text
 #                                     on every form that diffs: a rename is its delete
-#                                     and its add, and a gitlink change is listed
-#                                     whatever the submodule's own \`ignore\` says
+#                                     and its add, a gitlink change is listed whatever
+#                                     the submodule's own \`ignore\` says, and every
+#                                     changed line is shown, in a file git, an attribute
+#                                     or core.bigFileThreshold would call binary
+#   -c diff.relative=false            every path, not only those under the current folder
+#   grep -a                           every file's lines, binary-looking ones included
 #   -c core.commitGraph=false -c core.multiPackIndex=false, given an objects folder
 #                                     (_explicit_head.sh): its own graph and index
 #                                     are never read in place of its objects
@@ -33728,10 +33754,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  local name
-  for name in \$(compgen -e); do
-    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
-  done
+  explicit_head_clear_env
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "\$@"
@@ -33749,12 +33772,14 @@ _gu_git() {
     -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \\
     -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \\
     -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \\
-    -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "\$@"
+    -c submodule.recurse=false -c diff.submodule=short -c diff.relative=false \\
+    --no-replace-objects "\$@"
 }
 
 # The flags every form that diffs carries: no textconv, no external diff, no color; and
-# every changed path counted, a renamed one under both names and an ignored gitlink too.
-_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none)
+# every changed path counted, a renamed one under both names and an ignored gitlink too, and
+# every changed line shown as text.
+_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text)
 
 gu_names() {
   [ \$# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
@@ -33807,7 +33832,7 @@ gu_grep() {
   _gu_need_rev "\$2" || return 2
   local pattern="\$1" rev="\$2" && shift 2
   _gu_need_paths "\$@" || return 2
-  _gu_git grep -n -I -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
+  _gu_git grep -n -a -F --no-textconv --no-color -e "\$pattern" --end-of-options "\$rev" -- "\$@"
 }
 
 gu_base() {
@@ -33879,6 +33904,8 @@ gu_base() {
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
+# explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -33933,6 +33960,13 @@ explicit_head_take() {
 explicit_head_is_id() {
   local re='^[0-9a-f]{40}([0-9a-f]{24})?\$'
   [[ \$1 =~ \$re ]]
+}
+
+explicit_head_clear_env() {
+  local name
+  for name in \$(compgen -e); do
+    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+  done
 }
 
 explicit_head_env() {

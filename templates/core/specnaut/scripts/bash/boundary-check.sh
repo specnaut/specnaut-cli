@@ -20,8 +20,12 @@
 # The tracked files are listed by git, never by a glob or a walk, so an
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
-# the work tree, could point anywhere on the disk. Binary files are skipped.
-# Given a head, its tree is listed and each blob read by id: no work tree file is.
+# the work tree, could point anywhere on the disk. Grep reads every file as bytes
+# (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
+# passed that was not read. A conflicted path is read
+# when any of its stages is a regular file. Given a head, its tree is listed and each
+# blob read by id: no work tree file is. No GIT_* variable the script inherits is
+# kept: a hook's GIT_DIR or index names another view of the repository.
 #
 # Exit codes — a skip is never a pass, and neither is a check that broke:
 #   0   every tracked file under `domain:` was checked and none matches
@@ -47,6 +51,10 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "$@"; }
+explicit_head_clear_env
+# Bytes, not characters: under a locale that cannot decode a byte, no `.` of a pattern
+# matches it, and an import spelled around it goes unreported.
+export LC_ALL=C
 
 rc=0 && explicit_head_options "$@" || rc=$?
 [ "$rc" -ne 2 ] || fail "$EXPLICIT_REFUSAL"
@@ -107,12 +115,12 @@ for i in "${!domains[@]}"; do
   found=0 prev=""
   # Each record: `<mode> <object> <stage>\t<path>` from the index, or `<mode> blob
   # <object>\t<path>` from a head's tree. A conflicted path comes once per stage,
-  # adjacent; it is checked once.
+  # adjacent; it is checked once, at its first stage that is a regular file.
   while IFS= read -r -d '' rec; do
     path="${rec#*$'\t'}"
+    case "${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     [ "$path" != "$prev" ] || continue
     prev="$path"
-    case "${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
     found=1 tracked=$((tracked + 1))
     if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
     meta="${rec%%$'\t'*}" && meta="${meta#* }"
@@ -137,17 +145,18 @@ for i in "${!files[@]}"; do
     src="$blob"
   fi
   # One pass with every pattern; only a file that matches is read again, per
-  # pattern, to say which one.
-  grep -E -I -q "${grep_args[@]}" -- "$src"
+  # pattern, to say which one. -a: a file holding a NUL is read as text, never skipped.
+  grep -E -a -q "${grep_args[@]}" -- "$src"
   status=$?
   [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
   [ "$status" = 0 ] || continue
   for pat in "${patterns[@]}"; do
-    hits="$(grep -E -I -n -e "$pat" -- "$src")"
+    # Only the line numbers: a line's own bytes, a NUL among them, never reach a variable.
+    hits="$(grep -E -a -n -e "$pat" -- "$src" | cut -d: -f1)"
     status=$?
     [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
     while IFS= read -r hit; do
-      [ -n "$hit" ] && violations+=("$file:${hit%%:*}: $pat")
+      [ -n "$hit" ] && violations+=("$file:$hit: $pat")
     done <<<"$hits"
   done
 done

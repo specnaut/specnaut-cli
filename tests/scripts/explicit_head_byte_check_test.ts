@@ -34,15 +34,33 @@ async function failingTr(): Promise<Record<string, string>> {
   );
   await Deno.chmod(shim, 0o755);
   const key = Object.keys(Deno.env.toObject()).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  made.push(dir);
   return { [key]: `${dir}${DELIMITER}${Deno.env.get("PATH") ?? ""}` };
 }
+
+/** The folders a case made: the shim's, the project's and the one holding the head. */
+const made: string[] = [];
+
+async function fixture() {
+  const repo = await headRepo({ "src/a.ts": "a\n" }, { "src/head_only.ts": "h\n" });
+  made.push(repo.root, join(repo.objects, "..", ".."));
+  return { repo, path: await failingTr() };
+}
+
+/** `fn`, then every folder it made removed, whatever it threw. */
+const scoped = (fn: () => Promise<void>) => async () => {
+  try {
+    await fn();
+  } finally {
+    for (const dir of made.splice(0)) await Deno.remove(dir, { recursive: true });
+  }
+};
 
 Deno.test({
   name: "explicit head: a control-byte check that cannot run refuses the folder",
   ignore: Deno.build.os === "windows",
-  fn: async () => {
-    const repo = await headRepo({ "src/a.ts": "a\n" }, { "src/head_only.ts": "h\n" });
-    const path = await failingTr();
+  fn: scoped(async () => {
+    const { repo, path } = await fixture();
     const args = ["--head", repo.head, "--objects", repo.objects, "files"];
 
     const control = await gitRead(args, repo.root, path);
@@ -55,15 +73,14 @@ Deno.test({
       r.stderr,
       `--head: an objects folder borrowing from more than this repository: ${repo.objects}`,
     );
-  },
+  }),
 });
 
 Deno.test({
   name: "explicit head: the check refuses on a failed tr in a shell without pipefail too",
   ignore: Deno.build.os === "windows",
-  fn: async () => {
-    const repo = await headRepo({ "src/a.ts": "a\n" }, { "src/head_only.ts": "h\n" });
-    const path = await failingTr();
+  fn: scoped(async () => {
+    const { repo, path } = await fixture();
     const script =
       '. "$1" || exit 70; explicit_head_take "$2" "$3" git; echo "$?: $EXPLICIT_REFUSAL"';
     const take = (env: Record<string, string>) =>
@@ -73,5 +90,5 @@ Deno.test({
     assertEquals(control.stdout.trim(), "0:", control.stderr);
     const r = await take({ ...path, TR_FAILS: "1" });
     assertStringIncludes(r.stdout, "2: an objects folder borrowing from more than this repository");
-  },
+  }),
 });

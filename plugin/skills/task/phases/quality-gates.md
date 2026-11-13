@@ -245,7 +245,8 @@ imports break it are the project's to write: Specnaut ships no copy of that
 file and no default pattern, because a guessed one would report a pass that
 checked nothing.
 
-- **Exit 0** — every file was checked and none matches. Report it as a pass.
+- **Exit 0** — every file was checked and none matches. Each is read byte for
+  byte, one holding a NUL included: no file passes unread. Report it as a pass.
 - **Exit 1** — a forbidden import, printed as `path:line: pattern`. A failure
   of the tier it follows, fixed the same way.
 - **Exit 2** — the check could not run: an unreadable config, a pattern that

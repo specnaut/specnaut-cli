@@ -25,28 +25,48 @@ async function impact(repo: Repo, mode: [string, string], extra: string[], stdin
 
 const kinds = (rows: string[][], ...wanted: string[]) => rows.filter((r) => wanted.includes(r[0]));
 
+const made: string[] = [];
+
 async function withHead() {
   const repo = await impactRepo();
-  const { head, objects } = await exportHead(repo.root, { "apps/web/a.ts": "the head's web\n" });
+  const { head, objects, side } = await exportHead(repo.root, {
+    "apps/web/a.ts": "the head's web\n",
+  });
+  made.push(repo.root, repo.outside, side);
   return { repo, head, objects, given: ["--head", head, "--objects", objects] };
 }
 
-Deno.test("gate impact --head: a --base only the objects folder holds is unresolved", async () => {
-  const { repo, head, given } = await withHead();
-  const control = await impact(repo, ["--base", repo.main], given);
-  assertEquals(kinds(control, "base"), [["base", repo.main]], "the control: a project base");
-  assertEquals(kinds(control, "candidate")[0]?.[2], head, "the control: the folder is read");
+/** `fn`, then every folder it made removed, whatever it threw. */
+const scoped = (fn: () => Promise<void>) => async () => {
+  try {
+    await fn();
+  } finally {
+    for (const dir of made.splice(0)) await Deno.remove(dir, { recursive: true });
+  }
+};
 
-  const rows = await impact(repo, ["--base", head], given);
-  assertEquals(kinds(rows, "base", "fallback"), [["fallback", `base-unresolved: ${head}`]]);
-});
+Deno.test(
+  "gate impact --head: a --base only the objects folder holds is unresolved",
+  scoped(async () => {
+    const { repo, head, given } = await withHead();
+    const control = await impact(repo, ["--base", repo.main], given);
+    assertEquals(kinds(control, "base"), [["base", repo.main]], "the control: a project base");
+    assertEquals(kinds(control, "candidate")[0]?.[2], head, "the control: the folder is read");
 
-Deno.test("gate impact --head: a pushed ref's remote side only the objects folder holds is unfetched", async () => {
-  const { repo, head, given } = await withHead();
-  const line = (remote: string) => `refs/heads/feature ${head} refs/heads/feature ${remote}\n`;
-  const control = await impact(repo, ["--refs-stdin", ""], given, line(repo.main));
-  assertEquals(kinds(control, "base"), [["base", repo.main]], "the control: a project base");
+    const rows = await impact(repo, ["--base", head], given);
+    assertEquals(kinds(rows, "base", "fallback"), [["fallback", `base-unresolved: ${head}`]]);
+  }),
+);
 
-  const rows = await impact(repo, ["--refs-stdin", ""], given, line(head));
-  assertEquals(kinds(rows, "base", "fallback"), [["fallback", `remote-unfetched: ${head}`]]);
-});
+Deno.test(
+  "gate impact --head: a pushed ref's remote side only the objects folder holds is unfetched",
+  scoped(async () => {
+    const { repo, head, given } = await withHead();
+    const line = (remote: string) => `refs/heads/feature ${head} refs/heads/feature ${remote}\n`;
+    const control = await impact(repo, ["--refs-stdin", ""], given, line(repo.main));
+    assertEquals(kinds(control, "base"), [["base", repo.main]], "the control: a project base");
+
+    const rows = await impact(repo, ["--refs-stdin", ""], given, line(head));
+    assertEquals(kinds(rows, "base", "fallback"), [["fallback", `remote-unfetched: ${head}`]]);
+  }),
+);

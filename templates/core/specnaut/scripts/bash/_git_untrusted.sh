@@ -14,10 +14,14 @@
 #   -c log.showSignature=false        and every gpg.*program a path that cannot
 #                                     exist: no signature program, for any format
 #   -c submodule.recurse=false -c diff.submodule=short
-#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none
+#   --no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text
 #                                     on every form that diffs: a rename is its delete
-#                                     and its add, and a gitlink change is listed
-#                                     whatever the submodule's own `ignore` says
+#                                     and its add, a gitlink change is listed whatever
+#                                     the submodule's own `ignore` says, and every
+#                                     changed line is shown, in a file git, an attribute
+#                                     or core.bigFileThreshold would call binary
+#   -c diff.relative=false            every path, not only those under the current folder
+#   grep -a                           every file's lines, binary-looking ones included
 #   -c core.commitGraph=false -c core.multiPackIndex=false, given an objects folder
 #                                     (_explicit_head.sh): its own graph and index
 #                                     are never read in place of its objects
@@ -98,10 +102,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  local name
-  for name in $(compgen -e); do
-    case "$name" in GIT_*) unset "$name" 2>/dev/null || true ;; esac
-  done
+  explicit_head_clear_env
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "$@"
@@ -119,12 +120,14 @@ _gu_git() {
     -c core.fsmonitor=false -c core.hooksPath=/dev/null -c log.showSignature=false \
     -c gpg.program=/dev/null/none -c gpg.openpgp.program=/dev/null/none \
     -c gpg.ssh.program=/dev/null/none -c gpg.x509.program=/dev/null/none \
-    -c submodule.recurse=false -c diff.submodule=short --no-replace-objects "$@"
+    -c submodule.recurse=false -c diff.submodule=short -c diff.relative=false \
+    --no-replace-objects "$@"
 }
 
 # The flags every form that diffs carries: no textconv, no external diff, no color; and
-# every changed path counted, a renamed one under both names and an ignored gitlink too.
-_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none)
+# every changed path counted, a renamed one under both names and an ignored gitlink too, and
+# every changed line shown as text.
+_GU_PLAIN=(--no-textconv --no-ext-diff --no-color --no-renames --ignore-submodules=none --text)
 
 gu_names() {
   [ $# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
@@ -177,7 +180,7 @@ gu_grep() {
   _gu_need_rev "$2" || return 2
   local pattern="$1" rev="$2" && shift 2
   _gu_need_paths "$@" || return 2
-  _gu_git grep -n -I -F --no-textconv --no-color -e "$pattern" --end-of-options "$rev" -- "$@"
+  _gu_git grep -n -a -F --no-textconv --no-color -e "$pattern" --end-of-options "$rev" -- "$@"
 }
 
 gu_base() {

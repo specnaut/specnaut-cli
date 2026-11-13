@@ -21,7 +21,8 @@ export const UNTRUSTED_GIT_FLAGS: readonly string[] = [
   "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "log.showSignature=false",
   "-c", "gpg.program=/dev/null/none", "-c", "gpg.openpgp.program=/dev/null/none",
   "-c", "gpg.ssh.program=/dev/null/none", "-c", "gpg.x509.program=/dev/null/none",
-  "-c", "submodule.recurse=false", "-c", "diff.submodule=short", "--no-replace-objects",
+  "-c", "submodule.recurse=false", "-c", "diff.submodule=short", "-c", "diff.relative=false",
+  "--no-replace-objects",
 ];
 
 /** Passed only to a git that knows it (2.44 or later); below it, a promisor remote is refused. */
@@ -29,7 +30,8 @@ export const LAZY_FETCH_FLAG = "--no-lazy-fetch";
 
 /**
  * `_GU_PLAIN`: the flags every form that diffs carries. Every changed path is counted: a rename as
- * its delete and its add, and a gitlink change whatever the submodule's `ignore` setting says.
+ * its delete and its add, and a gitlink change whatever the submodule's `ignore` setting says;
+ * every changed line is shown as text, whatever makes git call its file binary.
  */
 export const PLAIN_DIFF_FLAGS: readonly string[] = [
   "--no-textconv",
@@ -37,6 +39,7 @@ export const PLAIN_DIFF_FLAGS: readonly string[] = [
   "--no-color",
   "--no-renames",
   "--ignore-submodules=none",
+  "--text",
 ];
 
 /** What `_gu_env_run` exports, plus no system configuration (a file the repository cannot see). */

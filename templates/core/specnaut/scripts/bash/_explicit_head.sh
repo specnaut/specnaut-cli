@@ -53,6 +53,8 @@
 #   resolves <sha> as a commit to itself; sets EXPLICIT_HEAD and EXPLICIT_OBJECTS. A
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
+# explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with `-c core.commitGraph=false -c
@@ -107,6 +109,13 @@ explicit_head_take() {
 explicit_head_is_id() {
   local re='^[0-9a-f]{40}([0-9a-f]{24})?$'
   [[ $1 =~ $re ]]
+}
+
+explicit_head_clear_env() {
+  local name
+  for name in $(compgen -e); do
+    case "$name" in GIT_*) unset "$name" 2>/dev/null || true ;; esac
+  done
 }
 
 explicit_head_env() {
