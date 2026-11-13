@@ -47,10 +47,16 @@ export async function runHook(
     await writer.write(new TextEncoder().encode(input));
     await writer.close();
     const { code } = await child.output();
-    return { code, called: await Deno.readTextFile(seen).catch(() => null) };
+    return { code, called: await Deno.readTextFile(seen).catch(notCalled) };
   } finally {
     await Deno.remove(bin, { recursive: true });
   }
+}
+
+/** No file where the stub writes means it never ran; any other failure is the test's. */
+function notCalled(e: unknown): null {
+  if (e instanceof Deno.errors.NotFound) return null;
+  throw e;
 }
 
 export const input = (session: string) =>

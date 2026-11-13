@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { runSandbox, type SandboxDeps } from "../../src/cli/handlers/sandbox_handler.ts";
 import { openCappedLog } from "../../src/infrastructure/capped_log.ts";
@@ -54,7 +54,7 @@ Deno.test({
       );
       assertEquals(judged, [join(logs, "1.log")], "judged by where it resolved");
       assertEquals((await Deno.lstat(join(logs, "1.log"))).isFile, true, "made there");
-      assertEquals(await Deno.lstat(join(elsewhere, "1.log")).catch(() => null), null);
+      await assertRejects(() => Deno.lstat(join(elsewhere, "1.log")), Deno.errors.NotFound);
     } finally {
       await Deno.remove(root, { recursive: true });
     }
