@@ -11,7 +11,7 @@ import { bashScript } from "./explicit_head_fixture.ts";
 const SCRIPT = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/boundary-check.sh", import.meta.url),
 );
-const CONFIG = "domain:\n  - 'src/domain'\nforbid:\n  - '^import .* from \"web-framework\"'\n";
+const CONFIG = "domain:\n  - 'src/domain'\nforbid:\n  - 'import .* from \"web-framework\"'\n";
 const IMPORT = 'import x from "web-framework";\n';
 const enc = (s: string) => new TextEncoder().encode(s);
 const bytes = (...parts: (string | number[])[]) =>
@@ -67,7 +67,7 @@ async function localeHidesLine(): Promise<boolean> {
   const dir = await Deno.makeTempDir({ prefix: "boundary-locale-" });
   try {
     await Deno.writeFile(join(dir, "a.ts"), LATIN1);
-    const r = await run("grep", ["-E", "-a", "-q", "^import .* from", "a.ts"], dir, UTF8);
+    const r = await run("grep", ["-E", "-a", "-q", "import .* from", "a.ts"], dir, UTF8);
     return r.code !== 0;
   } finally {
     await Deno.remove(dir, { recursive: true });
@@ -138,17 +138,18 @@ Deno.test({
 });
 
 // A commit hook runs it beside an index that lists a path the work tree lacks: removed after it
-// was staged, or outside a sparse checkout. Without a head the work tree is what is read, so that
-// path is skipped as a link is, never a grep failure that stops the commit.
+// was staged, or outside a sparse checkout. No file passes unread, so that path is read as the
+// blob the index records: a forbidden import staged and then deleted from disk is still reported.
 Deno.test(
-  "boundary check: a path the index lists but the work tree lacks is skipped like a link",
+  "boundary check: a path the index lists but the work tree lacks is read from its staged blob",
   scoped(async () => {
     const dir = await repo({ "src/domain/a.ts": enc("export const a = 1;\n") });
     await Deno.writeTextFile(join(dir, "src/domain/b.ts"), IMPORT);
     await git(dir, "add", "src/domain/b.ts");
     await Deno.remove(join(dir, "src/domain/b.ts"));
     const r = await check(dir);
-    assertEquals(r.code, 0, r.stdout + r.stderr);
-    assertStringIncludes(r.stdout, "boundary-check: 1 file(s) under domain: clean");
+    assertEquals(r.code, 1, r.stdout + r.stderr);
+    assertStringIncludes(r.stderr, "src/domain/b.ts:1: ");
+    assertStringIncludes(r.stderr, "1 forbidden import(s) in 2 file(s)");
   }),
 );

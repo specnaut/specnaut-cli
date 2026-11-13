@@ -97,6 +97,18 @@ Deno.test(
   }),
 );
 
+// A bash built without programmable completion has no compgen: the list it would print is then
+// empty, and dropping nothing would read as dropping everything.
+Deno.test(
+  "explicit head: a bash without compgen fails the clearing",
+  scoped(async () => {
+    const root = await project();
+    const probe = '. "$1" || exit 70; enable -n compgen; explicit_head_clear_env; echo "rc=$?"';
+    const r = await run("bash", ["-c", probe, "_", LIBRARY], root, ICASE);
+    assertEquals(r.stdout.trim(), "rc=1", r.stderr);
+  }),
+);
+
 Deno.test(
   "boundary check: a GIT_* variable it cannot drop stops the check",
   scoped(async () => {

@@ -16,10 +16,11 @@ function Test-GateSame([string]$A, [string]$B) { return [string]::Equals($A, $B,
 
 # Remove-GateGitEnv - drops every GIT_* variable from a process about to start, as the bash
 # twin's explicit_head_clear_env does: not only those `git rev-parse --local-env-vars` lists,
-# since others still change what git answers, such as how a pathspec matches.
+# since others still change what git answers, such as how a pathspec matches. Any case: Windows
+# reads `Git_Dir` as GIT_DIR.
 function Remove-GateGitEnv([System.Diagnostics.ProcessStartInfo]$Psi) {
     foreach ($name in @($Psi.Environment.Keys)) {
-        if ($name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]$Psi.Environment.Remove($name) }
+        if ($name.StartsWith('GIT_', [StringComparison]::OrdinalIgnoreCase)) { [void]$Psi.Environment.Remove($name) }
     }
 }
 

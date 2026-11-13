@@ -24,12 +24,12 @@
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
 # the work tree, could point anywhere on the disk. Without a head, the work tree's
-# copy is the one read: a path the index lists but the work tree does not hold at
-# all (removed after it was staged, outside a sparse checkout) is skipped as a link
-# is, so in a commit hook this checks the work tree, not the staged content; for a
-# commit's own content, give --head. Grep reads every file as bytes
-# (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
-# passed that was not read. A conflicted path is read
+# copy is the one read, so in a commit hook this checks the work tree, not the
+# staged content; for a commit's own content, give --head. A path the index lists
+# but the work tree does not hold at all (removed after it was staged, outside a
+# sparse checkout) is read as the blob the index records: no file passes unread.
+# Grep reads every file as bytes (LC_ALL=C, -a): no locale's decoding and no NUL
+# makes it skip a line. A conflicted path is read
 # when any of its stages is a regular file. Given a head, its tree is listed and each
 # blob read by id: no work tree file is. No GIT_* variable the script inherits is
 # kept: a hook's GIT_DIR or index names another view of the repository.
@@ -134,24 +134,25 @@ for i in "${!domains[@]}"; do
     [ "$key" != "$prev" ] || continue
     prev="$key"
     found=1 tracked=$((tracked + 1))
-    # The work tree's copy is what is read: a link, or a path it does not hold at all.
-    if [ -z "$EXPLICIT_HEAD" ] && { [ -L "$path" ] || [ ! -e "$path" ]; }; then continue; fi
+    # The work tree's copy is what is read, never through a link.
+    if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
     is_exempt "$path" || { files+=("$path") && objects+=("$object"); }
   done <"$listing"
   [ "$found" = 1 ] || echo "  note: domain: '$domain' (line ${domain_lines[$i]}) names no tracked file"
 done
 
 [ "$tracked" -gt 0 ] || skip "no tracked file under domain: in $CONFIG_BOUNDARIES"
-[ "${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt, a link or not in the work tree"
+[ "${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt or a link"
 
 grep_args=()
 for pat in "${patterns[@]}"; do grep_args+=(-e "$pat"); done
 
-# A head's file is its blob, written out by id; the work tree's is read in place.
+# A head's file is its blob, written out by id, and so is an index entry the work tree lacks:
+# no file passes unread. The work tree's own copy is read in place.
 violations=()
 for i in "${!files[@]}"; do
   file="${files[$i]}" src="${files[$i]}"
-  if [ -n "$EXPLICIT_HEAD" ]; then
+  if [ -n "$EXPLICIT_HEAD" ] || [ ! -e "$file" ]; then
     git cat-file blob "${objects[$i]}" >"$blob" || fail "$file: git could not read its blob"
     src="$blob"
   fi

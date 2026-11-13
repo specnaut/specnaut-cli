@@ -53,28 +53,15 @@
 #       usage error
 set -uo pipefail
 
-usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
-
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
-{ . "$here/_config.sh" && . "$here/_explicit_head.sh"; } || {
-  echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
+{ . "$here/_config.sh" && . "$here/_explicit_head.sh" && . "$here/_size_ratchet_args.sh"; } || {
+  echo "size-ratchet: _config.sh, _explicit_head.sh or _size_ratchet_args.sh is missing beside the script" >&2
   exit 3
 }
 git() { explicit_head_git "$@"; } # every git call below: an --objects folder, read safely
-
-SINCE="" SINCE_ID="" REPORT=0
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
-    --head | --objects) explicit_head_option "$@" || { echo "size-ratchet: $EXPLICIT_REFUSAL" >&2; usage; }; shift 2 ;;
-    --report) REPORT=1; shift ;;
-    *) usage ;;
-  esac
-done
-# A head is judged against an explicit base.
-if [ -n "$EXPLICIT_HEAD_OPTION" ] && [ -z "$SINCE" ]; then usage; fi
+size_ratchet_options "$@"
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
@@ -82,15 +69,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 cd -- "$REPO_ROOT" || exit 3
 explicit_head_from_options git || { echo "size-ratchet: --head: $EXPLICIT_REFUSAL" >&2; exit 3; }
-# The base is resolved before the objects folder is added, from this repository's own objects,
-# as gate_candidate_base_commit does: it is where the branch lands, and the folder holds the
-# branch's commits, so a base found only there was never this repository's. Its id, not its
-# name, is used from here on.
-if [ -n "$SINCE" ] &&
-  ! SINCE_ID="$(EXPLICIT_OBJECTS="" git rev-parse --verify -q --end-of-options "$SINCE^{commit}")"; then
-  echo "size-ratchet: not a commit: $SINCE" >&2
-  exit 3
-fi
+size_ratchet_since_id # before explicit_head_env: from this repository's own objects
 explicit_head_env
 CONSTITUTION="$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"

@@ -14,7 +14,7 @@ const SCRIPT = fromFileUrl(
 );
 const CONFIG = {
   [BOUNDARIES_CONFIG_PATH]:
-    "domain:\n  - 'src/domain'\nforbid:\n  - '^import .* from \"web-framework\"'\n",
+    "domain:\n  - 'src/domain'\nforbid:\n  - 'import .* from \"web-framework\"'\n",
 };
 const VIOLATION = 'export const a = 1;\nimport x from "web-framework";\n';
 const CLEAN = "export const a = 1;\n";

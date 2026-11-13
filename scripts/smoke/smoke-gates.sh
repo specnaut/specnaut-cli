@@ -31,8 +31,8 @@ echo "═══ #651 + spec 038  size-ratchet.sh reads .specnaut/size-limits.yml
 RATCHET=.specnaut/scripts/bash/size-ratchet.sh
 check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)" \
   '[ -x $RATCHET ] && grep -qF "size-ratchet.sh --since" .claude/skills/task/phases/quality-gates.md'
-check "_config.sh, the one reader of the gate configs, installed beside it" \
-  '[ -f .specnaut/scripts/bash/_config.sh ]'
+check "_config.sh, the one reader of the gate configs, and _size_ratchet_args.sh installed beside it" \
+  '[ -f .specnaut/scripts/bash/_config.sh ] && [ -f .specnaut/scripts/bash/_size_ratchet_args.sh ]'
 echo "- one more principle" >>docs/constitution.md
 smoke_commit "grow the constitution"
 # With no config the defaults apply, and the bootstrap constitution sits well

@@ -17609,7 +17609,8 @@ gu_base() {
 #   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
 #   and others git does not list in \`rev-parse --local-env-vars\` still change its answers
 #   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
-#   the variable, when one cannot be unset (readonly): a kept one would be read.
+#   the variable, when one cannot be unset (readonly): a kept one would be read; and when
+#   compgen cannot list them, as in a bash built without it.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -17667,10 +17668,11 @@ explicit_head_is_id() {
 }
 
 explicit_head_clear_env() {
-  local name
-  for name in \$(compgen -e); do
+  local name names
+  names="\$(compgen -e)" || return 1
+  while IFS= read -r name; do
     case "\$name" in GIT_*) unset "\$name" || return 1 ;; esac
-  done
+  done <<<"\$names"
 }
 
 explicit_head_env() {
@@ -33332,28 +33334,15 @@ load_report() {
 #       usage error
 set -uo pipefail
 
-usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
-
 # Sourced before the \`cd\` below: the script's own directory may be relative.
 here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
-{ . "\$here/_config.sh" && . "\$here/_explicit_head.sh"; } || {
-  echo "size-ratchet: _config.sh or _explicit_head.sh is missing beside the script" >&2
+{ . "\$here/_config.sh" && . "\$here/_explicit_head.sh" && . "\$here/_size_ratchet_args.sh"; } || {
+  echo "size-ratchet: _config.sh, _explicit_head.sh or _size_ratchet_args.sh is missing beside the script" >&2
   exit 3
 }
 git() { explicit_head_git "\$@"; } # every git call below: an --objects folder, read safely
-
-SINCE="" SINCE_ID="" REPORT=0
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
-    --head | --objects) explicit_head_option "\$@" || { echo "size-ratchet: \$EXPLICIT_REFUSAL" >&2; usage; }; shift 2 ;;
-    --report) REPORT=1; shift ;;
-    *) usage ;;
-  esac
-done
-# A head is judged against an explicit base.
-if [ -n "\$EXPLICIT_HEAD_OPTION" ] && [ -z "\$SINCE" ]; then usage; fi
+size_ratchet_options "\$@"
 
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
@@ -33361,15 +33350,7 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 cd -- "\$REPO_ROOT" || exit 3
 explicit_head_from_options git || { echo "size-ratchet: --head: \$EXPLICIT_REFUSAL" >&2; exit 3; }
-# The base is resolved before the objects folder is added, from this repository's own objects,
-# as gate_candidate_base_commit does: it is where the branch lands, and the folder holds the
-# branch's commits, so a base found only there was never this repository's. Its id, not its
-# name, is used from here on.
-if [ -n "\$SINCE" ] &&
-  ! SINCE_ID="\$(EXPLICIT_OBJECTS="" git rev-parse --verify -q --end-of-options "\$SINCE^{commit}")"; then
-  echo "size-ratchet: not a commit: \$SINCE" >&2
-  exit 3
-fi
+size_ratchet_since_id # before explicit_head_env: from this repository's own objects
 explicit_head_env
 CONSTITUTION="\$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"
@@ -33506,6 +33487,59 @@ exit 0
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/_size_ratchet_args.sh",
+    content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: SINCE, SINCE_ID and REPORT are read by size-ratchet.sh.)
+# _size_ratchet_args.sh - size-ratchet.sh's command line and the base it names. Sourced, never
+# run, by size-ratchet.sh after _explicit_head.sh, and calls that script's git().
+#
+# size_ratchet_options <args...> - sets SINCE and REPORT, and the head options through
+#   explicit_head_option; any other argument is a usage error (exit 3). Given a head, it drops
+#   every GIT_* variable the script inherits, as boundary-check.sh does: one a caller exported
+#   (GIT_DIR, alternates) names another view of the repository than the one the head is judged
+#   in. Staged, they are kept: a commit hook's GIT_INDEX_FILE names the index the commit holds.
+# size_ratchet_since_id - resolves --since to a commit id in SINCE_ID, or exits 3.
+
+SINCE="" SINCE_ID="" REPORT=0
+
+usage() { echo "usage: size-ratchet.sh [--since <ref> [--head <sha> [--objects <dir>]]] [--report]" >&2; exit 3; }
+
+size_ratchet_options() {
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
+      --head | --objects) explicit_head_option "\$@" || { echo "size-ratchet: \$EXPLICIT_REFUSAL" >&2; usage; }; shift 2 ;;
+      --report) REPORT=1; shift ;;
+      *) usage ;;
+    esac
+  done
+  # A head is judged against an explicit base.
+  if [ -n "\$EXPLICIT_HEAD_OPTION" ] && [ -z "\$SINCE" ]; then usage; fi
+  [ -z "\$EXPLICIT_HEAD_OPTION\$EXPLICIT_OBJECTS_OPTION" ] || explicit_head_clear_env || {
+    echo "size-ratchet: an inherited GIT_* variable cannot be dropped" >&2
+    exit 3
+  }
+}
+
+# The base is resolved before the objects folder is added, from this repository's own objects,
+# as gate_candidate_base_commit does: it is where the branch lands, and the folder holds the
+# branch's commits, so a base found only there was never this repository's. Its id, not its
+# name, is used from then on.
+size_ratchet_since_id() {
+  [ -n "\$SINCE" ] || return 0
+  SINCE_ID="\$(EXPLICIT_OBJECTS="" git rev-parse --verify -q --end-of-options "\$SINCE^{commit}")" &&
+    return 0
+  echo "size-ratchet: not a commit: \$SINCE" >&2
+  exit 3
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/boundary-check.sh",
     content: `#!/usr/bin/env bash
 # Hold the project's domain paths free of the imports it forbids.
@@ -33533,12 +33567,12 @@ exit 0
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
 # the work tree, could point anywhere on the disk. Without a head, the work tree's
-# copy is the one read: a path the index lists but the work tree does not hold at
-# all (removed after it was staged, outside a sparse checkout) is skipped as a link
-# is, so in a commit hook this checks the work tree, not the staged content; for a
-# commit's own content, give --head. Grep reads every file as bytes
-# (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
-# passed that was not read. A conflicted path is read
+# copy is the one read, so in a commit hook this checks the work tree, not the
+# staged content; for a commit's own content, give --head. A path the index lists
+# but the work tree does not hold at all (removed after it was staged, outside a
+# sparse checkout) is read as the blob the index records: no file passes unread.
+# Grep reads every file as bytes (LC_ALL=C, -a): no locale's decoding and no NUL
+# makes it skip a line. A conflicted path is read
 # when any of its stages is a regular file. Given a head, its tree is listed and each
 # blob read by id: no work tree file is. No GIT_* variable the script inherits is
 # kept: a hook's GIT_DIR or index names another view of the repository.
@@ -33643,24 +33677,25 @@ for i in "\${!domains[@]}"; do
     [ "\$key" != "\$prev" ] || continue
     prev="\$key"
     found=1 tracked=\$((tracked + 1))
-    # The work tree's copy is what is read: a link, or a path it does not hold at all.
-    if [ -z "\$EXPLICIT_HEAD" ] && { [ -L "\$path" ] || [ ! -e "\$path" ]; }; then continue; fi
+    # The work tree's copy is what is read, never through a link.
+    if [ -z "\$EXPLICIT_HEAD" ] && [ -L "\$path" ]; then continue; fi
     is_exempt "\$path" || { files+=("\$path") && objects+=("\$object"); }
   done <"\$listing"
   [ "\$found" = 1 ] || echo "  note: domain: '\$domain' (line \${domain_lines[\$i]}) names no tracked file"
 done
 
 [ "\$tracked" -gt 0 ] || skip "no tracked file under domain: in \$CONFIG_BOUNDARIES"
-[ "\${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt, a link or not in the work tree"
+[ "\${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt or a link"
 
 grep_args=()
 for pat in "\${patterns[@]}"; do grep_args+=(-e "\$pat"); done
 
-# A head's file is its blob, written out by id; the work tree's is read in place.
+# A head's file is its blob, written out by id, and so is an index entry the work tree lacks:
+# no file passes unread. The work tree's own copy is read in place.
 violations=()
 for i in "\${!files[@]}"; do
   file="\${files[\$i]}" src="\${files[\$i]}"
-  if [ -n "\$EXPLICIT_HEAD" ]; then
+  if [ -n "\$EXPLICIT_HEAD" ] || [ ! -e "\$file" ]; then
     git cat-file blob "\${objects[\$i]}" >"\$blob" || fail "\$file: git could not read its blob"
     src="\$blob"
   fi
@@ -33956,7 +33991,8 @@ gu_base() {
 #   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
 #   and others git does not list in \`rev-parse --local-env-vars\` still change its answers
 #   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
-#   the variable, when one cannot be unset (readonly): a kept one would be read.
+#   the variable, when one cannot be unset (readonly): a kept one would be read; and when
+#   compgen cannot list them, as in a bash built without it.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -34014,10 +34050,11 @@ explicit_head_is_id() {
 }
 
 explicit_head_clear_env() {
-  local name
-  for name in \$(compgen -e); do
+  local name names
+  names="\$(compgen -e)" || return 1
+  while IFS= read -r name; do
     case "\$name" in GIT_*) unset "\$name" || return 1 ;; esac
-  done
+  done <<<"\$names"
 }
 
 explicit_head_env() {
@@ -36203,10 +36240,11 @@ function Test-GateSame([string]\$A, [string]\$B) { return [string]::Equals(\$A, 
 
 # Remove-GateGitEnv - drops every GIT_* variable from a process about to start, as the bash
 # twin's explicit_head_clear_env does: not only those \`git rev-parse --local-env-vars\` lists,
-# since others still change what git answers, such as how a pathspec matches.
+# since others still change what git answers, such as how a pathspec matches. Any case: Windows
+# reads \`Git_Dir\` as GIT_DIR.
 function Remove-GateGitEnv([System.Diagnostics.ProcessStartInfo]\$Psi) {
     foreach (\$name in @(\$Psi.Environment.Keys)) {
-        if (\$name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]\$Psi.Environment.Remove(\$name) }
+        if (\$name.StartsWith('GIT_', [StringComparison]::OrdinalIgnoreCase)) { [void]\$Psi.Environment.Remove(\$name) }
     }
 }
 

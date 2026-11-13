@@ -57,7 +57,8 @@
 #   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
 #   and others git does not list in `rev-parse --local-env-vars` still change its answers
 #   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
-#   the variable, when one cannot be unset (readonly): a kept one would be read.
+#   the variable, when one cannot be unset (readonly): a kept one would be read; and when
+#   compgen cannot list them, as in a bash built without it.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with `-c core.commitGraph=false -c
@@ -115,10 +116,11 @@ explicit_head_is_id() {
 }
 
 explicit_head_clear_env() {
-  local name
-  for name in $(compgen -e); do
+  local name names
+  names="$(compgen -e)" || return 1
+  while IFS= read -r name; do
     case "$name" in GIT_*) unset "$name" || return 1 ;; esac
-  done
+  done <<<"$names"
 }
 
 explicit_head_env() {
