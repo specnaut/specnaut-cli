@@ -4,7 +4,9 @@
  */
 
 import type { BackendProbe, BackendStatus, Engine } from "./sandbox.ts";
+import type { EnginePlatform } from "./sandbox_hosts.ts";
 import { engineDrops } from "./sandbox_limits.ts";
+import { isFilterArch } from "./sandbox_seccomp.ts";
 
 const NO_ROOTLESS = "no rootless podman";
 const NO_DOCKER = "no docker";
@@ -48,7 +50,7 @@ function recentEnough(version: string | null): boolean | null {
  * volumes and mounts out of the container, would not apply. Nor is one older than
  * {@link MINIMUM}, or one whose version cannot be read, which may not read that file as written,
  * nor one that starts containers without a syscall filter: bubblewrap always has one, and a
- * container is not offered with less.
+ * container is not offered with less; nor one on a platform {@link platformWhy} refuses.
  */
 function podmanWhy(probe: BackendProbe): string | null {
   if (probe.podman !== "rootless") return NO_ROOTLESS;
@@ -56,6 +58,8 @@ function podmanWhy(probe: BackendProbe): string | null {
   const recent = recentEnough(probe.podmanVersion);
   if (recent !== true) return recent === null ? UNREAD : OLD;
   if (!probe.podmanSeccomp) return UNFILTERED_PODMAN;
+  const platform = platformWhy("podman", probe.podmanPlatform);
+  if (platform !== null) return platform;
   const { memory, pids, cpuQuota } = probe.podmanLimits;
   return memory && pids && cpuQuota ? null : UNCAPPED;
 }
@@ -65,13 +69,39 @@ function podmanWhy(probe: BackendProbe): string | null {
  * limit its host cannot apply and runs, so docker is taken as it is, unless that daemon is a
  * podman service: it starts the container from its own containers.conf, as a remote podman does.
  * One whose components could not be read is not offered either: it may be such a service. Nor is
- * a daemon that starts containers without a syscall filter.
+ * a daemon that starts containers without a syscall filter, or on a platform {@link platformWhy}
+ * refuses.
  */
 function dockerWhy(probe: BackendProbe): string | null {
   if (!probe.docker) return NO_DOCKER;
   if (probe.dockerOnPodman === null) return DOCKER_UNREAD;
   if (probe.dockerOnPodman) return DOCKER_ON_PODMAN;
-  return probe.dockerSeccomp ? null : UNFILTERED_DOCKER;
+  if (!probe.dockerSeccomp) return UNFILTERED_DOCKER;
+  return platformWhy("docker", probe.dockerPlatform);
+}
+
+/**
+ * The oldest kernel run on: before 4.8, seccomp checked a call before a tracer saw it, so a traced
+ * process could have a call the filter allowed rewritten into one it refuses.
+ */
+const KERNEL = { major: 4, minor: 8 };
+const OLD_KERNEL = `older than ${KERNEL.major}.${KERNEL.minor} or could not be read, and before ` +
+  `${KERNEL.major}.${KERNEL.minor} a traced process could step past a syscall filter`;
+
+/**
+ * Why `engine` cannot run the sandbox's container on `platform`, or `null` when it can: the CLI's
+ * syscall profile (`seccompProfile`) is checked on x86_64 and aarch64 only, and needs a kernel of
+ * {@link KERNEL} or later, one whose version can be read.
+ */
+function platformWhy(engine: Engine, { arch, kernel }: EnginePlatform): string | null {
+  if (arch === null || !isFilterArch(arch)) {
+    const on = arch ?? "an architecture it did not report";
+    return `${engine} runs on ${on}, which the CLI's syscall profile is not checked on`;
+  }
+  const found = kernel?.match(/^(\d+)\.(\d+)/);
+  const [major, minor] = found ? [Number(found[1]), Number(found[2])] : [0, 0];
+  if (major > KERNEL.major || (major === KERNEL.major && minor >= KERNEL.minor)) return null;
+  return `${engine}'s kernel is ${OLD_KERNEL}`;
 }
 
 /** The engine a container runs on: rootless podman first, then docker. */

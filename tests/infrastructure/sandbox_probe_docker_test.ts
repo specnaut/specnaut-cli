@@ -21,6 +21,8 @@ const dockerInfo = (over: Record<string, unknown> = {}) =>
     PidsLimit: true,
     CpuCfsQuota: true,
     SecurityOptions: ["name=seccomp,profile=builtin", "name=cgroupns"],
+    Architecture: "x86_64",
+    KernelVersion: "6.8.0-1017-azure",
     ...over,
   }));
 
@@ -161,4 +163,16 @@ Deno.test("probe: docker without a syscall filter is not run on, and says why", 
     chosen.kind === "static" && chosen.why[0],
     "container: no rootless podman, and docker runs containers without a syscall filter (seccomp)",
   );
+});
+
+Deno.test("probe: docker's platform is its daemon's Architecture and KernelVersion", async () => {
+  const platformOf = async (over: Record<string, unknown>) =>
+    (await prober("linux", daemon(dockerInfo(over))).prober.probe()).dockerPlatform;
+  assertEquals(await platformOf({}), { arch: "x86_64", kernel: "6.8.0-1017-azure" });
+  const desktop = { Architecture: "aarch64", KernelVersion: "6.10.14-linuxkit" };
+  assertEquals(await platformOf(desktop), { arch: "aarch64", kernel: "6.10.14-linuxkit" });
+  for (const unread of [undefined, "", 64]) {
+    const over = { Architecture: unread, KernelVersion: unread };
+    assertEquals(await platformOf(over), { arch: null, kernel: null }, `${unread}`);
+  }
 });

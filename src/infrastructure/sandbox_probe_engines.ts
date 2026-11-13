@@ -1,6 +1,6 @@
 import type { SubprocessRunner } from "../application/ports.ts";
 import type { BackendProbe } from "../domain/sandbox.ts";
-import type { EngineLimits } from "../domain/sandbox_hosts.ts";
+import type { EngineLimits, EnginePlatform } from "../domain/sandbox_hosts.ts";
 
 /**
  * Podman's and docker's own reports of what they offer a sandbox: facts the domain judges
@@ -12,13 +12,20 @@ export type Engines = { readonly runner: SubprocessRunner; readonly env: Record<
 
 type Podman = Pick<
   BackendProbe,
-  "podman" | "podmanRemote" | "podmanVersion" | "podmanSeccomp" | "podmanLimits" | "podmanCpus"
+  | "podman"
+  | "podmanRemote"
+  | "podmanVersion"
+  | "podmanSeccomp"
+  | "podmanLimits"
+  | "podmanCpus"
+  | "podmanPlatform"
 >;
 type Docker = Pick<
   BackendProbe,
-  "docker" | "dockerOnPodman" | "dockerSeccomp" | "dockerLimits" | "dockerCpus"
+  "docker" | "dockerOnPodman" | "dockerSeccomp" | "dockerLimits" | "dockerCpus" | "dockerPlatform"
 >;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
+const NO_PLATFORM: EnginePlatform = { arch: null, kernel: null };
 export const NO_PODMAN: Podman = {
   podman: "absent",
   podmanRemote: false,
@@ -26,6 +33,7 @@ export const NO_PODMAN: Podman = {
   podmanSeccomp: false,
   podmanLimits: NO_LIMITS,
   podmanCpus: null,
+  podmanPlatform: NO_PLATFORM,
 };
 export const NO_DOCKER: Docker = {
   docker: false,
@@ -33,6 +41,7 @@ export const NO_DOCKER: Docker = {
   dockerSeccomp: false,
   dockerLimits: NO_LIMITS,
   dockerCpus: null,
+  dockerPlatform: NO_PLATFORM,
 };
 
 /**
@@ -68,6 +77,7 @@ export async function probePodman({ runner, env }: Engines): Promise<Podman> {
       host?.security?.seccompProfilePath !== UNCONFINED,
     podmanLimits: await podmanLimits(runner, host, podmanRemote),
     podmanCpus: count(host?.cpus),
+    podmanPlatform: platformOf(host?.arch, host?.kernel),
   };
 }
 
@@ -106,6 +116,7 @@ export async function probeDocker(engines: Engines): Promise<Docker> {
     dockerOnPodman: await dockerOnPodman(engines),
     dockerSeccomp: filtered(info.SecurityOptions),
     dockerCpus: count(info.NCPU),
+    dockerPlatform: platformOf(info.Architecture, info.KernelVersion),
     dockerLimits: {
       memory: can("MemoryLimit"),
       swap: can("SwapLimit"),
@@ -141,6 +152,21 @@ function filtered(options: unknown): boolean {
     .map((o: string) => new Map(o.split(",").map((f) => f.split("=", 2) as [string, string])));
   const seccomp = fields.find((f) => f.get("name") === "seccomp");
   return seccomp !== undefined && seccomp.get("profile") !== UNCONFINED;
+}
+
+/** Podman reports its host's machine as Go names it; docker, and the domain, as `uname -m` does. */
+const UNAME: Readonly<Record<string, string>> = { amd64: "x86_64", arm64: "aarch64" };
+
+/** The platform an engine reports, its machine spelt as `uname -m` spells it. */
+function platformOf(arch: unknown, kernel: unknown): EnginePlatform {
+  const machine = text(arch);
+  const uname = machine !== null && Object.hasOwn(UNAME, machine) ? UNAME[machine] : machine;
+  return { arch: uname, kernel: text(kernel) };
+}
+
+/** `value` when it is a non-empty string, else `null`. */
+function text(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
 }
 
 /** `value` when it is a count (a whole number above zero), else `null`. */

@@ -18,6 +18,13 @@ export type EngineLimits = {
   readonly cpuQuota: boolean;
 };
 
+/**
+ * The machine and kernel an engine runs its containers on, as it reports them, which may not be
+ * this process's (a VM, an emulated machine): `null` for what it did not report. The architecture
+ * is spelt as `uname -m` spells it (`x86_64`, `aarch64`).
+ */
+export type EnginePlatform = { readonly arch: string | null; readonly kernel: string | null };
+
 /** What the host offers, as the caller probed it. */
 export type BackendProbe = {
   /** `Deno.build.os`. */
@@ -44,6 +51,8 @@ export type BackendProbe = {
   readonly podmanLimits: EngineLimits;
   /** The CPUs on podman's host, as it reports them (`host.cpus`), or `null` when it does not. */
   readonly podmanCpus: number | null;
+  /** Podman's host's machine and kernel (`host.arch`, `host.kernel`). */
+  readonly podmanPlatform: EnginePlatform;
   /** A docker daemon answers. */
   readonly docker: boolean;
   /**
@@ -61,6 +70,8 @@ export type BackendProbe = {
   readonly dockerLimits: EngineLimits;
   /** The CPUs on that daemon's host, as it reports them (`NCPU`), or `null` when it does not. */
   readonly dockerCpus: number | null;
+  /** That daemon's host's machine and kernel (`Architecture`, `KernelVersion`). */
+  readonly dockerPlatform: EnginePlatform;
   /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */
   readonly bwrap: "usable" | "userns_restricted" | "trial_failed" | "absent";
   /** What `bwrap --version` printed, or `null` when it printed nothing. */

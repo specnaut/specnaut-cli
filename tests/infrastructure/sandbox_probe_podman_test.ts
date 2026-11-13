@@ -26,6 +26,8 @@ const podmanInfo = (
     host: {
       security: { rootless, seccompEnabled: true, seccompProfilePath: SECCOMP_JSON },
       serviceIsRemote: false,
+      arch: "amd64",
+      kernel: "6.8.0-45-generic",
       cgroupVersion: version,
       cgroupControllers: controllers,
       ...host,
@@ -138,4 +140,18 @@ Deno.test("probe: podman without a syscall filter is not run on, and says why", 
     chosen.kind === "static" && chosen.why[0],
     "container: podman runs containers without a syscall filter (seccomp), and no docker",
   );
+});
+
+Deno.test("probe: podman's platform is its host's arch, spelt as uname -m spells it, and kernel", async () => {
+  const platformOf = async (host: Record<string, unknown>) =>
+    (await limitsOf(podmanInfo(true, "v2", ALL, host))).probed.podmanPlatform;
+  assertEquals(await platformOf({}), { arch: "x86_64", kernel: "6.8.0-45-generic" });
+  assertEquals((await platformOf({ arch: "arm64" })).arch, "aarch64");
+  for (const arch of ["s390x", "riscv64", "toString"]) {
+    assertEquals((await platformOf({ arch })).arch, arch);
+  }
+  for (const unread of [undefined, "", 7]) {
+    const host = { arch: unread, kernel: unread };
+    assertEquals(await platformOf(host), { arch: null, kernel: null }, `${unread}`);
+  }
 });
