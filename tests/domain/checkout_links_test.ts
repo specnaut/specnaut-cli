@@ -35,8 +35,9 @@ const tipLink = (path: string, target?: string): BaseEntry => ({ kind: "link", p
 const toAgents: LinkEnd = { kind: "inside", path: A, id: AGENTS_ID };
 
 /** The tree holds AGENTS.md and `entry`; the tip holds AGENTS.md and `base`. */
-function judge(entry: CheckoutEntry, base: BaseEntry) {
+function judge(entry: CheckoutEntry, base: BaseEntry, symlinks = true) {
   return judgeCheckout({
+    symlinks,
     headCommits: [],
     untrustedCommits: [],
     scripts: { trusted: true, untrusted: [] },
@@ -132,5 +133,10 @@ Deno.test("a link where the tip has a file fails", () => {
 
 Deno.test("a file holding the tip link's target holds: git's checkout where links are off", () => {
   const entry: CheckoutEntry = { kind: "file", path: L, bytes: enc("../AGENTS.md"), links: 1 };
-  assertEquals(judge(entry, tipLink(L, "../AGENTS.md")), HOLDS);
+  assertEquals(judge(entry, tipLink(L, "../AGENTS.md"), false), HOLDS);
+});
+
+Deno.test("where git writes links as links, a file holding the tip link's target differs", () => {
+  const entry: CheckoutEntry = { kind: "file", path: L, bytes: enc("../AGENTS.md"), links: 1 };
+  assertEquals(judge(entry, tipLink(L, "../AGENTS.md"), true), fails(L, REASON.differs));
 });

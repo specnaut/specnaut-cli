@@ -31,6 +31,8 @@ export interface GitObjectReader {
   /** The user's global `init.defaultBranch`, includes not followed, or `null`. */
   globalDefaultBranch(): Promise<string | null>;
   hasOrigin(): Promise<boolean>;
+  /** Whether git checks a link out as a link here: `core.symlinks`, true unless set false. */
+  symlinks(): Promise<boolean>;
   /** The full sha `ref` names as a commit, or `null`. */
   commitOf(ref: string): Promise<string | null>;
   mergeBase(a: string, b: string): Promise<string | null>;

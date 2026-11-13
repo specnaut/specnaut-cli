@@ -53,6 +53,8 @@ export type InstructionInput = {
   /** The same roots at the merge base: read only to say a file is behind the base. */
   readonly mergeBase: readonly BaseEntry[];
   readonly committed: readonly CommittedInstruction[];
+  /** Whether git checks a link out as a link here (`core.symlinks`). */
+  readonly symlinks: boolean;
 };
 
 /** One trusted line, or one untrusted line per path, each with its most specific reason. */
@@ -68,7 +70,7 @@ const inComparedRoot = (path: string) =>
 
 function treeReasons(input: InstructionInput): Untrusted[] {
   const ctx = { tree: treeBytes(input.tree), tip: byPath(input.tip), old: byPath(input.mergeBase) };
-  return configReasons(input.tree, input.tip, holdsBytes, inComparedRoot)
+  return configReasons(input.tree, input.tip, holdsBytes(input.symlinks), inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
 }
 

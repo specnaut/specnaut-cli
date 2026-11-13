@@ -34,8 +34,9 @@ function judge(
   tip: BaseEntry[],
   mergeBase: BaseEntry[] = tip,
   committed: CommittedInstruction[] = [],
+  symlinks = true,
 ) {
-  return judgeInstructions({ tree, tip, mergeBase, committed }).map((v) =>
+  return judgeInstructions({ tree, tip, mergeBase, committed, symlinks }).map((v) =>
     v.trusted ? "trusted" : `${v.path} ${v.reason}`
   );
 }
@@ -96,6 +97,13 @@ Deno.test("a link the base holds as the same link to a checked file is trusted",
     { kind: "link", path: ".claude/CLAUDE.md", target: "../AGENTS.md" },
   ];
   assertEquals(judge(walked(file("AGENTS.md"), link), tip), ["trusted"]);
+});
+
+Deno.test("a tip link replaced by a file holding its target differs where git writes links", () => {
+  const tip: BaseEntry[] = [{ kind: "link", path: "CLAUDE.md", target: "AGENTS.md" }];
+  const tree = walked(file("CLAUDE.md", enc("AGENTS.md")));
+  assertEquals(judge(tree, tip), [`CLAUDE.md ${REASON.differs}`]);
+  assertEquals(judge(tree, tip, tip, [], false), ["trusted"]);
 });
 
 Deno.test("a hard-linked instruction file is untrusted, whatever its bytes", () => {

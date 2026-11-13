@@ -139,13 +139,17 @@ Deno.test("a SessionStart payload names its session and its source", () => {
   }
 });
 
-async function judge(record: Awaited<ReturnType<typeof recordOf>>, headCommits: string[] = []) {
+async function judge(
+  record: Awaited<ReturnType<typeof recordOf>>,
+  headCommits: string[] = [],
+  symlinks = true,
+) {
   return judgeRecord({
     headCommits,
     untrustedCommits: [OUTSIDE],
     tree: record.tree,
     tip: TIP,
-    tipDigests: await tipDigests(TIP),
+    tipDigests: await tipDigests(TIP, symlinks),
   });
 }
 
@@ -178,7 +182,19 @@ Deno.test("a recorded file holding the tip's link target holds, as on disk where
       { kind: "file", path: L, bytes: enc("../x"), links: 1 },
     ],
   }];
-  assertEquals((await judge(await recordOf(HEAD, MARK, walk))).holds, true);
+  assertEquals((await judge(await recordOf(HEAD, MARK, walk), [], false)).holds, true);
+});
+
+Deno.test("where git writes links as links, a recorded file holding the tip's link target differs", async () => {
+  const walk: CheckoutWalk[] = [{
+    kind: "walked",
+    entries: [
+      { kind: "file", path: S, bytes: enc("{}\n"), links: 1 },
+      { kind: "file", path: L, bytes: enc("../x"), links: 1 },
+    ],
+  }];
+  const verdict = await judge(await recordOf(HEAD, MARK, walk), [], true);
+  assertEquals(verdict.reasons, [{ path: L, reason: REASON.differs }]);
 });
 
 Deno.test("what the record found that the checkout now does not show is marked as found at session start", () => {

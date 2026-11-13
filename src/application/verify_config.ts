@@ -84,7 +84,13 @@ export async function verifyInstructions(
       mergeBase: commitFile(await deps.git.readFile(base.mergeBase, path)),
     });
   }
-  return judgeInstructions({ tree, tip, mergeBase, committed });
+  return judgeInstructions({
+    tree,
+    tip,
+    mergeBase,
+    committed,
+    symlinks: await deps.git.symlinks(),
+  });
 }
 
 /**

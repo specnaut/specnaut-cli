@@ -5,6 +5,7 @@ import {
   type CheckoutWalk,
   commitReasons,
   configReasons,
+  fileBytesOf,
   type HoldsTip,
   type RecordedEntry,
   type RecordedWalk,
@@ -106,14 +107,15 @@ async function recorded(entry: CheckoutEntry): Promise<RecordedEntry> {
   return { ...rest, sha256: await sha256HexBytes(bytes) };
 }
 
-/** The digest of what each tip path holds as a file: a blob's bytes, or a link's target. */
-export async function tipDigests(tip: readonly BaseEntry[]): Promise<Map<string, string>> {
+/** The digest of what git writes as a file at each tip path, by `fileBytesOf`. */
+export async function tipDigests(
+  tip: readonly BaseEntry[],
+  symlinks: boolean,
+): Promise<Map<string, string>> {
   const digests = new Map<string, string>();
   for (const entry of tip) {
-    if (entry.kind === "blob") digests.set(entry.path, await sha256HexBytes(entry.bytes));
-    if (entry.kind === "link" && entry.target !== undefined) {
-      digests.set(entry.path, await sha256HexBytes(new TextEncoder().encode(entry.target)));
-    }
+    const bytes = fileBytesOf(entry, symlinks);
+    if (bytes !== undefined) digests.set(entry.path, await sha256HexBytes(bytes));
   }
   return digests;
 }

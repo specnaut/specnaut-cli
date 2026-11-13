@@ -112,13 +112,14 @@ type Facts = Awaited<ReturnType<typeof gather>>;
 /** What the rule reads besides the scripts: each side's commits, the checked files on both sides. */
 async function gather(deps: VerifyCheckoutDeps, tip: string, untrustedHead: string | null) {
   const { git, checkout } = deps;
-  const [headCommits, untrustedCommits, tree, atTip] = await Promise.all([
+  const [headCommits, untrustedCommits, tree, atTip, symlinks] = await Promise.all([
     git.commitsAhead(tip, "HEAD"),
     untrustedHead === null ? [] : git.commitsAhead(tip, untrustedHead),
     Promise.all(CHECKOUT_SCOPE.map((root) => checkout.walk(root))),
     Promise.all(CHECKOUT_SCOPE.map((root) => git.listRoot(tip, root))),
+    git.symlinks(),
   ]);
-  return { headCommits, untrustedCommits, tree, tip: atTip.flat() };
+  return { headCommits, untrustedCommits, tree, tip: atTip.flat(), symlinks };
 }
 
 async function startRecord(
@@ -146,7 +147,7 @@ async function atStart(
     untrustedCommits: facts.untrustedCommits,
     tree: record.tree,
     tip: facts.tip,
-    tipDigests: await tipDigests(facts.tip),
+    tipDigests: await tipDigests(facts.tip, facts.symlinks),
   }).reasons;
 }
 

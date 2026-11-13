@@ -5,6 +5,7 @@ import {
   bundled,
   commitAll,
   fixture,
+  git,
   GIT_READ,
   LOCK,
   verify,
@@ -84,6 +85,38 @@ Deno.test({
     await Deno.remove(join(root, "CLAUDE.md"));
     await Deno.symlink("elsewhere.md", join(root, "CLAUDE.md"));
     assertEquals(await lines(root), ["VERDICT instructions untrusted CLAUDE.md differs from base"]);
+  },
+});
+
+/** A base whose CLAUDE.md is a link to AGENTS.md; the branch puts a file holding "AGENTS.md" there. */
+async function linkAsText(links: "on" | "off") {
+  const { root } = await fixture({ files: base() });
+  await git(root, "checkout", "-q", "main");
+  await Deno.symlink("AGENTS.md", join(root, "CLAUDE.md"));
+  await commitAll(root, "link");
+  await git(root, "push", "-q", "origin", "main");
+  await git(root, "checkout", "-q", "feature");
+  await git(root, "merge", "-q", "--ff-only", "main");
+  if (links === "off") await git(root, "config", "core.symlinks", "false");
+  await Deno.remove(join(root, "CLAUDE.md"));
+  await Deno.writeTextFile(join(root, "CLAUDE.md"), "AGENTS.md");
+  return root;
+}
+
+Deno.test({
+  name: "a link replaced by a file holding its target differs where git writes links as links",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const root = await linkAsText("on");
+    assertEquals(await lines(root), ["VERDICT instructions untrusted CLAUDE.md differs from base"]);
+  },
+});
+
+Deno.test({
+  name: "the file git writes for a link where core.symlinks is false holds",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    assertEquals(await lines(await linkAsText("off")), ["VERDICT instructions trusted"]);
   },
 });
 

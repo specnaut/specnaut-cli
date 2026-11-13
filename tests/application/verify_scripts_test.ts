@@ -49,6 +49,7 @@ function reader(over: Partial<Repo>): GitObjectReader {
     originHead: () => Promise.resolve(r.originHead),
     globalDefaultBranch: () => Promise.resolve(r.globalDefault),
     hasOrigin: () => Promise.resolve(r.hasOrigin),
+    symlinks: () => Promise.reject(new Error("verify-scripts reads no link setting")),
     commitOf: (ref) => Promise.resolve(r.commits[ref] ?? null),
     mergeBase: () => Promise.resolve(r.mergeBase),
     aheadCount: () => Promise.resolve(r.ahead),

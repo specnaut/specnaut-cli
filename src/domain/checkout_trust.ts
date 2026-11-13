@@ -59,6 +59,8 @@ type JudgedFile = Extract<CheckoutEntry | RecordedEntry, { kind: "file" }>;
 export type HoldsTip = (file: JudgedFile, base: BaseEntry) => boolean;
 
 export type CheckoutInput = {
+  /** Whether git checks a link out as a link here (`core.symlinks`): see {@link fileBytesOf}. */
+  readonly symlinks: boolean;
   /** The commits of base..HEAD. */
   readonly headCommits: readonly string[];
   /** The commits of base..<the branch's head>: only to say which reason a commit of HEAD gets. */
@@ -98,7 +100,7 @@ export function judgeCheckout(input: CheckoutInput): CheckoutVerdict {
   const reasons = [
     ...commitReasons(input),
     ...scriptReasons(input.scripts),
-    ...configReasons(input.tree, input.tip, holdsBytes),
+    ...configReasons(input.tree, input.tip, holdsBytes(input.symlinks)),
   ];
   return { holds: reasons.length === 0, reasons };
 }
@@ -120,13 +122,20 @@ function scriptReasons(scripts: ScriptVerdict): readonly Untrusted[] {
   return [{ path: SCRIPTS_DIR, reason: CHECKOUT_REASON.scripts }];
 }
 
-/** A file the walk read holds the tip's blob, or, where links are off, the tip's link's target. */
-export const holdsBytes: HoldsTip = (file, base) => {
-  if (!("bytes" in file)) return false;
-  if (base.kind === "blob") return sameBytes(file.bytes, base.bytes);
-  return base.kind === "link" && base.target !== undefined &&
-    sameBytes(file.bytes, new TextEncoder().encode(base.target));
-};
+/**
+ * The bytes git writes as a regular file for a tip entry: a blob's own, or a link's target where
+ * links are off (`core.symlinks=false`). Where git writes links as links, no regular file stands
+ * for one: a file holding the target's text replaced the link, so it differs.
+ */
+export function fileBytesOf(base: BaseEntry, symlinks: boolean): Uint8Array | undefined {
+  if (base.kind === "blob") return base.bytes;
+  if (base.kind !== "link" || symlinks || base.target === undefined) return undefined;
+  return new TextEncoder().encode(base.target);
+}
+
+/** A file the walk read holds what git writes for the tip's entry, by {@link fileBytesOf}. */
+export const holdsBytes = (symlinks: boolean): HoldsTip => (file, base) =>
+  "bytes" in file && sameBytes(file.bytes, fileBytesOf(base, symlinks));
 
 /**
  * Rule 3: each walk that stopped, each tree entry the tip does not match, each tip entry the tree

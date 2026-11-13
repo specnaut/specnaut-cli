@@ -28,6 +28,7 @@ const CLEAN_TIP = [blob(S, "{}\n"), blob(A, "rules\n")];
 
 function judge(over: Partial<CheckoutInput> & { entries?: CheckoutEntry[] } = {}) {
   return judgeCheckout({
+    symlinks: over.symlinks ?? true,
     headCommits: over.headCommits ?? [],
     untrustedCommits: over.untrustedCommits ?? [OUTSIDE],
     scripts: over.scripts ?? { trusted: true, untrusted: [] },
