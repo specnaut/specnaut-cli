@@ -45,6 +45,9 @@ export type BaseEntry =
   | { readonly kind: "link"; readonly path: string; readonly target?: string }
   | { readonly kind: "submodule"; readonly path: string };
 
+/** One entry of a commit's whole tree, as `git ls-tree -r -t` lists it: a folder included. */
+export type CommitEntry = BaseEntry | { readonly kind: "tree"; readonly path: string };
+
 /**
  * The bundled copy, mapped through the lock at the base's tip. With no lock there, only the base
  * rule applies: a first install trusts what the base already has.

@@ -12,7 +12,8 @@ import {
   INSTRUCTION_SCOPE,
   judgeInstructions,
 } from "../domain/instruction_trust.ts";
-import { headDigest, type HeadEntry } from "../domain/script_digest.ts";
+import { keptAtHead } from "../domain/instruction_scope.ts";
+import { headDigest } from "../domain/script_digest.ts";
 import { type BaseEntry, REASON } from "../domain/script_trust.ts";
 import type { BaseFile, CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 
@@ -72,56 +73,44 @@ export async function verifyInstructions(
   deps: VerifyConfigDeps,
   base: InstructionBase,
 ): Promise<InstructionOutcome> {
-  const { tree, tip, mergeBase, head } = await listRoots(deps, base);
+  const { tree, tip, mergeBase } = await listRoots(deps, base);
+  const head = await deps.git.listCommit(base.head, keptAtHead);
   const committed = await readCommitted(deps.git, base);
   const symlinks = await deps.git.symlinks();
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
-  return { verdicts, digest: await headDigest([...head, ...committed.flatMap(atHead)]) };
+  return { verdicts, digest: await headDigest(head.flatMap((e) => e.kind === "tree" ? [] : [e])) };
 }
 
 /** The commits the instruction class reads: the config's two, and HEAD, what lands. */
 export type InstructionBase = ConfigBase & { readonly head: string };
 
-/** Each {@link INSTRUCTION_SCOPE} root walked in the tree and listed at the three commits. */
+/**
+ * Each {@link INSTRUCTION_SCOPE} root walked in the tree and listed at the tip and the merge base.
+ * HEAD is listed whole instead (`keptAtHead`), so a name in another letter case is seen.
+ */
 async function listRoots(deps: VerifyConfigDeps, base: InstructionBase) {
   const tree: CheckoutWalk[] = [];
   const tip: BaseEntry[] = [];
   const mergeBase: BaseEntry[] = [];
-  const head: BaseEntry[] = [];
   for (const root of INSTRUCTION_SCOPE) {
     tree.push(await deps.tree.walk(root));
     tip.push(...await deps.git.listRoot(base.tip, root));
     mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
-    head.push(...await deps.git.listRoot(base.head, root));
   }
-  return { tree, tip, mergeBase, head };
+  return { tree, tip, mergeBase };
 }
 
-/** Each of {@link COMMITTED_INSTRUCTIONS} at HEAD, the tip and the merge base. */
+/** Each of {@link COMMITTED_INSTRUCTIONS} at the tip and the merge base: HEAD's is listed whole. */
 async function readCommitted(
   git: GitObjectReader,
   base: InstructionBase,
 ): Promise<CommittedInstruction[]> {
   const committed: CommittedInstruction[] = [];
   for (const path of COMMITTED_INSTRUCTIONS) {
-    const atHead = await git.readFile(base.head, path);
-    committed.push({
-      path,
-      head: atHead.kind === "not_regular"
-        ? { kind: "refused", why: REASON.notRegular }
-        : commitFile(atHead),
-      tip: commitFile(await git.readFile(base.tip, path)),
-      mergeBase: commitFile(await git.readFile(base.mergeBase, path)),
-    });
+    const tip = commitFile(await git.readFile(base.tip, path));
+    committed.push({ path, tip, mergeBase: commitFile(await git.readFile(base.mergeBase, path)) });
   }
   return committed;
-}
-
-/** An override as HEAD commits it, for the digest: none when HEAD has no such path. */
-function atHead(c: CommittedInstruction): HeadEntry[] {
-  if (c.head.kind === "absent") return [];
-  if (c.head.kind === "refused") return [{ kind: "not_regular", path: c.path }];
-  return [{ kind: "blob", path: c.path, bytes: c.head.bytes }];
 }
 
 /**

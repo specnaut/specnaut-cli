@@ -1,5 +1,5 @@
 import { sameBytes } from "./bytes.ts";
-import { inCheckoutScope, inScopeRoot, type ScopeRoot } from "./checkout_scope.ts";
+import { inCheckoutScope, inScopeRoot } from "./checkout_scope.ts";
 import {
   type CheckoutEntry,
   type CheckoutWalk,
@@ -7,11 +7,18 @@ import {
   holdsBytes,
 } from "./checkout_trust.ts";
 import type { ConfigFile, ConfigVerdict } from "./config_trust.ts";
-import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
+import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
 import { headReasons } from "./instruction_head.ts";
+import {
+  type COMMITTED_INSTRUCTIONS,
+  type HeadSplit,
+  INSTRUCTION_SCOPE,
+  splitHead,
+} from "./instruction_scope.ts";
 
 export { INSTRUCTION_REASON } from "./instruction_head.ts";
+export { COMMITTED_INSTRUCTIONS, INSTRUCTION_SCOPE } from "./instruction_scope.ts";
 
 /**
  * Whether the instruction files a session takes as its rules hold, in the work tree, what the base
@@ -31,26 +38,9 @@ export { INSTRUCTION_REASON } from "./instruction_head.ts";
 
 export const INSTRUCTION_CLASS = "instructions";
 
-/** The instruction files, as roots of the checked files (`checkout_scope.ts` holds them all). */
-// deno-fmt-ignore
-export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
-  { dir: ".", deep: false, names: ["AGENTS.md", "CLAUDE.md"] },
-  { dir: ".claude", deep: false, names: ["CLAUDE.md"] },
-  { dir: ".specnaut/addenda", deep: true },
-  { dir: "docs", deep: false, names: ["constitution.md"] },
-];
-
-/**
- * Overrides a session loads beside the instruction files that a project often keeps as a personal,
- * untracked copy. They are judged from git objects, HEAD's against the tip's, so a copy only the
- * work tree holds stays silent and a committed one counts.
- */
-export const COMMITTED_INSTRUCTIONS = ["AGENTS.override.md", "CLAUDE.local.md"] as const;
-
-/** One of {@link COMMITTED_INSTRUCTIONS} at HEAD, the base's tip and the merge base. */
+/** One of {@link COMMITTED_INSTRUCTIONS} at the base's tip and the merge base; HEAD's is listed. */
 export type CommittedInstruction = {
-  readonly path: string;
-  readonly head: ConfigFile;
+  readonly path: (typeof COMMITTED_INSTRUCTIONS)[number];
   readonly tip: ConfigFile;
   readonly mergeBase: ConfigFile;
 };
@@ -62,8 +52,8 @@ export type InstructionInput = {
   readonly tip: readonly BaseEntry[];
   /** The same roots at the merge base: read only to say a file is behind the base. */
   readonly mergeBase: readonly BaseEntry[];
-  /** The same roots at HEAD: what lands. */
-  readonly head: readonly BaseEntry[];
+  /** HEAD's whole tree, kept by `keptAtHead` (`instruction_scope.ts`): what lands. */
+  readonly head: readonly CommitEntry[];
   readonly committed: readonly CommittedInstruction[];
   /** Whether git checks a link out as a link here (`core.symlinks`). */
   readonly symlinks: boolean;
@@ -71,7 +61,9 @@ export type InstructionInput = {
 
 /** One trusted line, or one untrusted line per path, each with its most specific reason. */
 export function judgeInstructions(input: InstructionInput): ConfigVerdict[] {
-  const found = [...treeReasons(input), ...input.committed.flatMap(committedReason)];
+  const head = splitHead(input.head, byPath(input.tip));
+  const committed = input.committed.flatMap((c) => committedReason(c, head.overrides.get(c.path)));
+  const found = [...treeReasons(input, head), ...committed];
   if (found.length === 0) return [{ class: INSTRUCTION_CLASS, path: ".", trusted: true }];
   return found.map((u) => ({ class: INSTRUCTION_CLASS, ...u, trusted: false }));
 }
@@ -80,7 +72,7 @@ export function judgeInstructions(input: InstructionInput): ConfigVerdict[] {
 const inComparedRoot = (path: string) =>
   INSTRUCTION_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
 
-function treeReasons(input: InstructionInput): Untrusted[] {
+function treeReasons(input: InstructionInput, head: HeadSplit): Untrusted[] {
   const holds = holdsBytes(input.symlinks);
   const ctx = {
     tree: treeEntries(input.tree),
@@ -89,23 +81,23 @@ function treeReasons(input: InstructionInput): Untrusted[] {
   };
   const found = configReasons(input.tree, input.tip, holds, inComparedRoot)
     .map((u) => ({ path: u.path, reason: refined(u, ctx) }));
-  const reasons = new Map(found.map((u) => [u.path, u.reason]));
+  const reasons = new Map([...found, ...head.reasons].map((u) => [u.path, u.reason]));
   const blocked = input.tree.flatMap((w) => w.kind === "blocked" ? [w.path] : []);
-  headReasons(reasons, { ...ctx, blocked, head: byPath(input.head) }, holds);
+  headReasons(reasons, { ...ctx, blocked, head: byPath(head.entries) }, holds);
   return [...reasons].map(([path, reason]) => ({ path, reason }));
 }
 
 /** HEAD's committed copy against the tip's: none at HEAD is silent, whatever the tree holds. */
-function committedReason(c: CommittedInstruction): Untrusted[] {
+function committedReason(c: CommittedInstruction, atHead: ConfigFile | undefined): Untrusted[] {
   const why = (reason: string) => [{ path: c.path, reason }];
-  if (c.head.kind === "absent") return [];
-  if (c.head.kind === "refused") return why(c.head.why);
+  if (atHead === undefined || atHead.kind === "absent") return [];
+  if (atHead.kind === "refused") return why(atHead.why);
   if (c.tip.kind === "refused") return why(REASON.baseNotRegular);
   const tip = c.tip.kind === "file" ? c.tip.bytes : undefined;
-  if (sameBytes(c.head.bytes, tip)) return [];
+  if (sameBytes(atHead.bytes, tip)) return [];
   const mergeBase = c.mergeBase.kind === "file" ? c.mergeBase.bytes : undefined;
   const otherwise = c.tip.kind === "absent" ? REASON.notOnBase : REASON.differs;
-  return why(refinedReason(c.head.bytes, { copies: [tip], mergeBase }, otherwise));
+  return why(refinedReason(atHead.bytes, { copies: [tip], mergeBase }, otherwise));
 }
 
 type Context = {

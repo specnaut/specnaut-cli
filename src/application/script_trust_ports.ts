@@ -1,6 +1,6 @@
 import type { ScopeRoot } from "../domain/checkout_scope.ts";
 import type { CheckoutWalk } from "../domain/checkout_trust.ts";
-import type { BaseEntry, TreeWalk } from "../domain/script_trust.ts";
+import type { BaseEntry, CommitEntry, TreeWalk } from "../domain/script_trust.ts";
 
 /**
  * The ports the script and checkout checks read through. Their own module: `ports.ts` is the
@@ -49,6 +49,11 @@ export interface GitObjectReader {
   listTree(commit: string, dir: string): Promise<BaseEntry[]>;
   /** The entries of `root` at `commit`, a link with its target; a blob over the cap is a throw. */
   listRoot(commit: string, root: ScopeRoot): Promise<BaseEntry[]>;
+  /**
+   * Every entry of `commit`'s whole tree, folders included, that `keep` keeps, a link with its
+   * target: no pathspec, so letter case is the caller's to judge. A kept blob over the cap is a throw.
+   */
+  listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]>;
   /** One path at `commit`; a blob over the cap is a throw. */
   readFile(commit: string, path: string): Promise<BaseFile>;
   /** The paths changed between two commits, from the repository's top. */

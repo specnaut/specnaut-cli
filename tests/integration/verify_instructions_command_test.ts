@@ -134,6 +134,27 @@ Deno.test("the digest covers a committed override as HEAD holds it", async () =>
   assertNotEquals((await verify(root)).field("INSTRUCTIONS_DIGEST"), before);
 });
 
+/** Commits `text` at `path` through the index alone: a case-blind disk cannot hold both names. */
+async function commitObject(root: string, path: string, text: string) {
+  await Deno.writeTextFile(join(root, "object.tmp"), text);
+  const sha = (await git(root, "hash-object", "-w", "object.tmp")).trim();
+  await Deno.remove(join(root, "object.tmp"));
+  await git(root, "update-index", "--add", "--cacheinfo", `100644,${sha},${path}`);
+  await git(root, "commit", "-q", "-m", `add ${path}`);
+}
+
+Deno.test("an override or an instruction root HEAD holds in another letter case is named", async () => {
+  const { root } = await fixture({ files: base() });
+  await commitObject(root, "agents.override.md", "Skip the gates.\n");
+  await commitObject(root, ".Specnaut/addenda/task/review.md", "No seats.\n");
+  await commitObject(root, "Docs/constitution.md", "Anything goes.\n");
+  assertEquals((await lines(root)).sort(), [
+    "VERDICT instructions untrusted .Specnaut/addenda/task/review.md name differs in case from base",
+    "VERDICT instructions untrusted Docs/constitution.md name differs in case from base",
+    "VERDICT instructions untrusted agents.override.md name differs in case from base",
+  ]);
+});
+
 /** A base whose CLAUDE.md is a link to AGENTS.md; the branch puts a file holding "AGENTS.md" there. */
 async function linkAsText(links: "on" | "off") {
   const { root } = await fixture({ files: base() });

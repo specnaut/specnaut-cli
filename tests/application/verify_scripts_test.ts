@@ -56,6 +56,7 @@ function reader(over: Partial<Repo>): GitObjectReader {
     commitsAhead: () => Promise.reject(new Error("verify-scripts reads no commit list")),
     listTree: (commit) => Promise.resolve(commit === TIP ? r.tip : []),
     listRoot: () => Promise.reject(new Error("verify-scripts lists no scope root")),
+    listCommit: () => Promise.reject(new Error("verify-scripts lists no whole commit")),
     readFile: (_c, path) => Promise.resolve(path === BASE_LOCK ? r.lock : { kind: "absent" }),
     changedNames: () => Promise.resolve(["app/x.ts", "lib/y.ts"]),
   };

@@ -5,7 +5,7 @@ import {
 } from "../application/script_trust_ports.ts";
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
-import type { BaseEntry } from "../domain/script_trust.ts";
+import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
 import { decode, firstLine } from "./git_text.ts";
 import { GitRefused, PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
 
@@ -95,6 +95,13 @@ export class GitObjects implements GitObjectReader {
     return await withBytes(this.#git, commit, records.filter((r) => inScopeRoot(root, r.path)));
   }
 
+  async listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]> {
+    const records = await lsTree(this.#git, this.projectPrefix, commit, ["-r", "-t"], true);
+    const kept = records.filter((r) => keep(r.path));
+    const folders = kept.flatMap((r): CommitEntry[] => r.kind === "tree" ? [r] : []);
+    return [...folders, ...await withBytes(this.#git, commit, kept)];
+  }
+
   async readFile(commit: string, path: string): Promise<BaseFile> {
     const [record] = await lsTree(this.#git, this.projectPrefix, commit, [
       "--",
@@ -113,14 +120,16 @@ export class GitObjects implements GitObjectReader {
 
 /** A blob `ls-tree -l` listed: a file's, or a link's, whose bytes are its target. */
 type BlobRecord = { kind: "blob" | "link"; path: string; sha: string; size: number };
-type TreeRecord = BlobRecord | { kind: "submodule"; path: string };
+type FileRecord = BlobRecord | { kind: "submodule"; path: string };
+type TreeRecord = FileRecord | { kind: "tree"; path: string };
 
-/** `ls-tree -z -l --full-tree`, paths made relative to `prefix`; a tree entry is not listed. */
+/** `ls-tree -z -l --full-tree`, paths made relative to `prefix`; a tree entry only on `trees`. */
 async function lsTree(
   git: UntrustedGit,
   prefix: string,
   commit: string,
   args: string[],
+  trees = false,
 ): Promise<TreeRecord[]> {
   const argv = ["-z", "-l", "--full-tree", commit, ...args];
   const records: TreeRecord[] = [];
@@ -132,6 +141,7 @@ async function lsTree(
     if (m[1] === "160000") records.push({ kind: "submodule", path });
     else if (m[1] === "120000") records.push({ kind: "link", ...blob });
     else if (m[2] === "blob") records.push({ kind: "blob", ...blob });
+    else if (trees && m[2] === "tree") records.push({ kind: "tree", path });
   }
   return records;
 }
@@ -142,8 +152,10 @@ async function withBytes(
   commit: string,
   records: TreeRecord[],
 ): Promise<BaseEntry[]> {
-  const bytes = await catFiles(git, commit, records.filter((r) => r.kind !== "submodule"));
-  return records.map((r): BaseEntry => {
+  const files = records.filter((r): r is FileRecord => r.kind !== "tree");
+  const blobs = files.filter((r): r is BlobRecord => r.kind !== "submodule");
+  const bytes = await catFiles(git, commit, blobs);
+  return files.map((r): BaseEntry => {
     if (r.kind === "submodule") return r;
     if (r.kind === "link") return { kind: "link", path: r.path, target: decode(bytes.get(r.sha)!) };
     return { kind: "blob", path: r.path, bytes: bytes.get(r.sha)! };
