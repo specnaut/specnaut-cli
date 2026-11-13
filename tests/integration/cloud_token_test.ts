@@ -84,7 +84,9 @@ Deno.test("`cloud token` refuses a plain-http API URL before it reaches any toke
     );
     assertEquals(r.code, 1, url);
     assertEquals(r.stdout.includes("sfc_headless_xyz"), false, url);
-    assertStringIncludes(r.stderr, "invalid Specnaut Cloud API URL", url);
+    // The reason is plain http, not a malformed URL (cli#787).
+    assertStringIncludes(r.stderr, "plain http", url);
+    assertEquals(r.stderr.includes("invalid Specnaut Cloud API URL"), false, r.stderr);
   } finally {
     await Deno.remove(home, { recursive: true });
   }

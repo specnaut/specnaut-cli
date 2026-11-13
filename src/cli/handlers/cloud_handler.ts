@@ -17,7 +17,11 @@ import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/clou
 import { bindingClient, bindProject } from "./cloud_project_binding.ts";
 import { deviceLogin } from "./cloud_login.ts";
 import { printToken, requireCloudToken } from "./cloud_token.ts";
-import { DEFAULT_CLOUD_API_URL, normalizeApiUrl } from "../../domain/cloud/cloud_config.ts";
+import {
+  apiUrlRefusal,
+  DEFAULT_CLOUD_API_URL,
+  normalizeApiUrl,
+} from "../../domain/cloud/cloud_config.ts";
 import { headlessRefusal, headlessToken } from "../../domain/cloud/headless_token.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
@@ -44,20 +48,17 @@ type ResolvedApiUrl = { url: string; source: ApiUrlSource };
 /** Resolve the deployment URL: flag → existing config → the canonical default,
  *  tagging the source so `runLogin` can disclose it before authenticating.
  *  Since Specnaut Cloud is a single hosted service, there is always a valid
- *  target — the only null is a malformed explicit `--api-url` / `api_url`. */
+ *  target — the only refusal is an explicit `--api-url` / `api_url` that is not
+ *  a plain one, reported on stderr with its reason, and returned as null. */
 async function resolveApiUrl(
   explicit: string | null,
 ): Promise<ResolvedApiUrl | null> {
-  if (explicit) {
-    const url = normalizeApiUrl(explicit);
-    return url ? { url, source: "flag" } : null;
-  }
-  const cfg = await new FsBacklogConfigStore().readCloudConfig(Deno.cwd());
-  if (cfg?.apiUrl) {
-    const url = normalizeApiUrl(cfg.apiUrl);
-    return url ? { url, source: "config" } : null;
-  }
-  return { url: DEFAULT_CLOUD_API_URL, source: "default" };
+  const cfg = explicit ? null : await new FsBacklogConfigStore().readCloudConfig(Deno.cwd());
+  const raw = explicit || cfg?.apiUrl;
+  if (!raw) return { url: DEFAULT_CLOUD_API_URL, source: "default" };
+  const url = normalizeApiUrl(raw);
+  if (!url) console.error(red(`error: ${apiUrlRefusal(raw)}`));
+  return url ? { url, source: explicit ? "flag" : "config" } : null;
 }
 
 const URL_SOURCE_LABEL: Record<ApiUrlSource, string> = {
@@ -106,10 +107,7 @@ async function authedSession(
   intent: CloudIntent,
 ): Promise<{ client: CloudClient; token: string } | number> {
   const resolved = await resolveApiUrl(intent.apiUrl);
-  if (!resolved) {
-    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
-    return 1;
-  }
+  if (!resolved) return 1;
   const apiUrl = resolved.url;
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
@@ -222,10 +220,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   if (!Deno.stdin.isTerminal()) return refuseNoTerminal();
 
   const resolved = await resolveApiUrl(intent.apiUrl);
-  if (!resolved) {
-    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
-    return 2;
-  }
+  if (!resolved) return 2;
   const apiUrl = resolved.url;
 
   // Disclose the target server + where the URL came from BEFORE opening the
@@ -285,10 +280,7 @@ async function trustedTarget(resolved: ResolvedApiUrl, store: CredentialStore): 
 
 async function runToken(intent: CloudIntent): Promise<number> {
   const resolved = await resolveApiUrl(intent.apiUrl);
-  if (!resolved) {
-    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
-    return 1;
-  }
+  if (!resolved) return 1;
   const apiUrl = resolved.url;
   // Headless / CI: the environment's token wins, for a deployment it may go to only.
   const headless = headlessToken(apiUrl, (k) => Deno.env.get(k));
@@ -308,10 +300,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
 
 async function runLogout(intent: CloudIntent): Promise<number> {
   const resolved = await resolveApiUrl(intent.apiUrl);
-  if (!resolved) {
-    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
-    return 1;
-  }
+  if (!resolved) return 1;
   const apiUrl = resolved.url;
   await defaultCredentialStore().delete(apiUrl);
   console.log(green(`✓ logged out of ${apiUrl}`));

@@ -46,10 +46,26 @@ export function normalizeApiUrl(raw: string): string | null {
   return trimmed.startsWith("http://") && !LOOPBACK_HOSTS.has(host) ? null : trimmed;
 }
 
+const INVALID_API_URL = "invalid Specnaut Cloud API URL — check --api-url / api_url.";
+
+/**
+ * Why `raw` is refused as an API base. A URL whose https form passes is refused
+ * for plain http alone, and says so: "invalid" sent its user looking for a typo.
+ */
+export function apiUrlRefusal(raw: string): string {
+  const trimmed = raw.trim();
+  const plainHttp = trimmed.startsWith("http://") &&
+    normalizeApiUrl(`https://${trimmed.slice("http://".length)}`) !== null;
+  return plainHttp
+    ? "plain http reaches a loopback host only: the token would cross the network in clear. " +
+      "Use https — check --api-url / api_url."
+    : INVALID_API_URL;
+}
+
 /** An `api_url` is set, and is not a plain http(s) base: not the same as no link at all. */
 export class InvalidApiUrl extends Error {
   constructor() {
-    super("invalid Specnaut Cloud API URL — check --api-url / api_url.");
+    super(INVALID_API_URL);
     this.name = "InvalidApiUrl";
   }
 }
