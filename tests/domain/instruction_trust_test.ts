@@ -44,6 +44,8 @@ Deno.test("the class covers every surface a harness loads from the checkout, and
     ".claude/agents/developer/memory/MEMORY.md",
     ".claude/hooks/review-gate.sh",
     ".claude/commands/ship.md",
+    ".claude/rules/testing.md",
+    ".claude/output-styles/terse.md",
     ".claude/settings.json",
     ".mcp.json",
     ".codex/config.toml",
@@ -165,9 +167,9 @@ Deno.test("a link both sides hold into a folder this class does not compare is u
   const link: CheckoutEntry = {
     kind: "link",
     path: ".claude/CLAUDE.md",
-    target: "rules/main.md",
-    end: { kind: "inside", path: ".claude/rules/main.md", id: "5:5" },
+    target: "notes/main.md",
+    end: { kind: "inside", path: ".claude/notes/main.md", id: "5:5" },
   };
-  const tip: BaseEntry[] = [{ kind: "link", path: ".claude/CLAUDE.md", target: "rules/main.md" }];
+  const tip: BaseEntry[] = [{ kind: "link", path: ".claude/CLAUDE.md", target: "notes/main.md" }];
   assertEquals(judge(walked(link), tip), [`.claude/CLAUDE.md ${LINK_REASON.linkLeaves}`]);
 });

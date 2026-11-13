@@ -12,10 +12,10 @@ import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./scri
 
 /**
  * The instruction files, and every other surface a harness loads from the checkout and acts on:
- * skills, agents and their memory, hooks and the settings that name them, slash commands, MCP
- * servers, Codex's config, Specnaut's own hooks. `.gitattributes` too: it decides how git shows
- * and checks out every other file. Each is a root of the checked files (`checkout_scope.ts` holds
- * them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files there.
+ * skills, agents and their memory, hooks and the settings that name them, slash commands, rules,
+ * output styles, MCP servers, Codex's config, Specnaut's own hooks. `.gitattributes` too: it
+ * decides how git shows and checks out every other file. Each is a root of the checked files
+ * (`checkout_scope.ts` holds them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files there.
  */
 // deno-fmt-ignore
 export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
@@ -25,6 +25,8 @@ export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
   { dir: ".claude/agents", deep: true },
   { dir: ".claude/hooks", deep: true },
   { dir: ".claude/commands", deep: true },
+  { dir: ".claude/rules", deep: true },
+  { dir: ".claude/output-styles", deep: true },
   { dir: ".codex", deep: true },
   { dir: ".agents", deep: true },
   { dir: ".specnaut/hooks", deep: true },
