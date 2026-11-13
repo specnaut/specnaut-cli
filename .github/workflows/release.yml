@@ -181,6 +181,25 @@ jobs:
             rm -f "$dir/response"
           done
           rm -f "$dir/auth-header"
+          # The password is added from a text file, which ends in a line feed the password does
+          # not hold; rcodesign reads the file whole. A password holds no line break.
+          pw="$dir/macos-developer-id-p12-password"
+          tr -d '\r\n' < "$pw" > "$pw.line"
+          mv "$pw.line" "$pw"
+      - name: Check the password opens the Developer ID certificate
+        if: github.repository_id == '1218483524'
+        # Says which secret is wrong before signing, and prints nothing of either.
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/signing"
+          for legacy in "" -legacy; do
+            if openssl pkcs12 $legacy -in "$dir/macos-developer-id-p12" -noout \
+              -passin "file:$dir/macos-developer-id-p12-password" 2>/dev/null; then
+              exit 0
+            fi
+          done
+          echo "::error::macos-developer-id-p12-password does not open macos-developer-id-p12 (Secret Manager, project specnaut): add the certificate's password as a new version"
+          exit 1
       - name: Install rcodesign (pinned version and sha256)
         if: github.repository_id == '1218483524'
         run: |

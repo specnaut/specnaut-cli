@@ -118,7 +118,7 @@ Deno.test("sign-macos signs only in the canonical repository and warns in a fork
 Deno.test("every canonical-repository test in release.yml is keyed on the repository ID", async () => {
   const text = await Deno.readTextFile(`${WORKFLOWS}/release.yml`);
   assert(!/github\.repository\s*[!=]=/.test(text), "a fork test keyed on the repository NAME");
-  assertEquals((text.match(/github\.repository_id [!=]= '1218483524'/g) ?? []).length, 8);
+  assertEquals((text.match(/github\.repository_id [!=]= '1218483524'/g) ?? []).length, 9);
 });
 
 Deno.test("the signing material is deleted after signing and on every outcome", async () => {

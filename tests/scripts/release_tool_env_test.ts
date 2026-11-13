@@ -34,3 +34,19 @@ Deno.test("release.yml exports no variable rcodesign would read as its own confi
   );
   assertEquals(keys.filter((k) => k.startsWith(TOOL_CONFIG_PREFIX)), []);
 });
+
+type Step = { name?: string; run?: string };
+
+Deno.test("release.yml drops the password file's line feed and checks it opens the certificate before signing", async () => {
+  const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as {
+    jobs: Record<string, { steps: Step[] }>;
+  };
+  const steps = wf.jobs["sign-macos"].steps;
+  const at = (pred: (s: Step) => boolean) => steps.findIndex(pred);
+  const fetch = at((s) => (s.run ?? "").includes("secretmanager.googleapis.com"));
+  const check = at((s) => (s.run ?? "").includes("openssl pkcs12"));
+  const sign = at((s) => (s.run ?? "").includes("rcodesign sign"));
+  // A password added from a text file ends in a line feed rcodesign would read as part of it.
+  assertEquals(/tr -d '\\r\\n' < "\$pw"/.test(steps[fetch].run ?? ""), true);
+  assertEquals(fetch < check && check < sign, true, `fetch ${fetch}, check ${check}, sign ${sign}`);
+});
