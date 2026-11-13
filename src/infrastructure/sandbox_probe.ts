@@ -24,7 +24,7 @@ const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 const NEEDED_CONTROLLERS = ["pids", "memory", "cpu"];
 
 type Podman = Pick<BackendProbe, "podman" | "podmanRemote" | "podmanVersion" | "podmanLimits">;
-type Docker = Pick<BackendProbe, "docker" | "dockerLimits">;
+type Docker = Pick<BackendProbe, "docker" | "dockerOnPodman" | "dockerLimits">;
 type Bwrap = Pick<BackendProbe, "bwrap" | "bwrapVersion" | "bwrapScope">;
 const NO_LIMITS: EngineLimits = { memory: false, swap: false, pids: false, cpuQuota: false };
 const NO_PODMAN: Podman = {
@@ -33,7 +33,7 @@ const NO_PODMAN: Podman = {
   podmanVersion: null,
   podmanLimits: NO_LIMITS,
 };
-const NO_DOCKER: Docker = { docker: false, dockerLimits: NO_LIMITS };
+const NO_DOCKER: Docker = { docker: false, dockerOnPodman: false, dockerLimits: NO_LIMITS };
 
 /**
  * Whether this process's own cgroup (cgroup v2) has the file podman checks before it passes on the
@@ -136,6 +136,7 @@ export class HostBackendProber implements BackendProber {
     const can = (flag: string) => info[flag] === true;
     return {
       docker: true,
+      dockerOnPodman: await this.#dockerOnPodman(),
       dockerLimits: {
         memory: can("MemoryLimit"),
         swap: can("SwapLimit"),
@@ -143,6 +144,20 @@ export class HostBackendProber implements BackendProber {
         cpuQuota: can("CpuCfsQuota"),
       },
     };
+  }
+
+  /**
+   * Whether the daemon docker reaches is a podman service: its version names a `Podman Engine`
+   * component, which a docker daemon's never does. A version that cannot be read says nothing,
+   * and docker is taken as its own: `docker info` has already answered as a docker daemon does.
+   */
+  async #dockerOnPodman(): Promise<boolean> {
+    const args = ["version", "--format", "{{json .}}"];
+    const { code, stdout } = await this.runner.run("docker", args, { env: this.engineVars() });
+    if (code !== 0) return false;
+    const components: unknown = parsed(stdout, "docker version")?.Server?.Components;
+    if (!Array.isArray(components)) return false;
+    return components.some((c) => c?.Name === "Podman Engine");
   }
 
   async #bwrap(): Promise<Bwrap> {

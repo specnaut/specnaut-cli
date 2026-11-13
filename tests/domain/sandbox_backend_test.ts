@@ -23,6 +23,7 @@ const NOTHING: BackendProbe = {
   podmanVersion: "4.8.0",
   podmanLimits: { memory: false, swap: false, pids: false, cpuQuota: false },
   docker: false,
+  dockerOnPodman: false,
   dockerLimits: { memory: true, swap: true, pids: true, cpuQuota: true },
   bwrap: "absent",
   bwrapVersion: "bubblewrap 0.8.0",

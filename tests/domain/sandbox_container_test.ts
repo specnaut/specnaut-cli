@@ -20,6 +20,7 @@ const PODMAN: BackendProbe = {
   podmanVersion: "4.8.0",
   podmanLimits: ALL,
   docker: false,
+  dockerOnPodman: false,
   dockerLimits: ALL,
   bwrap: "absent",
   bwrapVersion: null,
@@ -80,4 +81,26 @@ Deno.test("container: a podman whose version cannot be read is not offered, and 
     const withDocker = probe({ podmanVersion, docker: true });
     assertEquals(chooseBackend(withDocker), ON_DOCKER, String(podmanVersion));
   }
+});
+
+const ON_PODMAN_SERVICE =
+  "docker answers from a podman service, which reads its own containers.conf";
+
+Deno.test("container: docker that is a podman service is not offered, and says why", () => {
+  const service = { docker: true, dockerOnPodman: true } as const;
+  assertEquals(
+    firstWhy(probe({ ...service, podmanRemote: true })),
+    [
+      "container: podman answers from a remote service, which reads its own containers.conf",
+      ON_PODMAN_SERVICE,
+    ].join(", and "),
+  );
+  assertEquals(
+    firstWhy(probe({ ...service, podman: "absent" })),
+    [
+      "container: no rootless podman",
+      ON_PODMAN_SERVICE,
+    ].join(", and "),
+  );
+  assertEquals(chooseBackend(probe(service)), ON_PODMAN);
 });

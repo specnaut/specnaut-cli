@@ -39,6 +39,11 @@ export type BackendProbe = {
   readonly podmanLimits: EngineLimits;
   /** A docker daemon answers. */
   readonly docker: boolean;
+  /**
+   * That daemon is a podman service (`docker version` names a `Podman Engine` component), reached
+   * by a docker client on its socket: it starts a container from its own containers.conf.
+   */
+  readonly dockerOnPodman: boolean;
   /** What that daemon can limit; every one false when none answers. */
   readonly dockerLimits: EngineLimits;
   /** Bubblewrap ran a trial command, was stopped by the user-namespace restriction, or failed. */

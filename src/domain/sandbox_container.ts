@@ -10,6 +10,8 @@ const NO_ROOTLESS = "no rootless podman";
 const UNCAPPED = "rootless podman without cgroup v2 pids, memory and cpu delegated";
 const REMOTE = "podman answers from a remote service, which reads its own containers.conf";
 const UNREAD = "podman's version could not be read";
+const DOCKER_ON_PODMAN =
+  "docker answers from a podman service, which reads its own containers.conf";
 const OLD = "podman older than 4.8, whose containers.conf cannot empty a list";
 
 /**
@@ -47,12 +49,19 @@ function podmanWhy(probe: BackendProbe): string | null {
 }
 
 /**
- * The engine a container runs on: rootless podman first, then docker. Docker's daemon discards a
- * limit its host cannot apply and runs, so docker is taken as it is.
+ * Why docker cannot run the sandbox's container, or `null` when it can. Its daemon discards a
+ * limit its host cannot apply and runs, so docker is taken as it is, unless that daemon is a
+ * podman service: it starts the container from its own containers.conf, as a remote podman does.
  */
+function dockerWhy(probe: BackendProbe): string | null {
+  if (!probe.docker) return "no docker";
+  return probe.dockerOnPodman ? DOCKER_ON_PODMAN : null;
+}
+
+/** The engine a container runs on: rootless podman first, then docker. */
 export function containerEngine(probe: BackendProbe): Engine | null {
   if (podmanWhy(probe) === null) return "podman";
-  return probe.docker ? "docker" : null;
+  return dockerWhy(probe) === null ? "docker" : null;
 }
 
 /** The container backend `probe` offers, or why there is none. */
@@ -67,6 +76,6 @@ export function containerStatus(probe: BackendProbe): BackendStatus {
   }
   const why = probe.image.kind === "none"
     ? `no container image: ${probe.image.why}`
-    : `container: ${podmanWhy(probe)}, and no docker`;
+    : `container: ${podmanWhy(probe)}, and ${dockerWhy(probe)}`;
   return { kind: "container", why, onThisOs: true };
 }

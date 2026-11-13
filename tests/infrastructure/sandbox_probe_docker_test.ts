@@ -4,7 +4,7 @@ import type { BackendProbe } from "../../src/domain/sandbox.ts";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
 import { capsWithout } from "../../src/domain/sandbox_limits.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
-import { ok, prober } from "./sandbox_probe_fixture.ts";
+import { ENGINE_ENV, ok, prober } from "./sandbox_probe_fixture.ts";
 
 /**
  * Docker as the probe finds it: a daemon that answers with a version, and the limits it reports
@@ -83,4 +83,30 @@ Deno.test("probe: docker without a CPU quota runs without --cpus, and reports th
 Deno.test("probe: docker without the paged-out bound keeps the memory cap, reported apart", async () => {
   const probed = await prober("linux", { docker: dockerInfo({ SwapLimit: false }) }).prober.probe();
   assertEquals(capsLacking(probed), ["memorySwap"]);
+});
+
+/** What `docker version` prints of a server made of the components `names`. */
+const dockerVersion = (...names: string[]) =>
+  ok(JSON.stringify({ Server: { Components: names.map((Name) => ({ Name, Version: "1" })) } }));
+
+/** The probe of a docker daemon answering `version` to `docker version`. */
+const withVersion = (version: ReturnType<typeof ok>) =>
+  prober("linux", { "docker info": dockerInfo(), "docker version": version });
+
+Deno.test("probe: a docker daemon that is a podman service is read as one, and not run on", async () => {
+  const { prober: p, calls } = withVersion(dockerVersion("Podman Engine"));
+  const probed = await p.probe();
+  assertEquals([probed.docker, probed.dockerOnPodman], [true, true]);
+  const asked = calls.find((c) => c.cmd === "docker" && c.args[0] === "version");
+  assertEquals(asked?.args, ["version", "--format", "{{json .}}"]);
+  assertEquals(asked?.opts, { env: ENGINE_ENV });
+  assertEquals(chooseBackend(probed).kind, "static");
+});
+
+Deno.test("probe: docker's own daemon, or a version that says nothing, is docker's own", async () => {
+  const failed = { code: 1, stdout: "", stderr: "" };
+  for (const version of [dockerVersion("Engine", "containerd", "runc"), failed, ok("garbled")]) {
+    const probed = await withVersion(version).prober.probe();
+    assertEquals([probed.docker, probed.dockerOnPodman], [true, false], version.stdout);
+  }
 });
