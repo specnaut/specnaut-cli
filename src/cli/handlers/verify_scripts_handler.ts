@@ -1,6 +1,10 @@
 import { red } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
-import { verifyConfig, verifyInstructions } from "../../application/verify_config.ts";
+import {
+  type InstructionBase,
+  verifyConfig,
+  verifyInstructions,
+} from "../../application/verify_config.ts";
 import type {
   CheckoutTreeWalker,
   GitObjectReader,
@@ -96,7 +100,7 @@ type Judged = { readonly verdicts: readonly ConfigVerdict[]; readonly digest: st
 async function judgeInputs(
   git: GitObjectReader,
   tree: CheckoutTreeWalker,
-  base: Parameters<typeof verifyInstructions>[1] | null,
+  base: InstructionBase | null,
 ): Promise<Judged> {
   if (base === null) return { verdicts: [], digest: null };
   const config = await verifyConfig({ git, tree }, base);
@@ -113,11 +117,21 @@ async function answer(
     return refuse(deps, EXIT.couldNotRun, `the base is unknown: ${outcome.why}`);
   }
   const names = outcome.names.map((n) => `${terminalText(n)}\n`).join("");
-  const lines = [
+  deps.out(reportLines(outcome, config, await deps.writeNames(names)).join("\n"));
+  return outcome.verdict.trusted ? EXIT.trusted : EXIT.untrusted;
+}
+
+/** Exits 0 and 1's lines, in the order the header gives. */
+function reportLines(
+  outcome: Extract<VerifyOutcome, { kind: "judged" }>,
+  config: Judged,
+  namesFile: string,
+): string[] {
+  return [
     `BASE ${outcome.base}`,
     `BASE_TIP ${outcome.baseTip}`,
     `BASE_BRANCH ${outcome.baseBranch}`,
-    `NAMES_FILE ${terminalText(await deps.writeNames(names))}`,
+    `NAMES_FILE ${terminalText(namesFile)}`,
     `NAMES_RELATIVE_TO ${terminalText(outcome.namesRelativeTo)}`,
     `SCRIPTS_DIGEST ${outcome.digest}`,
     ...config.digest === null ? [] : [`INSTRUCTIONS_DIGEST ${config.digest}`],
@@ -127,8 +141,6 @@ async function answer(
     ),
     outcome.verdict.trusted ? "VERDICT scripts trusted" : UNTRUSTED,
   ];
-  deps.out(lines.join("\n"));
-  return outcome.verdict.trusted ? EXIT.trusted : EXIT.untrusted;
 }
 
 function configLine(v: ConfigVerdict): string {

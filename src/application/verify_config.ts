@@ -70,8 +70,20 @@ export type InstructionOutcome = {
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
-  base: ConfigBase & { readonly head: string },
+  base: InstructionBase,
 ): Promise<InstructionOutcome> {
+  const { tree, tip, mergeBase, head } = await listRoots(deps, base);
+  const committed = await readCommitted(deps.git, base);
+  const symlinks = await deps.git.symlinks();
+  const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
+  return { verdicts, digest: await headDigest([...head, ...committed.flatMap(atHead)]) };
+}
+
+/** The commits the instruction class reads: the config's two, and HEAD, what lands. */
+export type InstructionBase = ConfigBase & { readonly head: string };
+
+/** Each {@link INSTRUCTION_SCOPE} root walked in the tree and listed at the three commits. */
+async function listRoots(deps: VerifyConfigDeps, base: InstructionBase) {
   const tree: CheckoutWalk[] = [];
   const tip: BaseEntry[] = [];
   const mergeBase: BaseEntry[] = [];
@@ -82,21 +94,27 @@ export async function verifyInstructions(
     mergeBase.push(...await deps.git.listRoot(base.mergeBase, root));
     head.push(...await deps.git.listRoot(base.head, root));
   }
+  return { tree, tip, mergeBase, head };
+}
+
+/** Each of {@link COMMITTED_INSTRUCTIONS} at HEAD, the tip and the merge base. */
+async function readCommitted(
+  git: GitObjectReader,
+  base: InstructionBase,
+): Promise<CommittedInstruction[]> {
   const committed: CommittedInstruction[] = [];
   for (const path of COMMITTED_INSTRUCTIONS) {
-    const head = await deps.git.readFile(base.head, path);
+    const atHead = await git.readFile(base.head, path);
     committed.push({
       path,
-      head: head.kind === "not_regular"
-        ? { kind: "refused", why: REASON.notRegular } as const
-        : commitFile(head),
-      tip: commitFile(await deps.git.readFile(base.tip, path)),
-      mergeBase: commitFile(await deps.git.readFile(base.mergeBase, path)),
+      head: atHead.kind === "not_regular"
+        ? { kind: "refused", why: REASON.notRegular }
+        : commitFile(atHead),
+      tip: commitFile(await git.readFile(base.tip, path)),
+      mergeBase: commitFile(await git.readFile(base.mergeBase, path)),
     });
   }
-  const symlinks = await deps.git.symlinks();
-  const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks });
-  return { verdicts, digest: await headDigest([...head, ...committed.flatMap(atHead)]) };
+  return committed;
 }
 
 /** An override as HEAD commits it, for the digest: none when HEAD has no such path. */
