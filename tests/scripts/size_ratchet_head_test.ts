@@ -89,3 +89,19 @@ Deno.test("size ratchet --head: an empty --head or --objects is refused, never r
     assertStringIncludes(r.stderr, `size-ratchet: ${args.at(-2)} takes a value`);
   }
 });
+
+// A base is where the branch lands, so it comes from the project's own objects: the objects
+// folder holds the branch's commits, and a base found only there was never the project's.
+Deno.test("size ratchet --head: a base only the objects folder holds is not a commit", async () => {
+  const repo = await grown();
+  const r = await ratchet(repo.root, [
+    "--since",
+    repo.head,
+    "--head",
+    repo.head,
+    "--objects",
+    repo.objects,
+  ]);
+  assertEquals(r.code, 3, r.stdout + r.stderr);
+  assertStringIncludes(r.stderr, `size-ratchet: not a commit: ${repo.head}`);
+});

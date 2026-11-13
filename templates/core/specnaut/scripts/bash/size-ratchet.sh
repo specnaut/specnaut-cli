@@ -18,7 +18,8 @@
 #   - staged:  the merge base of HEAD with the default branch (HEAD itself on
 #              the default branch), compared with the index — what the commit
 #              will contain, not the working tree;
-#   - --since: <ref>, compared with HEAD.
+#   - --since: <ref>, compared with HEAD or the head; with --objects, <ref> is
+#              resolved in this repository's own objects, never in that folder.
 #
 # That is what lets rule 3 work commit by commit: an extraction commit shrinks
 # a file, and the next commit may add back up to the size the file had when the
@@ -63,7 +64,7 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 }
 git() { explicit_head_git "$@"; } # every git call below: an --objects folder, read safely
 
-SINCE="" REPORT=0
+SINCE="" SINCE_ID="" REPORT=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --since) [ -n "${2:-}" ] || usage; SINCE="$2"; shift 2 ;;
@@ -81,11 +82,16 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 cd -- "$REPO_ROOT" || exit 3
 explicit_head_from_options git || { echo "size-ratchet: --head: $EXPLICIT_REFUSAL" >&2; exit 3; }
-explicit_head_env
-if [ -n "$SINCE" ] && ! git rev-parse --verify -q "$SINCE^{commit}" >/dev/null; then
+# The base is resolved before the objects folder is added, from this repository's own objects,
+# as gate_candidate_base_commit does: it is where the branch lands, and the folder holds the
+# branch's commits, so a base found only there was never this repository's. Its id, not its
+# name, is used from here on.
+if [ -n "$SINCE" ] &&
+  ! SINCE_ID="$(EXPLICIT_OBJECTS="" git rev-parse --verify -q --end-of-options "$SINCE^{commit}")"; then
   echo "size-ratchet: not a commit: $SINCE" >&2
   exit 3
 fi
+explicit_head_env
 CONSTITUTION="$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"
 
@@ -133,7 +139,7 @@ default_branch_base() {
 # `:0:` is the index entry; a bare `:` would read a name like `1:x` as stage 1.
 if [ -n "$SINCE" ]; then
   tip="${EXPLICIT_HEAD:-HEAD}"
-  base="$SINCE" head_prefix="$tip:" diff_args=("$SINCE" "$tip")
+  base="$SINCE_ID" head_prefix="$tip:" diff_args=("$SINCE_ID" "$tip")
   scope="changed since $SINCE${EXPLICIT_HEAD:+ up to $EXPLICIT_HEAD}"
 elif git rev-parse --verify -q HEAD >/dev/null; then
   base="$(default_branch_base || git rev-parse HEAD)"

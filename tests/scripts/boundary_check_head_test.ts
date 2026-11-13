@@ -101,3 +101,34 @@ Deno.test("boundary check: without a head, each file's object is its blob id", a
   const traced = r.stderr.split("\n").filter((l) => /^\++ object=/.test(l));
   assertEquals(traced.map((l) => l.replace(/^\++ /, "")), [`object=${blob}`]);
 });
+
+/** `git <args>` fed `stdin`, its output's id. */
+async function fed(root: string, stdin: string, ...args: string[]): Promise<string> {
+  const r = await run("git", args, root, IDENTITY, stdin);
+  if (r.code !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+/** A tree object of `ls-tree`-style entries, as written: `git mktree` keeps a repeated name. */
+const mktree = (root: string, entries: string[]) =>
+  fed(root, entries.map((e) => `${e}\n`).join(""), "mktree");
+
+// A tree may name one path twice, with two blobs. A path is skipped as already read only when its
+// blob repeats too: a head's second entry is not the work tree's conflicted stage of the first.
+Deno.test("boundary check --head: a path named twice in a tree has both blobs read", async () => {
+  const repo = await split(CLEAN);
+  const clean = await fed(repo.root, CLEAN, "hash-object", "-w", "--stdin");
+  const bad = await fed(repo.root, VIOLATION, "hash-object", "-w", "--stdin");
+  const domain = await mktree(repo.root, [
+    `100644 blob ${clean}\ta.ts`,
+    `100644 blob ${bad}\ta.ts`,
+  ]);
+  const src = await mktree(repo.root, [`040000 tree ${domain}\tdomain`]);
+  const top = await mktree(repo.root, [`040000 tree ${src}\tsrc`]);
+  const head = await git(repo.root, "commit-tree", top, "-m", "a tree naming a.ts twice");
+  const listed = await git(repo.root, "ls-tree", "-r", head);
+  assertEquals(listed.split("\n").map((l) => l.split("\t")[0].split(" ")[2]), [clean, bad]);
+  const r = await check(repo.root, ["--head", head]);
+  assertEquals(r.code, 1, r.stdout + r.stderr);
+  assertStringIncludes(r.stderr, "src/domain/a.ts:2: ");
+});

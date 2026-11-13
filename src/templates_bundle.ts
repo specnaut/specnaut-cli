@@ -775,12 +775,12 @@ ratchet; under \`review\` or \`merge\`, only under \`VERDICT boundaries trusted\
 bash .specnaut/scripts/bash/boundary-check.sh
 \`\`\`
 
-It holds the tracked files under the \`domain:\` paths of
-\`.specnaut/boundaries.yml\` free of the \`forbid:\` patterns (extended regular
-expressions), minus the \`exempt:\` globs. Which paths are the domain and which
-imports break it are the project's to write: Specnaut ships no copy of that
-file and no default pattern, because a guessed one would report a pass that
-checked nothing.
+It holds the tracked files under the \`domain:\` paths of \`.specnaut/boundaries.yml\` free of the
+\`forbid:\` patterns (extended regular expressions), minus the \`exempt:\` globs. Leave a pattern
+unanchored: grep ends a line only at a newline, where a language may also end one at a lone CR or
+a U+2028, so an import after one is not where \`^\` or \`\$\` look. Which paths are the domain and which
+imports break it are the project's to write: Specnaut ships no copy of that file and no default
+pattern, because a guessed one would report a pass that checked nothing.
 
 - **Exit 0** — every file was checked and none matches. Each is read byte for
   byte, one holding a NUL included: no file passes unread. Report it as a pass.
@@ -17455,7 +17455,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  explicit_head_clear_env
+  explicit_head_clear_env || { _gu_refuse "an inherited GIT_* variable cannot be dropped"; exit 2; }
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "\$@"
@@ -17606,7 +17606,10 @@ gu_base() {
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
-#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
+#   and others git does not list in \`rev-parse --local-env-vars\` still change its answers
+#   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
+#   the variable, when one cannot be unset (readonly): a kept one would be read.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -17666,7 +17669,7 @@ explicit_head_is_id() {
 explicit_head_clear_env() {
   local name
   for name in \$(compgen -e); do
-    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+    case "\$name" in GIT_*) unset "\$name" || return 1 ;; esac
   done
 }
 
@@ -17708,14 +17711,10 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
 # outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="\$1" line own count
+  local file="\$1" line own
   shift
   [ -e "\$file" ] || [ -L "\$file" ] || return 0
-  [ -f "\$file" ] && [ ! -L "\$file" ] || return 1
-  # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  # A tr that fails prints nothing, which would count as none: its failure refuses.
-  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c)" || return 1
-  [ "\${count//[!0-9]/}" = 0 ] || return 1
+  [ -f "\$file" ] && [ ! -L "\$file" ] && _explicit_head_no_control_byte "\$file" || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in
@@ -17727,6 +17726,15 @@ _explicit_head_own_alternates() {
   case "\$line/" in */./* | */../*) return 1 ;; esac
   own="\$("\$@" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
   [ "\$line" -ef "\$own/objects" ]
+}
+
+# _explicit_head_no_control_byte <file> - true when <file> holds no control byte but the
+# newline: read drops a NUL git would not, and no path written holds one. The count fails
+# closed: a tr that fails prints nothing, which would count as none, so its failure is false.
+_explicit_head_no_control_byte() {
+  local count
+  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$1" | wc -c)" || return 1
+  [ "\${count//[!0-9]/}" = 0 ]
 }
 
 # _explicit_head_msys - true under Git for Windows' bash, whose git reads a drive letter as
@@ -30168,7 +30176,7 @@ REPO_ROOT="\$(cd -- "\$SCRIPT_DIR/../../.." && pwd)"
 # shellcheck source=SCRIPTDIR/_gate_impact_graph.sh
 . "\$SCRIPT_DIR/_gate_impact_graph.sh" || exit 70
 
-for gate_var in \$GATE_LOCAL_ENV; do unset "\$gate_var"; done
+explicit_head_clear_env || exit 70
 
 TIER="\${1:?}" COMMANDS="\${2:?}" RECORDS="\${3:?}" MODE="\${4:?}" BASE_ARG="\${5:-}"
 : >"\$RECORDS" || exit 70
@@ -30431,7 +30439,9 @@ main "\${@:6}"
 #
 # Requires REPO_ROOT. Every git call goes through gate_git: this runs inside hooks,
 # where git has exported GIT_DIR and friends pointing at someone else's view of
-# the repository.
+# the repository. Every GIT_* variable is dropped, through explicit_head_clear_env,
+# not only those \`git rev-parse --local-env-vars\` lists: others still change
+# what git answers, such as how a pathspec matches.
 #
 # Given a head (gate_candidate_head, _explicit_head.sh), the candidate is that
 # commit, read from git's objects by its id: never HEAD, the index or a work tree,
@@ -30439,13 +30449,13 @@ main "\${@:6}"
 
 # shellcheck source=SCRIPTDIR/_explicit_head.sh disable=SC1091
 . "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_explicit_head.sh" || return 70
-GATE_LOCAL_ENV="\$(git rev-parse --local-env-vars 2>/dev/null)"
 
-# gate_git <git args...> - git on this repository, with the inherited repository
-# variables gone and no filesystem monitor to start.
+# gate_git <git args...> - git on this repository, with every inherited GIT_*
+# variable gone and no filesystem monitor to start. One that cannot be dropped
+# fails the call as git's own fatal error does.
 gate_git() {
   (
-    for gate_var in \$GATE_LOCAL_ENV; do unset "\$gate_var"; done
+    explicit_head_clear_env || exit 128
     explicit_head_env
     explicit_head_git -C "\$REPO_ROOT" -c core.fsmonitor=false "\$@"
   )
@@ -30728,9 +30738,7 @@ gate_adapter_cleanup() {
 # reach it, and its stdout goes to stderr: only the file it writes is its answer.
 gate_adapter_run() {
   (
-    for gate_var in \$(compgen -e); do
-      case "\$gate_var" in GIT_*) unset "\$gate_var" ;; esac
-    done
+    explicit_head_clear_env || exit 125
     cd "\$2" || exit 125
     export SPECNAUT_IMPACT_TREE="\$3" SPECNAUT_IMPACT_COMMIT="\$4" SPECNAUT_IMPACT_OUT="\$5"
     export SPECNAUT_IMPACT_SCHEMA=1 SPECNAUT_IMPACT_REPO="\$REPO_ROOT"
@@ -33289,7 +33297,8 @@ load_report() {
 #   - staged:  the merge base of HEAD with the default branch (HEAD itself on
 #              the default branch), compared with the index — what the commit
 #              will contain, not the working tree;
-#   - --since: <ref>, compared with HEAD.
+#   - --since: <ref>, compared with HEAD or the head; with --objects, <ref> is
+#              resolved in this repository's own objects, never in that folder.
 #
 # That is what lets rule 3 work commit by commit: an extraction commit shrinks
 # a file, and the next commit may add back up to the size the file had when the
@@ -33334,7 +33343,7 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 }
 git() { explicit_head_git "\$@"; } # every git call below: an --objects folder, read safely
 
-SINCE="" REPORT=0
+SINCE="" SINCE_ID="" REPORT=0
 while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
@@ -33352,11 +33361,16 @@ REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
 }
 cd -- "\$REPO_ROOT" || exit 3
 explicit_head_from_options git || { echo "size-ratchet: --head: \$EXPLICIT_REFUSAL" >&2; exit 3; }
-explicit_head_env
-if [ -n "\$SINCE" ] && ! git rev-parse --verify -q "\$SINCE^{commit}" >/dev/null; then
+# The base is resolved before the objects folder is added, from this repository's own objects,
+# as gate_candidate_base_commit does: it is where the branch lands, and the folder holds the
+# branch's commits, so a base found only there was never this repository's. Its id, not its
+# name, is used from here on.
+if [ -n "\$SINCE" ] &&
+  ! SINCE_ID="\$(EXPLICIT_OBJECTS="" git rev-parse --verify -q --end-of-options "\$SINCE^{commit}")"; then
   echo "size-ratchet: not a commit: \$SINCE" >&2
   exit 3
 fi
+explicit_head_env
 CONSTITUTION="\$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"
 
@@ -33404,7 +33418,7 @@ default_branch_base() {
 # \`:0:\` is the index entry; a bare \`:\` would read a name like \`1:x\` as stage 1.
 if [ -n "\$SINCE" ]; then
   tip="\${EXPLICIT_HEAD:-HEAD}"
-  base="\$SINCE" head_prefix="\$tip:" diff_args=("\$SINCE" "\$tip")
+  base="\$SINCE_ID" head_prefix="\$tip:" diff_args=("\$SINCE_ID" "\$tip")
   scope="changed since \$SINCE\${EXPLICIT_HEAD:+ up to \$EXPLICIT_HEAD}"
 elif git rev-parse --verify -q HEAD >/dev/null; then
   base="\$(default_branch_base || git rev-parse HEAD)"
@@ -33504,7 +33518,10 @@ exit 0
 # beside it (the grammar is stated there):
 #
 #   domain:   the paths whose tracked files are checked, from the repo root
-#   forbid:   extended regular expressions no line of those files may match
+#   forbid:   extended regular expressions no line of those files may match;
+#             leave them unanchored: grep ends a line only at a newline, where
+#             a language may also end one at a lone CR or a U+2028, so an
+#             import after one is not where \`^\` or \`\$\` look
 #   exempt:   globs that keep a file out, matched as the size ratchet matches
 #             its own (\`path\` or \`/path\`, shell \`case\` semantics)
 #
@@ -33515,7 +33532,11 @@ exit 0
 # The tracked files are listed by git, never by a glob or a walk, so an
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
-# the work tree, could point anywhere on the disk. Grep reads every file as bytes
+# the work tree, could point anywhere on the disk. Without a head, the work tree's
+# copy is the one read: a path the index lists but the work tree does not hold at
+# all (removed after it was staged, outside a sparse checkout) is skipped as a link
+# is, so in a commit hook this checks the work tree, not the staged content; for a
+# commit's own content, give --head. Grep reads every file as bytes
 # (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
 # passed that was not read. A conflicted path is read
 # when any of its stages is a regular file. Given a head, its tree is listed and each
@@ -33546,7 +33567,7 @@ here="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "\$@"; }
-explicit_head_clear_env
+explicit_head_clear_env || fail "an inherited GIT_* variable cannot be dropped"
 # Bytes, not characters: under a locale that cannot decode a byte, no \`.\` of a pattern
 # matches it, and an import spelled around it goes unreported.
 export LC_ALL=C
@@ -33610,23 +33631,27 @@ for i in "\${!domains[@]}"; do
   found=0 prev=""
   # Each record: \`<mode> <object> <stage>\\t<path>\` from the index, or \`<mode> blob
   # <object>\\t<path>\` from a head's tree. A conflicted path comes once per stage,
-  # adjacent; it is checked once, at its first stage that is a regular file.
+  # adjacent, and all its stages are one work tree file: it is checked once, at its first
+  # stage that is a regular file. A head's tree has no stages, so a name it holds twice
+  # is two blobs: there, an entry is skipped only when its blob repeats too.
   while IFS= read -r -d '' rec; do
     path="\${rec#*\$'\\t'}"
     case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
-    [ "\$path" != "\$prev" ] || continue
-    prev="\$path"
-    found=1 tracked=\$((tracked + 1))
-    if [ -z "\$EXPLICIT_HEAD" ] && [ -L "\$path" ]; then continue; fi
     meta="\${rec%%\$'\\t'*}" && meta="\${meta#* }"
     case "\$meta" in blob\\ *) object="\${meta#blob }" ;; *) object="\${meta%% *}" ;; esac
+    if [ -n "\$EXPLICIT_HEAD" ]; then key="\$object \$path"; else key="\$path"; fi
+    [ "\$key" != "\$prev" ] || continue
+    prev="\$key"
+    found=1 tracked=\$((tracked + 1))
+    # The work tree's copy is what is read: a link, or a path it does not hold at all.
+    if [ -z "\$EXPLICIT_HEAD" ] && { [ -L "\$path" ] || [ ! -e "\$path" ]; }; then continue; fi
     is_exempt "\$path" || { files+=("\$path") && objects+=("\$object"); }
   done <"\$listing"
   [ "\$found" = 1 ] || echo "  note: domain: '\$domain' (line \${domain_lines[\$i]}) names no tracked file"
 done
 
 [ "\$tracked" -gt 0 ] || skip "no tracked file under domain: in \$CONFIG_BOUNDARIES"
-[ "\${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt or a link"
+[ "\${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt, a link or not in the work tree"
 
 grep_args=()
 for pat in "\${patterns[@]}"; do grep_args+=(-e "\$pat"); done
@@ -33777,7 +33802,7 @@ _gu_lazy_flag() {
 
 # git with no GIT_* variable from the caller, and the ones this file sets.
 _gu_env_run() (
-  explicit_head_clear_env
+  explicit_head_clear_env || { _gu_refuse "an inherited GIT_* variable cannot be dropped"; exit 2; }
   explicit_head_env && export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_NO_LAZY_FETCH=1
   export GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/dev/null/none
   explicit_head_git "\$@"
@@ -33928,7 +33953,10 @@ gu_base() {
 #   refusal sets EXPLICIT_REFUSAL to why and returns 2, leaving both empty.
 # explicit_head_is_id <text> - true for a full commit id, in the form --head takes.
 # explicit_head_clear_env - unsets every GIT_* variable in the calling shell: one a hook or
-#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository.
+#   a caller exported (GIT_DIR, GIT_INDEX_FILE, alternates) names another view of the repository,
+#   and others git does not list in \`rev-parse --local-env-vars\` still change its answers
+#   (GIT_ICASE_PATHSPECS, GIT_NAMESPACE). The one home of that drop. Returns 1, and bash names
+#   the variable, when one cannot be unset (readonly): a kept one would be read.
 # explicit_head_env - exports the objects folder for git. Call it in the subshell that
 #   runs git, after any inherited GIT_* variable was dropped.
 # explicit_head_git <args...> - git, with \`-c core.commitGraph=false -c
@@ -33988,7 +34016,7 @@ explicit_head_is_id() {
 explicit_head_clear_env() {
   local name
   for name in \$(compgen -e); do
-    case "\$name" in GIT_*) unset "\$name" 2>/dev/null || true ;; esac
+    case "\$name" in GIT_*) unset "\$name" || return 1 ;; esac
   done
 }
 
@@ -34030,14 +34058,10 @@ _explicit_head_objects_refusal() {
 # comment, quoted, a second line, a control byte, a \`.\` or \`..\` component, a drive letter
 # outside MSYS, a leading \`/\` under it - is one git would read and this check could not judge.
 _explicit_head_own_alternates() {
-  local file="\$1" line own count
+  local file="\$1" line own
   shift
   [ -e "\$file" ] || [ -L "\$file" ] || return 0
-  [ -f "\$file" ] && [ ! -L "\$file" ] || return 1
-  # No control byte but the newline: read drops a NUL git would not, and no path written holds one.
-  # A tr that fails prints nothing, which would count as none: its failure refuses.
-  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$file" | wc -c)" || return 1
-  [ "\${count//[!0-9]/}" = 0 ] || return 1
+  [ -f "\$file" ] && [ ! -L "\$file" ] && _explicit_head_no_control_byte "\$file" || return 1
   # The first line is the whole file, but for the newline after it.
   IFS= read -r line <"\$file" && [ "\$(cat -- "\$file")" = "\$line" ] || return 1
   case "\$line" in
@@ -34049,6 +34073,15 @@ _explicit_head_own_alternates() {
   case "\$line/" in */./* | */../*) return 1 ;; esac
   own="\$("\$@" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
   [ "\$line" -ef "\$own/objects" ]
+}
+
+# _explicit_head_no_control_byte <file> - true when <file> holds no control byte but the
+# newline: read drops a NUL git would not, and no path written holds one. The count fails
+# closed: a tr that fails prints nothing, which would count as none, so its failure is false.
+_explicit_head_no_control_byte() {
+  local count
+  count="\$(set -o pipefail && LC_ALL=C tr -dc '\\000-\\011\\013-\\037\\177' <"\$1" | wc -c)" || return 1
+  [ "\${count//[!0-9]/}" = 0 ]
 }
 
 # _explicit_head_msys - true under Git for Windows' bash, whose git reads a drive letter as
@@ -36168,7 +36201,16 @@ exit 3
 
 function Test-GateSame([string]\$A, [string]\$B) { return [string]::Equals(\$A, \$B, [StringComparison]::Ordinal) }
 
-# Invoke-GateProcess - a process with stdin closed and the repository variables gone;
+# Remove-GateGitEnv - drops every GIT_* variable from a process about to start, as the bash
+# twin's explicit_head_clear_env does: not only those \`git rev-parse --local-env-vars\` lists,
+# since others still change what git answers, such as how a pathspec matches.
+function Remove-GateGitEnv([System.Diagnostics.ProcessStartInfo]\$Psi) {
+    foreach (\$name in @(\$Psi.Environment.Keys)) {
+        if (\$name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]\$Psi.Environment.Remove(\$name) }
+    }
+}
+
+# Invoke-GateProcess - a process with stdin closed and every GIT_* variable gone;
 # returns its exit code and its whole stdout. A program that cannot start reads as exit
 # 127, as bash has it, so each caller's own check on the exit reports it.
 function Invoke-GateProcess([string]\$File, [string[]]\$Arguments, [string]\$Cwd) {
@@ -36180,7 +36222,7 @@ function Invoke-GateProcess([string]\$File, [string[]]\$Arguments, [string]\$Cwd
     \$psi.RedirectStandardOutput = \$true
     \$psi.RedirectStandardError = \$true
     \$psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new(\$false)
-    foreach (\$name in \$script:GateLocalEnv) { [void]\$psi.Environment.Remove(\$name) }
+    Remove-GateGitEnv \$psi
     try {
         \$process = [System.Diagnostics.Process]::Start(\$psi)
     } catch [System.ComponentModel.Win32Exception] {
@@ -36193,12 +36235,6 @@ function Invoke-GateProcess([string]\$File, [string[]]\$Arguments, [string]\$Cwd
     [void]\$stderr.Result
     return [pscustomobject]@{ Code = \$process.ExitCode; Out = \$stdout }
 }
-
-\$script:GateLocalEnv = @()
-\$gateEnvList = Invoke-GateProcess 'git' @('rev-parse', '--local-env-vars') ''
-# No git at all has no variables to scrub. A git that fails here would leave them in place.
-if (\$gateEnvList.Code -ne 0 -and \$gateEnvList.Code -ne 127) { throw "git rev-parse --local-env-vars exited \$(\$gateEnvList.Code)" }
-\$script:GateLocalEnv = @(\$gateEnvList.Out -split '\\s+' | Where-Object { \$_.Length -gt 0 })
 
 function Invoke-GateGit([string[]]\$GitArgs) {
     return Invoke-GateProcess 'git' (@('-C', \$repoRoot, '-c', 'core.fsmonitor=false') + \$GitArgs) ''
@@ -36537,7 +36573,7 @@ function Invoke-GateAdapter([string]\$Command, [string]\$Worktree, [string]\$Tre
     # New-GateCommandStart is run-gate.ps1's, the one caller of this script family.
     \$psi = New-GateCommandStart \$Command \$Worktree
     \$psi.RedirectStandardOutput = \$true
-    foreach (\$name in @(\$psi.Environment.Keys)) { if (\$name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]\$psi.Environment.Remove(\$name) } }
+    Remove-GateGitEnv \$psi
     \$psi.Environment['SPECNAUT_IMPACT_TREE'] = \$Tree
     \$psi.Environment['SPECNAUT_IMPACT_COMMIT'] = \$Commit
     \$psi.Environment['SPECNAUT_IMPACT_OUT'] = \$Out

@@ -136,3 +136,19 @@ Deno.test({
     assertStringIncludes(r.stderr, `${path}:1: `);
   }),
 });
+
+// A commit hook runs it beside an index that lists a path the work tree lacks: removed after it
+// was staged, or outside a sparse checkout. Without a head the work tree is what is read, so that
+// path is skipped as a link is, never a grep failure that stops the commit.
+Deno.test(
+  "boundary check: a path the index lists but the work tree lacks is skipped like a link",
+  scoped(async () => {
+    const dir = await repo({ "src/domain/a.ts": enc("export const a = 1;\n") });
+    await Deno.writeTextFile(join(dir, "src/domain/b.ts"), IMPORT);
+    await git(dir, "add", "src/domain/b.ts");
+    await Deno.remove(join(dir, "src/domain/b.ts"));
+    const r = await check(dir);
+    assertEquals(r.code, 0, r.stdout + r.stderr);
+    assertStringIncludes(r.stdout, "boundary-check: 1 file(s) under domain: clean");
+  }),
+);

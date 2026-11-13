@@ -238,12 +238,12 @@ ratchet; under `review` or `merge`, only under `VERDICT boundaries trusted`:
 bash .specnaut/scripts/bash/boundary-check.sh
 ```
 
-It holds the tracked files under the `domain:` paths of
-`.specnaut/boundaries.yml` free of the `forbid:` patterns (extended regular
-expressions), minus the `exempt:` globs. Which paths are the domain and which
-imports break it are the project's to write: Specnaut ships no copy of that
-file and no default pattern, because a guessed one would report a pass that
-checked nothing.
+It holds the tracked files under the `domain:` paths of `.specnaut/boundaries.yml` free of the
+`forbid:` patterns (extended regular expressions), minus the `exempt:` globs. Leave a pattern
+unanchored: grep ends a line only at a newline, where a language may also end one at a lone CR or
+a U+2028, so an import after one is not where `^` or `$` look. Which paths are the domain and which
+imports break it are the project's to write: Specnaut ships no copy of that file and no default
+pattern, because a guessed one would report a pass that checked nothing.
 
 - **Exit 0** — every file was checked and none matches. Each is read byte for
   byte, one holding a NUL included: no file passes unread. Report it as a pass.

@@ -9,7 +9,10 @@
 # beside it (the grammar is stated there):
 #
 #   domain:   the paths whose tracked files are checked, from the repo root
-#   forbid:   extended regular expressions no line of those files may match
+#   forbid:   extended regular expressions no line of those files may match;
+#             leave them unanchored: grep ends a line only at a newline, where
+#             a language may also end one at a lone CR or a U+2028, so an
+#             import after one is not where `^` or `$` look
 #   exempt:   globs that keep a file out, matched as the size ratchet matches
 #             its own (`path` or `/path`, shell `case` semantics)
 #
@@ -20,7 +23,11 @@
 # The tracked files are listed by git, never by a glob or a walk, so an
 # untracked or ignored file is never read. Only regular files (modes 100644 and
 # 100755) are, and never through a link: a symlink, committed or swapped in by
-# the work tree, could point anywhere on the disk. Grep reads every file as bytes
+# the work tree, could point anywhere on the disk. Without a head, the work tree's
+# copy is the one read: a path the index lists but the work tree does not hold at
+# all (removed after it was staged, outside a sparse checkout) is skipped as a link
+# is, so in a commit hook this checks the work tree, not the staged content; for a
+# commit's own content, give --head. Grep reads every file as bytes
 # (LC_ALL=C, -a): no locale's decoding and no NUL makes it skip a line, so no file is
 # passed that was not read. A conflicted path is read
 # when any of its stages is a regular file. Given a head, its tree is listed and each
@@ -51,7 +58,7 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   fail "_config.sh or _explicit_head.sh is missing beside the script"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "$@"; }
-explicit_head_clear_env
+explicit_head_clear_env || fail "an inherited GIT_* variable cannot be dropped"
 # Bytes, not characters: under a locale that cannot decode a byte, no `.` of a pattern
 # matches it, and an import spelled around it goes unreported.
 export LC_ALL=C
@@ -115,23 +122,27 @@ for i in "${!domains[@]}"; do
   found=0 prev=""
   # Each record: `<mode> <object> <stage>\t<path>` from the index, or `<mode> blob
   # <object>\t<path>` from a head's tree. A conflicted path comes once per stage,
-  # adjacent; it is checked once, at its first stage that is a regular file.
+  # adjacent, and all its stages are one work tree file: it is checked once, at its first
+  # stage that is a regular file. A head's tree has no stages, so a name it holds twice
+  # is two blobs: there, an entry is skipped only when its blob repeats too.
   while IFS= read -r -d '' rec; do
     path="${rec#*$'\t'}"
     case "${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
-    [ "$path" != "$prev" ] || continue
-    prev="$path"
-    found=1 tracked=$((tracked + 1))
-    if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
     meta="${rec%%$'\t'*}" && meta="${meta#* }"
     case "$meta" in blob\ *) object="${meta#blob }" ;; *) object="${meta%% *}" ;; esac
+    if [ -n "$EXPLICIT_HEAD" ]; then key="$object $path"; else key="$path"; fi
+    [ "$key" != "$prev" ] || continue
+    prev="$key"
+    found=1 tracked=$((tracked + 1))
+    # The work tree's copy is what is read: a link, or a path it does not hold at all.
+    if [ -z "$EXPLICIT_HEAD" ] && { [ -L "$path" ] || [ ! -e "$path" ]; }; then continue; fi
     is_exempt "$path" || { files+=("$path") && objects+=("$object"); }
   done <"$listing"
   [ "$found" = 1 ] || echo "  note: domain: '$domain' (line ${domain_lines[$i]}) names no tracked file"
 done
 
 [ "$tracked" -gt 0 ] || skip "no tracked file under domain: in $CONFIG_BOUNDARIES"
-[ "${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt or a link"
+[ "${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt, a link or not in the work tree"
 
 grep_args=()
 for pat in "${patterns[@]}"; do grep_args+=(-e "$pat"); done
