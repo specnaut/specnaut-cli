@@ -62,3 +62,24 @@ Deno.test("with no inode, the stated limit: a replacement keeping size and mtime
   assertEquals(sameEntry(...await noInode()), true);
   assertEquals(sameEntry(...await noInode({ isFile: false })), false);
 });
+
+Deno.test("with no inode, a write during the read is refused after the read", async () => {
+  await withStagedFile(async (dir, full) => {
+    const seen = { ...await Deno.lstat(full), ino: null };
+    const read: string[] = [];
+    const stats = {
+      fstat: () => Promise.resolve(seen),
+      // After the read, the entry has grown: a write landed while it was being read.
+      lstat: (path: string) => {
+        read.push(path);
+        return Promise.resolve({ ...seen, size: (seen.size ?? 0) + 1 });
+      },
+    };
+    await assertRejects(
+      () => readSameEntry(dir, full, seen, stats),
+      ContainmentRefusal,
+      "changed between its check and its read",
+    );
+    assertEquals(read, [full]);
+  });
+});

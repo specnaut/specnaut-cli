@@ -6,6 +6,8 @@ import {
   mermaidLabel,
   terminalJson,
   terminalText,
+  uncaughtText,
+  UNPRINTABLE,
 } from "../../src/domain/terminal_text.ts";
 
 /** Every character a terminal or a renderer could act on, one of each kind. */
@@ -96,4 +98,16 @@ Deno.test("inertText: a sink pass escapes what is unsafe and never escapes a sou
 Deno.test("errorText: an error's message, or any thrown value, made inert", () => {
   assertEquals(errorText(new Error("bad \x1b[2J")), "bad \\u001b[2J");
   assertEquals(errorText("\x9b"), "\\u009b");
+});
+
+Deno.test("uncaughtText: a thrown value with no string form is shown as unprintable, not rethrown", () => {
+  assertEquals(uncaughtText(Object.create(null)), `Uncaught ${UNPRINTABLE}`);
+  const err = new Error("hidden");
+  Object.defineProperty(err, "stack", {
+    get() {
+      throw new Error("no stack");
+    },
+  });
+  assertEquals(uncaughtText(err), `Uncaught ${UNPRINTABLE}`);
+  assertEquals(uncaughtText("plain"), "Uncaught plain");
 });

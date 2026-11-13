@@ -63,6 +63,10 @@ const ESCAPE_LIKE = new RegExp(`\\\\+(?=u|[${UNSAFE_CLASS}])`, "gu");
  * Doubled only there, not everywhere (cli#785): a path is what a refusal asks the user to act on,
  * and a Windows path shown as `C:\\Users\\…` is not the one they would type. Where a folder name
  * starts with a `u`, its separator is still doubled, which Windows reads as the same path.
+ *
+ * The output is read back as a whole: it must not be joined directly to text that starts with a
+ * `u`. A value ending in a single backslash keeps it single, and followed by `u001b` it would read
+ * as an escape. Put a separator between them, or pass the joined text through here once.
  */
 export function terminalText(value: string): string {
   return value.replace(ESCAPE_LIKE, (run) => run + run).replace(UNSAFE, textEscaped);
@@ -90,9 +94,18 @@ export function errorText(err: unknown): string {
  * a server's text, and the stack is what a bug report needs.
  */
 export function uncaughtText(err: unknown): string {
-  const said = err instanceof Error ? err.stack ?? `${err.name}: ${err.message}` : String(err);
+  let said: string;
+  try {
+    said = err instanceof Error ? err.stack ?? `${err.name}: ${err.message}` : String(err);
+  } catch {
+    // A value with no string form, or whose stack getter throws: the printer must not throw too.
+    said = UNPRINTABLE;
+  }
   return `Uncaught ${inertText(said)}`;
 }
+
+/** What `uncaughtText` shows for a thrown value it cannot turn into text. */
+export const UNPRINTABLE = "<unprintable thrown value>";
 
 /** What a Mermaid label may hold as it is: no quote, bracket, `#`, `%`, `<` or backtick. */
 const MERMAID_PLAIN = /^[A-Za-z0-9 _./,:()-]$/;

@@ -10,8 +10,12 @@ import { changedStagedEntryRefusal } from "./fs_refusals.ts";
  *
  * Per platform: Linux and macOS report the inode, Windows the file index, so a
  * replacement is caught by identity. Where a platform reports none, the device alone
- * proves nothing, so the handle and a second `lstat` after the read must both
- * match the first one's size and mtime (`sameEntry`).
+ * proves nothing, so the handle's `fstat` before the read and a second `lstat` after
+ * it must both match the first one's size and mtime (`sameEntry`). The handle's check
+ * catches a replacement before the open; the second `lstat` catches a write during the
+ * read, which changes the size or the mtime of the entry the handle reads. Where the
+ * platform reports no mtime either, both mtimes are null and compare equal, so the
+ * size alone is left to tell a change apart.
  *
  * The limit, stated rather than detected (cli#785): with no inode, a replacement by a
  * file of the same size and mtime is read as the staged copy. Nothing else a
@@ -21,12 +25,13 @@ export async function readSameEntry(
   root: string,
   full: string,
   seen: Deno.FileInfo,
+  stats: EntryStats = SYSTEM_STATS,
 ): Promise<string> {
   if (!seen.isFile) throw changedStagedEntryRefusal(root, full);
   const file = await Deno.open(full, { read: true });
   let info: Deno.FileInfo;
   try {
-    info = await file.stat();
+    info = await stats.fstat(file);
   } catch (err) {
     file.close();
     throw err;
@@ -36,11 +41,19 @@ export async function readSameEntry(
     throw changedStagedEntryRefusal(root, full);
   }
   const text = await new Response(file.readable).text();
-  if (seen.ino === null && !sameEntry(seen, await Deno.lstat(full))) {
+  if (seen.ino === null && !sameEntry(seen, await stats.lstat(full))) {
     throw changedStagedEntryRefusal(root, full);
   }
   return text;
 }
+
+/** The two stat calls `readSameEntry` makes: the open handle's, and the path's after the read. */
+export type EntryStats = {
+  readonly fstat: (file: Deno.FsFile) => Promise<Deno.FileInfo>;
+  readonly lstat: (path: string) => Promise<Deno.FileInfo>;
+};
+
+const SYSTEM_STATS: EntryStats = { fstat: (file) => file.stat(), lstat: Deno.lstat };
 
 /**
  * Whether `now` is still the regular file `seen` described: the same device and
