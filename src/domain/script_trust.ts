@@ -191,7 +191,7 @@ export function hasCaseTwin(path: string, entries: ReadonlyMap<string, BaseEntry
 }
 
 /** The bytes with every CR before an LF dropped: only ever used to name a reason. */
-function withoutCr(bytes: Uint8Array): Uint8Array {
+export function withoutCr(bytes: Uint8Array): Uint8Array {
   const out: number[] = [];
   for (let i = 0; i < bytes.length; i++) {
     if (!(bytes[i] === 0x0d && bytes[i + 1] === 0x0a)) out.push(bytes[i]);

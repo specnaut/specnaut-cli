@@ -1,5 +1,5 @@
 import { sameBytes } from "./bytes.ts";
-import { REASON } from "./script_trust.ts";
+import { REASON, withoutCr } from "./script_trust.ts";
 
 /**
  * Whether the config inputs a branch can edit hold, in the work tree, what the base branch's tip
@@ -75,6 +75,7 @@ function configReason(input: ConfigInput, sides: ConfigSides): string | null {
   const theirs = valueOf(input, tip.bytes);
   if (!(theirs instanceof Uint8Array)) return `at base: ${theirs.why}`;
   if (sameBytes(mine, theirs)) return null;
+  if (sameBytes(withoutCr(mine), withoutCr(theirs))) return REASON.lineEndings;
   return isBehind(input, mine, sides.mergeBase) ? REASON.behind : REASON.differs;
 }
 

@@ -35,10 +35,12 @@ Deno.test("the classes are the six inputs a branch controls, each at its path", 
 });
 
 for (const cls of ["workflow", "size-limits", "boundaries", "gates"]) {
-  Deno.test(`${cls}: the tree's bytes must be the tip's, one byte apart is untrusted`, () => {
+  Deno.test(`${cls}: the tree's bytes must be the tip's, and line endings alone are named`, () => {
     assertEquals(judge(cls, {}), "trusted");
     assertEquals(judge(cls, { tree: file("x: 2\n") }), REASON.differs);
-    assertEquals(judge(cls, { tree: file("x: 1\r\n") }), REASON.differs);
+    assertEquals(judge(cls, { tree: file("x: 1\r\n") }), REASON.lineEndings);
+    const crlf = file("x: 1\r\n");
+    assertEquals(judge(cls, { tip: crlf, mergeBase: crlf }), REASON.lineEndings);
   });
 }
 
@@ -76,7 +78,7 @@ Deno.test("backlog-config: a grooming line that is not one quoted value is refus
     judged('repo: "acme/my-app"\nready_column: "Ready"\r---\n'),
     "a carriage return inside a line",
   );
-  assertEquals(judged('repo: "acme/my-app"\r\nready_column: "Ready"\n'), REASON.differs);
+  assertEquals(judged('repo: "acme/my-app"\r\nready_column: "Ready"\n'), REASON.lineEndings);
 });
 
 Deno.test("backlog-config: a remote block turned off is judged, like any line grooming does not write", () => {
