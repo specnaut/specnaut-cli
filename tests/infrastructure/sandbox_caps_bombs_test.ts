@@ -6,8 +6,10 @@ import {
   type Cap,
   expectedVerdicts,
   HANG,
+  MEMORY_UNITS,
   START,
   STOP_BY,
+  unitFd,
   WALL,
 } from "./sandbox_caps_bombs.ts";
 
@@ -67,6 +69,23 @@ Deno.test("memory and fork bombs: the units wait on a barrier, never on a timed 
     assert(command.includes("mkfifo go && exec 3<>go"), command);
     assert(command.includes("read -r g <&3"), command);
   }
+});
+
+Deno.test("memory bomb: its shell reads each unit's FIFO once, and keeps every one open to the release", () => {
+  const { command } = BOMBS.memoryBytes;
+  const release = command.lastIndexOf(">&3; }");
+  const before = command.slice(0, release);
+  const reads = [...before.matchAll(/read -r h <&(\d+);/g)].map((m) => Number(m[1]));
+  assertEquals(reads, Array.from({ length: MEMORY_UNITS }, (_, i) => unitFd(i)));
+  // Its descriptors stay below 9, the one each unit's write end is opened on and closed after.
+  assert(unitFd(MEMORY_UNITS - 1) < 9, `unit descriptor ${unitFd(MEMORY_UNITS - 1)}`);
+  for (const fd of reads) {
+    assert(
+      !new RegExp(`\\b${fd}[<>]&-`).test(before),
+      `descriptor ${fd} closed before the release`,
+    );
+  }
+  assertEquals(command.slice(release).endsWith("; wait"), true, command.slice(release));
 });
 
 Deno.test("scratch fill: a full scratch is the cap; a write refused otherwise is not", () => {

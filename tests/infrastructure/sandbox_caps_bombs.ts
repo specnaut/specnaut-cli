@@ -91,8 +91,9 @@ export const HANG = STOP_BY + 30;
  * clock, and a unit lost without its status (its wrapper killed) leaves its line out, which the
  * verdict counts.
  */
-const MEMORY_UNITS = 4;
-const unitFd = (i: number) => 5 + i;
+export const MEMORY_UNITS = 4;
+/** The descriptor the bomb's shell reads unit `i`'s FIFO on: 3 is the barrier, 9 the writer. */
+export const unitFd = (i: number) => 5 + i;
 const HOLD = "( (x=$(head -c 33554432 /dev/zero | tr '\\0' a) || exit $?; " +
   `[ "\${#x}" -eq 33554432 ] || exit 3; echo held >&9; ${AWAIT}); echo "unit $i $?") &`;
 const UNIT_IDS = Array.from({ length: MEMORY_UNITS }, (_, i) => i);
@@ -105,14 +106,19 @@ const FULL = /No space left on device|^head: standard output: I\/O error$/;
 
 export const BOMBS: Readonly<Record<Cap, Bomb>> = {
   memoryBytes: {
-    what: "a multi-process memory bomb (4 x 32 MiB held at once, cap 64 MiB)",
+    what: `a multi-process memory bomb (${MEMORY_UNITS} x 32 MiB held at once, cap 64 MiB)`,
     limits: { memoryBytes: 64 * MIB },
     command: MEMORY_BOMB,
     // A unit the cap ends is killed (137); a shell may also say so of its job. At most one unit
     // fits in the cap with its shell. A host OOM kill that leaves no more than one is not told
     // from the cap's: the memory cgroup's own count of kills is out of the run's reach.
     verdict: (_, out) =>
-      judged(out, { units: 4, done: /^unit \d+ 0$/, capped: /^unit \d+ 137$|Killed/, atMost: 1 }),
+      judged(out, {
+        units: MEMORY_UNITS,
+        done: /^unit \d+ 0$/,
+        capped: /^unit \d+ 137$|Killed/,
+        atMost: 1,
+      }),
   },
   processes: {
     what: "a fork bomb (40 processes, cap 16)",
