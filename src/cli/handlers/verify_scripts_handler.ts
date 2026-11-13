@@ -1,10 +1,7 @@
 import { red } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
-import {
-  type InstructionBase,
-  verifyConfig,
-  verifyInstructions,
-} from "../../application/verify_config.ts";
+import { verifyConfig } from "../../application/verify_config.ts";
+import { type InstructionBase, verifyInstructions } from "../../application/verify_instructions.ts";
 import { shippedSkills } from "../../application/shipped_copies.ts";
 import type {
   CheckoutTreeWalker,
