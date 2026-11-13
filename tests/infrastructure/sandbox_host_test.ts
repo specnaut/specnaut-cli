@@ -2,13 +2,12 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { execInSandbox } from "../../src/application/sandbox_exec.ts";
 import { SandboxRefused } from "../../src/application/sandbox_ports.ts";
-import { readDevcontainerImage } from "../../src/infrastructure/devcontainer_image.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
 
 /**
  * The host side of a sandboxed run: the export's scratch copy found by its commit, as real paths;
- * a private scratch folder removed after the run, even when the run left it hard to remove; and
- * the container image read from the checkout's devcontainer.
+ * and a private scratch folder removed after the run, even when the run left it hard to remove.
+ * The container image: `devcontainer_image_test.ts`.
  */
 
 const SHA = "e".repeat(40);
@@ -99,54 +98,6 @@ Deno.test({
     await scratch.remove();
     await assertRejects(() => Deno.lstat(scratch.path), Deno.errors.NotFound);
   },
-});
-
-Deno.test("readDevcontainerImage: a pinned image in .devcontainer/devcontainer.json, comments and all", () =>
-  withTemp(async (dir) => {
-    const ref = `acme/dev@sha256:${"a".repeat(64)}`;
-    await Deno.mkdir(join(dir, ".devcontainer"));
-    await Deno.writeTextFile(
-      join(dir, ".devcontainer", "devcontainer.json"),
-      `// a devcontainer\n{\n  "image": "${ref}", // pinned\n  "mounts": ["source=/,target=/h"],\n}\n`,
-    );
-    assertEquals(await readDevcontainerImage(dir), { kind: "pinned", ref });
-  }));
-
-Deno.test("readDevcontainerImage: .devcontainer.json at the top when the folder has none", () =>
-  withTemp(async (dir) => {
-    await Deno.writeTextFile(join(dir, ".devcontainer.json"), `{ "image": "acme/dev:latest" }`);
-    assertEquals(await readDevcontainerImage(dir), {
-      kind: "none",
-      why: "the devcontainer image is not pinned by digest",
-    });
-  }));
-
-Deno.test("readDevcontainerImage: none, unreadable or too large gives no image, and why", () =>
-  withTemp(async (dir) => {
-    assertEquals(await readDevcontainerImage(dir), { kind: "none", why: "no devcontainer" });
-    await Deno.writeTextFile(join(dir, ".devcontainer.json"), "{ not json");
-    const garbled = await readDevcontainerImage(dir);
-    assert(garbled.kind === "none" && garbled.why.startsWith(".devcontainer.json is not JSON"));
-    await Deno.writeTextFile(join(dir, ".devcontainer.json"), " ".repeat(1024 * 1024 + 1));
-    assertEquals(await readDevcontainerImage(dir), {
-      kind: "none",
-      why: ".devcontainer.json is larger than 1048576 bytes",
-    });
-  }));
-
-Deno.test({
-  name: "readDevcontainerImage: a devcontainer that is a link is not followed",
-  ignore: !posix,
-  fn: () =>
-    withTemp(async (dir) => {
-      const ref = `acme/dev@sha256:${"a".repeat(64)}`;
-      await Deno.writeTextFile(join(dir, "real.json"), `{ "image": "${ref}" }`);
-      await Deno.symlink(join(dir, "real.json"), join(dir, ".devcontainer.json"));
-      assertEquals(await readDevcontainerImage(dir), {
-        kind: "none",
-        why: ".devcontainer.json is not a regular file",
-      });
-    }),
 });
 
 Deno.test({

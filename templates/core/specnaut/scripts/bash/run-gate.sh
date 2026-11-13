@@ -27,7 +27,8 @@
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # `specnaut sandbox exec` (_gate_sandbox.sh), its output to a new file under the
-# --evidence folder, judged by its exit code alone. --head and --objects are only for it,
+# --evidence folder, judged by its exit code alone. It needs --base, and reads the tier
+# from that commit's gates.yml, never from the work tree. --head and --objects are only for it,
 # and reach gate-impact.sh as given; the evidence goes to that folder.
 #
 # Bare, it never reads `.specnaut/impact.json` and is the manual full override.

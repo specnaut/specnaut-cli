@@ -53,6 +53,7 @@ Deno.test("its code runs only in a sandbox, judged by exit code, its output brie
   assert(!doc.includes("mktemp"), "the lock refuses mktemp: the start makes the logs folder");
   assertStringIncludes(doc, "run-gate.sh <fast|full> --base");
   assertStringIncludes(doc, "--sandbox");
+  assertStringIncludes(doc, "reads `gates.yml` from the `--base` commit, never from the work tree");
   assertStringIncludes(doc, "The result is the exit code alone");
   assertStringIncludes(doc, "a command's 127 (not found on the sandbox's PATH) is NOT RUN too");
   assertStringIncludes(doc, "a tier `gates.yml` does not declare exits 125 as well");

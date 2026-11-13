@@ -91,8 +91,8 @@ inside `$LOGS`, then `--`. The hook refuses any other commit, a log anywhere els
 and the `--toolchain`. A command whose tools are not on the sandbox's PATH is NOT RUN.
 
 `run-gate.sh` runs only under `VERDICT gates trusted`, else the tiers are NOT RUN: <the line>. It
-reads this checkout's `gates.yml`, runs each command through `specnaut sandbox exec`
-on the scratch copy, prints one `log: <file>` line per command, and writes its evidence under
+reads `gates.yml` from the `--base` commit, never from the work tree, runs each command through
+`specnaut sandbox exec` on the scratch copy, prints one `log: <file>` line per command, and writes its evidence under
 `$LOGS`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
 `--sandbox`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: `run-gate.sh` stops
 there, exits 125 and names the command; a tier `gates.yml` does not declare exits 125 as well. A

@@ -1,5 +1,5 @@
-// `run-gate.sh <tier> … --head <sha> --objects <dir> --evidence <dir> --sandbox`: each command of
-// this checkout's gates.yml runs on the head's exported copy through `specnaut sandbox exec`,
+// `run-gate.sh <tier> --base <rev> … --head <sha> --objects <dir> --evidence <dir> --sandbox`: each
+// command of the base's gates.yml runs on the head's exported copy through `specnaut sandbox exec`,
 // never here, and is judged by its exit code alone. A `specnaut` first on the PATH records each
 // call and exits as told, so no sandbox is needed; the project's own commands write a mark when
 // they run here, so a run that bypassed the sandbox leaves one. Refusals: the sibling file.
@@ -53,13 +53,13 @@ Deno.test("run-gate --sandbox: 125 or 127 from the sandbox is NOT RUN, never a p
 });
 
 Deno.test("run-gate --sandbox: with no declaration, the bare run goes through the sandbox too", async () => {
-  const { run, full } = await sandboxed({ declaration: null });
-  const r = await run(["fast", ...full]);
+  const { repo, run, full } = await sandboxed({ declaration: null });
+  const r = await run(["fast", "--base", repo.main, ...full]);
   assertEquals(r.code, 0, r.stderr);
   assertEquals(r.marks, [], "a command ran on the host");
   assertEquals(r.calls.map((c) => c.at(-1)), [SUITE, WEB_ONLY, ALWAYS]);
   for (const rc of [125, 127]) {
-    const notRun = await run(["fast", ...full], rc);
+    const notRun = await run(["fast", "--base", repo.main, ...full], rc);
     assertEquals(notRun.code, 125, notRun.stdout);
     assertEquals(notRun.calls.length, 1);
     assertStringIncludes(
@@ -94,8 +94,31 @@ Deno.test("run-gate --sandbox: a tier not declared is NOT RUN, with a declaratio
     const r = await run(["fast", "--base", repo.main, ...full]);
     assertEquals([r.code, r.calls], [125, []], r.stdout + r.stderr);
     assertStringIncludes(r.stdout + r.stderr, "NOT RUN, never a pass");
-    await Deno.remove(`${repo.root}/.specnaut/gates.yml`);
-    const absent = await run(["fast", ...full]);
+    const bare = await repo.commit({}, [".specnaut/gates.yml"]);
+    const absent = await run(["fast", "--base", bare, ...full]);
     assertEquals([absent.code, absent.calls], [125, []], absent.stdout + absent.stderr);
   }
+});
+
+Deno.test("run-gate --sandbox: the tier is the base's; an edit to the work tree's gates.yml runs nothing", async () => {
+  for (const declaration of [undefined, null]) {
+    const { repo, run, full } = await sandboxed({ declaration });
+    await Deno.writeTextFile(`${repo.root}/.specnaut/gates.yml`, "fast_gate:\n  - echo edited\n");
+    const r = await run(["fast", "--base", repo.main, ...full]);
+    assertEquals(r.code, 0, r.stdout + r.stderr);
+    assertEquals(r.calls.map((c) => c.at(-1)), [SUITE, WEB_ONLY, ALWAYS], String(declaration));
+  }
+});
+
+Deno.test("run-gate --sandbox: no --base, one naming no commit, or the head's, runs nothing", async () => {
+  const { head, run, full } = await sandboxed({ declaration: null });
+  const none = await run(["fast", ...full]);
+  assertEquals([none.code, none.calls], [2, []], none.stderr);
+  assertStringIncludes(none.stderr, "--sandbox needs --base <rev>");
+  const missing = await run(["fast", "--base", "no-such-branch", ...full]);
+  assertEquals([missing.code, missing.calls], [3, []], missing.stderr);
+  assertStringIncludes(missing.stderr, "no-such-branch names no commit");
+  const own = await run(["fast", "--base", head, ...full]);
+  assertEquals([own.code, own.calls], [3, []], own.stderr);
+  assertStringIncludes(own.stderr, `${head} names no commit of this repository`);
 });

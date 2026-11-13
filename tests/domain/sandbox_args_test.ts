@@ -40,6 +40,8 @@ const EXPECTED_CONTAINER_ARGS = [
   "none",
   "--network",
   "none",
+  "--entrypoint",
+  "",
   "--read-only",
   "--cap-drop",
   "ALL",
@@ -84,6 +86,13 @@ Deno.test("containerArgs: no network, read-only root, no capabilities, no privil
   assertEquals(after(args, "--security-opt"), ["no-new-privileges"]);
   assertEquals(after(args, "--user"), ["65534:65534"]);
   assertEquals(args.filter((a) => a === "--cap-add" || a === "--privileged"), []);
+});
+
+Deno.test("containerArgs: the image's own entrypoint is emptied, so the command given is what runs", () => {
+  const args = container();
+  assertEquals(after(args, "--entrypoint"), [""]);
+  assertEquals(args.filter((a) => a.startsWith("--entrypoint")), ["--entrypoint"]);
+  assert(args.indexOf("--entrypoint") < args.indexOf(IMAGE));
 });
 
 Deno.test("containerArgs: only the exported tree is mounted, read-only; writes go to tmpfs", () => {

@@ -1600,8 +1600,8 @@ inside \`\$LOGS\`, then \`--\`. The hook refuses any other commit, a log anywher
 and the \`--toolchain\`. A command whose tools are not on the sandbox's PATH is NOT RUN.
 
 \`run-gate.sh\` runs only under \`VERDICT gates trusted\`, else the tiers are NOT RUN: <the line>. It
-reads this checkout's \`gates.yml\`, runs each command through \`specnaut sandbox exec\`
-on the scratch copy, prints one \`log: <file>\` line per command, and writes its evidence under
+reads \`gates.yml\` from the \`--base\` commit, never from the work tree, runs each command through
+\`specnaut sandbox exec\` on the scratch copy, prints one \`log: <file>\` line per command, and writes its evidence under
 \`\$LOGS\`. The result is the exit code alone: 0 PASS, 125 NOT RUN, any other FAIL. Under
 \`--sandbox\`, a command's 127 (not found on the sandbox's PATH) is NOT RUN too: \`run-gate.sh\` stops
 there, exits 125 and names the command; a tier \`gates.yml\` does not declare exits 125 as well. A
@@ -30006,7 +30006,8 @@ generate_branch_name() {
 #
 # --sandbox runs each command on the exported copy of the head commit <sha> through
 # \`specnaut sandbox exec\` (_gate_sandbox.sh), its output to a new file under the
-# --evidence folder, judged by its exit code alone. --head and --objects are only for it,
+# --evidence folder, judged by its exit code alone. It needs --base, and reads the tier
+# from that commit's gates.yml, never from the work tree. --head and --objects are only for it,
 # and reach gate-impact.sh as given; the evidence goes to that folder.
 #
 # Bare, it never reads \`.specnaut/impact.json\` and is the manual full override.
@@ -31143,9 +31144,9 @@ run_selected() {
     name: "specify",
     suffix: "scripts/bash/_gate_sandbox.sh",
     content: `# shellcheck shell=bash
-# Sourced by run-gate.sh behind --sandbox: the tier's commands, read from this checkout's
-# own gates.yml, run on the exported copy of a head commit through \`specnaut sandbox exec\`,
-# never in this shell. Sourced before the options are read; gate_sandbox_start requires
+# Sourced by run-gate.sh behind --sandbox: the tier's commands, read from the --base
+# commit's gates.yml (never the work tree's, which the branch under review can edit), run
+# on the exported copy of a head commit through \`specnaut sandbox exec\`, never in this shell. Sourced before the options are read; gate_sandbox_start requires
 # TIER and _gate_selected.sh.
 #
 # A command's output goes to a new file in a folder made under the evidence folder, and
@@ -31198,6 +31199,35 @@ gate_sandbox_start() {
   gate_evidence_apart "\$EVIDENCE" || flag_usage "--evidence lies inside the head's repository"
   GATE_LOGS="\$(mktemp -d "\$EVIDENCE/gate-\$TIER.XXXXXX" 2>/dev/null)" ||
     flag_usage "--evidence names no folder a log can be made in"
+  gate_sandbox_gates
+}
+
+# gate_sandbox_gates - points GATES at a copy of the --base commit's gates.yml, kept beside
+# the logs. The base is read from this repository's own objects, never the export's, so a
+# commit only the branch carries cannot be named as the base. A base with no regular
+# gates.yml leaves GATES naming no file: no tier is declared, which is NOT RUN. Exit 2 with
+# no --base, 3 for a base this repository does not hold as a commit.
+gate_sandbox_gates() {
+  local commit path=.specnaut/gates.yml
+  [ "\$FLAG" = --base ] || flag_usage "--sandbox needs --base <rev>: its gates are that commit's"
+  commit="\$(gate_base_git rev-parse --verify --quiet --end-of-options "\$BASE_VALUE^{commit}")" ||
+    refuse_candidate "base-refused: \$(gate_ascii "\$BASE_VALUE") names no commit of this repository"
+  GATES="\$GATE_LOGS/base-gates.yml"
+  case "\$(gate_base_git ls-tree "\$commit" -- "\$path" 2>/dev/null)" in
+    "100644 blob "* | "100755 blob "*) ;;
+    *) return 0 ;;
+  esac
+  gate_base_git cat-file blob "\$commit:./\$path" >"\$GATES" ||
+    refuse_candidate "base-refused: \$path at \$commit cannot be read"
+}
+
+# gate_base_git <git...> - git in the project's repository, with no GIT_* variable, so with
+# its own objects only, and no replacement object.
+gate_base_git() {
+  (
+    explicit_head_clear_env || exit 128
+    command git -C "\$REPO_ROOT" --no-replace-objects -c core.fsmonitor=false "\$@"
+  )
 }
 
 # gate_run_sandboxed <command> - runs it on the head in the sandbox, its output to the

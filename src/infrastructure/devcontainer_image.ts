@@ -1,26 +1,33 @@
 import { parse as parseJsonc } from "@std/jsonc";
-import { join } from "@std/path";
+import type { GitObjectReader } from "../application/script_trust_ports.ts";
 import { imageFromDevcontainer, type ImageSource } from "../domain/sandbox_image.ts";
+import { GitRefused } from "./untrusted_git.ts";
 
 /**
- * The container image a sandboxed run uses, read from the checkout's own devcontainer:
- * `.devcontainer/devcontainer.json`, else `.devcontainer.json`. The file is JSON with comments;
- * which of its fields count is `imageFromDevcontainer`'s decision (only a digest-pinned `image:`).
- * No image is ever built: a build needs the network, which a sandboxed run never has.
+ * The container image a sandboxed run uses, read from the base branch's tip, never from the work
+ * tree: `.devcontainer/devcontainer.json`, else `.devcontainer.json`, as git objects. A branch
+ * under review can edit the work tree's copy; the base's is the one a reviewer already accepted.
+ * The file is JSON with comments; which of its fields count is `imageFromDevcontainer`'s decision
+ * (only a digest-pinned `image:`). No image is ever built: a build needs the network, which a
+ * sandboxed run never has.
  */
 
-const CANDIDATES = [join(".devcontainer", "devcontainer.json"), ".devcontainer.json"];
-const MAX_BYTES = 1024 * 1024;
+/** Paths in git's own spelling, `/` whatever the host. */
+const CANDIDATES = [".devcontainer/devcontainer.json", ".devcontainer.json"];
 
-export async function readDevcontainerImage(checkout: string): Promise<ImageSource> {
+/** The image the commit `base` pins (`null`: the base is unknown, so there is none). */
+export async function readDevcontainerImage(
+  git: Pick<GitObjectReader, "readFile">,
+  base: string | null,
+): Promise<ImageSource> {
+  if (base === null) return none("the base branch's tip is unknown");
   for (const name of CANDIDATES) {
-    const info = await Deno.lstat(join(checkout, name)).catch(notFoundAsNull);
-    if (info === null) continue;
-    if (!info.isFile) return none(`${name} is not a regular file`);
-    if (info.size > MAX_BYTES) return none(`${name} is larger than ${MAX_BYTES} bytes`);
-    const text = await Deno.readTextFile(join(checkout, name));
+    const file = await git.readFile(base, name).catch(refusedAsWhy);
+    if (typeof file === "string") return none(file);
+    if (file.kind === "absent") continue;
+    if (file.kind === "not_regular") return none(`${name} at the base is not a regular file`);
     try {
-      return imageFromDevcontainer(parseJsonc(text));
+      return imageFromDevcontainer(parseJsonc(new TextDecoder().decode(file.bytes)));
     } catch (err) {
       // The reason is the probe's answer: it is printed, never swallowed.
       return none(`${name} is not JSON with comments: ${(err as Error).message}`);
@@ -33,7 +40,8 @@ function none(why: string): ImageSource {
   return { kind: "none", why };
 }
 
-function notFoundAsNull(err: unknown): null {
-  if (err instanceof Deno.errors.NotFound) return null;
+/** git's refusal (a blob over the cap, a commit it cannot read) as the probe's reason. */
+function refusedAsWhy(err: unknown): string {
+  if (err instanceof GitRefused) return `the devcontainer cannot be read: ${err.message}`;
   throw err;
 }

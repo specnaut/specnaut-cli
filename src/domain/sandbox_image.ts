@@ -4,8 +4,9 @@
  * Only `image:` is read, and only when it is pinned by a sha256 digest: a tag can be moved to
  * other bytes after the base was reviewed. Every other devcontainer field — mounts, run
  * arguments, lifecycle commands, environment, features, the remote user — would hand the sandbox
- * a host folder, a privilege or a host command, so none is read. Pure: the caller parses the file
- * (it is JSON with comments) and passes the value.
+ * a host folder, a privilege or a host command, so none is read. Nor is the image's own entrypoint
+ * run: `containerArgs` empties it. Pure: the caller parses the file (it is JSON with comments)
+ * and passes the value.
  */
 
 /** Where the image comes from: a pinned reference, or why there is none. */

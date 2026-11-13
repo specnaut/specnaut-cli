@@ -8,7 +8,11 @@ import {
 import { userBus } from "../../domain/sandbox_args.ts";
 import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
+import { baseTipOf } from "../../application/verify_scripts.ts";
+import type { ImageSource } from "../../domain/sandbox_image.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
+import { GitObjects } from "../../infrastructure/git_object_reader.ts";
+import { GitRefused } from "../../infrastructure/untrusted_git.ts";
 import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
 import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
 import { exportCacheRoot } from "../../infrastructure/fs_tree_export.ts";
@@ -22,7 +26,7 @@ export function sandboxHostDeps(): SandboxDeps {
   const subprocess = new DenoSubprocessRunner();
   const checkout = () => checkoutRoot(subprocess);
   const { os, arch } = Deno.build;
-  const image = async () => readDevcontainerImage(await checkout());
+  const image = async () => baseImage(await checkout());
   // The engines are asked with the environment a run gives them, and nothing of ours beside it.
   const prober = new HostBackendProber(
     new DenoSubprocessRunner({ wholeEnv: true }),
@@ -37,6 +41,22 @@ export function sandboxHostDeps(): SandboxDeps {
     lockRefusal: sessionLockRefusal,
     exec: (request) => execWithLog(prober, checkout, request),
   };
+}
+
+/**
+ * The image the base branch's tip pins, as `verify-scripts` resolves that tip: never the work
+ * tree's devcontainer, which the branch under review can edit. Outside a repository there is no
+ * base, so no image.
+ */
+export async function baseImage(checkout: string): Promise<ImageSource> {
+  let git: GitObjects;
+  try {
+    git = await GitObjects.open(checkout);
+  } catch (err) {
+    if (!(err instanceof GitRefused)) throw err;
+    return { kind: "none", why: `no base to read the devcontainer from: ${err.message}` };
+  }
+  return await readDevcontainerImage(git, await baseTipOf(git));
 }
 
 /**

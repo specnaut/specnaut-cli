@@ -28,11 +28,11 @@ export type ContainerRun = {
 const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
 /**
- * `run` arguments for podman or docker: a named run of an image already present (never pulled,
- * so a run stays offline), with an init process that reaps orphans and forwards signals, no log
- * the engine keeps after it, no network, a read-only root, no capabilities, no privilege gain, the
- * `nobody` user, the policy's caps (swap counted in the memory cap), its scratch folders as tmpfs
- * and the exported tree as the one bind mount, read-only, and the policy's variables only.
+ * `run` arguments for podman or docker: a named run of an image already present (never pulled, so
+ * offline), its entrypoint emptied so the command given is what runs, an init that reaps orphans
+ * and forwards signals, no engine log, no network, a read-only root, no capabilities, no privilege
+ * gain, the `nobody` user, the policy's caps (paged-out memory counted in the memory cap), its
+ * scratch as tmpfs, the exported tree as the one read-only bind mount, the policy's variables only.
  */
 export function containerArgs(
   policy: SandboxPolicy,
@@ -43,7 +43,7 @@ export function containerArgs(
   return [
     ...["run", "--rm", "--pull", "never", "--name", name, "--init", "--log-driver", "none"],
     ...containerNetwork(policy.network),
-    ...["--read-only", "--cap-drop", "ALL"],
+    ...["--entrypoint", "", "--read-only", "--cap-drop", "ALL"],
     ...["--security-opt", "no-new-privileges", "--user", policy.user],
     ...containerCaps(policy.limits, run.dropped),
     ...containerFolders(policy),
