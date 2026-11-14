@@ -10,9 +10,24 @@ const ZWJ = "\u200d";
 export const BASES: Case[] = [
   {
     name: "a default branch that cannot be named widens",
+    // Git for Windows' installer writes init.defaultBranch into the system config, and the scripts
+    // drop every GIT_* variable, GIT_CONFIG_NOSYSTEM included: there no config is ever without one.
+    // The empty value below names none on every host.
+    posixOnly: true,
     build: async (r) => {
       await change("apps/web/a.ts")(r);
       await r.git("config", "--unset", "init.defaultBranch");
+    },
+    code: 0,
+    scope: "full",
+    fallback: "default-branch-unresolved",
+    marks: FULL_MARKS,
+  },
+  {
+    name: "a default branch configured empty names none, and widens",
+    build: async (r) => {
+      await change("apps/web/a.ts")(r);
+      await r.git("config", "init.defaultBranch", "");
     },
     code: 0,
     scope: "full",

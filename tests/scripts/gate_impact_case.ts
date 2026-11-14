@@ -20,7 +20,10 @@ export type Case = {
   marks: string[];
   /** The `removed:` lines, when a base's tier held more. */
   removed?: string[];
-  /** Plants something a Windows checkout cannot hold without privileges. */
+  /**
+   * Plants something a Windows checkout cannot hold without privileges, or needs a state Git for
+   * Windows cannot be put in from the scripts' environment.
+   */
   posixOnly?: boolean;
 };
 
