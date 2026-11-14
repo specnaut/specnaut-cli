@@ -4,7 +4,7 @@ import { containerArgs } from "../../src/domain/sandbox_args.ts";
 import { bwrapArgs } from "../../src/domain/sandbox_bwrap_args.ts";
 import { HOME_RECEIPTS } from "../../src/domain/sandbox_paths.ts";
 import { seatbeltProfile } from "../../src/domain/sandbox_seatbelt.ts";
-import { PATHS, policyOf } from "./sandbox_fixture.ts";
+import { PATHS, policyOf, SECCOMP } from "./sandbox_fixture.ts";
 
 /**
  * The receipts a pipx or uv venv keeps, which can name an index or git URL carrying a login:
@@ -67,6 +67,7 @@ Deno.test("containerArgs: no host receipt is mounted, as no host tool folder is"
     engine: "podman",
     dropped: [],
     cpus: null,
+    seccomp: SECCOMP,
   } as const;
   const args = containerArgs(policy, run, ["true"]);
   assert(!args.some((a) => a.includes(".local/share")), args.join(" "));
