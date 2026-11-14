@@ -6,7 +6,14 @@ import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.t
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 import { exists, withEnv } from "./sandbox_live_fixture.ts";
-import { COMMAND, fakeLauncher, IMAGE, POSIX, withWallClock } from "./sandbox_runner_fixture.ts";
+import {
+  COMMAND,
+  containerTest,
+  fakeLauncher,
+  IMAGE,
+  POSIX,
+  withWallClock,
+} from "./sandbox_runner_fixture.ts";
 
 /**
  * Every container run carries the CLI's own syscall profile, on docker and podman alike: a file
@@ -50,14 +57,17 @@ const runner = (engine: typeof ENGINES[number], launcher: ProcessLauncher) =>
     () => HOST_ENV,
   );
 
-Deno.test("engine profile: each run on either engine is handed the CLI's profile, as written", async () => {
-  for (const engine of ENGINES) {
-    const { launcher, handed } = reading(0);
-    await runner(engine, launcher).run(policyOf("container"), COMMAND);
-    assertEquals(handed.length, 1, engine);
-    assertEquals(JSON.parse(handed[0].text ?? "null"), seccompProfile(), engine);
-  }
-});
+containerTest(
+  "engine profile: each run on either engine is handed the CLI's profile, as written",
+  async () => {
+    for (const engine of ENGINES) {
+      const { launcher, handed } = reading(0);
+      await runner(engine, launcher).run(policyOf("container"), COMMAND);
+      assertEquals(handed.length, 1, engine);
+      assertEquals(JSON.parse(handed[0].text ?? "null"), seccompProfile(), engine);
+    }
+  },
+);
 
 Deno.test({
   name: "engine profile: the file is the user's alone, in a temporary folder of the run's own",
@@ -75,16 +85,19 @@ Deno.test({
   },
 });
 
-Deno.test("engine profile: the run's profile and its folder go once the run is over, however it ends", async () => {
-  for (const engine of ENGINES) {
-    for (const code of [0, null]) {
-      const { launcher, handed } = reading(code);
-      await runner(engine, launcher).run(withWallClock(policyOf("container"), 0.01), COMMAND);
-      assertEquals(exists(handed[0].path), false, `${engine}, a run ending with ${code}`);
-      assertEquals(exists(dirname(handed[0].path)), false, `${engine}, ${code}`);
+containerTest(
+  "engine profile: the run's profile and its folder go once the run is over, however it ends",
+  async () => {
+    for (const engine of ENGINES) {
+      for (const code of [0, null]) {
+        const { launcher, handed } = reading(code);
+        await runner(engine, launcher).run(withWallClock(policyOf("container"), 0.01), COMMAND);
+        assertEquals(exists(handed[0].path), false, `${engine}, a run ending with ${code}`);
+        assertEquals(exists(dirname(handed[0].path)), false, `${engine}, ${code}`);
+      }
     }
-  }
-});
+  },
+);
 
 Deno.test("engine profile: each run writes a profile of its own", async () => {
   const [first, second] = [await engineRunEnv("docker", {}), await engineRunEnv("docker", {})];

@@ -87,3 +87,12 @@ export function fakeVolumes(
 
 /** A container run's engine caps on a host that can apply every one and did not say its CPUs. */
 export const NO_DROPS = { dropped: [], cpus: null } as const;
+
+/**
+ * A test that runs a `ContainerRunner`. No container is run on Windows (the backend probe offers
+ * none there), and a run's syscall profile is written to the temporary folder, a Windows path no
+ * container argument accepts: there the test is skipped, not failed.
+ */
+export function containerTest(name: string, fn: () => Promise<void> | void): void {
+  Deno.test({ name, ignore: !POSIX, fn });
+}

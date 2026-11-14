@@ -6,7 +6,13 @@ import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.t
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 import { exists } from "./sandbox_live_fixture.ts";
-import { COMMAND, fakeLauncher, IMAGE, withWallClock } from "./sandbox_runner_fixture.ts";
+import {
+  COMMAND,
+  containerTest,
+  fakeLauncher,
+  IMAGE,
+  withWallClock,
+} from "./sandbox_runner_fixture.ts";
 
 /**
  * A podman run starts from a CLI-owned configuration: its client, its removal and its watchdog are
@@ -95,41 +101,53 @@ Deno.test("podman conf: the override turns env_host off and resets each list a c
   });
 });
 
-Deno.test("podman conf: every launch of a run is handed the CLI's override, never the user's", async () => {
-  const { launcher, launches, handed } = reading(0);
-  await runner("podman", launcher).run(policyOf("container"), COMMAND);
-  assert(launches.length >= 3, "the run, its watchdog and its removal");
-  const path = handed[0].path;
-  assert(path !== undefined, "the run's client was handed no override");
-  assertNotEquals(path, USER_OVERRIDE);
-  const text = podmanOverride(dirname(path));
-  assertEquals(handed, launches.map(() => ({ path, text, hooks: [], mounts: "" })));
-});
+containerTest(
+  "podman conf: every launch of a run is handed the CLI's override, never the user's",
+  async () => {
+    const { launcher, launches, handed } = reading(0);
+    await runner("podman", launcher).run(policyOf("container"), COMMAND);
+    assert(launches.length >= 3, "the run, its watchdog and its removal");
+    const path = handed[0].path;
+    assert(path !== undefined, "the run's client was handed no override");
+    assertNotEquals(path, USER_OVERRIDE);
+    const text = podmanOverride(dirname(path));
+    assertEquals(handed, launches.map(() => ({ path, text, hooks: [], mounts: "" })));
+  },
+);
 
-Deno.test("podman conf: the run's podman reads the empty mounts.conf beside the override", async () => {
-  const { launcher, launches, handed } = reading(0);
-  await runner("podman", launcher).run(policyOf("container"), COMMAND);
-  const mounts = join(dirname(handed[0].path!), MOUNTS);
-  assertEquals(launches[0].spec.args.slice(0, 3), ["--default-mounts-file", mounts, "run"]);
-  assertEquals(handed[0].mounts, "");
-  const docker = reading(0);
-  await runner("docker", docker.launcher).run(policyOf("container"), COMMAND);
-  assertEquals(docker.launches[0].spec.args[0], "run");
-});
+containerTest(
+  "podman conf: the run's podman reads the empty mounts.conf beside the override",
+  async () => {
+    const { launcher, launches, handed } = reading(0);
+    await runner("podman", launcher).run(policyOf("container"), COMMAND);
+    const mounts = join(dirname(handed[0].path!), MOUNTS);
+    assertEquals(launches[0].spec.args.slice(0, 3), ["--default-mounts-file", mounts, "run"]);
+    assertEquals(handed[0].mounts, "");
+    const docker = reading(0);
+    await runner("docker", docker.launcher).run(policyOf("container"), COMMAND);
+    assertEquals(docker.launches[0].spec.args[0], "run");
+  },
+);
 
-Deno.test("podman conf: the override's folder is removed once the run is over, however it ends", async () => {
-  for (const code of [0, null]) {
-    const { launcher, handed } = reading(code);
-    const policy = withWallClock(policyOf("container"), 0.01);
-    await runner("podman", launcher).run(policy, COMMAND);
-    const path = handed[0].path!;
-    assertEquals(exists(path), false, `left behind after a run ending with ${code}`);
-    assertEquals(exists(dirname(path)), false);
-  }
-});
+containerTest(
+  "podman conf: the override's folder is removed once the run is over, however it ends",
+  async () => {
+    for (const code of [0, null]) {
+      const { launcher, handed } = reading(code);
+      const policy = withWallClock(policyOf("container"), 0.01);
+      await runner("podman", launcher).run(policy, COMMAND);
+      const path = handed[0].path!;
+      assertEquals(exists(path), false, `left behind after a run ending with ${code}`);
+      assertEquals(exists(dirname(path)), false);
+    }
+  },
+);
 
-Deno.test("podman conf: docker, which reads no containers.conf, is handed no override", async () => {
-  const { launcher, handed } = reading(0);
-  await runner("docker", launcher).run(policyOf("container"), COMMAND);
-  assertEquals(handed.map((h) => h.path), handed.map(() => undefined));
-});
+containerTest(
+  "podman conf: docker, which reads no containers.conf, is handed no override",
+  async () => {
+    const { launcher, handed } = reading(0);
+    await runner("docker", launcher).run(policyOf("container"), COMMAND);
+    assertEquals(handed.map((h) => h.path), handed.map(() => undefined));
+  },
+);
