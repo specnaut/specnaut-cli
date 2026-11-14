@@ -16,13 +16,15 @@ const BOUND_MS = 60_000;
 /**
  * A `tr` whose first caller loses its unit: it kills, outermost first, every process between
  * itself and the bomb's shell (`$BOMB`), the wrapper that would print the unit's status included.
- * Every later caller is the real `tr`.
+ * Every later caller is the real `tr`. What it killed, and the run's processes left after, go to
+ * `lost/tree`: a run that loses more than its one unit says which processes were gone.
  */
 const LOSING_TR = `#!/bin/sh
 if mkdir "$TMPDIR/lost" 2>/dev/null; then
   p=$PPID; unit=
   while [ "$p" -ne "$BOMB" ] && [ "$p" -gt 1 ]; do unit="$p $unit"; p=$(($(ps -o ppid= -p "$p"))); done
   kill -9 $unit
+  { echo "bomb $BOMB killed $unit"; ps -axo pid=,ppid=,args= | grep -F -- "$TMPDIR"; } >"$TMPDIR/lost/tree" 2>&1
   exit 0
 fi
 exec /usr/bin/tr "$@"
@@ -51,8 +53,9 @@ Deno.test({
       assert(success, out);
       assert(Deno.statSync(join(dir, "lost")).isDirectory, "no unit was lost");
       const units = out.split("\n").filter((l) => l.startsWith("unit "));
-      assertEquals(units.length, 3, out);
-      assert(units.every((l) => / 0$/.test(l)), out);
+      const seen = `${out}\n${await Deno.readTextFile(join(dir, "lost", "tree")).catch(String)}`;
+      assertEquals(units.length, 3, seen);
+      assert(units.every((l) => / 0$/.test(l)), seen);
     } finally {
       await Deno.remove(dir, { recursive: true });
     }
