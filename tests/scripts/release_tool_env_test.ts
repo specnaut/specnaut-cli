@@ -50,3 +50,33 @@ Deno.test("release.yml drops the password file's line feed and checks it opens t
   assertEquals(/tr -d '\\r\\n' < "\$pw"/.test(steps[fetch].run ?? ""), true);
   assertEquals(fetch < check && check < sign, true, `fetch ${fetch}, check ${check}, sign ${sign}`);
 });
+
+Deno.test("release.yml re-encrypts the certificate with 3DES before rcodesign reads it, and leaves no key in clear", async () => {
+  const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as {
+    jobs: Record<string, { steps: Step[] }>;
+  };
+  const steps = wf.jobs["sign-macos"].steps;
+  const check = steps.find((s) => (s.run ?? "").includes("openssl pkcs12"))?.run ?? "";
+  // rcodesign reads an AES (PBES2) certificate as a wrong password: only 3DES and a SHA-1 MAC.
+  for (const option of ["-certpbe PBE-SHA1-3DES", "-keypbe PBE-SHA1-3DES", "-macalg sha1"]) {
+    assertEquals(check.replace(/\\\n\s*/g, "").includes(option), true, `no ${option}`);
+  }
+  assertEquals(
+    /mv "\$p12\.3des" "\$p12"/.test(check),
+    true,
+    "the re-encrypted copy is not the one signed",
+  );
+  assertEquals(
+    /trap 'rm -f "\$p12\.pem"' EXIT/.test(check),
+    true,
+    "the clear key outlives a failure",
+  );
+  assertEquals(/umask 077/.test(check), true, "the clear key is readable by others");
+  // The repository is public, and so are its logs: a key decrypted to stdout would be printed.
+  const clear = check.split("\n").filter((l) => /openssl pkcs12\b.*-nodes/.test(l));
+  assertEquals(clear.length > 0, true, "no step decrypts the certificate");
+  for (const line of clear) {
+    assertEquals(/-out "\$p12\.pem"/.test(line), true, `the clear key goes to the log: ${line}`);
+    assertEquals(/-clcerts/.test(line), true, `a chain certificate could be signed with: ${line}`);
+  }
+});
