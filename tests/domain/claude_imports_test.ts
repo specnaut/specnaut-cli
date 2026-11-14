@@ -28,9 +28,11 @@ Deno.test("imports are read from every line: a fenced block and a code span coun
   assertEquals(importsIn("~~~\n@x.md\n~~~\n@y.md\r\n"), ["x.md", "y.md"]);
 });
 
-Deno.test("CLAUDE.md and CLAUDE.local.md import, in any folder and letter case; AGENTS.md does not", () => {
-  const paths = ["CLAUDE.md", "src/claude.local.md", "../CLAUDE.md", "AGENTS.md", "docs/x.md"];
-  assertEquals(paths.map(importsFrom), [true, true, true, false, false]);
+Deno.test("CLAUDE.md, CLAUDE.local.md and the rules import, in any folder and letter case", () => {
+  const paths = ["CLAUDE.md", "src/claude.local.md", "../CLAUDE.md", "docs/x.md"];
+  assertEquals(paths.map(importsFrom), [true, true, true, false]);
+  const rules = [".claude/rules/style.md", ".claude/rules/a/b.md", ".claude/rules/x.txt"];
+  assertEquals(rules.map(importsFrom), [true, true, false]);
 });
 
 Deno.test("a target is read relative to the importing file, and the home or an absolute path is out", () => {

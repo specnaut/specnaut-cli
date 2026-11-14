@@ -14,9 +14,14 @@ import { refinedReason } from "./trust_reason.ts";
 /** Claude Code follows imports this many hops from the file that started them. */
 export const IMPORT_DEPTH = 5;
 
-/** Whether the file at `path` is one whose imports Claude Code follows. */
+/**
+ * Whether the file at `path` is one whose imports are followed: a CLAUDE.md or CLAUDE.local.md, or
+ * a Markdown rule under `.claude/rules/`, which Claude Code loads as project instructions.
+ */
 export function importsFrom(path: string): boolean {
-  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  const folded = path.toLowerCase();
+  const name = folded.slice(folded.lastIndexOf("/") + 1);
+  if (folded.startsWith(".claude/rules/") && name.endsWith(".md")) return true;
   return name === "claude.md" || name === "claude.local.md";
 }
 
