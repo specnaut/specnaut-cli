@@ -54,15 +54,14 @@ export async function verifyInstructions(
   const symlinks = await deps.git.symlinks();
   const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
   const parents = await readParents(deps.git, base);
-  const sources = [...files, ...parents.head, ...tip, ...parents.tip, ...tipOverrides(committed)];
-  const imports = await readImports(deps.git, base, sources);
-  const extra = [
-    ...await shippedReasons(files, shipped),
-    ...parentReasons(parents),
-    ...importReasons(imports),
-  ];
+  const imports = await readImports(deps.git, base, {
+    head: [...files, ...parents.head],
+    tip: [...tip, ...parents.tip, ...tipOverrides(committed)],
+  });
+  const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
+  extra.push(...importReasons(imports.files), ...imports.reasons);
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
-  const landing = [...files, ...parents.head, ...importedAtHead(imports)];
+  const landing = [...files, ...parents.head, ...importedAtHead(imports.files)];
   return { verdicts, digest: await digestOf(deps.git, base.head, landing, verdicts) };
 }
 

@@ -1,4 +1,5 @@
 import { sameBytes } from "./bytes.ts";
+import { INSTRUCTION_NAMES } from "./checkout_scope.ts";
 import { invisibleReason } from "./instruction_head.ts";
 import { REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
@@ -14,15 +15,21 @@ import { refinedReason } from "./trust_reason.ts";
 /** Claude Code follows imports this many hops from the file that started them. */
 export const IMPORT_DEPTH = 5;
 
+/** The reasons the import walk adds to `REASON`. */
+export const IMPORT_REASON = {
+  linkEnd: "a link whose end cannot be read for its imports",
+} as const;
+
 /**
- * Whether the file at `path` is one whose imports are followed: a CLAUDE.md or CLAUDE.local.md, or
- * a Markdown rule under `.claude/rules/`, which Claude Code loads as project instructions.
+ * Whether the file at `path` is one whose imports are followed: any instruction file the class
+ * judges by name (a `CLAUDE.md` may link to or import an `AGENTS.md`, which then imports for it),
+ * or a Markdown rule under `.claude/rules/`, which Claude Code loads as project instructions.
  */
 export function importsFrom(path: string): boolean {
   const folded = path.toLowerCase();
   const name = folded.slice(folded.lastIndexOf("/") + 1);
   if (folded.startsWith(".claude/rules/") && name.endsWith(".md")) return true;
-  return name === "claude.md" || name === "claude.local.md";
+  return INSTRUCTION_NAMES.some((n) => n.toLowerCase() === name);
 }
 
 /**
