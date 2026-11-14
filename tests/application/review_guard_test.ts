@@ -6,9 +6,11 @@ import {
 } from "../../src/application/review_guard.ts";
 import type { ReviewLock } from "../../src/application/review_ports.ts";
 import { type LockedReview, UNKNOWN_REVIEW } from "../../src/domain/review_lock.ts";
+import { hostPath } from "../helpers/host_path.ts";
 
 const SHA = "a".repeat(40);
-const REVIEW: LockedReview = { head: SHA, logs: "/real/logs" };
+/** The review's folder and every resolved log are real paths, spelt as the host spells one. */
+const REVIEW: LockedReview = { head: SHA, logs: hostPath("/real/logs") };
 
 /** A lock held by the sessions in `locked`, each recording `REVIEW`; what it was asked, in `asked`. */
 function lock(locked: readonly (string | null)[], asked: (string | null)[] = []): ReviewLock {
@@ -25,7 +27,7 @@ function lock(locked: readonly (string | null)[], asked: (string | null)[] = [])
 function resolver(asked: string[] = []): RealLog {
   return (path) => {
     asked.push(path);
-    return Promise.resolve(path.startsWith("/logs/") ? `/real${path}` : null);
+    return Promise.resolve(path.startsWith("/logs/") ? hostPath(`/real${path}`) : null);
   };
 }
 
@@ -87,14 +89,21 @@ Deno.test("a lock that cannot be read refuses the call, naming why", async () =>
 Deno.test("sandbox exec under a lock of its checkout logs only where a review's folder is", async () => {
   const run = (toolchain: string[], log: string | null) => ({ toolchain, log });
   assertEquals(await execLockRefusal(null, run(["/opt"], null), null), null);
-  assertEquals(await execLockRefusal(lock([]), run(["/opt"], "/x"), null), null);
-  assertEquals(await execLockRefusal(lock(["s-1"]), run([], "/real/logs/1.log"), null), null);
-  const refused = [run([], "/elsewhere/1.log"), run([], null), run(["/opt"], "/real/logs/1.log")];
+  assertEquals(await execLockRefusal(lock([]), run(["/opt"], hostPath("/x")), null), null);
+  assertEquals(
+    await execLockRefusal(lock(["s-1"]), run([], hostPath("/real/logs/1.log")), null),
+    null,
+  );
+  const refused = [
+    run([], hostPath("/elsewhere/1.log")),
+    run([], null),
+    run(["/opt"], hostPath("/real/logs/1.log")),
+  ];
   for (const request of refused) {
     const why = await execLockRefusal(lock(["s-1"]), request, null);
     assertStringIncludes(why ?? "ran", "review lock", JSON.stringify(request));
   }
   const unknown: ReviewLock = { ...lock([]), all: () => Promise.resolve([UNKNOWN_REVIEW]) };
-  const why = await execLockRefusal(unknown, run([], "/real/logs/1.log"), null);
+  const why = await execLockRefusal(unknown, run([], hostPath("/real/logs/1.log")), null);
   assertStringIncludes(why ?? "ran", "review lock", "a lock naming no folder");
 });

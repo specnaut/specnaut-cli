@@ -4,15 +4,17 @@ import { execLockRefusal } from "../../src/application/review_guard.ts";
 import type { ReviewLock } from "../../src/application/review_ports.ts";
 import type { LockedReview } from "../../src/domain/review_lock.ts";
 import { FsReviewLock } from "../../src/infrastructure/fs_review_lock.ts";
+import { hostPath } from "../helpers/host_path.ts";
 
 /**
  * `sandbox exec`'s own lock check, where the session that starts it is known: it reads that
  * session's entry, per-user copy included, and accepts a log only in that session's own folder.
+ * Folders and logs are resolved paths, so spelt as the host spells one (`hostPath`).
  */
 
 const SHA = "a".repeat(40);
-const MINE: LockedReview = { head: SHA, logs: "/real/mine" };
-const THEIRS: LockedReview = { head: SHA, logs: "/real/theirs" };
+const MINE: LockedReview = { head: SHA, logs: hostPath("/real/mine") };
+const THEIRS: LockedReview = { head: SHA, logs: hostPath("/real/theirs") };
 
 /** A checkout locked by `checkout` (every session's entry), the session `s-1` holding `own`. */
 function lock(checkout: readonly LockedReview[], own: LockedReview | null): ReviewLock {
@@ -28,25 +30,33 @@ const run = (log: string | null) => ({ toolchain: [], log });
 
 Deno.test("a known session's run logs only in its own review's folder", async () => {
   const both = lock([MINE, THEIRS], MINE);
-  assertEquals(await execLockRefusal(both, run("/real/mine/1.log"), "s-1"), null);
-  const theirs = await execLockRefusal(both, run("/real/theirs/1.log"), "s-1");
+  assertEquals(await execLockRefusal(both, run(hostPath("/real/mine/1.log")), "s-1"), null);
+  const theirs = await execLockRefusal(both, run(hostPath("/real/theirs/1.log")), "s-1");
   assertStringIncludes(theirs ?? "ran", "review lock", "another session's folder");
-  const unknown = await execLockRefusal(both, run("/real/theirs/1.log"), null);
+  const unknown = await execLockRefusal(both, run(hostPath("/real/theirs/1.log")), null);
   assertEquals(unknown, null, "an unknown session is judged against every lock of the checkout");
 });
 
 Deno.test("a known session's per-user copy locks its runs with no checkout entry", async () => {
   const copyOnly = lock([], MINE);
-  const why = await execLockRefusal(copyOnly, run("/elsewhere/1.log"), "s-1");
+  const why = await execLockRefusal(copyOnly, run(hostPath("/elsewhere/1.log")), "s-1");
   assertStringIncludes(why ?? "ran", "review lock");
-  assertEquals(await execLockRefusal(copyOnly, run("/real/mine/1.log"), "s-1"), null);
+  assertEquals(await execLockRefusal(copyOnly, run(hostPath("/real/mine/1.log")), "s-1"), null);
 });
 
 Deno.test("a known session not itself locked runs nothing while its checkout is", async () => {
-  const why = await execLockRefusal(lock([THEIRS], null), run("/real/theirs/1.log"), "s-2");
+  const why = await execLockRefusal(
+    lock([THEIRS], null),
+    run(hostPath("/real/theirs/1.log")),
+    "s-2",
+  );
   assertStringIncludes(why ?? "ran", "review lock");
   assertEquals(await execLockRefusal(lock([], null), run(null), "s-2"), null, "no lock at all");
-  const notAnId = await execLockRefusal(lock([THEIRS], null), run("/real/theirs/1.log"), "../x");
+  const notAnId = await execLockRefusal(
+    lock([THEIRS], null),
+    run(hostPath("/real/theirs/1.log")),
+    "../x",
+  );
   assertEquals(notAnId, null, "a value that is no id names no session");
 });
 

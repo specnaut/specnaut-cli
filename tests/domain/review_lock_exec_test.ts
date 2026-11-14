@@ -7,6 +7,7 @@ import {
   type LockedReview,
   UNKNOWN_REVIEW,
 } from "../../src/domain/review_lock.ts";
+import { hostPath } from "../helpers/host_path.ts";
 
 /**
  * A sandboxed run under the review lock: the head the review exported, its log in the folder the
@@ -15,31 +16,42 @@ import {
 
 const SHA = "a".repeat(40);
 const OTHER = "b".repeat(40);
-const REVIEW: LockedReview = { head: SHA, logs: "/c/logs" };
-const LOG = "/c/logs/1.log";
+/**
+ * The log as a command spells it, and where it resolves: the guard judges the second alone, and a
+ * resolved path carries the host's separator (`hostPath`).
+ */
+const WORD = "/c/logs/1.log";
+const LOG = hostPath(WORD);
+const REVIEW: LockedReview = { head: SHA, logs: hostPath("/c/logs") };
 const bash = (command: string, review = REVIEW, log: string | null = LOG) =>
   lockedCallRefusal("Bash", { command }, review, log);
 
 Deno.test("under the review lock, sandbox exec runs the review's head alone, logged in its folder", () => {
   const exec = (rest: string) => `specnaut sandbox exec ${rest}`;
-  assertEquals(bash(exec(`${SHA} --log ${LOG} -- make`)), null);
+  assertEquals(bash(exec(`${SHA} --log ${WORD} -- make`)), null);
   const nested = "/c/logs/gate-fast.x1/1.log";
-  assertEquals(bash(exec(`${SHA} --log ${nested} -- make`), REVIEW, nested), null, "below it");
+  const below = hostPath(nested);
+  assertEquals(bash(exec(`${SHA} --log ${nested} -- make`), REVIEW, below), null, "below it");
   const refused: [string, LockedReview, string | null, string][] = [
-    [exec(`${OTHER} --log ${LOG} -- make`), REVIEW, LOG, "another commit"],
+    [exec(`${OTHER} --log ${WORD} -- make`), REVIEW, LOG, "another commit"],
     [exec(`${SHA} -- make`), REVIEW, null, "no log"],
-    [exec(`${SHA} --log ${LOG} --toolchain /opt -- make`), REVIEW, LOG, "a toolchain after"],
-    [exec(`${SHA} --toolchain /opt --log ${LOG} -- make`), REVIEW, LOG, "a toolchain before"],
-    [exec(`${SHA} --log=${LOG} -- make`), REVIEW, LOG, "the log joined to its flag"],
-    [exec(`${SHA} --toolchain ${LOG} -- make`), REVIEW, LOG, "another flag in --log's place"],
-    [exec(`${SHA} --log ${LOG} --`), REVIEW, LOG, "no command"],
-    [exec(`${SHA} --log ${LOG} x -- make`), REVIEW, LOG, "a word before --"],
-    [exec(`${SHA} --log ${LOG} -- make`), REVIEW, "/home/u/.profile", "it resolves elsewhere"],
-    [exec(`${SHA} --log ${LOG} -- make`), REVIEW, null, "it resolves nowhere"],
-    [exec(`${SHA} --log ${LOG} -- make`), REVIEW, "/c/logsx/1.log", "a sibling folder"],
-    [exec(`${SHA} --log ${LOG} -- make`), REVIEW, "/c/logs", "the folder itself"],
-    [exec(`${SHA} --log ${LOG} -- make`), UNKNOWN_REVIEW, LOG, "an entry naming nothing"],
-    [exec(`${SHA} --log ${LOG} -- make`), { head: SHA, logs: null }, LOG, "no logs folder"],
+    [exec(`${SHA} --log ${WORD} --toolchain /opt -- make`), REVIEW, LOG, "a toolchain after"],
+    [exec(`${SHA} --toolchain /opt --log ${WORD} -- make`), REVIEW, LOG, "a toolchain before"],
+    [exec(`${SHA} --log=${WORD} -- make`), REVIEW, LOG, "the log joined to its flag"],
+    [exec(`${SHA} --toolchain ${WORD} -- make`), REVIEW, LOG, "another flag in --log's place"],
+    [exec(`${SHA} --log ${WORD} --`), REVIEW, LOG, "no command"],
+    [exec(`${SHA} --log ${WORD} x -- make`), REVIEW, LOG, "a word before --"],
+    [
+      exec(`${SHA} --log ${WORD} -- make`),
+      REVIEW,
+      hostPath("/home/u/.profile"),
+      "it resolves elsewhere",
+    ],
+    [exec(`${SHA} --log ${WORD} -- make`), REVIEW, null, "it resolves nowhere"],
+    [exec(`${SHA} --log ${WORD} -- make`), REVIEW, hostPath("/c/logsx/1.log"), "a sibling folder"],
+    [exec(`${SHA} --log ${WORD} -- make`), REVIEW, hostPath("/c/logs"), "the folder itself"],
+    [exec(`${SHA} --log ${WORD} -- make`), UNKNOWN_REVIEW, LOG, "an entry naming nothing"],
+    [exec(`${SHA} --log ${WORD} -- make`), { head: SHA, logs: null }, LOG, "no logs folder"],
   ];
   for (const [command, review, log, name] of refused) {
     assertStringIncludes(bash(command, review, log) ?? "allowed", "review lock", name);
@@ -48,10 +60,10 @@ Deno.test("under the review lock, sandbox exec runs the review's head alone, log
 
 Deno.test("the log the guard must resolve is the one of exec's exact shape, and no other", () => {
   const log = (command: string, name = "Bash") => lockedLogOf(name, { command });
-  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${LOG} -- make`), LOG);
-  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${LOG} -- make`, "Read"), null);
-  assertEquals(log(`specnaut sandbox exec ${SHA} --toolchain ${LOG} -- make`), null);
-  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${LOG}; make`), null);
+  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${WORD} -- make`), WORD);
+  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${WORD} -- make`, "Read"), null);
+  assertEquals(log(`specnaut sandbox exec ${SHA} --toolchain ${WORD} -- make`), null);
+  assertEquals(log(`specnaut sandbox exec ${SHA} --log ${WORD}; make`), null);
   assertEquals(log("specnaut verify-scripts"), null);
 });
 
@@ -84,14 +96,14 @@ Deno.test({
 });
 
 Deno.test("sandbox exec itself, under any lock of its checkout, logs only in a review's folder", () => {
-  const other: LockedReview = { head: OTHER, logs: "/c/other" };
+  const other: LockedReview = { head: OTHER, logs: hostPath("/c/other") };
   assertEquals(lockedExecRefusal([], ["/opt"], null), null, "no lock: as it always ran");
   assertEquals(lockedExecRefusal([REVIEW], [], LOG), null);
   assertEquals(lockedExecRefusal([other, REVIEW], [], LOG), null, "any review's folder");
   const refused: [LockedReview[], string[], string | null, string][] = [
     [[REVIEW], ["/opt"], LOG, "a toolchain"],
     [[REVIEW], [], null, "no log, or one resolving nowhere"],
-    [[REVIEW], [], "/home/u/.profile", "a log elsewhere"],
+    [[REVIEW], [], hostPath("/home/u/.profile"), "a log elsewhere"],
     [[UNKNOWN_REVIEW], [], LOG, "a lock naming no folder"],
   ];
   for (const [held, toolchain, log, name] of refused) {
@@ -103,10 +115,10 @@ const TOOLS: LockedReview = { ...REVIEW, toolchain: ["/opt/go/bin", "/home/u/.de
 
 Deno.test("under the review lock, sandbox exec names only toolchain folders the start recorded", () => {
   const exec = (toolchain: string) =>
-    `specnaut sandbox exec ${SHA} --toolchain ${toolchain} --log ${LOG} -- make`;
+    `specnaut sandbox exec ${SHA} --toolchain ${toolchain} --log ${WORD} -- make`;
   assertEquals(bash(exec("/opt/go/bin"), TOOLS), null);
   assertEquals(bash(exec("/home/u/.deno/bin:/opt/go/bin"), TOOLS), null, "both, in any order");
-  assertEquals(lockedLogOf("Bash", { command: exec("/opt/go/bin") }), LOG);
+  assertEquals(lockedLogOf("Bash", { command: exec("/opt/go/bin") }), WORD);
   for (
     const [toolchain, review, name] of [
       ["/opt/go/bin", REVIEW, "a lock recording none"],
@@ -119,7 +131,7 @@ Deno.test("under the review lock, sandbox exec names only toolchain folders the 
 });
 
 Deno.test("sandbox exec itself, under a lock, takes only the toolchain that review recorded", () => {
-  const other: LockedReview = { head: OTHER, logs: "/c/other", toolchain: ["/opt/x"] };
+  const other: LockedReview = { head: OTHER, logs: hostPath("/c/other"), toolchain: ["/opt/x"] };
   assertEquals(lockedExecRefusal([TOOLS], ["/opt/go/bin"], LOG), null);
   assertEquals(lockedExecRefusal([TOOLS], [], LOG), null, "no toolchain is always one");
   for (

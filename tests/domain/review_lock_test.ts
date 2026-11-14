@@ -5,10 +5,13 @@ import {
   type LockedReview,
   REVIEW_SEATS,
 } from "../../src/domain/review_lock.ts";
+import { hostPath } from "../helpers/host_path.ts";
 
 const SHA = "a".repeat(40);
 const REVIEW: LockedReview = { head: SHA, logs: "/c/logs", base: SHA };
-const LOG = "/c/logs/1.log";
+const WORD = "/c/logs/1.log";
+/** Where `WORD` resolves: a real path, in the host's spelling (`hostPath`). */
+const LOG = hostPath(WORD);
 const bash = (command: string, review = REVIEW, log: string | null = LOG) =>
   lockedCallRefusal("Bash", { command }, review, log);
 const tool = (name: string | null, input: unknown) => lockedCallRefusal(name, input, REVIEW, null);
@@ -90,8 +93,6 @@ Deno.test("under the review lock, the review's own commands run, each alone", ()
   const allowed = [
     "specnaut verify-scripts",
     "specnaut sandbox probe",
-    `specnaut sandbox exec ${SHA} --log ${LOG} -- deno task test`,
-    `specnaut sandbox exec ${SHA} --log ${LOG} -- sh -c 'a && b'`,
     `specnaut review end ${SHA}`,
     `bash .specnaut/scripts/audit/collect-audit-scope.sh --base ${SHA} --head ${SHA} --objects /c/o`,
     `bash .specnaut/scripts/bash/size-ratchet.sh --since ${SHA} --head ${SHA} --objects /c --report`,
@@ -101,6 +102,15 @@ Deno.test("under the review lock, the review's own commands run, each alone", ()
     `--evidence /c/logs --sandbox`,
   ];
   for (const command of allowed) assertEquals(bash(command), null, command);
+  // A sandboxed run's log is judged by where it resolves, against the folder as the host spells it;
+  // the scripts' `--evidence` above, by the folder as `review start` printed it.
+  const resolved = { ...REVIEW, logs: hostPath("/c/logs") };
+  for (
+    const command of [
+      `specnaut sandbox exec ${SHA} --log ${WORD} -- deno task test`,
+      `specnaut sandbox exec ${SHA} --log ${WORD} -- sh -c 'a && b'`,
+    ]
+  ) assertEquals(bash(command, resolved), null, command);
 });
 
 Deno.test("under the review lock, a push, a tracker write, a merge or the landing script is refused", () => {
