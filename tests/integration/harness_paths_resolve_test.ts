@@ -48,6 +48,15 @@ const ALLOWED: Record<string, { reason: string; section?: string }> = {
     reason: "the same gate doc, under Copilot's flattened instruction name",
     section: "The config verdicts",
   },
+  "script-gate .codex/": {
+    reason: "the files the merge judges include Codex's `.codex/`, whichever harness runs the " +
+      "merge: a branch can change what Codex loads",
+    section: "The config verdicts",
+  },
+  "task-script-gate .codex/": {
+    reason: "the same gate doc, under Copilot's flattened instruction name",
+    section: "The config verdicts",
+  },
   "facts-integrations .claude/": {
     reason: "the same reference, under Copilot's flattened instruction name",
     section: "Claude Code",
