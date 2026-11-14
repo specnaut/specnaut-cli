@@ -90,7 +90,8 @@ Deno.test("podman conf: the override turns env_host off and resets each list a c
       utsns: "private",
       cgroupns: "private",
     },
-    engine: { hooks_dir: [`${DIR}/${HOOKS}`, { append: false }] },
+    // The folder as the host joins it: podman runs on no Windows host, but the text is the same code.
+    engine: { hooks_dir: [join(DIR, HOOKS), { append: false }] },
   });
 });
 
