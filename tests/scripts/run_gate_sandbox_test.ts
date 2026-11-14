@@ -8,6 +8,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { dirname } from "@std/path";
 import { ALWAYS, GATES, SUITE, WEB_ONLY } from "./gate_impact_fixture.ts";
 import { evidenceOf, sandboxed } from "./run_gate_sandbox_fixture.ts";
+import { spawn } from "./run_gate_fixture.ts";
 import { blob, commit, mktree } from "../helpers/git_fixture.ts";
 
 Deno.test("run-gate --sandbox: each configured command runs on the head in the sandbox, never here", async () => {
@@ -141,7 +142,11 @@ Deno.test("run-gate --sandbox: the base's toolchain folders are each run's --too
   await Deno.writeTextFile(`${repo.root}/.specnaut/gates.yml`, `${GATES}toolchain:\n  - /etc\n`);
   const r = await run(["fast", "--base", repo.main, ...full]);
   assertEquals(r.code, 0, r.stdout + r.stderr);
-  const folders = `/opt/go/bin:${Deno.env.get("HOME")}/.deno/bin`;
+  // `~/` is the HOME the gate's bash sees: the fixture's own home, in bash's spelling (on Windows,
+  // Git Bash turns `C:\x` into `/c/x`), never this process's.
+  const home = (await spawn(["bash", "-c", 'printf %s "$HOME"'], repo.root, { env: repo.env() }))
+    .stdout;
+  const folders = `/opt/go/bin:${home}/.deno/bin`;
   for (const call of r.calls) {
     assertEquals(call.slice(0, 5), ["sandbox", "exec", head, "--toolchain", folders]);
     assertEquals(call[5], "--log");
