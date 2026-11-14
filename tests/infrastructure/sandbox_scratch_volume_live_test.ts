@@ -40,7 +40,7 @@ function attachedNow(): string {
 
 Deno.test({
   name: live(
-    "hdiutil live: an image attached but not found mounted has its disk detached",
+    "seatbelt hdiutil live: an image attached but not found mounted has its disk detached",
     MISSING,
   ),
   ignore: MISSING !== null,

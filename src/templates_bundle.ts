@@ -37158,9 +37158,9 @@ function Invoke-SelectedRun(\$Answer) {
 # review of a branch this session cannot trust) reads its tools from: each an
 # absolute folder, or \`~/\` and a folder under your home. They are read from
 # the base branch, not the branch under review, put on the sandbox's PATH
-# read-only. In your home only a toolchain's folder is read (~/.cargo/bin,
-# ~/.rustup/toolchains, ~/.deno/bin, ~/.bun/bin, ~/go/bin, ~/.local/bin, and
-# the nvm, pipx and uv tool folders): any other folder there is refused.
+# read-only. In your home only the folders a language toolchain or a per-user
+# tool installer puts its commands in are read, as the CLI lists them; any
+# other folder there is refused.
 #
 #   toolchain:
 #     - ~/.deno/bin
