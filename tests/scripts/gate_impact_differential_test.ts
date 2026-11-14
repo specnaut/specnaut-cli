@@ -43,7 +43,15 @@ function results() {
   const map = new Map<string, Promise<Awaited<ReturnType<typeof runCase>>>>();
   const queue = [...ACTIVE];
   const resolvers = new Map<string, (v: Promise<Awaited<ReturnType<typeof runCase>>>) => void>();
-  for (const c of ACTIVE) map.set(c.name, new Promise((res) => resolvers.set(c.name, res)));
+  for (const c of ACTIVE) {
+    const answer = new Promise<Awaited<ReturnType<typeof runCase>>>((res) =>
+      resolvers.set(c.name, res)
+    );
+    // A case whose test `--filter` skipped is still run, and no test awaits its answer: its failure
+    // (its folder removed under it at unload) is nobody's verdict. A test awaiting it still sees it.
+    answer.catch(() => {});
+    map.set(c.name, answer);
+  }
   const worker = async () => {
     for (let c = queue.shift(); c; c = queue.shift()) {
       const running = runCase(c);
