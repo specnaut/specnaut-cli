@@ -5,6 +5,7 @@ import {
   type ImportSides,
   importsIn,
   importTarget,
+  nearAtHead,
 } from "../../src/domain/claude_imports.ts";
 import { INSTRUCTION_REASON } from "../../src/domain/instruction_head.ts";
 import { REASON } from "../../src/domain/script_trust.ts";
@@ -71,4 +72,17 @@ Deno.test("an imported file is judged as HEAD commits it against the tip", () =>
     `h.md ${INSTRUCTION_REASON.invisible}: U+202E (line 1)`,
     `i.md ${REASON.behind}`,
   ]);
+});
+
+Deno.test("a target HEAD lacks as written: a link on its way, else a file in another case", () => {
+  const paths = [
+    { path: "docs", kind: "tree" },
+    { path: "docs/rules.md", kind: "blob" },
+    { path: "shared", kind: "link" },
+  ];
+  assertEquals(nearAtHead("Docs/Rules.md", paths), { match: "docs/rules.md" });
+  assertEquals(nearAtHead("shared/rules.md", paths), { link: "shared" });
+  assertEquals(nearAtHead("SHARED/x/y.md", paths), { link: "shared" });
+  assertEquals(nearAtHead("docs/other.md", paths), {});
+  assertEquals(nearAtHead("Docs", paths), {});
 });

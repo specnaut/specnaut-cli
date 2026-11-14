@@ -99,6 +99,11 @@ export class GitObjects implements GitObjectReader {
     return [...folders, ...await withBytes(this.#git, commit, kept)];
   }
 
+  async listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]> {
+    const records = await lsTree(this.#git, this.projectPrefix, commit, ["-r", "-t"], true);
+    return records.map((r) => ({ path: r.path, kind: r.kind }));
+  }
+
   async listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]> {
     const folded = names.map((n) => n.toLowerCase());
     const parts = this.projectPrefix.split("/").filter(Boolean);

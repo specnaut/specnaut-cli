@@ -6,6 +6,7 @@ import {
   type ImportSides,
   importsIn,
   importTarget,
+  nearAtHead,
 } from "../domain/claude_imports.ts";
 import type { BaseEntry, Untrusted } from "../domain/script_trust.ts";
 import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
@@ -39,7 +40,13 @@ export type ImportRead = {
 };
 
 type Source = { readonly path: string; readonly bytes: Uint8Array };
-type Walk = ImportRead & { readonly git: GitObjectReader; readonly base: ImportBase };
+type Paths = { path: string; kind: string }[];
+type Walk = ImportRead & {
+  readonly git: GitObjectReader;
+  readonly base: ImportBase;
+  /** HEAD's whole listing, read once, at the first target HEAD lacks as written. */
+  pathsAtHead?: Promise<Paths>;
+};
 
 export async function readImports(
   git: GitObjectReader,
@@ -90,6 +97,15 @@ async function visit(walk: Walk, target: string): Promise<Source[]> {
   const next = [sides.head, sides.tip].flatMap((b) =>
     b instanceof Uint8Array ? [{ path: target, bytes: b }] : []
   );
+  if (sides.head !== "absent") return next;
+  walk.pathsAtHead ??= walk.git.listPaths(walk.base.head);
+  const near = nearAtHead(target, await walk.pathsAtHead);
+  if (near.link !== undefined) {
+    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${near.link}` });
+  } else if (near.match !== undefined) {
+    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.caseDiffers}: ${near.match}` });
+    next.push(...await visit(walk, near.match));
+  }
   return next;
 }
 

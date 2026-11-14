@@ -55,6 +55,11 @@ export interface GitObjectReader {
    */
   listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]>;
   /**
+   * Every path of `commit`'s whole tree under the project's folder with its kind, folders included,
+   * and no bytes read: what a lookup of a name in another letter case searches.
+   */
+  listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]>;
+  /**
    * The files directly in each folder above the project's, up to the repository's top, whose name
    * is one of `names` but for letter case, a link with its target; none when the project is at the
    * top. Paths are relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.

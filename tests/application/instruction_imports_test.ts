@@ -20,7 +20,7 @@ function reader(files: Record<string, Record<string, string | "link">>): GitObje
     if (at === "link") return Promise.resolve({ kind: "not_regular" });
     return Promise.resolve({ kind: "blob", bytes: enc(at) });
   };
-  return { readFile } as unknown as GitObjectReader;
+  return { readFile, listPaths: () => Promise.resolve([]) } as unknown as GitObjectReader;
 }
 
 const link = (path: string, target: string): BaseEntry => ({ kind: "link", path, target });

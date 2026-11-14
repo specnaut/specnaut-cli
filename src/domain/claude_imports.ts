@@ -18,6 +18,8 @@ export const IMPORT_DEPTH = 5;
 /** The reasons the import walk adds to `REASON`. */
 export const IMPORT_REASON = {
   linkEnd: "a link whose end cannot be read for its imports",
+  caseDiffers: "imported in another letter case than HEAD's file",
+  linkOnTheWay: "a link on the way at HEAD",
 } as const;
 
 /**
@@ -30,6 +32,26 @@ export function importsFrom(path: string): boolean {
   const name = folded.slice(folded.lastIndexOf("/") + 1);
   if (folded.startsWith(".claude/rules/") && name.endsWith(".md")) return true;
   return INSTRUCTION_NAMES.some((n) => n.toLowerCase() === name);
+}
+
+/** What HEAD holds where an import names a path it lacks as written. */
+export type NearAtHead = { readonly link?: string; readonly match?: string };
+
+/**
+ * Where an import `target` HEAD lacks as written leads in HEAD's `paths` (each with its kind): a
+ * link on a folder along its way, or a file under the same name in another letter case.
+ */
+export function nearAtHead(
+  target: string,
+  paths: readonly { path: string; kind: string }[],
+): NearAtHead {
+  const folded = target.toLowerCase();
+  const link = paths.find((p) =>
+    p.kind === "link" && folded.startsWith(`${p.path.toLowerCase()}/`)
+  );
+  if (link !== undefined) return { link: link.path };
+  const match = paths.find((p) => p.kind === "blob" && p.path.toLowerCase() === folded);
+  return match === undefined ? {} : { match: match.path };
 }
 
 /**
