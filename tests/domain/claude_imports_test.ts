@@ -13,11 +13,19 @@ import { REASON } from "../../src/domain/script_trust.ts";
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
-Deno.test("imports are read from prose, never from a fenced block or a code span", () => {
+Deno.test("imports are read from every line: a fenced block and a code span count too", () => {
   const text =
-    "See @docs/rules.md and @./a.md.\n```\n@docs/secret.md\n```\nRun `see @b.md` x@c.md\n@d.md";
-  assertEquals(importsIn(text), ["docs/rules.md", "./a.md.", "./a.md", "d.md"]);
-  assertEquals(importsIn("~~~\n@x.md\n~~~\n@y.md\r\n"), ["y.md"]);
+    "See @docs/rules.md and @./a.md.\n```\n@docs/fenced.md\n```\nRun `@b.md` (@c.md) x@d.md";
+  assertEquals(importsIn(text), [
+    "docs/rules.md",
+    "./a.md.",
+    "./a.md",
+    "docs/fenced.md",
+    "b.md",
+    "c.md)",
+    "c.md",
+  ]);
+  assertEquals(importsIn("~~~\n@x.md\n~~~\n@y.md\r\n"), ["x.md", "y.md"]);
 });
 
 Deno.test("CLAUDE.md and CLAUDE.local.md import, in any folder and letter case; AGENTS.md does not", () => {

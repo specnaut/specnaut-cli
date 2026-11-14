@@ -5,8 +5,8 @@ import { refinedReason } from "./trust_reason.ts";
 
 /**
  * A `CLAUDE.md` (or `CLAUDE.local.md`) pulls other files into the session with `@path` imports,
- * read relative to the importing file, recursively up to {@link IMPORT_DEPTH} hops; an import in a
- * code span or a fenced block is text, and `@~/…` reads the user's home, outside the repository.
+ * read relative to the importing file, recursively up to {@link IMPORT_DEPTH} hops; `@~/…` reads
+ * the user's home, outside the repository.
  * The files a judged one imports are part of the instruction class (`instruction_trust.ts`): each
  * in-repository target is judged as HEAD commits it against the base's tip.
  */
@@ -20,20 +20,13 @@ export function importsFrom(path: string): boolean {
   return name === "claude.md" || name === "claude.local.md";
 }
 
-/** The `@path` imports `text` holds, as written, outside fenced blocks and code spans. */
+/**
+ * The `@path` imports `text` holds, as written, on every line: an `@` at a line's start or after a
+ * space, a quote, a backtick or an opening bracket. Claude Code skips fenced blocks and code spans;
+ * this reads them too, on purpose: reading too much only names a file the branch changed.
+ */
 export function importsIn(text: string): string[] {
-  const found: string[] = [];
-  let fenced = false;
-  for (const line of text.split(/\r?\n/)) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced) continue;
-    const prose = line.replace(/`[^`]*`/g, " ");
-    for (const m of prose.matchAll(/(?:^|\s)@(\S+)/g)) found.push(...readings(m[1]));
-  }
-  return found;
+  return [...text.matchAll(/(?:^|[\s`'"([{<])@([^\s`]+)/gm)].flatMap((m) => readings(m[1]));
 }
 
 /**
@@ -41,7 +34,7 @@ export function importsIn(text: string): string[] {
  * path. Both are followed; a reading that names no file at any commit asks nothing.
  */
 function readings(written: string): string[] {
-  const bare = written.replace(/[.,;:!?)\]]+$/, "");
+  const bare = written.replace(/[.,;:!?)\]}>'"]+$/, "");
   return bare === written || bare === "" ? [written] : [written, bare];
 }
 

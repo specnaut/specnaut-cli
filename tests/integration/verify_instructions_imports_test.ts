@@ -65,11 +65,19 @@ Deno.test("a target the tip imports and the branch deletes with its import is na
   ]);
 });
 
-Deno.test("an import in a code block or a code span, or of the home, is not followed", async () => {
-  const text = "```\n@docs/a.md\n```\nNot `see @docs/b.md` here. Mine: @~/c.md\n";
+Deno.test("an import in a code block or a code span is followed: reading too much fails closed", async () => {
+  const text = "```\n@docs/a.md\n```\nNot `see @docs/b.md` here.\n";
   const root = await importing({ "CLAUDE.md": text, "docs/a.md": "a\n", "docs/b.md": "b\n" });
   await write(root, { "docs/a.md": "A\n", "docs/b.md": "B\n" });
   await commitAll(root, "edit");
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted docs/a.md differs from base",
+    "VERDICT instructions untrusted docs/b.md differs from base",
+  ]);
+});
+
+Deno.test("an import of the home is not followed: it is outside the repository", async () => {
+  const root = await importing({ "CLAUDE.md": "Mine: @~/c.md\n" });
   assertEquals(await lines(root), ["VERDICT instructions trusted"]);
 });
 
