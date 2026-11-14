@@ -80,3 +80,20 @@ Deno.test("release.yml re-encrypts the certificate with 3DES before rcodesign re
     assertEquals(/-clcerts/.test(line), true, `a chain certificate could be signed with: ${line}`);
   }
 });
+
+Deno.test("release.yml waits for notarization longer than rcodesign's 10-minute default", async () => {
+  const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/release.yml`)) as {
+    jobs: Record<string, { steps: Step[]; "timeout-minutes"?: number }>;
+  };
+  const job = wf.jobs["sign-macos"];
+  const notarize = job.steps.find((s) => (s.run ?? "").includes("rcodesign notary-submit"))?.run;
+  const wait = Number(/--max-wait-seconds (\d+)/.exec(notarize ?? "")?.[1] ?? 0);
+  // A first submission was still "InProgress" at Apple when the 600 s default ran out.
+  assertEquals(wait >= 3600, true, `notarization waits ${wait}s`);
+  // Both binaries are waited on in turn, inside the job's limit (GitHub's default is 6 hours).
+  assertEquals(
+    2 * wait < (job["timeout-minutes"] ?? 360) * 60,
+    true,
+    "the job ends before its waits",
+  );
+});
