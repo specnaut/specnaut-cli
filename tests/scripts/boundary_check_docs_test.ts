@@ -14,7 +14,8 @@ const DOCS = [
 for (const doc of DOCS) {
   Deno.test(`boundary check docs (${doc}): forbid patterns are left unanchored, and why`, async () => {
     const text = (await Deno.readTextFile(fromFileUrl(new URL(`../../${doc}`, import.meta.url))))
-      .replace(/\n#?\s*/g, " ");
+      // A Windows checkout ends each line with CRLF (core.autocrlf), and the sentence spans lines.
+      .replace(/\r?\n#?\s*/g, " ");
     assertMatch(text, /unanchored/);
     assertMatch(text, /lone CR or a U\+2028/);
     assertMatch(text, /`\^` (and|or) `\$`/);
