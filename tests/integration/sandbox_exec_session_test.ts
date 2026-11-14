@@ -10,10 +10,18 @@ import { FsReviewLock } from "../../src/infrastructure/fs_review_lock.ts";
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 const SHA = "a".repeat(40);
 
-/** `sandbox exec` in `repo`, its log in `log`, with `extra` beside a bare environment. */
+/**
+ * `sandbox exec` in `repo`, its log in `log`, with `extra` beside a bare environment. Its export
+ * cache is a folder of `repo`'s, so what it finds there is this test's alone. PATHEXT is kept: on
+ * Windows, without it a program is not found on the PATH by its bare name, git included.
+ */
 async function exec(repo: string, log: string, extra: Record<string, string>) {
-  const env: Record<string, string> = { NO_COLOR: "1", ...extra };
-  for (const name of ["PATH", "HOME", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR"]) {
+  const env: Record<string, string> = {
+    NO_COLOR: "1",
+    XDG_CACHE_HOME: join(repo, "cache"),
+    ...extra,
+  };
+  for (const name of ["PATH", "PATHEXT", "HOME", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR"]) {
     const value = Deno.env.get(name);
     if (value !== undefined) env[name] = value;
   }
@@ -45,8 +53,8 @@ Deno.test("sandbox exec refuses its session a log in another session's folder", 
     assertEquals(mine.code, 125);
     assert(mine.err.includes("review lock"), mine.err);
     const unknown = await exec(repo, log, { XDG_STATE_HOME: xdg });
-    const past = Deno.build.os === "windows" ? "no sandbox on Windows" : `no export of ${SHA}`;
-    assert(unknown.err.includes(past), `past the lock: ${unknown.err}`);
+    // Past the lock, the export is looked up before any backend, on every host: Windows too.
+    assert(unknown.err.includes(`no export of ${SHA}`), `past the lock: ${unknown.err}`);
   } finally {
     await Deno.remove(repo, { recursive: true });
   }
