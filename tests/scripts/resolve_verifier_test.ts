@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { DELIMITER, fromFileUrl, join } from "@std/path";
 import { git, run } from "./git_sandbox.ts";
 
@@ -62,6 +62,84 @@ async function stub(dir: string): Promise<string> {
 /** One PATH, where it runs from, and the answer both spellings must give. */
 type Case = { name: string; path: string; cwd: string; expect: Answer; skip?: string };
 
+/** The folders and files the cases name, all under one physical temp folder. */
+type Layout = {
+  tmp: string;
+  repo: string;
+  tools: string;
+  inRepo: string;
+  outside: string;
+  sibling: string;
+  caseBlind: boolean;
+};
+
+/** A folder holding only the tools both spellings run, each a link to the real one. */
+async function toolsIn(tmp: string): Promise<string> {
+  const tools = join(tmp, "tools");
+  await Deno.mkdir(tools);
+  for (const tool of ["git", "readlink"]) {
+    const real = (await run("bash", ["-c", `command -v ${tool}`], tmp)).stdout.trim();
+    await Deno.symlink(real, join(tools, tool));
+  }
+  return tools;
+}
+
+/** A repository, stubs inside, outside and beside it, and the tools. */
+async function layout(tmp: string): Promise<Layout> {
+  const repo = join(tmp, "repo");
+  await Deno.mkdir(repo);
+  await git(repo, "init", "--quiet");
+  const l: Layout = {
+    tmp,
+    repo,
+    tools: await toolsIn(tmp),
+    inRepo: await stub(join(repo, "bin")),
+    outside: await stub(join(tmp, "outside", "real")),
+    sibling: await stub(join(tmp, "repo-x", "bin")),
+    caseBlind: await Deno.stat(join(tmp, "REPO", "bin")).then(() => true, () => false),
+  };
+  await links(l);
+  return l;
+}
+
+/** A linked parent, links across the repository's edge both ways, and a chain of relative links. */
+async function links(l: Layout) {
+  await Deno.symlink(l.repo, join(l.tmp, "alias"));
+  await Deno.mkdir(join(l.tmp, "outside", "links"));
+  await Deno.symlink(l.inRepo, join(l.tmp, "outside", "links", "specnaut"));
+  await Deno.mkdir(join(l.repo, "linkbin"));
+  await Deno.symlink(l.outside, join(l.repo, "linkbin", "specnaut"));
+  const chain = join(l.tmp, "outside", "chain");
+  await Deno.mkdir(chain);
+  await Deno.symlink(l.outside, join(chain, "c2"));
+  await Deno.symlink("c2", join(chain, "c1"));
+  await Deno.symlink("../chain/c1", join(chain, "specnaut"));
+}
+
+const inside = { refused: "is inside the repository" };
+const relative = { refused: "is not an absolute path" };
+
+/** Every case, its PATH ending with the tools folder. */
+function casesFor(l: Layout): Case[] {
+  const at = (...entries: string[]) => [...entries, l.tools].join(DELIMITER);
+  const bin = join(l.repo, "bin");
+  // deno-fmt-ignore
+  return [
+    { name: "a relative entry", path: at("bin"), cwd: l.repo, expect: relative },
+    { name: "an empty entry", path: `${DELIMITER}${l.tools}`, cwd: bin, expect: relative },
+    { name: "a `.` entry", path: at("."), cwd: bin, expect: relative },
+    { name: "no specnaut at all", path: l.tools, cwd: l.repo, expect: { refused: "is not on the PATH" } },
+    { name: "an in-repo folder", path: at(bin), cwd: l.repo, expect: inside },
+    { name: "an in-repo folder through a linked parent", path: at(join(l.tmp, "alias", "bin")), cwd: l.repo, expect: inside },
+    { name: "a link outside naming an in-repo file", path: at(join(l.tmp, "outside", "links")), cwd: l.repo, expect: inside },
+    { name: "a link inside naming an outside file", path: at(join(l.repo, "linkbin")), cwd: l.repo, expect: inside },
+    { name: "the repository named in another case", path: at(join(l.tmp, "REPO", "bin")), cwd: l.repo, expect: inside, skip: l.caseBlind ? undefined : "this file system tells case apart" },
+    { name: "a sibling `<repo>-x`", path: at(join(l.tmp, "repo-x", "bin")), cwd: l.repo, expect: { resolved: l.sibling } },
+    { name: "a chain of relative links outside", path: at(join(l.tmp, "outside", "chain")), cwd: l.repo, expect: { resolved: l.outside } },
+    { name: "outside the repository", path: at(join(l.tmp, "outside", "real")), cwd: l.repo, expect: { resolved: l.outside } },
+  ];
+}
+
 Deno.test({
   name: "both spellings of the verifier's resolution answer every case alike",
   // Symlinks need a privilege Windows runners lack, and the stub needs POSIX exec bits.
@@ -69,96 +147,8 @@ Deno.test({
   fn: async () => {
     const tmp = await Deno.realPath(await Deno.makeTempDir({ prefix: "resolve-verifier-" }));
     try {
-      const repo = join(tmp, "repo");
-      await Deno.mkdir(repo);
-      await git(repo, "init", "--quiet");
-      const tools = join(tmp, "tools");
-      await Deno.mkdir(tools);
-      for (const tool of ["git", "readlink"]) {
-        const real = (await run("bash", ["-c", `command -v ${tool}`], tmp)).stdout.trim();
-        await Deno.symlink(real, join(tools, tool));
-      }
       const bash = (await run("bash", ["-c", "command -v bash"], tmp)).stdout.trim();
-      const inRepo = await stub(join(repo, "bin"));
-      const outside = await stub(join(tmp, "outside", "real"));
-      const sibling = await stub(join(tmp, "repo-x", "bin"));
-      await Deno.symlink(repo, join(tmp, "alias"));
-      await Deno.mkdir(join(tmp, "outside", "links"));
-      await Deno.symlink(inRepo, join(tmp, "outside", "links", "specnaut"));
-      await Deno.mkdir(join(repo, "linkbin"));
-      await Deno.symlink(outside, join(repo, "linkbin", "specnaut"));
-      const chain = join(tmp, "outside", "chain");
-      await Deno.mkdir(chain);
-      await Deno.symlink(outside, join(chain, "c2"));
-      await Deno.symlink("c2", join(chain, "c1"));
-      await Deno.symlink("../chain/c1", join(chain, "specnaut"));
-      const mixed = join(tmp, "REPO", "bin");
-      const caseBlind = await Deno.stat(mixed).then(() => true, () => false);
-
-      const at = (...entries: string[]) => [...entries, tools].join(DELIMITER);
-      const inside = { refused: "is inside the repository" };
-      const relative = { refused: "is not an absolute path" };
-      const cases: Case[] = [
-        { name: "a relative entry", path: at("bin"), cwd: repo, expect: relative },
-        {
-          name: "an empty entry",
-          path: `${DELIMITER}${tools}`,
-          cwd: join(repo, "bin"),
-          expect: relative,
-        },
-        { name: "a `.` entry", path: at("."), cwd: join(repo, "bin"), expect: relative },
-        {
-          name: "no specnaut at all",
-          path: tools,
-          cwd: repo,
-          expect: { refused: "is not on the PATH" },
-        },
-        { name: "an in-repo folder", path: at(join(repo, "bin")), cwd: repo, expect: inside },
-        {
-          name: "an in-repo folder through a linked parent",
-          path: at(join(tmp, "alias", "bin")),
-          cwd: repo,
-          expect: inside,
-        },
-        {
-          name: "a link outside naming an in-repo file",
-          path: at(join(tmp, "outside", "links")),
-          cwd: repo,
-          expect: inside,
-        },
-        {
-          name: "a link inside naming an outside file",
-          path: at(join(repo, "linkbin")),
-          cwd: repo,
-          expect: inside,
-        },
-        {
-          name: "the repository named in another case",
-          path: at(mixed),
-          cwd: repo,
-          expect: inside,
-          skip: caseBlind ? undefined : "this file system tells case apart",
-        },
-        {
-          name: "a sibling `<repo>-x`",
-          path: at(join(tmp, "repo-x", "bin")),
-          cwd: repo,
-          expect: { resolved: sibling },
-        },
-        {
-          name: "a chain of relative links outside",
-          path: at(chain),
-          cwd: repo,
-          expect: { resolved: outside },
-        },
-        {
-          name: "outside the repository",
-          path: at(join(tmp, "outside", "real")),
-          cwd: repo,
-          expect: { resolved: outside },
-        },
-      ];
-      for (const c of cases) {
+      for (const c of casesFor(await layout(tmp))) {
         if (c.skip) {
           console.warn(`skipped "${c.name}": ${c.skip}`);
           continue;
@@ -171,9 +161,4 @@ Deno.test({
       await Deno.remove(tmp, { recursive: true });
     }
   },
-});
-
-Deno.test("a refusal in the landing names the path it refused", async () => {
-  const lib = await Deno.readTextFile(LIB);
-  assertStringIncludes(lib, 'echo "land-feature: VERIFIER REFUSED: ${p:-specnaut} $why');
 });

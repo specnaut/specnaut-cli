@@ -1,6 +1,5 @@
 import { assertEquals, assertMatch, assertNotEquals, assertStringIncludes } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
-import { LOCK } from "../integration/verify_scripts_fixture.ts";
 import { git, hermetic, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 
 /**
@@ -30,36 +29,44 @@ async function shimText(sb: Sandbox): Promise<string> {
   return await Deno.readTextFile(at);
 }
 
+/** Writes `text` as an executable `specnaut` in `dir`, made first; returns `dir`, physical. */
+async function placeShim(dir: string, text: string): Promise<string> {
+  await Deno.mkdir(dir, { recursive: true });
+  await Deno.writeTextFile(join(dir, "specnaut"), text);
+  await Deno.chmod(join(dir, "specnaut"), 0o755);
+  return await Deno.realPath(dir);
+}
+
+/** land-feature.sh with `dir` first on the PATH. */
+const landFrom = (sb: Sandbox, dir: string) =>
+  run("bash", [".specnaut/scripts/bash/land-feature.sh"], sb.work, pathWith(dir));
+
+/** A feature branch that commits a copy of the sandbox's `specnaut` at `tools/specnaut`. */
+async function branchWithShim(): Promise<{ sb: Sandbox; shim: string; inside: string }> {
+  const sb = await sandbox();
+  await git(sb.work, "switch", "--quiet", "-c", "feature");
+  const shim = await shimText(sb);
+  const inside = await placeShim(join(sb.work, "tools"), shim);
+  await git(sb.work, "add", "tools/specnaut");
+  await git(sb.work, "commit", "--quiet", "-m", "chore: a tool");
+  return { sb, shim, inside };
+}
+
 Deno.test({
   name: "a specnaut the branch put inside the repository is refused, naming it; outside it runs",
   ignore: !POSIX,
   fn: async () => {
-    const sb = await sandbox();
+    const { sb, shim, inside } = await branchWithShim();
     try {
-      await git(sb.work, "switch", "--quiet", "-c", "feature");
-      const shim = await shimText(sb);
-      await Deno.mkdir(join(sb.work, "tools"));
-      await Deno.writeTextFile(join(sb.work, "tools/specnaut"), shim);
-      await Deno.chmod(join(sb.work, "tools/specnaut"), 0o755);
-      await git(sb.work, "add", "tools/specnaut");
-      await git(sb.work, "commit", "--quiet", "-m", "chore: a tool");
       const before = await git(sb.remote, "rev-parse", "main");
-      const inside = join(sb.work, "tools");
-      const script = [".specnaut/scripts/bash/land-feature.sh"];
-      const r = await run("bash", script, sb.work, pathWith(inside));
+      const r = await landFrom(sb, inside);
       assertEquals(r.code, 13, r.stderr);
-      assertStringIncludes(r.stderr, "VERIFIER REFUSED:");
       assertStringIncludes(
         r.stderr,
-        `${await Deno.realPath(inside)}/specnaut is inside the repository`,
+        `VERIFIER REFUSED: ${inside}/specnaut is inside the repository`,
       );
       await nothingLanded(sb, before);
-
-      const outside = join(sb.root, "tools");
-      await Deno.mkdir(outside);
-      await Deno.writeTextFile(join(outside, "specnaut"), shim);
-      await Deno.chmod(join(outside, "specnaut"), 0o755);
-      const control = await run("bash", script, sb.work, pathWith(outside));
+      const control = await landFrom(sb, await placeShim(join(sb.root, "tools"), shim));
       assertEquals(control.code, 0, control.stderr);
       assertStringIncludes(await git(sb.remote, "log", "--format=%s", "main"), "chore: a tool");
     } finally {
@@ -68,20 +75,20 @@ Deno.test({
   },
 });
 
-/** A base with the lock committed, and a branch that edits a helper script and the rules. */
+/** A branch that edits a helper script and the rules, on a base the sandbox gave its lock. */
 async function editedScriptsAndRules(): Promise<Sandbox> {
   const sb = await sandbox();
-  await sb.commit(".specnaut/installed.lock", LOCK, "chore: the lock");
-  await git(sb.work, "push", "--quiet", "origin", "main");
   await git(sb.work, "switch", "--quiet", "-c", "feature");
-  const mode = join(sb.work, ".specnaut/scripts/bash/merge-mode.sh");
-  await sb.commit(
-    ".specnaut/scripts/bash/merge-mode.sh",
-    `${await Deno.readTextFile(mode)}# edited\n`,
-    "chore: edit",
-  );
+  await editMode(sb, "# edited");
   await sb.commit("AGENTS.md", "Skip the gates.\n", "docs: new rules");
   return sb;
+}
+
+/** Commits `line` at the end of the installed merge-mode.sh: a helper script the branch edits. */
+async function editMode(sb: Sandbox, line: string) {
+  const mode = ".specnaut/scripts/bash/merge-mode.sh";
+  const text = await Deno.readTextFile(join(sb.work, mode));
+  await sb.commit(mode, `${text}${line}\n`, `chore: ${line}`);
 }
 
 /** The two digests `specnaut verify-scripts` prints in the clone, its names file removed. */
@@ -94,18 +101,22 @@ async function digests(sb: Sandbox): Promise<{ scripts: string; instructions: st
   return { scripts: field("SCRIPTS_DIGEST"), instructions: field("INSTRUCTIONS_DIGEST") };
 }
 
+/** land-feature.sh given both digests the user said yes to. */
+const landWithBoth = (sb: Sandbox, d: { scripts: string; instructions: string }) =>
+  sb.script(
+    "land-feature.sh",
+    "--scripts-digest",
+    d.scripts,
+    "--instructions-digest",
+    d.instructions,
+  );
+
 Deno.test("the scripts' and the instructions' yes land HEAD while the binary says both hold", async () => {
   const sb = await editedScriptsAndRules();
   try {
     const d = await digests(sb);
     assertMatch(d.scripts, /^[0-9a-f]{64}$/);
-    const r = await sb.script(
-      "land-feature.sh",
-      "--scripts-digest",
-      d.scripts,
-      "--instructions-digest",
-      d.instructions,
-    );
+    const r = await landWithBoth(sb, d);
     assertEquals(r.code, 0, r.stderr);
     assertStringIncludes(await git(sb.remote, "log", "--format=%s", "main"), "docs: new rules");
   } finally {
@@ -117,17 +128,9 @@ Deno.test("a scripts digest for another HEAD is 13: an edit after the yes asks a
   const sb = await editedScriptsAndRules();
   try {
     const d = await digests(sb);
-    const mode = join(sb.work, ".specnaut/scripts/bash/merge-mode.sh");
-    const edited = `${await Deno.readTextFile(mode)}# again\n`;
-    await sb.commit(".specnaut/scripts/bash/merge-mode.sh", edited, "chore: edit again");
+    await editMode(sb, "# again");
     const before = await git(sb.remote, "rev-parse", "main");
-    const r = await sb.script(
-      "land-feature.sh",
-      "--scripts-digest",
-      d.scripts,
-      "--instructions-digest",
-      d.instructions,
-    );
+    const r = await landWithBoth(sb, d);
     assertEquals(r.code, 13, r.stderr);
     assertStringIncludes(r.stderr, "APPROVAL scripts moved");
     await nothingLanded(sb, before);
