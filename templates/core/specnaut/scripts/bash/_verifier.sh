@@ -31,15 +31,11 @@ resolve_specnaut() {
   exit 13
 }
 
-# HEAD's verdict, from the binary, each digest held passed on as its flag: return 0, or exit 13.
-# The binary compares the digests; this reads its lines. The instructions must be trusted or held
-# by their digest; the scripts, when a digest was passed, too. Without one the scripts' verdict is
-# merge step 0's, which stops before the landing, and a local base ahead of origin stays exit 6's.
-judge_head() {
-  local out rc=0 names ok=1 flags=()
-  [ -z "$scripts_digest" ] || flags+=(--approved-scripts "$scripts_digest")
-  [ -z "$instructions_digest" ] || flags+=(--approved-instructions "$instructions_digest")
-  out=$("$sn" verify-scripts ${flags[@]+"${flags[@]}"}) || rc=$?
+# The verifier's answer on HEAD, into `out`, given the flags; exit 13 when it is no answer for this
+# base: an exit past 1, no instructions digest, or another base's name.
+ask_verifier() {
+  local rc=0 names
+  out=$("$sn" verify-scripts "$@") || rc=$?
   names=$(sed -n 's/^NAMES_FILE //p' <<<"$out")
   [ -z "$names" ] || rm -f "$names"
   if [ "$rc" -gt 1 ] || ! grep -qE '^INSTRUCTIONS_DIGEST [0-9a-f]{64}$' <<<"$out" ||
@@ -47,12 +43,38 @@ judge_head() {
     echo "land-feature: the verifier could not judge HEAD (exit $rc) - nothing was landed" >&2
     exit 13
   fi
-  [ -z "$scripts_digest" ] || [ "$(sed -n '$p' <<<"$out")" = "VERDICT scripts trusted" ] ||
-    grep -q '^APPROVAL scripts holds ' <<<"$out" || ok=0
+}
+
+# Whether the scripts let HEAD land: trusted, or held by the digest passed. With none, the one
+# reason allowed is a local base ahead of origin, which the landing stops on itself (exit 6); a
+# script or the lock at base the branch changed is not landed without a yes.
+scripts_hold() {
+  local others
+  [ "$(sed -n '$p' <<<"$out")" = "VERDICT scripts trusted" ] && return 0
+  if [ -n "$scripts_digest" ]; then
+    grep -q '^APPROVAL scripts holds ' <<<"$out"
+    return
+  fi
+  others=$(grep '^UNTRUSTED ' <<<"$out" | grep -vxF "UNTRUSTED refs/heads/$base local $base ahead of origin") || true
+  [ -z "$others" ] && grep -q '^UNTRUSTED ' <<<"$out"
+}
+
+# HEAD's verdict, from the binary, each digest held passed on as its flag: return 0, or exit 13.
+# The binary compares the digests; this reads its lines. The instructions must be trusted or held.
+judge_head() {
+  local ok=1 flags=()
+  [ -z "$scripts_digest" ] || flags+=(--approved-scripts "$scripts_digest")
+  [ -z "$instructions_digest" ] || flags+=(--approved-instructions "$instructions_digest")
+  ask_verifier ${flags[@]+"${flags[@]}"}
+  scripts_hold || ok=0
   grep -qx 'VERDICT instructions trusted' <<<"$out" ||
     { [ -n "$instructions_digest" ] && grep -q '^APPROVAL instructions holds ' <<<"$out"; } || ok=0
   [ "$ok" = 0 ] || return 0
   grep -E '^(VERDICT instructions |UNTRUSTED |APPROVAL )' <<<"$out" >&2 || true
-  echo "land-feature: HEAD's instructions, or its helper scripts under --scripts-digest, are neither trusted nor the digest passed - ask, then land again with it. Nothing was landed" >&2
+  if [ -n "$scripts_digest" ] && grep -qxF "APPROVAL scripts moved $scripts_digest" <<<"$out"; then
+    echo "land-feature: HEAD's helper scripts hold a reason no yes can cover - stop on it. Nothing was landed" >&2
+  else
+    echo "land-feature: HEAD's instructions or helper scripts are neither trusted nor the digest passed - ask, then land again with it. Nothing was landed" >&2
+  fi
   exit 13
 }

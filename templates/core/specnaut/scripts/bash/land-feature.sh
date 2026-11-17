@@ -31,10 +31,10 @@
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
 #   12 an unexpected git failure before the push, named on stderr
-#   13 HEAD's instructions, or its helper scripts when --scripts-digest is
-#      passed, are neither trusted nor that digest, as the verifier judges
-#      them; or it could not judge HEAD, or `specnaut` resolved to a path it
-#      refuses (VERIFIER REFUSED);
+#   13 HEAD's instructions or helper scripts are neither trusted nor the
+#      digest passed, as the verifier judges them (without --scripts-digest
+#      only a local base ahead of origin passes, to exit 6); or it could not
+#      judge HEAD, or `specnaut` resolved to a path it refuses (VERIFIER REFUSED);
 #      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
 #      Nothing moved
 # (8 is retired: a branch that will not delete after the push is 11, never

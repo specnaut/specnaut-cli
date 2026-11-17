@@ -1,12 +1,12 @@
 import { DELIMITER, fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
+import { LOCK } from "../integration/verify_scripts_fixture.ts";
 import { specnautOnPath, withSpecnaut } from "./specnaut_shim.ts";
 
 /**
- * A throwaway clone with a bare `origin` whose HEAD is `main`, and the merge
- * scripts installed at `.specnaut/scripts/bash/` — the layout `base-branch.sh`
- * and the scripts resolve against (spec 042). Every command runs through
- * argv, never a shell string.
+ * A throwaway clone with a bare `origin` whose HEAD is `main`, the merge scripts and the lock
+ * installed under `.specnaut/` — the layout `base-branch.sh`, the scripts and the verifier resolve
+ * against (spec 042). Every command runs through argv, never a shell string.
  */
 
 const BASH_DIR = fromFileUrl(
@@ -17,11 +17,10 @@ export const SCRIPTS =
   land-feature.sh merge-mode.sh remove-spec.sh wip-audit.sh`.split(/\s+/);
 
 /**
- * Each merge script run on main with no feature stops at a refusal of its own,
- * past the sibling lookup (a sibling unfound is 3, base-branch.sh, or 13,
- * merge-hold.sh): its arguments, its exit, and the stderr line of that refusal
- * (fold-fixups.sh passes epic-status.sh's through). Exit 2 is bash's own too,
- * so the line is what tells the refusal apart (cli#728).
+ * Each merge script run on main with no feature stops at a refusal of its own, past the sibling
+ * lookup (a sibling unfound is 3, base-branch.sh, or 13, merge-hold.sh): its arguments, its exit,
+ * and the stderr line of that refusal (fold-fixups.sh passes epic-status.sh's through). Exit 2 is
+ * bash's own too, so the line is what tells the refusal apart (cli#728).
  */
 export const REFUSALS_ON_BASE: Readonly<
   Record<string, { args: string[]; code: number; line: string }>
@@ -161,6 +160,7 @@ export async function sandbox(): Promise<Sandbox> {
   const dest = join(work, ".specnaut/scripts/bash");
   await Deno.mkdir(dest, { recursive: true });
   for (const s of SCRIPTS) await Deno.copyFile(join(BASH_DIR, s), join(dest, s));
+  await Deno.writeTextFile(join(work, ".specnaut/installed.lock"), LOCK);
   // The installed scripts are the project's tooling, committed like any other file.
   await git(work, "add", ".specnaut");
   await git(work, "commit", "--quiet", "-m", "chore: install the scripts");

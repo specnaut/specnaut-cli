@@ -119,8 +119,8 @@ under `--no-close`, once more after the push: there the item's line must read `O
    ```
 
    Pass each digest the user said yes to at step 0, and no other. It judges HEAD again itself,
-   with the verifier, and lands only when the instructions, and the scripts when their digest is
-   passed, are each trusted or still that digest.
+   with the verifier, and lands only when the scripts and the instructions are each trusted or
+   still that digest; a local base ahead of origin is left to its exit 6.
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
    contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
@@ -144,7 +144,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
-   | 13 | HEAD's instructions, or its scripts under `--scripts-digest`, are neither trusted nor the digest passed, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
+   | 13 | HEAD's scripts or instructions are neither trusted nor the digest passed, or hold a reason no yes covers, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
    the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its

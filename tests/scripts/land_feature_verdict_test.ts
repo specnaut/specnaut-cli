@@ -78,19 +78,6 @@ Deno.test("a verdict with no digest line is 13", async () => {
   await refused(["BASE_BRANCH main", ...TRUSTED], "could not judge");
 });
 
-Deno.test("with no scripts digest, the scripts' verdict is step 0's: trusted instructions land on exit 1", async () => {
-  const sb = await featureBranch();
-  try {
-    const head = await git(sb.work, "rev-parse", "HEAD");
-    const lines = ["BASE_BRANCH main", DIGEST, TRUSTED[0], "VERDICT scripts untrusted"];
-    const r = await landWith(sb, lines, 1);
-    assertEquals(r.code, 0, r.stderr);
-    assertEquals(await git(sb.remote, "rev-parse", "main"), head);
-  } finally {
-    await sb.cleanup();
-  }
-});
-
 Deno.test("a failure inside the verdict's reading is 12, named, never a raw exit", async () => {
   const sb = await featureBranch();
   try {
@@ -118,73 +105,82 @@ const judged = (extra: string[], last = "VERDICT scripts untrusted") => [
   last,
 ];
 
-Deno.test("each digest held is passed on as its flag, and none when none is held", async () => {
-  for (
-    const [args, flags] of [
-      [[], []],
-      [["--scripts-digest", A], ["--approved-scripts", A]],
-      [["--instructions-digest", B], ["--approved-instructions", B]],
-      [
-        ["--instructions-digest", B, "--scripts-digest", A],
-        ["--approved-scripts", A, "--approved-instructions", B],
-      ],
-    ]
-  ) {
-    const sb = await featureBranch();
-    try {
-      const lines = judged(["VERDICT instructions trusted", `APPROVAL scripts holds ${A}`]);
-      const r = await landWith(sb, lines, 0, args);
-      assertEquals(r.code, 0, r.stderr);
-      const seen = (await Deno.readTextFile(argsOf(sb))).trimEnd().split("\n");
-      assertEquals(seen, ["verify-scripts", ...flags], args.join(" "));
-    } finally {
-      await sb.cleanup();
-    }
-  }
-});
-
-Deno.test("a scripts digest the binary says moved is 13, the trusted instructions aside", async () => {
-  await refusedWith(
-    judged(["VERDICT instructions trusted", `APPROVAL scripts moved ${B}`]),
-    1,
-    ["--scripts-digest", A],
-  );
-});
-
-Deno.test("untrusted instructions land only on the binary's holds line for their digest", async () => {
-  const untrusted = "VERDICT instructions untrusted AGENTS.md not on base";
-  await refusedWith(judged([untrusted]), 1, []);
-  await refusedWith(
-    judged([untrusted, `APPROVAL instructions moved ${B}`], "VERDICT scripts trusted"),
-    1,
-    [
-      "--instructions-digest",
-      A,
-    ],
-  );
+/** `lines` with exit `code`, given `args`: landed, and the stub given `flags` when named. */
+async function landedWith(lines: string[], code: number, args: string[], flags?: string[]) {
   const sb = await featureBranch();
   try {
-    const lines = judged(
-      [untrusted, `APPROVAL instructions holds ${A}`],
-      "VERDICT scripts trusted",
-    );
-    const r = await landWith(sb, lines, 0, ["--instructions-digest", A]);
+    const head = await git(sb.work, "rev-parse", "HEAD");
+    const r = await landWith(sb, lines, code, args);
     assertEquals(r.code, 0, r.stderr);
+    assertEquals(await git(sb.remote, "rev-parse", "main"), head);
+    if (flags === undefined) return;
+    const seen = (await Deno.readTextFile(argsOf(sb))).trimEnd().split("\n");
+    assertEquals(seen, ["verify-scripts", ...flags], args.join(" "));
   } finally {
     await sb.cleanup();
   }
-});
+}
 
-/** `lines` with exit `code`, given `args`: 13 and nothing moved. */
-async function refusedWith(lines: string[], code: number, args: string[]) {
+/** `lines` with exit `code`, given `args`: 13 naming `why`, and nothing moved. */
+async function refusedWith(lines: string[], code: number, args: string[], why = NOT_HELD) {
   const sb = await featureBranch();
   try {
     const before = await git(sb.remote, "rev-parse", "main");
     const r = await landWith(sb, lines, code, args);
     assertEquals(r.code, 13, r.stderr);
-    assertStringIncludes(r.stderr, "neither trusted nor the digest passed");
+    assertStringIncludes(r.stderr, why);
     assertEquals(await git(sb.remote, "rev-parse", "main"), before);
   } finally {
     await sb.cleanup();
   }
 }
+
+const NOT_HELD = "neither trusted nor the digest passed";
+const SCRIPTS_YES = `APPROVAL scripts holds ${A}`;
+
+Deno.test("each digest held is passed on as its flag, and none when none is held", async () => {
+  const lines = judged([TRUSTED[0], SCRIPTS_YES]);
+  const trusted = judged([TRUSTED[0]], "VERDICT scripts trusted");
+  await landedWith(trusted, 0, [], []);
+  await landedWith(lines, 0, ["--scripts-digest", A], ["--approved-scripts", A]);
+  await landedWith(trusted, 0, ["--instructions-digest", B], ["--approved-instructions", B]);
+  await landedWith(lines, 0, ["--instructions-digest", B, "--scripts-digest", A], [
+    "--approved-scripts",
+    A,
+    "--approved-instructions",
+    B,
+  ]);
+});
+
+Deno.test("without a scripts digest, a script or the lock the branch changed is 13", async () => {
+  for (
+    const reason of [
+      "UNTRUSTED .specnaut/scripts/bash/x.sh differs from base",
+      "UNTRUSTED .specnaut/installed.lock at base: no lock",
+    ]
+  ) await refusedWith(judged([TRUSTED[0], reason]), 1, []);
+  await refusedWith(judged([TRUSTED[0]]), 1, []);
+});
+
+Deno.test("without a scripts digest, a local base ahead of origin is left to exit 6", async () => {
+  await landedWith(
+    judged([TRUSTED[0], "UNTRUSTED refs/heads/main local main ahead of origin"]),
+    1,
+    [],
+  );
+});
+
+Deno.test("a scripts digest the binary says moved is 13; for the same digest, no yes covers it", async () => {
+  const moved = (d: string) => judged([TRUSTED[0], `APPROVAL scripts moved ${d}`]);
+  await refusedWith(moved(B), 1, ["--scripts-digest", A], "ask, then land again with it");
+  await refusedWith(moved(A), 1, ["--scripts-digest", A], "a reason no yes can cover");
+});
+
+Deno.test("untrusted instructions land only on the binary's holds line for their digest", async () => {
+  const untrusted = "VERDICT instructions untrusted AGENTS.md not on base";
+  const scripts = "VERDICT scripts trusted";
+  const args = ["--instructions-digest", A];
+  await refusedWith(judged([untrusted]), 1, []);
+  await refusedWith(judged([untrusted, `APPROVAL instructions moved ${B}`], scripts), 1, args);
+  await landedWith(judged([untrusted, `APPROVAL instructions holds ${A}`], scripts), 0, args);
+});
