@@ -1,6 +1,6 @@
 /**
  * The folders a sandboxed gate run may read its tools from, as `.specnaut/gates.yml` declares them
- * under `toolchain:`, in the file's narrow list format (`run-gate.sh`'s `parse_list`): a top-level
+ * under `toolchain:`, in the file's narrow list format (`_gate_list.sh`'s `parse_list`): a top-level
  * key, then `  - ` items, a matched pair of quotes stripped. An item is an absolute folder, or
  * `~/` and a folder under the home, the home written out for it.
  *

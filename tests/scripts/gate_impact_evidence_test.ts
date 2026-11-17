@@ -274,7 +274,7 @@ Deno.test("the decision table (bash): the resolver family holds no parser and no
     assert(!/\bawk\b/.test(code), `${file} holds an awk`);
   }
   assertStringIncludes(
-    await Deno.readTextFile(join(SCRIPTS, "bash", "run-gate.sh")),
+    await Deno.readTextFile(join(SCRIPTS, "bash", "_gate_list.sh")),
     "awk -v key=",
   );
 });

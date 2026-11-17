@@ -20,7 +20,7 @@ BASE="$(git rev-parse HEAD)"
 
 echo "═══ #725  impact-aware gates: run-gate.sh behind a flag, on a real scaffold ═══"
 GATE=.specnaut/scripts/bash/run-gate.sh
-for script in gate-impact.sh _gate_candidate.sh _gate_impact_read.sh _gate_impact_adapter.sh _gate_impact_graph.sh _gate_evidence.sh _gate_selected.sh _gate_sandbox.sh; do
+for script in gate-impact.sh _gate_candidate.sh _gate_impact_read.sh _gate_impact_adapter.sh _gate_impact_graph.sh _gate_evidence.sh _gate_selected.sh _gate_sandbox.sh _gate_list.sh; do
   check "$script scaffolded + executable" "[ -x .specnaut/scripts/bash/$script ]"
 done
 for script in gate-impact.ps1 base-branch.ps1 _gate_candidate.ps1 _gate_impact_read.ps1 _gate_impact_adapter.ps1 _gate_impact_graph.ps1 _gate_evidence.ps1 _gate_selected.ps1; do

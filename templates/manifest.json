@@ -2298,6 +2298,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_gate_list.sh",
+      "source": "core/specnaut/scripts/bash/_gate_list.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/merge-mode.sh",
       "source": "core/specnaut/scripts/bash/merge-mode.sh",
       "executable": true

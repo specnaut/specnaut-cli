@@ -7,9 +7,9 @@
 # Reads `.specnaut/gates.yml` and runs the commands under `fast_gate:` or
 # `full_gate:`, in order, from the repository root.
 #
-# This script is the ONE place the declaration is parsed. The per-child loop
-# and the pre-merge step both call it; neither reads the file itself. A second
-# parser is a second definition of what a gate is, and the two drift.
+# This script, through _gate_list.sh, is the ONE place the declaration is parsed.
+# The per-child loop and the pre-merge step both call it; neither reads the file
+# itself. A second parser is a second definition of what a gate is, and the two drift.
 #
 # It names no test tool, runner or framework, and it never will: the commands
 # come from the project's file and are executed verbatim. There is nowhere in
@@ -60,41 +60,10 @@ SPECNAUT_DIR="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 GATES="$SPECNAUT_DIR/gates.yml"
 REPO_ROOT="$(cd -- "$SPECNAUT_DIR/.." && pwd)"
 
-# Read one flat list. The format is narrow on purpose (see gates.yml): a
-# top-level key (`<tier>_gate:`, `toolchain:`), then `  - ` items until the next
-# top-level key. Quotes around an item are optional and are stripped as a matched
-# pair only, so a command containing a quote is not silently mangled.
-# src/domain/gates_toolchain.ts reads `toolchain:` the same way; a test runs both.
+# The tier's commands; how a list is read is _gate_list.sh's alone.
 parse_tier() { parse_list "${TIER}_gate:" "$1"; }
-
-# parse_list <key> <file> - the items under the top-level <key>, one a line.
-parse_list() {
-  awk -v key="$1" '
-    # A file saved with Windows line ends is read as if it had none: every
-    # carriage return goes first, or a blank line would read as a key.
-    { gsub(/\r/, "") }
-    # A top-level key is a line starting in column 1 with a non-space,
-    # non-comment character. Reaching one ends the section we are in.
-    /^[^ \t#]/ {
-      if (index($0, key) == 1) { inside = 1; next }
-      inside = 0
-    }
-    !inside { next }
-    /^[ \t]*#/ { next }
-    /^[ \t]*$/ { next }
-    /^[ \t]*-[ \t]*/ {
-      line = $0
-      sub(/^[ \t]*-[ \t]*/, "", line)
-      sub(/[ \t]+$/, "", line)
-      if (line == "") next
-      first = substr(line, 1, 1); last = substr(line, length(line), 1)
-      if ((first == "\"" && last == "\"") || (first == "'\''" && last == "'\''")) {
-        if (length(line) >= 2) line = substr(line, 2, length(line) - 2)
-      }
-      print line
-    }
-  ' < "$2"
-}
+# shellcheck source=SCRIPTDIR/_gate_list.sh
+. "$SCRIPT_DIR/_gate_list.sh" || { echo "run-gate: _gate_list.sh is missing" >&2; exit 3; }
 
 FLAG="" BASE_VALUE=""
 # shellcheck source=SCRIPTDIR/_gate_sandbox.sh

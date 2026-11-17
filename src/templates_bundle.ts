@@ -30107,9 +30107,9 @@ generate_branch_name() {
 # Reads \`.specnaut/gates.yml\` and runs the commands under \`fast_gate:\` or
 # \`full_gate:\`, in order, from the repository root.
 #
-# This script is the ONE place the declaration is parsed. The per-child loop
-# and the pre-merge step both call it; neither reads the file itself. A second
-# parser is a second definition of what a gate is, and the two drift.
+# This script, through _gate_list.sh, is the ONE place the declaration is parsed.
+# The per-child loop and the pre-merge step both call it; neither reads the file
+# itself. A second parser is a second definition of what a gate is, and the two drift.
 #
 # It names no test tool, runner or framework, and it never will: the commands
 # come from the project's file and are executed verbatim. There is nowhere in
@@ -30160,41 +30160,10 @@ SPECNAUT_DIR="\$(cd -- "\$SCRIPT_DIR/../.." && pwd)"
 GATES="\$SPECNAUT_DIR/gates.yml"
 REPO_ROOT="\$(cd -- "\$SPECNAUT_DIR/.." && pwd)"
 
-# Read one flat list. The format is narrow on purpose (see gates.yml): a
-# top-level key (\`<tier>_gate:\`, \`toolchain:\`), then \`  - \` items until the next
-# top-level key. Quotes around an item are optional and are stripped as a matched
-# pair only, so a command containing a quote is not silently mangled.
-# src/domain/gates_toolchain.ts reads \`toolchain:\` the same way; a test runs both.
+# The tier's commands; how a list is read is _gate_list.sh's alone.
 parse_tier() { parse_list "\${TIER}_gate:" "\$1"; }
-
-# parse_list <key> <file> - the items under the top-level <key>, one a line.
-parse_list() {
-  awk -v key="\$1" '
-    # A file saved with Windows line ends is read as if it had none: every
-    # carriage return goes first, or a blank line would read as a key.
-    { gsub(/\\r/, "") }
-    # A top-level key is a line starting in column 1 with a non-space,
-    # non-comment character. Reaching one ends the section we are in.
-    /^[^ \\t#]/ {
-      if (index(\$0, key) == 1) { inside = 1; next }
-      inside = 0
-    }
-    !inside { next }
-    /^[ \\t]*#/ { next }
-    /^[ \\t]*\$/ { next }
-    /^[ \\t]*-[ \\t]*/ {
-      line = \$0
-      sub(/^[ \\t]*-[ \\t]*/, "", line)
-      sub(/[ \\t]+\$/, "", line)
-      if (line == "") next
-      first = substr(line, 1, 1); last = substr(line, length(line), 1)
-      if ((first == "\\"" && last == "\\"") || (first == "'\\''" && last == "'\\''")) {
-        if (length(line) >= 2) line = substr(line, 2, length(line) - 2)
-      }
-      print line
-    }
-  ' < "\$2"
-}
+# shellcheck source=SCRIPTDIR/_gate_list.sh
+. "\$SCRIPT_DIR/_gate_list.sh" || { echo "run-gate: _gate_list.sh is missing" >&2; exit 3; }
 
 FLAG="" BASE_VALUE=""
 # shellcheck source=SCRIPTDIR/_gate_sandbox.sh
@@ -31301,6 +31270,9 @@ run_selected() {
 # and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
+# shellcheck source=SCRIPTDIR/_gate_list.sh disable=SC1091
+. "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_gate_list.sh" || return 70
+
 # shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
 GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TOOLCHAIN=""
 
@@ -31308,6 +31280,7 @@ GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TO
 # --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
 # it used. A value is never empty and never starts with \`-\`, as --base's. The head is
 # parsed once, later, by _explicit_head.sh.
+# shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
 gate_sandbox_option() {
   case "\$1" in --head | --objects | --evidence | --sandbox) ;; *) flag_usage ;; esac
   GATE_WORDS=1
@@ -31381,6 +31354,7 @@ gate_toolchain_of() {
   local item folder
   while IFS= read -r item; do
     item="\${item%\$'\\r'}"
+    # shellcheck disable=SC2088 # "~/" is matched as text, never expanded
     case "\$item" in
       "~/"*) [ -n "\${HOME:-}" ] || continue; folder="\$HOME\${item#\\~}" ;;
       *) folder="\$item" ;;
@@ -31428,6 +31402,55 @@ gate_not_run_line() {
 gate_not_run() {
   gate_not_run_line "\$@" >&2
   exit 125
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_list.sh",
+    content: `# shellcheck shell=bash
+# Sourced by run-gate.sh and _gate_sandbox.sh: the one home of how a list of
+# \`.specnaut/gates.yml\` is read. run-gate.sh is still the only way in from outside
+# (\`--parse-gates\`, \`--parse-toolchain\`): a second parser is a second definition of
+# what a gate is, and the two drift.
+#
+# The format is narrow on purpose (see gates.yml): a top-level key (\`<tier>_gate:\`,
+# \`toolchain:\`), then \`  - \` items until the next top-level key. Quotes around an item
+# are optional and are stripped as a matched pair only, so a command containing a
+# quote is not silently mangled. src/domain/gates_toolchain.ts reads \`toolchain:\` the
+# same way; a test runs both.
+
+# parse_list <key> <file> - the items under the top-level <key>, one a line.
+parse_list() {
+  awk -v key="\$1" '
+    # A file saved with Windows line ends is read as if it had none: every
+    # carriage return goes first, or a blank line would read as a key.
+    { gsub(/\\r/, "") }
+    # A top-level key is a line starting in column 1 with a non-space,
+    # non-comment character. Reaching one ends the section we are in.
+    /^[^ \\t#]/ {
+      if (index(\$0, key) == 1) { inside = 1; next }
+      inside = 0
+    }
+    !inside { next }
+    /^[ \\t]*#/ { next }
+    /^[ \\t]*\$/ { next }
+    /^[ \\t]*-[ \\t]*/ {
+      line = \$0
+      sub(/^[ \\t]*-[ \\t]*/, "", line)
+      sub(/[ \\t]+\$/, "", line)
+      if (line == "") next
+      first = substr(line, 1, 1); last = substr(line, length(line), 1)
+      if ((first == "\\"" && last == "\\"") || (first == "'\\''" && last == "'\\''")) {
+        if (length(line) >= 2) line = substr(line, 2, length(line) - 2)
+      }
+      print line
+    }
+  ' < "\$2"
 }
 `,
     executable: true,

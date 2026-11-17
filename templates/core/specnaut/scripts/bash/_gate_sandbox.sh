@@ -12,6 +12,9 @@
 # and exits 125, NOT RUN, which is never a pass. No owners reach a sandboxed command: a head
 # is always run in full (gate-impact.sh runs no adapter on a head).
 
+# shellcheck source=SCRIPTDIR/_gate_list.sh disable=SC1091
+. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_gate_list.sh" || return 70
+
 # shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
 GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TOOLCHAIN=""
 
@@ -19,6 +22,7 @@ GATE_LOGS="" GATE_RUNS=0 GATE_WORDS=0 EVIDENCE="" SANDBOX=0 HEAD_ARGS=() GATE_TO
 # --sandbox, any other option being a usage error, and sets GATE_WORDS to how many words
 # it used. A value is never empty and never starts with `-`, as --base's. The head is
 # parsed once, later, by _explicit_head.sh.
+# shellcheck disable=SC2034 # GATE_WORDS is read by run-gate.sh's option loop
 gate_sandbox_option() {
   case "$1" in --head | --objects | --evidence | --sandbox) ;; *) flag_usage ;; esac
   GATE_WORDS=1
@@ -92,6 +96,7 @@ gate_toolchain_of() {
   local item folder
   while IFS= read -r item; do
     item="${item%$'\r'}"
+    # shellcheck disable=SC2088 # "~/" is matched as text, never expanded
     case "$item" in
       "~/"*) [ -n "${HOME:-}" ] || continue; folder="$HOME${item#\~}" ;;
       *) folder="$item" ;;
