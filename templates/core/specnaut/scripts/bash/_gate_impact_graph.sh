@@ -3,6 +3,13 @@
 # Sourced by gate-impact.sh: the one home of the change set and of the affected set
 # with its reverse closure. Reports facts; whether one widens the run is
 # gate-impact.sh's call. Requires gate_git and jq_lf.
+#
+# Every path is top-relative: gate-impact refuses a project not at its work tree's top
+# (gate_candidate_in_repo), so a declared path already is one; trees are listed whole
+# (--full-tree). A path is compared as the text jq decodes it to, U+FFFD for bytes that
+# are not UTF-8, as the PowerShell twin decodes it. A path holding U+FFFD or a newline is
+# never compared: a changed one widens as `path-unreadable`, a protected one reads as not
+# regular. The same rule in both twins, so they never answer apart on such a name.
 
 # gate_graph_changes <base> <commit> <paths-out> - writes the changed paths,
 # NUL-separated. --no-renames makes a rename its delete plus its add, so both of
@@ -29,18 +36,21 @@ gate_graph_changes() {
 
 # gate_graph_protected_entries <commit> <path> - the path's tracked entries as text,
 # for comparing sides. Returns 1 when it has none, 2 when one is not a regular file
-# or its name holds a newline: the text is newline-joined, so such a name could read
-# as two entries and match a side that holds them. ls-tree finds nothing through a
-# symlink component, so that reads as untracked.
+# or its name holds a newline or U+FFFD: the text is newline-joined, so a newline could
+# read as two entries and match a side that holds them, and two names that are not
+# UTF-8 can decode alike. ls-tree finds nothing through a symlink component, so that
+# reads as untracked.
 gate_graph_protected_entries() {
-  local entry found=1
+  local entry text="" found=1
   while IFS= read -r -d '' entry; do
     found=0
     case "$entry" in *$'\n'*) return 2 ;; esac
     case "$entry" in 100644\ *|100755\ *) ;; *) return 2 ;; esac
-    printf '%s\n' "$entry"
-  done < <(gate_git ls-tree -r -z "$1" -- "$2" 2>/dev/null)
-  return "$found"
+    text+="$entry"$'\n'
+  done < <(gate_git ls-tree -r -z --full-tree "$1" -- "$2" 2>/dev/null)
+  [ "$found" -eq 0 ] || return 1
+  printf '%s' "$text" | jq_lf -Rse 'contains("\ufffd") | not' >/dev/null || return 2
+  printf '%s' "$text"
 }
 
 # gate_graph_pair <paths> <snapshot> >>pairs - one line of the input to
@@ -66,7 +76,8 @@ gate_graph_affected() {
       | if $n == $s then $s else $n | close($edges) end;
     . as $pairs | $cand[0] as $c | $declared[0] as $d
     | ([$pairs[] as $b | $b.changes[] as $p
-        | if listed($d.full_on; $p) then "full-on: \($p)"
+        | if ($p | contains("\ufffd") or contains("\n")) then "path-unreadable: \($p)"
+          elif listed($d.full_on; $p) then "full-on: \($p)"
           elif listed($d.inert; $p) then empty
           elif (($c | owners_of($p)) + ($b.snapshot | owners_of($p))) == [] then "unowned: \($p)"
           else empty end] | first // "") as $cause

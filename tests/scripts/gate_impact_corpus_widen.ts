@@ -32,12 +32,12 @@ export const WIDENING: Case[] = [
     marks: FULL_MARKS,
   },
   {
-    name: "a newline in an unowned path cannot forge a report line",
+    name: "a newline in a changed path cannot forge a report line",
     posixOnly: true,
     build: change("stray\nfallback: none"),
     code: 0,
     scope: "full",
-    fallback: "unowned: stray?fallback: none",
+    fallback: "path-unreadable: stray?fallback: none",
     marks: FULL_MARKS,
   },
   {

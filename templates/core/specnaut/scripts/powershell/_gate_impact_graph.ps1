@@ -1,6 +1,13 @@
 # Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
 # of the change set and of the affected set with its reverse closure. Reports facts;
 # whether one widens the run is gate-impact's call. Comparison is ordinal throughout.
+#
+# Every path is top-relative: gate-impact refuses a project not at its work tree's top
+# (Test-GateCandidateInRepo), so a declared path already is one; trees are listed whole
+# (--full-tree). git's output is decoded leniently (Invoke-GateProcess): bytes that are not
+# UTF-8 read as U+FFFD, as the bash twin's jq decodes them. A path holding U+FFFD or a
+# newline is never compared: a changed one widens as `path-unreadable`, a protected one
+# reads as not regular. The same rule in both twins, so they never answer apart on such a name.
 
 # Returns @{ Paths } or @{ Problem }. --no-renames makes a rename its delete plus its add,
 # so both of its owners are seen. Problem is the first path whose kind no adapter can
@@ -24,15 +31,15 @@ function Get-GateChanges([string]$Base, [string]$Commit) {
 }
 
 # The path's tracked entries as text, for comparing sides. Code 1 when it has none, 2 when
-# one is not a regular file or its name holds a newline: the text is newline-joined, so
-# such a name could read as two entries. ls-tree finds nothing through a symlink
-# component, so that reads as untracked.
+# one is not a regular file or its name holds a newline or U+FFFD: the text is
+# newline-joined, so a newline could read as two entries, and two names that are not UTF-8
+# can decode alike. ls-tree finds nothing through a symlink component, so that reads as untracked.
 function Get-GateProtectedEntries([string]$Commit, [string]$Path) {
-    $r = Invoke-GateGit @('ls-tree', '-r', '-z', $Commit, '--', $Path)
+    $r = Invoke-GateGit @('ls-tree', '-r', '-z', '--full-tree', $Commit, '--', $Path)
     $entries = @($r.Out.Split([char]0) | Where-Object { $_.Length -gt 0 })
     if ($entries.Count -eq 0) { return @{ Code = 1; Text = '' } }
     foreach ($entry in $entries) {
-        if ($entry.Contains("`n")) { return @{ Code = 2; Text = '' } }
+        if ($entry.Contains("`n") -or $entry.Contains([char]0xFFFD)) { return @{ Code = 2; Text = '' } }
         if (-not ($entry.StartsWith('100644 ', [StringComparison]::Ordinal) -or $entry.StartsWith('100755 ', [StringComparison]::Ordinal))) {
             return @{ Code = 2; Text = '' }
         }
@@ -56,12 +63,13 @@ function Get-GateOwnersOf($Owners, [string]$Path) {
     return , $out
 }
 
-# The first path no snapshot on its own pair's sides owns, or a full_on one. A path must
-# be owned on its own pair's sides, or an owner only another base knows would stop it
-# being unowned. Returns the cause, or ''.
+# The first path that cannot be compared, no snapshot on its own pair's sides owns, or a
+# full_on one. A path must be owned on its own pair's sides, or an owner only another base
+# knows would stop it being unowned. Returns the cause, or ''.
 function Get-GatePathCause($Pairs, $Candidate, $Declared) {
     foreach ($pair in $Pairs) {
         foreach ($path in $pair.Changes) {
+            if ($path.Contains([char]0xFFFD) -or $path.Contains("`n")) { return "path-unreadable: $path" }
             if (Test-GateListed $Declared.FullOn $path) { return "full-on: $path" }
             if (Test-GateListed $Declared.Inert $path) { continue }
             $held = (Get-GateOwnersOf $Candidate $path).Count + (Get-GateOwnersOf $pair.Snapshot $path).Count

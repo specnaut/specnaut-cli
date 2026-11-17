@@ -120,12 +120,12 @@ export const SELECTION: Case[] = [
     marks: scoped("web"),
   },
   {
-    name: "a path with a newline is matched as itself",
+    name: "a path with a newline is never matched, even under an owner's root",
     posixOnly: true,
     build: change("apps/web/a\nnewline.ts"),
     code: 0,
-    scope: "owners web",
-    marks: scoped("web"),
+    fallback: "path-unreadable: apps/web/a?newline.ts",
+    marks: FULL_MARKS,
   },
   {
     name: "an inert path affects nothing: every mapped command is omitted",

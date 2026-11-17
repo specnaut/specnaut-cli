@@ -680,12 +680,12 @@ owner whose record differs, or that exists on one side only, is affected. So is 
 owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-the \`fallback:\` line: an unowned path, a \`full_on\` match, a gitlink, a symlink or a type
-change; a declaration, an \`adapter.files\` entry, \`gates.yml\` or \`.specnaut/scripts/\` that
-differs from a given base, or from the merge-base with the default branch; any of those
-that is not a tracked regular file; an adapter that fails or answers anything invalid; a
-malformed declaration; a base that does not resolve or was never fetched; \`jq\` absent, older
-than 1.6, or failing where its answer decides the run.
+the \`fallback:\` line: a path name that is not UTF-8 or holds a newline, an unowned path, a
+\`full_on\` match, a gitlink, a symlink or a type change; a declaration, an \`adapter.files\`
+entry, \`gates.yml\` or \`.specnaut/scripts/\` that differs from a given base, or from the
+merge-base with the default branch; any of those not a tracked regular file; an adapter that
+fails or answers anything invalid; a malformed declaration; a base that does not resolve or
+was never fetched; \`jq\` absent, older than 1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -30905,6 +30905,13 @@ gate_adapter_run() {
 # Sourced by gate-impact.sh: the one home of the change set and of the affected set
 # with its reverse closure. Reports facts; whether one widens the run is
 # gate-impact.sh's call. Requires gate_git and jq_lf.
+#
+# Every path is top-relative: gate-impact refuses a project not at its work tree's top
+# (gate_candidate_in_repo), so a declared path already is one; trees are listed whole
+# (--full-tree). A path is compared as the text jq decodes it to, U+FFFD for bytes that
+# are not UTF-8, as the PowerShell twin decodes it. A path holding U+FFFD or a newline is
+# never compared: a changed one widens as \`path-unreadable\`, a protected one reads as not
+# regular. The same rule in both twins, so they never answer apart on such a name.
 
 # gate_graph_changes <base> <commit> <paths-out> - writes the changed paths,
 # NUL-separated. --no-renames makes a rename its delete plus its add, so both of
@@ -30931,18 +30938,21 @@ gate_graph_changes() {
 
 # gate_graph_protected_entries <commit> <path> - the path's tracked entries as text,
 # for comparing sides. Returns 1 when it has none, 2 when one is not a regular file
-# or its name holds a newline: the text is newline-joined, so such a name could read
-# as two entries and match a side that holds them. ls-tree finds nothing through a
-# symlink component, so that reads as untracked.
+# or its name holds a newline or U+FFFD: the text is newline-joined, so a newline could
+# read as two entries and match a side that holds them, and two names that are not
+# UTF-8 can decode alike. ls-tree finds nothing through a symlink component, so that
+# reads as untracked.
 gate_graph_protected_entries() {
-  local entry found=1
+  local entry text="" found=1
   while IFS= read -r -d '' entry; do
     found=0
     case "\$entry" in *\$'\\n'*) return 2 ;; esac
     case "\$entry" in 100644\\ *|100755\\ *) ;; *) return 2 ;; esac
-    printf '%s\\n' "\$entry"
-  done < <(gate_git ls-tree -r -z "\$1" -- "\$2" 2>/dev/null)
-  return "\$found"
+    text+="\$entry"\$'\\n'
+  done < <(gate_git ls-tree -r -z --full-tree "\$1" -- "\$2" 2>/dev/null)
+  [ "\$found" -eq 0 ] || return 1
+  printf '%s' "\$text" | jq_lf -Rse 'contains("\\ufffd") | not' >/dev/null || return 2
+  printf '%s' "\$text"
 }
 
 # gate_graph_pair <paths> <snapshot> >>pairs - one line of the input to
@@ -30968,7 +30978,8 @@ gate_graph_affected() {
       | if \$n == \$s then \$s else \$n | close(\$edges) end;
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
     | ([\$pairs[] as \$b | \$b.changes[] as \$p
-        | if listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
+        | if (\$p | contains("\\ufffd") or contains("\\n")) then "path-unreadable: \\(\$p)"
+          elif listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
           elif listed(\$d.inert; \$p) then empty
           elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
           else empty end] | first // "") as \$cause
@@ -37158,6 +37169,13 @@ function Invoke-GateAdapter([string]\$Command, [string]\$Worktree, [string]\$Tre
       `# Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
 # of the change set and of the affected set with its reverse closure. Reports facts;
 # whether one widens the run is gate-impact's call. Comparison is ordinal throughout.
+#
+# Every path is top-relative: gate-impact refuses a project not at its work tree's top
+# (Test-GateCandidateInRepo), so a declared path already is one; trees are listed whole
+# (--full-tree). git's output is decoded leniently (Invoke-GateProcess): bytes that are not
+# UTF-8 read as U+FFFD, as the bash twin's jq decodes them. A path holding U+FFFD or a
+# newline is never compared: a changed one widens as \`path-unreadable\`, a protected one
+# reads as not regular. The same rule in both twins, so they never answer apart on such a name.
 
 # Returns @{ Paths } or @{ Problem }. --no-renames makes a rename its delete plus its add,
 # so both of its owners are seen. Problem is the first path whose kind no adapter can
@@ -37181,15 +37199,15 @@ function Get-GateChanges([string]\$Base, [string]\$Commit) {
 }
 
 # The path's tracked entries as text, for comparing sides. Code 1 when it has none, 2 when
-# one is not a regular file or its name holds a newline: the text is newline-joined, so
-# such a name could read as two entries. ls-tree finds nothing through a symlink
-# component, so that reads as untracked.
+# one is not a regular file or its name holds a newline or U+FFFD: the text is
+# newline-joined, so a newline could read as two entries, and two names that are not UTF-8
+# can decode alike. ls-tree finds nothing through a symlink component, so that reads as untracked.
 function Get-GateProtectedEntries([string]\$Commit, [string]\$Path) {
-    \$r = Invoke-GateGit @('ls-tree', '-r', '-z', \$Commit, '--', \$Path)
+    \$r = Invoke-GateGit @('ls-tree', '-r', '-z', '--full-tree', \$Commit, '--', \$Path)
     \$entries = @(\$r.Out.Split([char]0) | Where-Object { \$_.Length -gt 0 })
     if (\$entries.Count -eq 0) { return @{ Code = 1; Text = '' } }
     foreach (\$entry in \$entries) {
-        if (\$entry.Contains("\`n")) { return @{ Code = 2; Text = '' } }
+        if (\$entry.Contains("\`n") -or \$entry.Contains([char]0xFFFD)) { return @{ Code = 2; Text = '' } }
         if (-not (\$entry.StartsWith('100644 ', [StringComparison]::Ordinal) -or \$entry.StartsWith('100755 ', [StringComparison]::Ordinal))) {
             return @{ Code = 2; Text = '' }
         }
@@ -37213,12 +37231,13 @@ function Get-GateOwnersOf(\$Owners, [string]\$Path) {
     return , \$out
 }
 
-# The first path no snapshot on its own pair's sides owns, or a full_on one. A path must
-# be owned on its own pair's sides, or an owner only another base knows would stop it
-# being unowned. Returns the cause, or ''.
+# The first path that cannot be compared, no snapshot on its own pair's sides owns, or a
+# full_on one. A path must be owned on its own pair's sides, or an owner only another base
+# knows would stop it being unowned. Returns the cause, or ''.
 function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
     foreach (\$pair in \$Pairs) {
         foreach (\$path in \$pair.Changes) {
+            if (\$path.Contains([char]0xFFFD) -or \$path.Contains("\`n")) { return "path-unreadable: \$path" }
             if (Test-GateListed \$Declared.FullOn \$path) { return "full-on: \$path" }
             if (Test-GateListed \$Declared.Inert \$path) { continue }
             \$held = (Get-GateOwnersOf \$Candidate \$path).Count + (Get-GateOwnersOf \$pair.Snapshot \$path).Count
