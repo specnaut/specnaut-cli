@@ -82,7 +82,7 @@ Deno.test("merge runs the gate at its three points and marks a partial delivery 
   );
   assertStringIncludes(
     merge,
-    "as `git commit --fixup <the last CHILD's sha>`, which the fold folds",
+    "as `git -c core.hooksPath=/dev/null commit --fixup <the last CHILD's sha>`, which the fold folds",
   );
   assertStringIncludes(merge, "After the PR lands, `/task resume <n>` settles it.");
   assert(!merge.includes("close keyword"), "the forge-keyword sentence is back");
@@ -180,7 +180,11 @@ const FIXTURE_BRANCHES: [string, string, string][] = [
   ["removeSpec: a directory", MC, "the last segment of the gate's `<dir>`"],
   ["removeSpec: 7", MC, "**7** — the push was rejected"],
   ["reenter: the line alone", MC, "nowhere else: never open `.specnaut/feature.json`"],
-  ["pushRow: the recovery", MC, "`git pull --rebase --no-autostash origin <base>`, then `git push"],
+  [
+    "pushRow: the recovery",
+    MC,
+    "`git -c core.hooksPath=/dev/null pull --rebase --no-autostash origin <base>`, then `git -c core.hooksPath=/dev/null push",
+  ],
   ["row: clear", AC, "Proceed only on exit 0 whose last line is `gate clear`"],
   ["row: FENCED, a yes", AC, "A yes reruns the gate with `--fence-ack <n>`"],
   ["row: FENCED, a no", AC, "Anything else runs no backlog script and stops."],

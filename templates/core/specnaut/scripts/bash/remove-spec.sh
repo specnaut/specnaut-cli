@@ -36,13 +36,17 @@
 #   24 the tracked files are removed and pushed, but files git does not
 #      track remain under the directory, listed and kept
 #   25 a git step between the removal and its commit failed — the commit
-#      itself, refused by a hook or a signing key: the removal undone
+#      itself, refused by a signing key (no hook runs): the removal undone
 #      (`git restore` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 #        remove-spec.sh --marker-only <n>
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+# Every git call runs no hook: the branch can commit a hook a hook manager runs, and
+# nothing judges hooks (phases/merge.md § Steps; the same alias as land-feature.sh).
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 skip() { echo "remove-spec: skipped — $*" >&2; exit 22; }
 

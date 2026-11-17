@@ -3,6 +3,8 @@
 Loaded by `phases/merge.md` at its step 5, **only when the push happened** and `--no-close` was
 not passed, and by `resume.md` through **Re-entry**, below. If nothing was pushed, nothing here
 runs: a repository that has not published the work cannot corroborate a board that says it is done.
+No git hook runs here: every git command that writes is `git -c core.hooksPath=/dev/null <subcommand> …`
+(`phases/merge.md` § Steps says why), and `remove-spec.sh` runs its own the same way.
 
 ## Order matters: close the issue first, then move the card
 
@@ -78,13 +80,14 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
    - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were
      kept. Report them by name and never delete them: they are someone's only copy.
    - **7** — the push was rejected; the removal commit is on the local base, and `feature.json` with
-     it — so never re-run the script (it would skip, 22). `git pull --rebase --no-autostash origin
-     <base>`, then `git push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>`; a
-     conflict: `git rebase --abort`, report it unpushed.
+     it — so never re-run the script (it would skip, 22).
+     `git -c core.hooksPath=/dev/null pull --rebase --no-autostash origin <base>`, then
+     `git -c core.hooksPath=/dev/null push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>`;
+     a conflict: `git -c core.hooksPath=/dev/null rebase --abort`, report it unpushed.
    - **23** — something else was staged while it ran: the removal is undone, nothing committed.
      Report the path it names; that staged work is someone else's — leave it staged.
-   - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
-     Quote the failure it names and report it; never bypass the hook.
+   - **25** — the removal commit failed (signing, or another git error; hooks are off, as in
+     `land-feature.sh`): the removal is undone, nothing committed. Quote the failure and report it.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## Re-entry — finishing a closeout an earlier run left
@@ -93,8 +96,9 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
 `FENCED` one was answered yes when there was one. Landed scripts are the project's own: they are the
 ones on the published base, so no `specnaut verify-scripts` runs first.
 
-1. **The base.** Switch to it; when it is strictly behind `refs/remotes/origin/<base>`, fast-forward
-   it there (`git merge --ff-only refs/remotes/origin/<base>`). Run the steps there.
+1. **The base.** Switch to it (`git -c core.hooksPath=/dev/null checkout <base>`); when it is strictly behind
+   `refs/remotes/origin/<base>`, fast-forward it there
+   (`git -c core.hooksPath=/dev/null merge --ff-only refs/remotes/origin/<base>`). Run the steps there.
 2. **The item, the directory and the sha** come from the gate's line and nowhere else: never open
    `.specnaut/feature.json`.
 3. **What shipped.** An epic is an item `bash .specnaut/scripts/bash/epic-status.sh --landed

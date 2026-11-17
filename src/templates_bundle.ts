@@ -822,10 +822,13 @@ A child fixed after its commit is written — its fast gate failed as the loop m
 gate failed at the end and the fault was traced to it — must fold back into **its own child's**
 commit, so the default branch still reads one commit per child.
 
+No git hook runs here: every git command that writes is \`git -c core.hooksPath=/dev/null <subcommand> …\` (\`phases/merge.md\`
+§ Steps says why), and \`fold-fixups.sh\` runs its own the same way.
+
 ## Write the fixup so it already knows where it goes
 
 \`\`\`
-git commit --fixup=<sha-of-that-child's-commit>
+git -c core.hooksPath=/dev/null commit --fixup=<sha-of-that-child's-commit>
 \`\`\`
 
 The commit is titled \`fixup! <that child's subject>\`: attributed to the child at fault by
@@ -851,7 +854,7 @@ quote it and stop.
 | 0 | folded | merge |
 | 2 | usage, or \`--verify\` given a sha that is not the \`PRE\` the stopped fold printed | re-run \`--verify\` with that \`PRE\` sha — never \`HEAD\`, never another |
 | 3 | the base is unknown, \`epic-status.sh\` could not read the branch, or the rebase failed without stopping (nothing folded, nothing recorded) | stop and say so |
-| 13 | the rebase stopped on a conflict — or, on \`--verify\`, is still in progress — or, on a plain run, a stopped fold awaits \`--verify <pre>\` (it names the sha) | resolve it, \`git rebase --continue\` (check it exits 0), then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold. Never a plain re-run: only a passing \`--verify\` spends the record |
+| 13 | the rebase stopped on a conflict — or, on \`--verify\`, is still in progress — or, on a plain run, a stopped fold awaits \`--verify <pre>\` (it names the sha) | resolve it, \`git -c core.hooksPath=/dev/null rebase --continue\` (check it exits 0), then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold. Never a plain re-run: only a passing \`--verify\` spends the record |
 | 10 | the tree moved | stop: a fold that changes the tree is a rewrite. The record stays, so a plain run is refused (13) — the fold is not retried over a moved tree |
 | 11 | the worktree is not clean | untracked output belongs in the child's commit or \`.gitignore\`; a modified file means something still holds the tree — stop it first |
 | 12 | not one commit per child | a surviving \`fixup!\` lost its target or was written by hand; attribute it by sha |
@@ -873,6 +876,8 @@ the board is the thing the epic loop exists to prevent.
 Loaded by \`phases/merge.md\` at its step 5, **only when the push happened** and \`--no-close\` was
 not passed, and by \`resume.md\` through **Re-entry**, below. If nothing was pushed, nothing here
 runs: a repository that has not published the work cannot corroborate a board that says it is done.
+No git hook runs here: every git command that writes is \`git -c core.hooksPath=/dev/null <subcommand> …\`
+(\`phases/merge.md\` § Steps says why), and \`remove-spec.sh\` runs its own the same way.
 
 ## Order matters: close the issue first, then move the card
 
@@ -948,13 +953,14 @@ the board fence of \`phases/merge.md\` step 5. Re-entry differs only where it sa
    - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were
      kept. Report them by name and never delete them: they are someone's only copy.
    - **7** — the push was rejected; the removal commit is on the local base, and \`feature.json\` with
-     it — so never re-run the script (it would skip, 22). \`git pull --rebase --no-autostash origin
-     <base>\`, then \`git push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>\`; a
-     conflict: \`git rebase --abort\`, report it unpushed.
+     it — so never re-run the script (it would skip, 22).
+     \`git -c core.hooksPath=/dev/null pull --rebase --no-autostash origin <base>\`, then
+     \`git -c core.hooksPath=/dev/null push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>\`;
+     a conflict: \`git -c core.hooksPath=/dev/null rebase --abort\`, report it unpushed.
    - **23** — something else was staged while it ran: the removal is undone, nothing committed.
      Report the path it names; that staged work is someone else's — leave it staged.
-   - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
-     Quote the failure it names and report it; never bypass the hook.
+   - **25** — the removal commit failed (signing, or another git error; hooks are off, as in
+     \`land-feature.sh\`): the removal is undone, nothing committed. Quote the failure and report it.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## Re-entry — finishing a closeout an earlier run left
@@ -963,8 +969,9 @@ the board fence of \`phases/merge.md\` step 5. Re-entry differs only where it sa
 \`FENCED\` one was answered yes when there was one. Landed scripts are the project's own: they are the
 ones on the published base, so no \`specnaut verify-scripts\` runs first.
 
-1. **The base.** Switch to it; when it is strictly behind \`refs/remotes/origin/<base>\`, fast-forward
-   it there (\`git merge --ff-only refs/remotes/origin/<base>\`). Run the steps there.
+1. **The base.** Switch to it (\`git -c core.hooksPath=/dev/null checkout <base>\`); when it is strictly behind
+   \`refs/remotes/origin/<base>\`, fast-forward it there
+   (\`git -c core.hooksPath=/dev/null merge --ff-only refs/remotes/origin/<base>\`). Run the steps there.
 2. **The item, the directory and the sha** come from the gate's line and nowhere else: never open
    \`.specnaut/feature.json\`.
 3. **What shipped.** An epic is an item \`bash .specnaut/scripts/bash/epic-status.sh --landed
@@ -1668,6 +1675,10 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
 
 ## Steps
 
+**No git hook runs in this phase.** Every git command it runs that writes — written here, described
+in words, or named by a script's message — is \`git -c core.hooksPath=/dev/null <subcommand> …\`, as the landing
+runs its own: the branch can commit a hook a hook manager runs, and nothing judges hooks.
+
 **The intake gate** (\`phases/auto-chain.md\`) runs before step 2, before every run of step 3, and,
 under \`--no-close\`, once more after the push: there the item's line must read \`OWN partial\`.
 
@@ -1686,7 +1697,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
      \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
      - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
        base): **stop on the branch** and say so. Never asked: no yes makes it hold.
-     - Every reason \`behind base: rebase\` — \`git rebase refs/remotes/origin/<BASE_BRANCH>\`, then
+     - Every reason \`behind base: rebase\` — \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>\`, then
        this step again at once. Not a question: the branch only lags the base.
      - Any other — this run's merge mode is \`manual\`, whatever \`phases/auto-chain.md\` read. Stop on
        the branch, name each \`UNTRUSTED\` path and its reason, and ask once: *"This branch changes
@@ -1699,7 +1710,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
      branch and say so. Nothing lands.
 
    A config line whose reason is \`behind base: rebase\` is handled as that reason is for a script:
-   \`git rebase refs/remotes/origin/<BASE_BRANCH>\`, then this step again at once — the branch only
+   \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>\`, then this step again at once — the branch only
    lags the base, and a later run judges it. A \`NAMES_FILE\` listing \`.specnaut/workflow.yml\` or
    \`.specnaut/backlog-config.yml\`, on any run, makes the merge mode \`manual\`; the \`workflow\` and
    \`backlog-config\` lines count on the last run only, and unless that run printed both \`VERDICT
@@ -1721,7 +1732,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    last \`CHILD\` and \`EPIC\` lines (after any fold) for the close.
    **Under \`--no-close\`, first mark the delivery partial, on the branch:** set \`"delivery":
    "partial"\` in \`.specnaut/feature.json\` and commit it — on exit 14 as a commit the squash groups,
-   on exit 0 as \`git commit --fixup <the last CHILD's sha>\`, which the fold folds — so it lands
+   on exit 0 as \`git -c core.hooksPath=/dev/null commit --fixup <the last CHILD's sha>\`, which the fold folds — so it lands
    with the work, in the same fast-forward or the same push.
    This list maps every exit \`epic-status.sh\`'s header lists; an exit it does not list is a
    finding: quote it and stop on the branch.
@@ -1757,7 +1768,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    declares \`.specnaut/impact.json\` may run less than the whole tier, so a pass whose \`scope:\`
    line is not \`full\` is reported as that scope, and a pass with a \`removed:\` line names those
    commands: neither is ever reported as the full gate.
-2. **\`--pr\` only** — push the branch, open the pull request against the base, name any issue its
+2. **\`--pr\` only** — push the branch (\`git -c core.hooksPath=/dev/null push -u origin <branch>\`), open the pull request against the base, name any issue its
    body references that \`gh pr view <n> --json closingIssuesReferences\` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. After the PR
    lands, \`/task resume <n>\` settles it. Never use the forge's "Squash and merge": it collapses
@@ -1783,13 +1794,13 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |
    | 0 | landed and pushed | step 5 |
-   | 2 | not on a feature branch | check out the feature branch, land again |
+   | 2 | not on a feature branch | \`git -c core.hooksPath=/dev/null checkout <branch>\`, land again |
    | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → step 0 at once, then re-run the gates — on the epic path, re-run \`epic-status.sh\` too and replace the kept \`CHILD\`/\`EPIC\` lines, whose shas the rebase changed — and land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
+   | 5 | behind \`origin/<base>\` | \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<base>\`. Applies cleanly → step 0 at once, then re-run the gates — on the epic path, re-run \`epic-status.sh\` too and replace the kept \`CHILD\`/\`EPIC\` lines, whose shas the rebase changed — and land again. A conflict → \`git -c core.hooksPath=/dev/null rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
    | 6 | the local base holds commits origin lacks (printed: \`origin/<base>..<base>\`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
-   | 7 | the push was rejected | quote the remote's message — never \`--force\`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: \`git checkout <branch>\`, \`git branch -f <base> refs/remotes/origin/<base>\` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
-   | 9 | \`HEAD\` is not the base | the landing stands — it was pushed. Say so, \`git checkout <base>\`, then step 5 runs: the person who asked must be back where they work |
+   | 7 | the push was rejected | quote the remote's message — never \`--force\`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: \`git -c core.hooksPath=/dev/null checkout <branch>\`, \`git -c core.hooksPath=/dev/null branch -f <base> refs/remotes/origin/<base>\` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
+   | 9 | \`HEAD\` is not the base | the landing stands — it was pushed. Say so, \`git -c core.hooksPath=/dev/null checkout <base>\`, then step 5 runs: the person who asked must be back where they work |
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with \`-d\` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
@@ -1869,10 +1880,14 @@ comes from whichever backlog backend the project uses; no backend-specific synta
 
 ### Procedure
 
+No git hook runs here: every git command that writes is \`git -c core.hooksPath=/dev/null <subcommand> …\`
+(\`phases/merge.md\` § Steps says why).
+
 1. \`git log <base>..HEAD --oneline\` — read what is actually there.
 2. Group the commits by scope using the table above, and **show the grouping**.
-3. \`git reset --soft <base>\`, then re-commit **one group at a time**, staging paths **by name**.
-   Never \`git add -A\` — a sweep is the fastest way to pull in something the branch never had.
+3. \`git -c core.hooksPath=/dev/null reset --soft <base>\`, then re-commit **one group at a time**, staging paths **by name**
+   (\`git -c core.hooksPath=/dev/null add <path>…\`, then \`git -c core.hooksPath=/dev/null commit -m "<subject>"\`).
+   Never stage with \`-A\` — a sweep is the fastest way to pull in something the branch never had.
 4. \`git log <base>..HEAD --oneline\` again. The result is one commit per scope, in an order that
    reads forwards: the feature first, its codegen after it, unrelated changes last.
 
@@ -1886,7 +1901,7 @@ legitimately halts here is a file you cannot classify — name those files, say 
 - **\`git diff <base>..HEAD\` must be byte-identical to what it was before the squash.** A squash that
   changes the tree is not a squash, it is a rewrite. Capture the diff before step 3 and compare
   after step 4.
-- **\`git status --short\` must then be empty.** If anything appears:
+- **\`git -c core.hooksPath=/dev/null status --short\` must then be empty.** If anything appears:
   - **Untracked (\`??\`)** — usually generated output. Decide per file: it belongs either to the
     codegen commit or to \`.gitignore\`. Never leave it dangling and never report success over it.
   - **Modified** — something wrote to the tree during the squash. Find out what before going
@@ -3704,7 +3719,7 @@ plan → implement → review → merge → push
    printed both \`VERDICT workflow trusted\` and \`VERDICT backlog-config trusted\`
    (\`phases/script-gate.md\`): a missing line is an untrusted one. So it is, too, unless it
    printed \`VERDICT instructions trusted\`, or only \`instructions\` lines reading \`behind base:
-   rebase\`: a missing \`instructions\` line is an untrusted one, and step 0 asks its one question. A dirty tree (\`git -c core.fsmonitor=false status
+   rebase\`: a missing \`instructions\` line is an untrusted one, and step 0 asks its one question. A dirty tree (\`git -c core.fsmonitor=false -c core.hooksPath=/dev/null status
    --porcelain\` prints a line) is never \`auto\`: say so. Otherwise:
 
    \`\`\`
@@ -32110,7 +32125,7 @@ printf 'audited %s, active %s, unpushed %s, landed %s, idle %s, deferred %s\\n' 
 #   3. one commit per child    — \`epic-status.sh\` reads the history back, no \`fixup!\` survives
 #
 # It prints \`PRE <sha>\` before it rewrites anything. If the rebase stops on a
-# conflict (exit 13), resolve it, \`git rebase --continue\`, then run
+# conflict (exit 13), resolve it, \`git -c core.hooksPath=/dev/null rebase --continue\`, then run
 # \`fold-fixups.sh --verify <that sha>\`: the checks compare against the tree
 # recorded before the fold, never against a tree the conflict already moved.
 # --verify is bound to that sha: a rebase that really stopped records it in
@@ -32136,6 +32151,10 @@ printf 'audited %s, active %s, unpushed %s, landed %s, idle %s, deferred %s\\n' 
 # Usage: fold-fixups.sh [--verify <pre-sha>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+# Every git call runs no hook: the branch can commit a hook a hook manager runs, and
+# nothing judges hooks (phases/merge.md § Steps; the same alias as land-feature.sh).
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 pre=""
@@ -32157,7 +32176,7 @@ rebasing() { [ -d "\$(git rev-parse --git-path rebase-merge)" ] || [ -d "\$(git 
 if [ -f "\$record" ] && ! rebasing && [ "\$(git rev-parse HEAD)" = "\$(cat "\$record")" ]; then rm -f "\$record"; fi
 if [ -z "\$pre" ]; then
   if [ -f "\$record" ]; then
-    echo "fold-fixups: a stopped fold awaits --verify \$(cat "\$record") — resolve it, 'git rebase --continue', then run that" >&2
+    echo "fold-fixups: a stopped fold awaits --verify \$(cat "\$record") — resolve it, 'git -c core.hooksPath=/dev/null rebase --continue', then run that" >&2
     exit 13
   fi
   if rebasing; then
@@ -32166,7 +32185,7 @@ if [ -z "\$pre" ]; then
   fi
 else
   if rebasing; then
-    echo "fold-fixups: the rebase is still in progress — resolve it and 'git rebase --continue' first" >&2
+    echo "fold-fixups: the rebase is still in progress — resolve it and 'git -c core.hooksPath=/dev/null rebase --continue' first" >&2
     exit 13
   fi
   if [ ! -f "\$record" ]; then
@@ -32201,7 +32220,7 @@ if [ -z "\$pre" ]; then
       exit 3
     fi
     printf '%s\\n' "\$pre" >"\$record"
-    echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
+    echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git -c core.hooksPath=/dev/null rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
     exit 13
   fi
 fi
@@ -32458,13 +32477,17 @@ fi
 #   24 the tracked files are removed and pushed, but files git does not
 #      track remain under the directory, listed and kept
 #   25 a git step between the removal and its commit failed — the commit
-#      itself, refused by a hook or a signing key: the removal undone
+#      itself, refused by a signing key (no hook runs): the removal undone
 #      (\`git restore\` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 #        remove-spec.sh --marker-only <n>
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+# Every git call runs no hook: the branch can commit a hook a hook manager runs, and
+# nothing judges hooks (phases/merge.md § Steps; the same alias as land-feature.sh).
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 skip() { echo "remove-spec: skipped — \$*" >&2; exit 22; }
 

@@ -95,7 +95,7 @@ const INSTRUCTION: ReadonlyArray<readonly [string, string, string]> = [
   ["merge", "phases/merge-squash.md", "which doc the agent loads: no script reads it"],
   ["merge-squash", "one commit per scope", "the grouping is the agent's; a landing keeps any"],
   ["merge-squash", "never the feature's", "a subject's id is the agent's choice; git takes any"],
-  ["merge-squash", "Never `git add -A`", "how the agent stages: no script stages for it"],
+  ["merge-squash", "Never stage with `-A`", "how the agent stages: no script stages for it"],
   ["merge-squash", "byte-identical", "the agent's own diff, before and after; nothing records it"],
   ["merge-squash", "Do not stop between steps 2 and 3", "a prompt the agent must not raise"],
   ["merge-squash", '"Squash and merge"', "a forge button no script can press"],

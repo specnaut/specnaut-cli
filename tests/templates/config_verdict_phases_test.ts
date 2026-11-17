@@ -16,7 +16,7 @@ Deno.test("merge rebases on a config line behind the base, and judges workflow o
   assertStringIncludes(
     m,
     "A config line whose reason is `behind base: rebase` is handled as that reason is for a " +
-      "script: `git rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once",
+      "script: `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once",
   );
   assertStringIncludes(
     m,

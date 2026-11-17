@@ -24,3 +24,8 @@ declared in a form Claude Code refreshes, still pinned to your Specnaut release,
 **The Cockpit no longer draws the chain.** The `plan ● implement ○ …` segment of the band and the
 pane's chain row stayed "in progress" long after a chain had stopped, so they are gone. Usage
 windows, context, cost and the quota hold are unchanged.
+
+**`/task merge` runs no git hook.** Its squash, fixup fold, rebase and closeout commands now run
+with hooks off, as the landing itself already did. Your project's own commit, checkout and push
+hooks do not fire during a merge, git-lfs's pre-push upload included; the full gate tier still runs
+before anything lands.

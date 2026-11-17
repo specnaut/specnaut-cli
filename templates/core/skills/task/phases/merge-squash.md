@@ -24,10 +24,14 @@ comes from whichever backlog backend the project uses; no backend-specific synta
 
 ### Procedure
 
+No git hook runs here: every git command that writes is `git -c core.hooksPath=/dev/null <subcommand> …`
+(`phases/merge.md` § Steps says why).
+
 1. `git log <base>..HEAD --oneline` — read what is actually there.
 2. Group the commits by scope using the table above, and **show the grouping**.
-3. `git reset --soft <base>`, then re-commit **one group at a time**, staging paths **by name**.
-   Never `git add -A` — a sweep is the fastest way to pull in something the branch never had.
+3. `git -c core.hooksPath=/dev/null reset --soft <base>`, then re-commit **one group at a time**, staging paths **by name**
+   (`git -c core.hooksPath=/dev/null add <path>…`, then `git -c core.hooksPath=/dev/null commit -m "<subject>"`).
+   Never stage with `-A` — a sweep is the fastest way to pull in something the branch never had.
 4. `git log <base>..HEAD --oneline` again. The result is one commit per scope, in an order that
    reads forwards: the feature first, its codegen after it, unrelated changes last.
 
@@ -41,7 +45,7 @@ legitimately halts here is a file you cannot classify — name those files, say 
 - **`git diff <base>..HEAD` must be byte-identical to what it was before the squash.** A squash that
   changes the tree is not a squash, it is a rewrite. Capture the diff before step 3 and compare
   after step 4.
-- **`git status --short` must then be empty.** If anything appears:
+- **`git -c core.hooksPath=/dev/null status --short` must then be empty.** If anything appears:
   - **Untracked (`??`)** — usually generated output. Decide per file: it belongs either to the
     codegen commit or to `.gitignore`. Never leave it dangling and never report success over it.
   - **Modified** — something wrote to the tree during the squash. Find out what before going

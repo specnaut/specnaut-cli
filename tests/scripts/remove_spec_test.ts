@@ -139,7 +139,9 @@ Deno.test(
       const head = await git(sb.work, "rev-parse", "HEAD");
       // A concurrent writer: it stages its own file right after the script's `git rm`.
       const r = await sb.scriptWithGit(
-        `if [ "$1" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
+        // The script passes `-c` pairs before the subcommand (it runs no hook): skip them.
+        `a=("$@"); i=0; while [ "\${a[i]}" = -c ]; do i=$((i + 2)); done
+if [ "\${a[i]}" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
 exec "$REAL_GIT" "$@"`,
         "remove-spec.sh",
         BRANCH,
@@ -196,18 +198,16 @@ Deno.test("a directory in no commit, and a run off the base, are skipped with th
   }
 });
 
-Deno.test("a commit a hook refuses is 25: the removal is undone, nothing committed, nothing pushed", async () => {
-  // Under set -e alone it died with git's own code and left the deletion staged (cli#711).
+Deno.test("a commit signing refuses is 25: the removal is undone, nothing committed, nothing pushed", async () => {
+  // set -e alone left the deletion staged (cli#711); no hook runs, so a failing signer stands in.
   const sb = await shipped();
   try {
-    const hook = join(sb.work, ".git/hooks/pre-commit");
-    await Deno.writeTextFile(hook, "#!/bin/sh\necho 'hook says no' >&2\nexit 1\n");
-    // Windows has no mode bits: Git for Windows runs a hook by its `#!` line.
-    if (Deno.build.os !== "windows") await Deno.chmod(hook, 0o755);
+    await git(sb.work, "config", "commit.gpgsign", "true");
+    await git(sb.work, "config", "gpg.program", "false");
     const before = await state(sb.work);
     const r = await sb.script("remove-spec.sh", BRANCH);
     assertEquals(r.code, 25, r.stderr);
-    assertStringIncludes(r.stderr, "hook says no");
+    assertStringIncludes(r.stderr, "gpg failed to sign");
     assertStringIncludes(r.stderr, "the removal is undone, nothing committed");
     assertEquals(await state(sb.work), before, "the removal was left staged or committed");
     assertEquals(await files(join(sb.work, `.specnaut/specs/${BRANCH}`)), ["plan.md:# plan\n"]);

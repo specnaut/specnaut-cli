@@ -25,7 +25,7 @@ plan → implement → review → merge → push
    printed both `VERDICT workflow trusted` and `VERDICT backlog-config trusted`
    (`phases/script-gate.md`): a missing line is an untrusted one. So it is, too, unless it
    printed `VERDICT instructions trusted`, or only `instructions` lines reading `behind base:
-   rebase`: a missing `instructions` line is an untrusted one, and step 0 asks its one question. A dirty tree (`git -c core.fsmonitor=false status
+   rebase`: a missing `instructions` line is an untrusted one, and step 0 asks its one question. A dirty tree (`git -c core.fsmonitor=false -c core.hooksPath=/dev/null status
    --porcelain` prints a line) is never `auto`: say so. Otherwise:
 
    ```

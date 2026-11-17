@@ -28,6 +28,10 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
 ## Steps
 
+**No git hook runs in this phase.** Every git command it runs that writes — written here, described
+in words, or named by a script's message — is `git -c core.hooksPath=/dev/null <subcommand> …`, as the landing
+runs its own: the branch can commit a hook a hook manager runs, and nothing judges hooks.
+
 **The intake gate** (`phases/auto-chain.md`) runs before step 2, before every run of step 3, and,
 under `--no-close`, once more after the push: there the item's line must read `OWN partial`.
 
@@ -46,7 +50,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
      `VERDICT scripts untrusted`** — otherwise it is *anything else*, below.
      - An `UNTRUSTED` path outside `.specnaut/scripts/` (`local <base> ahead of origin`, the lock at
        base): **stop on the branch** and say so. Never asked: no yes makes it hold.
-     - Every reason `behind base: rebase` — `git rebase refs/remotes/origin/<BASE_BRANCH>`, then
+     - Every reason `behind base: rebase` — `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then
        this step again at once. Not a question: the branch only lags the base.
      - Any other — this run's merge mode is `manual`, whatever `phases/auto-chain.md` read. Stop on
        the branch, name each `UNTRUSTED` path and its reason, and ask once: *"This branch changes
@@ -59,7 +63,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
      branch and say so. Nothing lands.
 
    A config line whose reason is `behind base: rebase` is handled as that reason is for a script:
-   `git rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once — the branch only
+   `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once — the branch only
    lags the base, and a later run judges it. A `NAMES_FILE` listing `.specnaut/workflow.yml` or
    `.specnaut/backlog-config.yml`, on any run, makes the merge mode `manual`; the `workflow` and
    `backlog-config` lines count on the last run only, and unless that run printed both `VERDICT
@@ -81,7 +85,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    last `CHILD` and `EPIC` lines (after any fold) for the close.
    **Under `--no-close`, first mark the delivery partial, on the branch:** set `"delivery":
    "partial"` in `.specnaut/feature.json` and commit it — on exit 14 as a commit the squash groups,
-   on exit 0 as `git commit --fixup <the last CHILD's sha>`, which the fold folds — so it lands
+   on exit 0 as `git -c core.hooksPath=/dev/null commit --fixup <the last CHILD's sha>`, which the fold folds — so it lands
    with the work, in the same fast-forward or the same push.
    This list maps every exit `epic-status.sh`'s header lists; an exit it does not list is a
    finding: quote it and stop on the branch.
@@ -117,7 +121,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    declares `.specnaut/impact.json` may run less than the whole tier, so a pass whose `scope:`
    line is not `full` is reported as that scope, and a pass with a `removed:` line names those
    commands: neither is ever reported as the full gate.
-2. **`--pr` only** — push the branch, open the pull request against the base, name any issue its
+2. **`--pr` only** — push the branch (`git -c core.hooksPath=/dev/null push -u origin <branch>`), open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. After the PR
    lands, `/task resume <n>` settles it. Never use the forge's "Squash and merge": it collapses
@@ -143,13 +147,13 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |
    | 0 | landed and pushed | step 5 |
-   | 2 | not on a feature branch | check out the feature branch, land again |
+   | 2 | not on a feature branch | `git -c core.hooksPath=/dev/null checkout <branch>`, land again |
    | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind `origin/<base>` | `git rebase refs/remotes/origin/<base>`. Applies cleanly → step 0 at once, then re-run the gates — on the epic path, re-run `epic-status.sh` too and replace the kept `CHILD`/`EPIC` lines, whose shas the rebase changed — and land again. A conflict → `git rebase --abort`, and the branch goes back to `review` — a resolution is a change nobody reviewed |
+   | 5 | behind `origin/<base>` | `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<base>`. Applies cleanly → step 0 at once, then re-run the gates — on the epic path, re-run `epic-status.sh` too and replace the kept `CHILD`/`EPIC` lines, whose shas the rebase changed — and land again. A conflict → `git -c core.hooksPath=/dev/null rebase --abort`, and the branch goes back to `review` — a resolution is a change nobody reviewed |
    | 6 | the local base holds commits origin lacks (printed: `origin/<base>..<base>`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
-   | 7 | the push was rejected | quote the remote's message — never `--force`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: `git checkout <branch>`, `git branch -f <base> refs/remotes/origin/<base>` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
-   | 9 | `HEAD` is not the base | the landing stands — it was pushed. Say so, `git checkout <base>`, then step 5 runs: the person who asked must be back where they work |
+   | 7 | the push was rejected | quote the remote's message — never `--force`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: `git -c core.hooksPath=/dev/null checkout <branch>`, `git -c core.hooksPath=/dev/null branch -f <base> refs/remotes/origin/<base>` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
+   | 9 | `HEAD` is not the base | the landing stands — it was pushed. Say so, `git -c core.hooksPath=/dev/null checkout <base>`, then step 5 runs: the person who asked must be back where they work |
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |

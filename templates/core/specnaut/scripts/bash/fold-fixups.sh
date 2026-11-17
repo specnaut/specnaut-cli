@@ -10,7 +10,7 @@
 #   3. one commit per child    — `epic-status.sh` reads the history back, no `fixup!` survives
 #
 # It prints `PRE <sha>` before it rewrites anything. If the rebase stops on a
-# conflict (exit 13), resolve it, `git rebase --continue`, then run
+# conflict (exit 13), resolve it, `git -c core.hooksPath=/dev/null rebase --continue`, then run
 # `fold-fixups.sh --verify <that sha>`: the checks compare against the tree
 # recorded before the fold, never against a tree the conflict already moved.
 # --verify is bound to that sha: a rebase that really stopped records it in
@@ -36,6 +36,10 @@
 # Usage: fold-fixups.sh [--verify <pre-sha>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+# Every git call runs no hook: the branch can commit a hook a hook manager runs, and
+# nothing judges hooks (phases/merge.md § Steps; the same alias as land-feature.sh).
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 pre=""
@@ -57,7 +61,7 @@ rebasing() { [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git re
 if [ -f "$record" ] && ! rebasing && [ "$(git rev-parse HEAD)" = "$(cat "$record")" ]; then rm -f "$record"; fi
 if [ -z "$pre" ]; then
   if [ -f "$record" ]; then
-    echo "fold-fixups: a stopped fold awaits --verify $(cat "$record") — resolve it, 'git rebase --continue', then run that" >&2
+    echo "fold-fixups: a stopped fold awaits --verify $(cat "$record") — resolve it, 'git -c core.hooksPath=/dev/null rebase --continue', then run that" >&2
     exit 13
   fi
   if rebasing; then
@@ -66,7 +70,7 @@ if [ -z "$pre" ]; then
   fi
 else
   if rebasing; then
-    echo "fold-fixups: the rebase is still in progress — resolve it and 'git rebase --continue' first" >&2
+    echo "fold-fixups: the rebase is still in progress — resolve it and 'git -c core.hooksPath=/dev/null rebase --continue' first" >&2
     exit 13
   fi
   if [ ! -f "$record" ]; then
@@ -101,7 +105,7 @@ if [ -z "$pre" ]; then
       exit 3
     fi
     printf '%s\n' "$pre" >"$record"
-    echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify $pre" >&2
+    echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git -c core.hooksPath=/dev/null rebase --continue', then: fold-fixups.sh --verify $pre" >&2
     exit 13
   fi
 fi
