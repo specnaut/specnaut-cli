@@ -66,7 +66,8 @@ async function dispatch(argv: string[]): Promise<number> {
     case "sandbox":
       return (await import("./cli/handlers/sandbox_handler.ts")).runSandbox(intent);
     case "verify-scripts":
-      return (await import("./cli/handlers/verify_scripts_handler.ts")).runVerifyScripts();
+      return (await import("./cli/handlers/verify_scripts_handler.ts"))
+        .runVerifyScripts(undefined, intent.approved);
     case "review":
       return (await import("./cli/handlers/review_handler.ts")).runReview(intent);
     case "record-checkout":

@@ -192,8 +192,8 @@ export type Intent =
   }
   | ScanIntent
   | SandboxIntent
-  /** `specnaut verify-scripts`: whether `.specnaut/scripts/` matches the base (verify_scripts_handler.ts). */
-  | { kind: "verify-scripts" }
+  /** `specnaut verify-scripts`, and the digests a yes covers (verify_scripts_handler.ts). */
+  | { kind: "verify-scripts"; approved: { scripts?: string; instructions?: string } }
   /** `specnaut record-checkout`: a `SessionStart` hook records the checkout (record_checkout_handler.ts). */
   | { kind: "record-checkout" }
   | ReviewIntent;

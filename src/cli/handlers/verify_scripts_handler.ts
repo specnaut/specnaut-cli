@@ -8,7 +8,15 @@ import type {
   GitObjectReader,
   ScriptTreeWalker,
 } from "../../application/script_trust_ports.ts";
+import {
+  type ApprovalLine,
+  type ApprovalVerdict,
+  approvalVerdict,
+  type ApprovedDigests,
+  scriptsApprovable,
+} from "../../domain/approval_verdict.ts";
 import type { ConfigVerdict } from "../../domain/config_trust.ts";
+import { INSTRUCTION_CLASS } from "../../domain/instruction_trust.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
@@ -46,6 +54,14 @@ import { findHarness } from "../harnesses.ts";
  * caller trusts the scripts only on exit 0 with that final `trusted` line and a full `BASE` sha;
  * anything else, the binary missing included, is untrusted. `scripts` names the class checked, so
  * others can be added without breaking a caller.
+ *
+ * `--approved-scripts <sha256>` and `--approved-instructions <sha256>` name the digests a user's
+ * yes covers (the merge phase after a yes, and `land-feature.sh`). With either, one line per
+ * flagged class, `APPROVAL <class> holds <digest>` or `APPROVAL <class> moved <digest>` (the digest
+ * computed now; a scripts reason outside `.specnaut/scripts/` is never held), comes right before
+ * the last line, and exits 0 and 1 change meaning: 0 when the scripts and the instructions are each
+ * trusted or held, 1 otherwise. Exit 0 then means binding, not consent: the tree is the one the
+ * digest named. The last line still reads `trusted` only for scripts that really are.
  */
 const EXIT = { trusted: 0, untrusted: 1, usage: 2, couldNotRun: 3 } as const;
 const UNTRUSTED = "VERDICT scripts untrusted";
@@ -78,7 +94,10 @@ function defaultDeps(): VerifyScriptsDeps {
   };
 }
 
-export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()): Promise<number> {
+export async function runVerifyScripts(
+  deps: VerifyScriptsDeps = defaultDeps(),
+  approved: ApprovedDigests = {},
+): Promise<number> {
   try {
     if (!await fileExists(`${deps.cwd}/.specnaut`)) {
       return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
@@ -88,7 +107,7 @@ export async function runVerifyScripts(deps: VerifyScriptsDeps = defaultDeps()):
     const base = outcome.kind === "judged"
       ? { tip: outcome.baseTip, mergeBase: outcome.base, head: outcome.head }
       : null;
-    return await answer(outcome, await judgeInputs(git, config, base), deps);
+    return await answer(outcome, await judgeInputs(git, config, base), deps, approved);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
@@ -111,24 +130,45 @@ async function judgeInputs(
   return { verdicts: [...config, ...instructions.verdicts], digest: instructions.digest };
 }
 
+type Outcome = Extract<VerifyOutcome, { kind: "judged" }>;
+
 async function answer(
   outcome: VerifyOutcome,
   config: Judged,
   deps: VerifyScriptsDeps,
+  approved: ApprovedDigests,
 ): Promise<number> {
   if (outcome.kind === "base_unknown") {
     return refuse(deps, EXIT.couldNotRun, `the base is unknown: ${outcome.why}`);
   }
   const names = outcome.names.map((n) => `${terminalText(n)}\n`).join("");
-  deps.out(reportLines(outcome, config, await deps.writeNames(names)).join("\n"));
-  return outcome.verdict.trusted ? EXIT.trusted : EXIT.untrusted;
+  const approval = Object.keys(approved).length === 0
+    ? null
+    : approvalOf(outcome, config, approved);
+  const namesFile = await deps.writeNames(names);
+  deps.out(reportLines(outcome, config, namesFile, approval?.lines ?? []).join("\n"));
+  return (approval?.holds ?? outcome.verdict.trusted) ? EXIT.trusted : EXIT.untrusted;
+}
+
+/** The yes's verdict on the scripts and the instructions as judged now. */
+function approvalOf(outcome: Outcome, config: Judged, approved: ApprovedDigests): ApprovalVerdict {
+  const { trusted, untrusted } = outcome.verdict;
+  return approvalVerdict(approved, {
+    scripts: { trusted, digest: outcome.digest, approvable: scriptsApprovable(untrusted) },
+    instructions: {
+      trusted: config.verdicts.some((v) => v.class === INSTRUCTION_CLASS && v.trusted),
+      digest: config.digest ?? "",
+      approvable: true,
+    },
+  });
 }
 
 /** Exits 0 and 1's lines, in the order the header gives. */
 function reportLines(
-  outcome: Extract<VerifyOutcome, { kind: "judged" }>,
+  outcome: Outcome,
   config: Judged,
   namesFile: string,
+  approval: readonly ApprovalLine[],
 ): string[] {
   return [
     `BASE ${outcome.base}`,
@@ -142,6 +182,7 @@ function reportLines(
     ...outcome.verdict.untrusted.map((u) =>
       `UNTRUSTED ${terminalText(u.path)} ${terminalText(u.reason)}`
     ),
+    ...approval.map((l) => `APPROVAL ${l.class} ${l.holds ? "holds" : "moved"} ${l.digest}`),
     outcome.verdict.trusted ? "VERDICT scripts trusted" : UNTRUSTED,
   ];
 }

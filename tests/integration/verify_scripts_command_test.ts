@@ -152,7 +152,7 @@ Deno.test("an argument: the parser's exit 2, help on stderr and no VERDICT line"
   const { root } = await fixture();
   const r = await runSpecnaut(["verify-scripts", "extra"], { cwd: root });
   assertEquals([r.code, r.stdout.includes("VERDICT")], [2, false]);
-  assertMatch(r.stderr, /verify-scripts takes no argument/);
+  assertMatch(r.stderr, /verify-scripts takes only --approved-scripts and --approved-instructions/);
 });
 
 Deno.test("run outside a project: exit 2", async () => {

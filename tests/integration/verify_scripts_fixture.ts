@@ -119,9 +119,9 @@ function cliHome(): Record<string, string> {
   return { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, ".config"), DENO_DIR };
 }
 
-/** `specnaut verify-scripts` in `cwd`, its stdout split into fields. */
-export async function verify(cwd: string): Promise<Verified> {
-  const r = await runSpecnaut(["verify-scripts"], { cwd, env: cliHome() });
+/** `specnaut verify-scripts` in `cwd`, with `args` after it, its stdout split into fields. */
+export async function verify(cwd: string, args: string[] = []): Promise<Verified> {
+  const r = await runSpecnaut(["verify-scripts", ...args], { cwd, env: cliHome() });
   const lines = r.stdout.trimEnd().split("\n");
   const field = (key: string) => lines.find((l) => l.startsWith(`${key} `))?.slice(key.length + 1);
   const untrusted = lines.filter((l) => l.startsWith("UNTRUSTED ")).map((l) => l.slice(10));

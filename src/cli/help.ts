@@ -17,10 +17,13 @@ ${bold("Usage:")}
   specnaut scan [--path <dir>] [--format text|json|mermaid] [--top <n|all>]
                                       Map file, function and class sizes against the size limits
                                       (read-only, offline, no agent): where to look, not a verdict
-  specnaut verify-scripts             Check .specnaut/scripts/ against a copy the branch does not carry,
+  specnaut verify-scripts [--approved-scripts <sha256>] [--approved-instructions <sha256>]
+                                      Check .specnaut/scripts/ against a copy the branch does not carry,
                                       and the config a branch controls against the base, before resume,
                                       groom, the backlog verbs, audit, review or merge run them
-                                      (read-only). Exit 0 trusted, 1 untrusted, 3 no base
+                                      (read-only). Exit 0 trusted, 1 untrusted, 3 no base. With the
+                                      digests a yes covers: an APPROVAL line per flag, exit 0 when the
+                                      scripts and the instructions are each trusted or still that digest
   specnaut record-checkout            Record the checkout a session started on (HEAD and the instruction and
                                       config files it loaded), from a SessionStart hook's input on stdin
   specnaut review gate                Check, from a Claude Code PreToolUse hook's input on stdin, that the
