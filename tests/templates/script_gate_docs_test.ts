@@ -33,7 +33,15 @@ Deno.test("merge's step 0 verifies before the first script and again after a reb
 });
 
 Deno.test("an untrusted verdict is a stop whose yes covers one digest; other outcomes land nothing", () => {
-  const m = flat(phase("merge").content);
+  const merge = flat(phase("merge").content);
+  const step0 = merge.slice(0, merge.indexOf("1. **Shape the history.**"));
+  assertStringIncludes(
+    step0,
+    "The first case of `phases/script-gate.md` § Merge's step 0 outcomes",
+  );
+  const g = flat(phase("script-gate").content);
+  const m = g.slice(g.indexOf("## Merge's step 0 outcomes"));
+  assert(m.length < g.length, "script-gate.md has no section for merge's step 0 outcomes");
   assertStringIncludes(
     m,
     "this run's merge mode is `manual`, whatever `phases/auto-chain.md` read",

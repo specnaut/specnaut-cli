@@ -1690,24 +1690,8 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    specnaut verify-scripts
    \`\`\`
 
-   The first case that matches decides, on every run:
-
-   - **Trusted** — exit 0, a full \`BASE\` sha, and the last line \`VERDICT scripts trusted\`: go on.
-   - **Exit 1, read only with a \`BASE\` line, at least one \`UNTRUSTED\` line and the last line
-     \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
-     - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
-       base): **stop on the branch** and say so. Never asked: no yes makes it hold.
-     - Every reason \`behind base: rebase\` — \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>\`, then
-       this step again at once. Not a question: the branch only lags the base.
-     - Any other — this run's merge mode is \`manual\`, whatever \`phases/auto-chain.md\` read. Stop on
-       the branch, name each \`UNTRUSTED\` path and its reason, and ask once: *"This branch changes
-       these helper scripts. Yes lands these scripts and runs them to land."* The yes covers that
-       run's \`SCRIPTS_DIGEST\` and its \`UNTRUSTED\` paths and nothing else: a later run with another
-       digest, or an \`UNTRUSTED\` path outside that set, asks again. Under it the rest of this phase
-       runs, \`land-feature.sh\` and \`phases/merge-close.md\` included; anything else stays on the
-       branch, nothing landed.
-   - **Anything else** — exit 3, no \`specnaut\` on the PATH, output without those parts: stop on the
-     branch and say so. Nothing lands.
+   The first case of \`phases/script-gate.md\` § Merge's step 0 outcomes that matches decides, on
+   every run.
 
    A config line whose reason is \`behind base: rebase\` is handled as that reason is for a script:
    \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>\`, then this step again at once — the branch only
@@ -3883,7 +3867,8 @@ exit 3/4 — the merge waits for a login and a re-run, or the user's own \`merge
 
 \`resume\`, \`groom\`, the backlog verbs and \`audit\` load this doc before the first script under
 \`.specnaut/scripts/\` runs. \`review\` and \`merge\` run their own gate step (\`phases/review.md\` step 1,
-\`phases/merge.md\` step 0); every verb that runs a gate reads § The config verdicts.
+\`phases/merge.md\` step 0, whose outcomes are § Merge's step 0 outcomes); every verb that runs a
+gate reads § The config verdicts.
 
 ## The gate
 
@@ -3908,6 +3893,29 @@ runs none in this run: report the \`SCRIPTS NOT RUN\` line and each \`UNTRUSTED\
 \`BASE\` line (exit 2 or 3, or no \`specnaut\` on the PATH) means the base or the verifier is
 missing: say which. Never fall back to a script of the tree, nor to a hand-run of what it does.
 The \`BASE\` sha is the base for any range the verb passes a script.
+
+## Merge's step 0 outcomes
+
+\`phases/merge.md\` step 0 reads each of its runs against this list. The first case that matches
+decides, on every run:
+
+- **Trusted** — exit 0, a full \`BASE\` sha, and the last line \`VERDICT scripts trusted\`: go on.
+- **Exit 1, read only with a \`BASE\` line, at least one \`UNTRUSTED\` line and the last line
+  \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
+  - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
+    base): **stop on the branch** and say so. Never asked: no yes makes it hold.
+  - Every reason \`behind base: rebase\` — \`git -c core.hooksPath=/dev/null rebase
+    refs/remotes/origin/<BASE_BRANCH>\`, then step 0 again at once. Not a question: the branch only
+    lags the base.
+  - Any other — this run's merge mode is \`manual\`, whatever \`phases/auto-chain.md\` read. Stop on
+    the branch, name each \`UNTRUSTED\` path and its reason, and ask once: *"This branch changes
+    these helper scripts. Yes lands these scripts and runs them to land."* The yes covers that
+    run's \`SCRIPTS_DIGEST\` and its \`UNTRUSTED\` paths and nothing else: a later run with another
+    digest, or an \`UNTRUSTED\` path outside that set, asks again. Under it the rest of the merge
+    runs, \`land-feature.sh\` and \`phases/merge-close.md\` included; anything else stays on the
+    branch, nothing landed.
+- **Anything else** — exit 3, no \`specnaut\` on the PATH, output without those parts: stop on the
+  branch and say so. Nothing lands.
 
 ## The config verdicts
 

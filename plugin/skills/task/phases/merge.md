@@ -43,24 +43,8 @@ under `--no-close`, once more after the push: there the item's line must read `O
    specnaut verify-scripts
    ```
 
-   The first case that matches decides, on every run:
-
-   - **Trusted** — exit 0, a full `BASE` sha, and the last line `VERDICT scripts trusted`: go on.
-   - **Exit 1, read only with a `BASE` line, at least one `UNTRUSTED` line and the last line
-     `VERDICT scripts untrusted`** — otherwise it is *anything else*, below.
-     - An `UNTRUSTED` path outside `.specnaut/scripts/` (`local <base> ahead of origin`, the lock at
-       base): **stop on the branch** and say so. Never asked: no yes makes it hold.
-     - Every reason `behind base: rebase` — `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then
-       this step again at once. Not a question: the branch only lags the base.
-     - Any other — this run's merge mode is `manual`, whatever `phases/auto-chain.md` read. Stop on
-       the branch, name each `UNTRUSTED` path and its reason, and ask once: *"This branch changes
-       these helper scripts. Yes lands these scripts and runs them to land."* The yes covers that
-       run's `SCRIPTS_DIGEST` and its `UNTRUSTED` paths and nothing else: a later run with another
-       digest, or an `UNTRUSTED` path outside that set, asks again. Under it the rest of this phase
-       runs, `land-feature.sh` and `phases/merge-close.md` included; anything else stays on the
-       branch, nothing landed.
-   - **Anything else** — exit 3, no `specnaut` on the PATH, output without those parts: stop on the
-     branch and say so. Nothing lands.
+   The first case of `phases/script-gate.md` § Merge's step 0 outcomes that matches decides, on
+   every run.
 
    A config line whose reason is `behind base: rebase` is handled as that reason is for a script:
    `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once — the branch only
