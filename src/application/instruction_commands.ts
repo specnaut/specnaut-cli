@@ -1,4 +1,4 @@
-import { commandEntries, entryPaths, isCommandSource } from "../domain/command_targets.ts";
+import { COMMAND_REASON, commandPaths, isCommandSource } from "../domain/command_targets.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { fold, linkOnTheWay, type PathIndex } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
@@ -14,31 +14,51 @@ import { indexAt, sourceAt, visit, type Walk } from "./head_targets.ts";
  * A target is judged by its bytes alone; its text is never read for imports or for commands.
  */
 
-/** The commands of each judged source HEAD and the tip hold (`sources`), their targets visited. */
+/**
+ * The commands of each judged source HEAD and the tip hold (`sources`), their targets visited. A
+ * source HEAD holds whose commands could not all be read is named itself: it is asked about, and
+ * the yes covers it, rather than trusted on what was read.
+ */
 export async function readCommands(
   walk: Walk,
   sources: { readonly head: readonly BaseEntry[]; readonly tip: readonly BaseEntry[] },
 ): Promise<void> {
-  const entries = [
-    ...await entriesAt(walk, walk.base.head, sources.head),
-    ...await entriesAt(walk, walk.base.tip, sources.tip),
+  const read = [
+    ...await sourcesAt(walk, walk.base.head, sources.head),
+    ...await sourcesAt(walk, walk.base.tip, sources.tip),
   ];
-  if (entries.length === 0) return;
+  if (read.length === 0) return;
   const head = await indexAt(walk, walk.base.head);
   const tip = await indexAt(walk, walk.base.tip);
   const isFolder = (path: string) => (head.get(fold(path)) ?? []).some((p) => p.kind === "tree");
-  const targets = new Set(entries.flatMap((words) => entryPaths(words, isFolder)));
-  for (const path of targets) {
+  for (const path of commandTargets(walk, read, isFolder)) {
     for (const target of heldAs(walk.git.projectPrefix, path, head, tip)) await visit(walk, target);
   }
 }
 
-/** The word groups of each command source among `entries`, read at `commit`. */
-async function entriesAt(walk: Walk, commit: string, entries: readonly BaseEntry[]) {
-  const out: string[][] = [];
-  for (const e of entries.filter((e) => isCommandSource(e.path))) {
-    const source = await sourceAt(walk, commit, e);
-    if (source !== null) out.push(...commandEntries(e.path, source.bytes));
+type Read = { readonly entry: BaseEntry; readonly bytes: Uint8Array; readonly atHead: boolean };
+
+/** Every path the sources `read` name; one HEAD holds that is not read whole gets the reason. */
+function commandTargets(walk: Walk, read: readonly Read[], isFolder: (p: string) => boolean) {
+  const targets = new Set<string>();
+  for (const { entry, bytes, atHead } of read) {
+    const found = commandPaths(entry.path, bytes, isFolder);
+    found.paths.forEach((p) => targets.add(p));
+    if (!found.whole && atHead) {
+      walk.reasons.push({ path: entry.path, reason: COMMAND_REASON.partial });
+    }
+  }
+  return targets;
+}
+
+/** Each command source among `entries`, with the bytes `commit` holds for it. */
+async function sourcesAt(walk: Walk, commit: string, entries: readonly BaseEntry[]) {
+  const out: Read[] = [];
+  for (const entry of entries.filter((e) => isCommandSource(e.path))) {
+    const source = await sourceAt(walk, commit, entry);
+    if (source !== null) {
+      out.push({ entry, bytes: source.bytes, atHead: commit === walk.base.head });
+    }
   }
   return out;
 }

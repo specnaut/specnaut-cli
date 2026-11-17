@@ -57,6 +57,11 @@ export function canonical(prefix: string, path: string): string | null {
  * path. Both are tried; a reading that names no file at any commit asks nothing.
  */
 export function readings(written: string): string[] {
-  const bare = written.replace(/[.,;:!?)\]}>'"]+$/, "");
+  let end = written.length;
+  while (end > 0 && TRAILING.has(written[end - 1])) end--;
+  const bare = written.slice(0, end);
   return bare === written || bare === "" ? [written] : [written, bare];
 }
+
+/** The punctuation a sentence ends a path on. Trimmed one character at a time: linear in the path. */
+const TRAILING = new Set([...".,;:!?)]}>'\""]);

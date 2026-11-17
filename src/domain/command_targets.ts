@@ -1,7 +1,8 @@
 import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb, readings } from "./project_path.ts";
-import { shellWords } from "./shell_words.ts";
+import { manifestsOf } from "./command_runners.ts";
+import { shellSegments } from "./shell_words.ts";
 
 /**
  * The repository files a judged config makes a harness run: a hook's or a status line's command,
@@ -25,74 +26,97 @@ export const COMMAND_SOURCES: readonly string[] = [
 export const isCommandSource = (path: string): boolean =>
   COMMAND_SOURCES.some((s) => s === path.toLowerCase());
 
-/** At most this many words are read from a source's parsed values, and as many from its bytes. */
-export const MAX_WORDS = 2000;
+/** The reason a source gets when its commands could not all be read: it is asked about whole. */
+export const COMMAND_REASON = { partial: "commands not fully read" } as const;
 
-/** A source larger than this is read from its bytes alone: no parser runs on it. */
+/** A source larger than this is not parsed: read from its bytes, and named as not fully read. */
 const PARSE_LIMIT = 256 * 1024;
+/** A longer word is not read: no path is that long. */
+const MAX_WORD = 4096;
+/** An absolute path, or one after a dropped variable, is tried from at most this many last parts. */
+const MAX_SUFFIXES = 32;
+/** At most this many paths are put under the folders one group of words names. */
+const MAX_JOINS = 50_000;
+
+/** What a source's commands name, and whether every word of it was read. */
+export type CommandPaths = { readonly paths: readonly string[]; readonly whole: boolean };
+
+/** Whether a reading met no limit: a source that did not parse, or a word or expansion past a cap. */
+type Reading = { whole: boolean };
 
 /**
- * A program that runs what a manifest in its folder lists (`npm run lint`, `make`): that manifest
- * is read as a target too.
+ * The paths a command source names (`entryPaths`), from its parsed values (each object's strings
+ * together: a server's `command`, `args` and `cwd`) and from each line of its bytes. Both always:
+ * the parse reads escapes (`\u002e`), the bytes what a parser rejects or misses. No word is left
+ * unread for being one too many; a source that is not parsed, or a word or an expansion past a
+ * cap, makes the reading not `whole`, and the caller names the source rather than trust it.
  */
-const RUNNERS: Readonly<Record<string, readonly string[]>> = {
-  npm: ["package.json"],
-  pnpm: ["package.json"],
-  yarn: ["package.json"],
-  bun: ["package.json"],
-  make: ["Makefile", "makefile", "GNUmakefile"],
-  gmake: ["Makefile", "makefile", "GNUmakefile"],
-  just: ["justfile", ".justfile", "Justfile"],
-  deno: ["deno.json", "deno.jsonc"],
-};
-
-/**
- * The groups of words a source holds: each object's strings, parsed (a server's `command`, `args`
- * and `cwd` together), then the whole text read as bytes. Both always: the parse reads escapes
- * (`\u002e`), the bytes read what a parser rejects or misses. A source that does not parse, or is
- * too large or too deep to, is read from its bytes alone.
- */
-export function commandEntries(path: string, bytes: Uint8Array): string[][] {
+export function commandPaths(
+  path: string,
+  bytes: Uint8Array,
+  isFolder: (path: string) => boolean,
+): CommandPaths {
+  const read: Reading = { whole: true };
   const text = new TextDecoder().decode(bytes);
-  const entries = [...capped(parsedEntries(path, text)), ...capped([rawWords(text)])];
-  return entries.filter((e) => e.length > 0);
+  const entries = [...parsedEntries(path, text, read), ...text.split("\n").map(rawWords)];
+  const paths = new Set(entries.flatMap((words) => entryPaths(words, isFolder, read)));
+  return { paths: [...paths], whole: read.whole };
 }
 
 /**
  * The paths one group of words may name, relative to the project's folder: each word, each part
  * of it around `=` or `:`, without a leading variable or command (`$DIR/x.sh` is `x.sh`), each
- * folder suffix of an absolute path, and the manifest a runner reads. A word naming a folder
- * (`isFolder`: a `cwd`, `cd X`, `-C X`) also puts every other path under it.
+ * folder suffix of an absolute path or of what follows a dropped variable or `~`. A word naming a
+ * folder (`isFolder`: a `cwd`, `cd X`, `-C X`) also puts every other path under it.
  */
 export function entryPaths(
   words: readonly string[],
   isFolder: (path: string) => boolean,
+  read: Reading = { whole: true },
 ): string[] {
-  const found = new Set(words.flatMap((w) => [...pathsIn(w), ...RUNNERS[runner(w)] ?? []]));
-  const named = [...found];
+  const found = new Set<string>();
+  for (const word of new Set(words)) {
+    if (word.length > MAX_WORD) read.whole = false;
+    else for (const p of pathsIn(word, read)) found.add(p);
+  }
+  return underFolders([...found], isFolder, read);
+}
+
+/** `named`, and each of them under each that is a folder, up to {@link MAX_JOINS} more. */
+function underFolders(named: string[], isFolder: (path: string) => boolean, read: Reading) {
+  const found = new Set(named);
   for (const folder of named.filter(isFolder)) {
     for (const path of named) {
+      if (found.size >= named.length + MAX_JOINS) {
+        read.whole = false;
+        return [...found];
+      }
       if (path !== folder) found.add(climb([], `${folder}/${path}`).join("/"));
     }
   }
   return [...found];
 }
 
-const runner = (word: string) => word.slice(word.lastIndexOf("/") + 1);
-
-function pathsIn(word: string): string[] {
+function pathsIn(word: string, read: Reading): string[] {
   const pieces = new Set([word, ...word.split("="), ...word.split(":")]);
-  return [...pieces].flatMap(readings).flatMap(pathOf);
+  return [...pieces].flatMap(readings).flatMap((p) => pathOf(p, read));
 }
 
-/** One piece as a path: relative as written, each suffix of an absolute one, none if a variable is left. */
-function pathOf(piece: string): string[] {
-  const bare = withoutVariable(piece.replaceAll("\\", "/"));
-  if (bare === null || bare === "" || bare.startsWith("~")) return [];
-  const absolute = /^(?:[A-Za-z]:)?\//.test(bare);
-  const parts = climb([], bare.replace(/^(?:[A-Za-z]:)?\/+/, "")).filter((p) => p !== "..");
-  if (!absolute) return parts.length === 0 ? [] : [climb([], bare).join("/")];
-  return parts.map((_, i) => parts.slice(i).join("/"));
+/**
+ * One piece as a path: relative as written; or, when it is absolute, starts at the home (`~`), or
+ * starts with a variable dropped up to its first `/`, each of its folder suffixes, since where it
+ * starts is not known. None when a variable is left.
+ */
+function pathOf(piece: string, read: Reading): string[] {
+  const slashed = piece.replaceAll("\\", "/");
+  const bare = withoutVariable(slashed);
+  if (bare === null || bare === "" || bare === "~") return [];
+  const rooted = bare !== slashed || /^(?:~|(?:[A-Za-z]:)?\/)/.test(bare);
+  if (!rooted) return [climb([], bare).join("/")].filter(Boolean);
+  const parts = climb([], bare.replace(/^(?:~|[A-Za-z]:)?\/*/, "")).filter((p) => p !== "..");
+  if (parts.length > MAX_SUFFIXES) read.whole = false;
+  const kept = parts.slice(-MAX_SUFFIXES);
+  return kept.map((_, i) => kept.slice(i).join("/"));
 }
 
 /**
@@ -120,18 +144,29 @@ function firstSlash(token: string): number {
   return -1;
 }
 
-function parsedEntries(path: string, text: string): string[][] {
-  if (text.length > PARSE_LIMIT) return [];
+function parsedEntries(path: string, text: string, read: Reading): string[][] {
+  if (text.length > PARSE_LIMIT) {
+    read.whole = false;
+    return [];
+  }
   try {
     const value = path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text);
     const entries: string[][] = [];
-    entries.push(stringsOf(value, entries).flatMap(shellWords));
+    entries.push(commandWords(stringsOf(value, entries)));
     return entries;
-  } catch {
-    // Not swallowed: a source that does not parse, or nests too deep to walk, is read from its
-    // bytes (`rawWords`), which every source is read from anyway.
+  } catch (err) {
+    // Not swallowed: a source that does not parse, or nests too deep to walk, is not read whole,
+    // and its caller names it. Anything else is not a parse failure and goes up.
+    if (!(err instanceof SyntaxError || err instanceof RangeError)) throw err;
+    read.whole = false;
     return [];
   }
+}
+
+/** The words of `strings`, and the manifest each command among them runs (`manifestsOf`). */
+function commandWords(strings: readonly string[]): string[] {
+  const commands = strings.flatMap(shellSegments);
+  return [...commands.flat(), ...commands.flatMap(manifestsOf)];
 }
 
 /** The strings of `value` that belong to the object holding it; each object's are one entry. */
@@ -139,7 +174,7 @@ function stringsOf(value: unknown, entries: string[][]): string[] {
   if (typeof value === "string") return [value];
   if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, entries));
   if (value === null || typeof value !== "object") return [];
-  entries.push(Object.values(value).flatMap((v) => stringsOf(v, entries)).flatMap(shellWords));
+  entries.push(commandWords(Object.values(value).flatMap((v) => stringsOf(v, entries))));
   return [];
 }
 
@@ -147,14 +182,4 @@ function stringsOf(value: unknown, entries: string[][]): string[] {
 function rawWords(text: string): string[] {
   const plain = text.replace(/\\\\/g, "/").replace(/\\["']/g, " ");
   return plain.split(/[\s"'`,;&|<>(){}[\]]+/).filter(Boolean);
-}
-
-/** `entries`, each without repeats, until {@link MAX_WORDS} words are read. */
-function capped(entries: readonly string[][]): string[][] {
-  let left = MAX_WORDS;
-  return entries.map((words) => {
-    const kept = [...new Set(words)].slice(0, Math.max(left, 0));
-    left -= kept.length;
-    return kept;
-  });
 }

@@ -91,3 +91,32 @@ Deno.test("the digest covers a command's target: a later edit to it is another d
   await edit(root, { "scripts/lint.sh": "#!/bin/sh\nexit 2\n" });
   assertNotEquals((await verify(root)).field("INSTRUCTIONS_DIGEST"), approved);
 });
+
+Deno.test("a hook after thousands of permission rules still has its script judged", async () => {
+  const allow = Array.from({ length: 2100 }, (_, i) => `Read(docs/w${i}.md)`);
+  const settings = JSON.stringify({
+    permissions: { allow },
+    hooks: { Stop: [{ hooks: [{ type: "command", command: "scripts/x.sh" }] }] },
+  });
+  const root = await project({ ".claude/settings.json": settings, "scripts/x.sh": LINT });
+  await edit(root, { "scripts/x.sh": "#!/bin/sh\nexit 1\n" });
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted scripts/x.sh differs from base",
+  ]);
+});
+
+Deno.test("a runner named in a permission rule runs nothing: its manifest is not judged", async () => {
+  const settings = JSON.stringify({ permissions: { allow: ["Bash(npm test:*)"] } });
+  const root = await project({ ".claude/settings.json": settings, "package.json": "{}\n" });
+  await edit(root, { "package.json": '{"dependencies": {}}\n' });
+  assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+});
+
+Deno.test("a source too large to parse is named itself, never trusted on what was read", async () => {
+  const settings = JSON.stringify({ env: { NOTE: "x ".repeat(140_000) } });
+  const root = await project({ ".claude/settings.json": settings });
+  await edit(root, { "notes.md": "x\n" });
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted .claude/settings.json commands not fully read",
+  ]);
+});

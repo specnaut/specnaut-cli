@@ -12,13 +12,27 @@ const SEPARATOR = /[\s;&|<>()]/;
 const ESCAPED = /[\s"'\\$`;&|<>()]/;
 
 export function shellWords(text: string): string[] {
-  const words: string[] = [];
+  return shellSegments(text).flat();
+}
+
+/** What starts another command: `;`, `&`, `|`, a line's end. */
+const NEXT_COMMAND = /[;&|\n\r]/;
+
+/**
+ * The words of each command `text` holds, one list per command: a new one after `;`, `&`, `|`, a
+ * line's end, and at a `(` that opens a word (a subshell). A `(` inside a word, as in a permission
+ * rule `Bash(npm test:*)`, only ends the word: what follows is not a command's first word.
+ */
+export function shellSegments(text: string): string[][] {
+  const segments: string[][] = [[]];
   let word: string | null = null;
   let i = 0;
   while (i < text.length) {
     if (SEPARATOR.test(text[i])) {
-      if (word !== null) words.push(word);
+      const opens = NEXT_COMMAND.test(text[i]) || (text[i] === "(" && word === null);
+      if (word !== null) segments.at(-1)!.push(word);
       word = null;
+      if (opens && segments.at(-1)!.length > 0) segments.push([]);
       i++;
       continue;
     }
@@ -26,8 +40,8 @@ export function shellWords(text: string): string[] {
     word = (word ?? "") + part;
     i = next;
   }
-  if (word !== null) words.push(word);
-  return words;
+  if (word !== null) segments.at(-1)!.push(word);
+  return segments.filter((s) => s.length > 0);
 }
 
 /** The part of a word that starts at `i`, unquoted, and where the next part starts. */
