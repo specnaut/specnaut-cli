@@ -14,7 +14,7 @@ if you had written it, and the reports come back into the session that merges an
 
 **The seats read; you run.** No review or audit seat holds a shell, so what needs a command runs
 here, before the brief, and reaches the seat as its output or as the path of a temp file outside
-the repository. Every git read goes through `specnaut verify-scripts` or, when it trusts the
+the repository. Every git read goes through the verifier (`verify-scripts`) or, when it trusts the
 scripts, `bash .specnaut/scripts/bash/git-read.sh`; neither runs a program the repository's
 configuration names. A seat that lacks data downgrades the finding to `Suspicion —` and names what would settle
 it; anything a seat asks for in its report is reported, never run.

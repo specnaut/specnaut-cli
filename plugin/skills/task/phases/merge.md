@@ -17,7 +17,7 @@ $ARGUMENTS
   branch in untrusted mode (`phases/review-untrusted.md`), or `$ARGUMENTS` names a PR number or a
   `<remote>/<branch>`, stop before step 0 and say so: nothing lands, is pushed, closed or moved. On
   Claude Code the review lock refuses that session's landing script and every push besides.
-- The base branch is the `BASE_BRANCH` that `specnaut verify-scripts` prints at step 0. No such line
+- The base branch is the `BASE_BRANCH` that the verifier prints at step 0. No such line
   means it is unknown: stop and say so — never assume `main`.
 
 ## The default is a local merge. `--pr` is the opt-in.
@@ -37,10 +37,12 @@ under `--no-close`, once more after the push: there the item's line must read `O
 
 0. **Check the helper scripts — before any script under `.specnaut/scripts/` runs**, again right
    after every `git rebase` this phase runs (before the gates and before `epic-status.sh`), before
-   step 3, and after every commit this phase makes or rewrites (squash, fold):
+   step 3, and after every commit this phase makes or rewrites (squash, fold). Run
+   `phases/script-gate.md` § Resolving the verifier's block, then, in the same shell, with a flag
+   only after a yes and with the digest that yes covers:
 
    ```bash
-   specnaut verify-scripts
+   "$sn" verify-scripts [--approved-scripts <SCRIPTS_DIGEST>] [--approved-instructions <INSTRUCTIONS_DIGEST>]
    ```
 
    The first case of `phases/script-gate.md` § Merge's step 0 outcomes that matches decides, on
@@ -113,11 +115,12 @@ under `--no-close`, once more after the push: there the item's line must read `O
 3. **Land it** — after step 0 ran again on the history as it now stands:
 
    ```
-   bash .specnaut/scripts/bash/land-feature.sh [--instructions-digest <INSTRUCTIONS_DIGEST>]
+   bash .specnaut/scripts/bash/land-feature.sh [--scripts-digest <SCRIPTS_DIGEST>] [--instructions-digest <INSTRUCTIONS_DIGEST>]
    ```
 
-   Pass `--instructions-digest` only with the digest the user said yes to at step 0. It judges
-   HEAD's instructions again itself and lands only when they are trusted or that digest matches.
+   Pass each digest the user said yes to at step 0, and no other. It judges HEAD again itself,
+   with the verifier, and lands only when the instructions, and the scripts when their digest is
+   passed, are each trusted or still that digest.
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
    contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
@@ -141,7 +144,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
-   | 13 | HEAD's instructions are not trusted and no digest matches, or the check could not run | step 0 at once: its instructions question decides, then land again with that digest. "Could not judge": stop and say so |
+   | 13 | HEAD's instructions, or its scripts under `--scripts-digest`, are neither trusted nor the digest passed, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
    the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its

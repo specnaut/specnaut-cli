@@ -31,17 +31,24 @@
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
 #   12 an unexpected git failure before the push, named on stderr
-#   13 HEAD's instructions are not trusted and no --instructions-digest
-#      matches the one `specnaut verify-scripts` computes, or it could not
-#      judge HEAD; its `VERDICT instructions` lines are printed. Nothing moved
+#   13 HEAD's instructions, or its helper scripts when --scripts-digest is
+#      passed, are neither trusted nor that digest, as the verifier judges
+#      them; or it could not judge HEAD, or `specnaut` resolved to a path it
+#      refuses (VERIFIER REFUSED);
+#      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
+#      Nothing moved
 # (8 is retired: a branch that will not delete after the push is 11, never
 # read as a failed landing.)
 #
-# The instructions at HEAD are judged here, not taken from the phase: a stop
-# the phase skipped is still a stop. `--instructions-digest` is the
-# INSTRUCTIONS_DIGEST the user said yes to (phases/script-gate.md).
+# HEAD is judged here, not taken from the phase: a stop the phase skipped is
+# still a stop. `--scripts-digest` and `--instructions-digest` are the
+# SCRIPTS_DIGEST and INSTRUCTIONS_DIGEST the user said yes to
+# (phases/script-gate.md); each is passed on to the verifier as
+# --approved-scripts / --approved-instructions, which compares it. Its limit:
+# when the scripts are the branch's, this script is too, judged by its own
+# approved bytes; the merge phase's own step-0 call is the binding.
 #
-# Usage: land-feature.sh [--instructions-digest <sha256>]
+# Usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]
 # -E: the ERR trap below reaches functions and command substitutions too, so a failure there is
 # exit 12, never the raw code of the command that failed.
 set -Eeuo pipefail
@@ -68,14 +75,24 @@ trap 'unexpected $? "$BASH_COMMAND"' ERR
 # shellcheck source=./_verifier.sh
 . "$here/_verifier.sh"
 
-usage="usage: land-feature.sh [--instructions-digest <sha256>]"
-approved=""
-if [ $# -eq 2 ] && [ "$1" = --instructions-digest ] && [[ $2 =~ ^[0-9a-f]{64}$ ]]; then
-  approved=$2
-elif [ $# -ne 0 ]; then
-  echo "$usage" >&2
-  exit 2
-fi
+usage="usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]"
+scripts_digest=""
+instructions_digest=""
+while [ $# -gt 0 ]; do
+  if [ $# -lt 2 ] || ! [[ $2 =~ ^[0-9a-f]{64}$ ]]; then
+    echo "$usage" >&2
+    exit 2
+  fi
+  case $1 in
+    --scripts-digest) [ -z "$scripts_digest" ] && scripts_digest=$2 ;;
+    --instructions-digest) [ -z "$instructions_digest" ] && instructions_digest=$2 ;;
+    *) false ;;
+  esac || {
+    echo "$usage" >&2
+    exit 2
+  }
+  shift 2
+done
 base=$(bash "$here/base-branch.sh") || exit 3
 branch=$(git symbolic-ref --quiet --short HEAD) || {
   echo "land-feature: HEAD is detached — check out the feature branch" >&2
@@ -118,7 +135,8 @@ fi
 # sed, not head: head closing the pipe early would fail rev-list under pipefail.
 first=$(git rev-list --reverse "refs/remotes/origin/$base..HEAD" | sed -n 1p)
 last=$(git rev-parse HEAD)
-judge_instructions
+resolve_specnaut
+judge_head
 
 git checkout --quiet "$base"
 # The commit judged above, never the branch's name: a ref that moved since would land unjudged. A

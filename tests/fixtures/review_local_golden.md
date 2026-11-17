@@ -16,12 +16,13 @@ $ARGUMENTS
    --detach "<sha>"`, and step 1 reviews that commit. Any other line or exit makes the review
    untrusted: follow `phases/review-untrusted.md`. **A PR review, trusted included, runs no fix
    loop (Phase 3) and does not chain to merge:** its findings are the report.
-1. **Check the helper scripts, then fix the range.** Run this block as written, from the project's
-   root, before any script under `.specnaut/scripts/` runs — again after each fix cycle (Phase 3):
+1. **Check the helper scripts, then fix the range.** Run `phases/script-gate.md` § Resolving the
+   verifier's block, then this one, as written and in that same shell, from the project's root,
+   before any script under `.specnaut/scripts/` runs — again after each fix cycle (Phase 3):
 
    <!-- review-gate: verify-scripts -->
    ```bash
-   out=$(specnaut verify-scripts); rc=$?; printf '%s\n' "$out"
+   out=$("$sn" verify-scripts); rc=$?; printf '%s\n' "$out"
    base=$(printf '%s\n' "$out" | sed -n 's/^BASE \([0-9a-f]\{40,64\}\)$/\1/p')
    last=$(printf '%s\n' "$out" | tail -n 1)
    if [ "$rc" -eq 0 ] && [ -n "$base" ] && [ "$last" = "VERDICT scripts trusted" ]; then
@@ -32,7 +33,7 @@ $ARGUMENTS
    ```
 
    The files under review are the lines of the file `NAMES_FILE` names. **No `BASE` line** — exit
-   2 or 3, or no `specnaut` on the PATH — **stops the review**: say the base or the verifier is
+   2 or 3, a `VERIFIER REFUSED` line, or no `specnaut` on the PATH — **stops the review**: say the base or the verifier is
    missing; never fall back to a script of the tree. Any outcome but the trusted one runs no script
    of the tree in this review: `phases/review-seats.md` § Review — Phase 0 says how each step is
    briefed. Phase 0 and Seat selection read the CATEGORY SIGNALS the scope script printed.

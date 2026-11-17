@@ -94,7 +94,7 @@ the board fence of `phases/merge.md` step 5. Re-entry differs only where it says
 
 `resume.md` comes here with one line of the intake gate, `OWN closeout <n> <dir> <sha>`, after a
 `FENCED` one was answered yes when there was one. Landed scripts are the project's own: they are the
-ones on the published base, so no `specnaut verify-scripts` runs first.
+ones on the published base, so the verifier does not run first.
 
 1. **The base.** Switch to it (`git -c core.hooksPath=/dev/null checkout <base>`); when it is strictly behind
    `refs/remotes/origin/<base>`, fast-forward it there

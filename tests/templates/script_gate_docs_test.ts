@@ -19,7 +19,8 @@ function steps(merge: string) {
 Deno.test("merge's step 0 verifies before the first script and again after a rebase", () => {
   const merge = phase("merge").content;
   const { zero, one } = steps(merge);
-  assert(merge.indexOf("specnaut verify-scripts", zero) < one, "step 0 does not run the verifier");
+  const call = merge.indexOf('"$sn" verify-scripts', zero);
+  assert(call > zero && call < one, "step 0 does not run the verifier");
   // Nothing before step 0 names a script of the tree; every one the steps run comes after it.
   assert(!/\.specnaut\/scripts\/|\.sh\b/.test(merge.slice(0, zero)), "a script before step 0");
   for (const script of ["epic-status.sh", "run-gate.sh", "land-feature.sh", "move.sh"]) {

@@ -69,7 +69,7 @@ Deno.test("the review and audit phases read git only through git-read.sh", async
     // review.md and audit.md read their range from the verifier, which runs before any script
     // of the tree: review.md runs it itself, audit.md through the gate doc.
     const reader = doc === REVIEW
-      ? "specnaut verify-scripts"
+      ? '"$sn" verify-scripts'
       : doc === SEATS
       ? "bash .specnaut/scripts/bash/git-read.sh"
       : "phases/script-gate.md";

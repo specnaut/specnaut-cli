@@ -16,7 +16,7 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   assert(!review.includes('invoke it on "yes"'), "review.md restates the merge mode");
   const merge = phase("merge").content;
   // The base branch comes from the verifier, which runs before any script of the tree; never main.
-  assertStringIncludes(merge, "the `BASE_BRANCH` that `specnaut verify-scripts` prints");
+  assertStringIncludes(merge, "the `BASE_BRANCH` that the verifier prints at step 0");
   assertStringIncludes(merge, "never assume `main`");
   // D6: merge never asks about the push (run by land-feature.sh); D4: it does not read the mode.
   assertStringIncludes(merge, "pushes without asking, in either merge mode");

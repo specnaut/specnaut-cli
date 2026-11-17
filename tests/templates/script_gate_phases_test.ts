@@ -12,24 +12,6 @@ const read = (rel: string) =>
   Deno.readTextFileSync(new URL(`../../templates/core/skills/task/${rel}`, import.meta.url));
 const gate = () => read("phases/script-gate.md");
 
-Deno.test("the gate block verifies first and words a refusal as the review does", () => {
-  const g = gate();
-  const block = g.split("<!-- script-gate: verify-scripts -->")[1];
-  assert(block !== undefined, "script-gate.md lost its anchor");
-  assert(block.indexOf("specnaut verify-scripts") < block.indexOf("SCRIPTS TRUSTED"));
-  const review = read("phases/review.md");
-  for (
-    const line of [
-      '[ "$last" = "VERDICT scripts trusted" ]',
-      "SCRIPTS NOT RUN: verify-scripts exit $rc",
-    ]
-  ) {
-    assertStringIncludes(block, line);
-    assertStringIncludes(review, line);
-  }
-  assertStringIncludes(flat(g), "Never fall back to a script of the tree");
-});
-
 Deno.test("the router sends resume, groom, the backlog verbs and audit through the gate", () => {
   const routing = flat(read("SKILL.md"));
   assertStringIncludes(

@@ -5,14 +5,47 @@
 `phases/merge.md` step 0, whose outcomes are § Merge's step 0 outcomes); every verb that runs a
 gate reads § The config verdicts.
 
+## Resolving the verifier
+
+Every block that runs the verifier runs this one first, in the same shell, and then calls `"$sn"
+verify-scripts`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
+`specnaut` of its own. It sets `sn` to the physical file `specnaut` resolves to, following each
+link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
+folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
+neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository.
+`land-feature.sh` holds the same rule as `resolve_specnaut`, in `_verifier.sh` beside it.
+
+<!-- script-gate: resolve-verifier -->
+```bash
+sn=""; why=""; n=0; p=$(command -v specnaut); top=$(git rev-parse --show-toplevel)
+case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
+[ -n "$why" ] || [ -n "$top" ] || why="has no repository to be judged outside of"
+while [ -z "$why" ]; do
+  d=$(cd -P "${p%/*}/" && pwd) || { why="names a folder that cannot be entered"; break; }
+  p="$d/${p##*/}"; a=$d
+  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+  if [ "$a" -ef "$top" ]; then why="is inside the repository"; break; fi
+  if ! [ -L "$p" ]; then sn=$p; break; fi
+  n=$((n + 1)); if [ "$n" -gt 40 ]; then why="links more than 40 times"; break; fi
+  t=$(readlink "$p") || { why="is a link that cannot be read"; break; }
+  case $t in /*) p=$t ;; *) p="$d/$t" ;; esac
+done
+[ -n "$sn" ] || echo "VERIFIER REFUSED: ${p:-specnaut} $why"
+```
+
+A `VERIFIER REFUSED: <path> <why>` line leaves `sn` empty, and the call after it fails: stop and
+say so, quoting the line. The verifier is an installed release: one that runs this checkout's own
+source is the branch's.
+
 ## The gate
 
-Run this block as written, from the project's root, before the first script of the tree, and
-again after any `git switch`, `git rebase` or commit the verb makes:
+Run § Resolving the verifier's block, then this one, as written and in that same shell, from the
+project's root, before the first script of the tree, and again after any `git switch`, `git
+rebase` or commit the verb makes:
 
 <!-- script-gate: verify-scripts -->
 ```bash
-out=$(specnaut verify-scripts); rc=$?; printf '%s\n' "$out"
+out=$("$sn" verify-scripts); rc=$?; printf '%s\n' "$out"
 base=$(printf '%s\n' "$out" | sed -n 's/^BASE \([0-9a-f]\{40,64\}\)$/\1/p')
 last=$(printf '%s\n' "$out" | tail -n 1)
 names=$(printf '%s\n' "$out" | sed -n 's/^NAMES_FILE //p'); [ -z "$names" ] || rm -f "$names"
@@ -25,16 +58,26 @@ fi
 
 `SCRIPTS TRUSTED` is the one outcome under which the verb runs a script of the tree. Any other
 runs none in this run: report the `SCRIPTS NOT RUN` line and each `UNTRUSTED` line, and stop. No
-`BASE` line (exit 2 or 3, or no `specnaut` on the PATH) means the base or the verifier is
-missing: say which. Never fall back to a script of the tree, nor to a hand-run of what it does.
+`BASE` line (exit 2 or 3, a `VERIFIER REFUSED` line, or no `specnaut` on the PATH) means the base
+or the verifier is missing or refused: say which. No verb but `merge` passes the verifier a flag. Never fall back to a script of the tree, nor to a hand-run of what it does.
 The `BASE` sha is the base for any range the verb passes a script.
 
 ## Merge's step 0 outcomes
 
-`phases/merge.md` step 0 reads each of its runs against this list. The first case that matches
-decides, on every run:
+`phases/merge.md` step 0 reads each of its runs against this list. After a yes, every later run
+passes the digest it covers: `--approved-scripts <SCRIPTS_DIGEST>` for the scripts' yes,
+`--approved-instructions <INSTRUCTIONS_DIGEST>` for the instructions' yes, and no flag without a
+yes. The binary compares them and prints an `APPROVAL <class> holds|moved <digest>` line per
+flag; the phase never compares digests itself. The first case that matches decides, on every run:
 
 - **Trusted** — exit 0, a full `BASE` sha, and the last line `VERDICT scripts trusted`: go on.
+- **Approved** — the run passed a digest, exit 0, a full `BASE` sha, and an `APPROVAL <class>
+  holds` line for each digest passed: go on under the yes.
+- **Moved** — the run passed a digest and exited 1: nothing goes on under the yes. An `APPROVAL
+  <class> moved` line voids that class's yes: the tree is not the one the user said yes to. Read
+  the run as below, a class whose `APPROVAL` line holds counting as answered: any other class not
+  trusted asks its question again (the scripts' here, the instructions' in § The instructions
+  verdict).
 - **Exit 1, read only with a `BASE` line, at least one `UNTRUSTED` line and the last line
   `VERDICT scripts untrusted`** — otherwise it is *anything else*, below.
   - An `UNTRUSTED` path outside `.specnaut/scripts/` (`local <base> ahead of origin`, the lock at
@@ -48,9 +91,9 @@ decides, on every run:
     run's `SCRIPTS_DIGEST` and its `UNTRUSTED` paths and nothing else: a later run with another
     digest, or an `UNTRUSTED` path outside that set, asks again. Under it the rest of the merge
     runs, `land-feature.sh` and `phases/merge-close.md` included; anything else stays on the
-    branch, nothing landed.
-- **Anything else** — exit 3, no `specnaut` on the PATH, output without those parts: stop on the
-  branch and say so. Nothing lands.
+    branch, nothing landed. Every later run passes that digest as `--approved-scripts`.
+- **Anything else** — exit 3, a `VERIFIER REFUSED` line, no `specnaut` on the PATH, output without
+  those parts: stop on the branch and say so. Nothing lands.
 
 ## The config verdicts
 
@@ -93,6 +136,8 @@ compares it with that copy. Then ask once, as the one question before step 3: *"
 the instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no
 stops on the branch. The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them
 and the reasons shown) and nothing else: a later run with another digest asks again, even naming the
-same paths, or with a new reason, and a run with no such line asks. Step 3 passes that digest to
-`land-feature.sh` as `--instructions-digest`, which judges HEAD again and refuses (13) any other.
+same paths, or with a new reason, and a run with no such line asks. Every later run of step 0
+passes it as `--approved-instructions`, and its `APPROVAL instructions holds` line answers this
+question: it is not asked again. Step 3 passes that digest to `land-feature.sh` as
+`--instructions-digest`, which judges HEAD again and refuses (13) any other.
 The session read `AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.

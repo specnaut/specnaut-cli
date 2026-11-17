@@ -14,7 +14,12 @@ file wins for an untrusted review.
 
 ## Start
 
-Run this block as written, from the project's root, with the argument the review was given and,
+First run `phases/script-gate.md` § Resolving the verifier's block alone, as written: a `VERIFIER
+REFUSED` line stops the review, and nothing is fetched. Under the lock below the verifier runs by
+its bare name, the one form the lock lets through, on the PATH this checked, in a checkout the gate
+holds to the base.
+
+Then run this block as written, from the project's root, with the argument the review was given and,
 as `<sha>`, the head the remote reported, written out: for a PR, the commit id step 0's `git
 ls-remote` printed; for a `<remote>/<branch>`, the one `git ls-remote "<remote>"
 "refs/heads/<branch>"` prints. A fetch that lands on any other head is refused:

@@ -18,18 +18,24 @@ const SCOPE = ".specnaut/scripts/audit/collect-audit-scope.sh";
 const ANCHOR = "<!-- review-gate: verify-scripts -->";
 const BUNDLE = bundleForLock(CORE_BUNDLE, parseLock(LOCK), findHarness)!;
 
-/** The bash block right after the anchor in the rendered review phase, its list indent removed. */
-function gateBlock(): string {
+/** The bash block right after `anchor` in the rendered phase `name`, its list indent removed. */
+function blockAfter(name: string, anchor: string): string {
   const doc = Object.entries(BUNDLE).find(([dest]) =>
-    dest.endsWith("skills/task/phases/review.md")
+    dest.endsWith(`skills/task/phases/${name}.md`)
   );
-  assert(doc, "the rendered bundle has no review phase");
-  const after = doc[1].content.split(ANCHOR)[1];
-  assert(after !== undefined, "the review phase lost its gate anchor");
+  assert(doc, `the rendered bundle has no ${name} phase`);
+  const after = doc[1].content.split(anchor)[1];
+  assert(after !== undefined, `the ${name} phase lost its anchor`);
   const m = /^\s*```bash\n([\s\S]*?)\n\s*```/.exec(after);
-  assert(m, "no bash block follows the gate anchor");
+  assert(m, `no bash block follows the ${name} anchor`);
   return m[1].split("\n").map((l) => l.replace(/^ {3}/, "")).join("\n");
 }
+
+/** What step 1 tells the agent to run: the gate doc's resolve block, then the gate, one shell. */
+const gateBlock = () =>
+  `${blockAfter("script-gate", "<!-- script-gate: resolve-verifier -->")}\n${
+    blockAfter("review", ANCHOR)
+  }`;
 
 /** Every script the bundle installs, the lock beside them: a project as `specnaut init` leaves it. */
 function installedScripts(): Record<string, string> {
