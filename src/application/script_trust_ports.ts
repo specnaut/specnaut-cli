@@ -55,8 +55,10 @@ export interface GitObjectReader {
    */
   listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]>;
   /**
-   * Every path of `commit`'s whole tree under the project's folder with its kind, folders included,
-   * and no bytes read: what a lookup of a name in another letter case searches.
+   * Every path of `commit`'s whole tree with its kind, folders included, and no bytes read: what a
+   * lookup of a name in another letter case searches. The whole repository, not only the project's
+   * folder, written relative to it (`project_path.ts`): `../shared.md` above it, `.` the project's
+   * own folder, `..` each folder above it.
    */
   listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]>;
   /**

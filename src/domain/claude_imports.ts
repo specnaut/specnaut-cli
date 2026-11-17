@@ -2,6 +2,7 @@ import { sameBytes } from "./bytes.ts";
 import { INSTRUCTION_NAMES } from "./checkout_scope.ts";
 import { invisibleReason } from "./instruction_head.ts";
 import { REASON, type Untrusted } from "./script_trust.ts";
+import { climb, readings } from "./project_path.ts";
 import { refinedReason } from "./trust_reason.ts";
 
 /**
@@ -64,28 +65,13 @@ export function importsIn(text: string): string[] {
 }
 
 /**
- * An import as written and, when it ends in punctuation, without it: prose ends a sentence on a
- * path. Both are followed; a reading that names no file at any commit asks nothing.
- */
-function readings(written: string): string[] {
-  const bare = written.replace(/[.,;:!?)\]}>'"]+$/, "");
-  return bare === written || bare === "" ? [written] : [written, bare];
-}
-
-/**
  * Where an import written in the file at `from` leads, relative to the project's folder (`../`
  * when it climbs above it), or `null` when it reads outside the repository's checkout: the home
  * (`~/`), an absolute path. Whether it climbs above the repository's top is the reader's to say.
  */
 export function importTarget(from: string, written: string): string | null {
   if (written.startsWith("~") || written.startsWith("/") || /^[A-Za-z]:/.test(written)) return null;
-  const parts = from.split("/").slice(0, -1);
-  for (const part of written.split("/")) {
-    if (part === "..") {
-      if (parts.length === 0 || parts.at(-1) === "..") parts.push("..");
-      else parts.pop();
-    } else if (part !== "." && part !== "") parts.push(part);
-  }
+  const parts = climb(from.split("/").slice(0, -1), written);
   return parts.length === 0 ? null : parts.join("/");
 }
 

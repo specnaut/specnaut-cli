@@ -63,3 +63,16 @@ Deno.test("the changed names hold a gitlink bump its submodule is set to ignore"
   const reader = await GitObjects.open(root);
   assertEquals(await reader.changedNames(before, "HEAD"), ["vendor/lib"]);
 });
+
+Deno.test("the paths of a project under the top are the whole repository, written from it", async () => {
+  const { root, head } = await repo({ "app/x.md": "x\n", "shared.md": "s\n", "lib/y.md": "y\n" });
+  const reader = await GitObjects.open(join(root, "app"));
+  const paths = (await reader.listPaths(head)).map((p) => `${p.kind} ${p.path}`).sort();
+  assertEquals(paths, [
+    "blob ../lib/y.md",
+    "blob ../shared.md",
+    "blob x.md",
+    "tree .",
+    "tree ../lib",
+  ]);
+});

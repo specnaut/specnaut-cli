@@ -1,6 +1,7 @@
 import type { BaseFile, GitObjectReader } from "../application/script_trust_ports.ts";
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
+import { fromTop, toProject } from "../domain/project_path.ts";
 import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
 import { catFiles, lsTree, withBytes } from "./git_tree_records.ts";
 import { decode, firstLine } from "./git_text.ts";
@@ -100,8 +101,8 @@ export class GitObjects implements GitObjectReader {
   }
 
   async listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]> {
-    const records = await lsTree(this.#git, this.projectPrefix, commit, ["-r", "-t"], true);
-    return records.map((r) => ({ path: r.path, kind: r.kind }));
+    const records = await lsTree(this.#git, "", commit, ["-r", "-t"], true);
+    return records.map((r) => ({ path: toProject(this.projectPrefix, r.path), kind: r.kind }));
   }
 
   async listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]> {
@@ -131,20 +132,4 @@ export class GitObjects implements GitObjectReader {
     const args = ["-r", "-z", "--name-only", ...PLAIN_DIFF_FLAGS, from, to];
     return decode(await this.#git.run("diff-tree", args)).split("\0").filter(Boolean);
   }
-}
-
-/**
- * `path`, relative to the project's folder `prefix` and possibly climbing above it with `..`, as a
- * path from the repository's top; `null` when it climbs above the top. git takes pathspecs
- * literally here, so `..` is resolved before it is asked.
- */
-function fromTop(prefix: string, path: string): string | null {
-  const parts: string[] = [];
-  for (const part of `${prefix}${path}`.split("/")) {
-    if (part === "..") {
-      if (parts.length === 0) return null;
-      parts.pop();
-    } else if (part !== "." && part !== "") parts.push(part);
-  }
-  return parts.length === 0 ? null : parts.join("/");
 }

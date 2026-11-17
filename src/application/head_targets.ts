@@ -4,6 +4,7 @@ import {
   type ImportSides,
   nearAtHead,
 } from "../domain/claude_imports.ts";
+import { canonical } from "../domain/project_path.ts";
 import type { Untrusted } from "../domain/script_trust.ts";
 import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
 
@@ -33,8 +34,13 @@ export type Walk = ImportRead & {
   pathsAtHead?: Promise<Paths>;
 };
 
-/** Reads `target`'s three sides, records them, and returns what to follow from it. */
-export async function visit(walk: Walk, target: string): Promise<Source[]> {
+/**
+ * Reads `written`'s three sides, records them, and returns what to follow from it. The path is
+ * written one way first (`canonical`): `../app/x.md` from the project `app/` is `x.md`.
+ */
+export async function visit(walk: Walk, written: string): Promise<Source[]> {
+  const target = canonical(walk.git.projectPrefix, written);
+  if (target === null) return [];
   const sides = await readSides(walk, target);
   walk.files.set(target, sides);
   const next = [sides.head, sides.tip].flatMap((b) =>
