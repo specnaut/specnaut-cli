@@ -30962,36 +30962,48 @@ gate_graph_pair() {
     '{snapshot: \$snapshot[0], changes: (\$paths | split("\\u0000") | map(select(length > 0)))}'
 }
 
-# gate_graph_affected <pairs> <candidate-snapshot> <normalized> - prints \`full<TAB>
-# <cause>\` or \`owners<TAB><space-separated ids>\`. Every base is walked against its
-# own snapshot: a path must be owned on its own pair's sides, or an owner that only
-# another base knows would stop it being unowned. Once owned, it affects whoever
-# holds it in any snapshot, and the closure runs over every edge any snapshot holds,
-# because a dependency removed on the branch still explains why the dependent broke.
-gate_graph_affected() {
-  jq_lf -r --slurp --slurpfile cand "\$2" --slurpfile declared "\$3" '
+# The jq both steps below read a path with: which roots hold it, and who owns it.
+GATE_GRAPH_DEFS='
     def holds(\$p): . as \$r | if endswith("/") then (\$p | startswith(\$r)) else \$p == \$r end;
     def listed(\$list; \$p): \$list | any(holds(\$p));
-    def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);
-    def close(\$edges): . as \$s
-      | (\$s + [\$edges[] | select(.[1] as \$d | \$s | any(. == \$d)) | .[0]] | unique) as \$n
-      | if \$n == \$s then \$s else \$n | close(\$edges) end;
+    def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);'
+
+# gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
+# path's reason to widen, or nothing. Every base is walked against its own snapshot: a
+# path must be owned on its own pair's sides, or an owner that only another base knows
+# would stop it being unowned. One that cannot be compared as text is never looked up.
+gate_graph_cause() {
+  jq_lf -r --slurp --slurpfile cand "\$2" --slurpfile declared "\$3" "\$GATE_GRAPH_DEFS"'
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
-    | ([\$pairs[] as \$b | \$b.changes[] as \$p
+    | [\$pairs[] as \$b | \$b.changes[] as \$p
         | if (\$p | contains("\\ufffd") or contains("\\n")) then "path-unreadable: \\(\$p)"
           elif listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
           elif listed(\$d.inert; \$p) then empty
           elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
-          else empty end] | first // "") as \$cause
-    | if \$cause != "" then "full\\t\\(\$cause)" else
-        ([\$c] + [\$pairs[].snapshot]) as \$snaps
-        | ([\$pairs[].changes[] | select(. as \$p | listed(\$d.inert; \$p) | not)
-            | . as \$p | \$snaps[] | owners_of(\$p)[]]) as \$by_path
-        | ([\$pairs[].snapshot as \$b | ((\$b.owners | keys) + (\$c.owners | keys) | unique)[]
-            | select(\$b.owners[.] != \$c.owners[.])]) as \$by_record
-        | ([\$snaps[].owners | to_entries[] | .key as \$o | .value.depends_on[] | [\$o, .]]) as \$edges
-        | "owners\\t" + ((\$by_path + \$by_record | unique | close(\$edges)) | join(" "))
-      end' "\$1"
+          else empty end] | first // empty' "\$1"
+}
+
+# gate_graph_affected <pairs> <candidate-snapshot> <normalized> - prints \`full<TAB>
+# <cause>\` (gate_graph_cause) or \`owners<TAB><space-separated ids>\`. Once owned, a path
+# affects whoever holds it in any snapshot, and the closure runs over every edge any
+# snapshot holds, because a dependency removed on the branch still explains why the
+# dependent broke.
+gate_graph_affected() {
+  local cause
+  cause="\$(gate_graph_cause "\$@")" || return 1
+  [ -z "\$cause" ] || { printf 'full\\t%s\\n' "\$cause"; return 0; }
+  jq_lf -r --slurp --slurpfile cand "\$2" --slurpfile declared "\$3" "\$GATE_GRAPH_DEFS"'
+    def close(\$edges): . as \$s
+      | (\$s + [\$edges[] | select(.[1] as \$d | \$s | any(. == \$d)) | .[0]] | unique) as \$n
+      | if \$n == \$s then \$s else \$n | close(\$edges) end;
+    . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
+    | ([\$c] + [\$pairs[].snapshot]) as \$snaps
+    | ([\$pairs[].changes[] | select(. as \$p | listed(\$d.inert; \$p) | not)
+        | . as \$p | \$snaps[] | owners_of(\$p)[]]) as \$by_path
+    | ([\$pairs[].snapshot as \$b | ((\$b.owners | keys) + (\$c.owners | keys) | unique)[]
+        | select(\$b.owners[.] != \$c.owners[.])]) as \$by_record
+    | ([\$snaps[].owners | to_entries[] | .key as \$o | .value.depends_on[] | [\$o, .]]) as \$edges
+    | "owners\\t" + ((\$by_path + \$by_record | unique | close(\$edges)) | join(" "))' "\$1"
 }
 `,
     executable: true,
