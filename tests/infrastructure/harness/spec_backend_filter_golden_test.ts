@@ -36,6 +36,7 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // pointer, and its step 0 began sending a PR or a remote branch to review-untrusted.md.
 // Re-captured when step 0 wrote the PR's commit out (`<sha>`, no shell variable) and stopped a
 // PR review short of the fix loop and the merge.
+// Re-captured when step 1 began resolving the verifier first and calling it as "$sn".
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
