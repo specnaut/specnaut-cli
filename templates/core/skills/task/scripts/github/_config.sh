@@ -45,11 +45,10 @@ extract() {
 REPO=$(extract repo)
 PROJECT_NUMBER=$(extract project_number)
 
-if [ -z "$REPO" ] || [ -z "$PROJECT_NUMBER" ]; then
-  echo "error: backlog-config.yml is missing 'repo' or 'project_number'." >&2
-  echo "Edit $CONFIG before running this command." >&2
-  exit 2
-fi
+for _f in "repo:$REPO" "project_number:$PROJECT_NUMBER"; do
+  [ -n "${_f#*:}" ] || { echo "error: backlog-config.yml is missing '${_f%%:*}'." >&2
+    echo "Edit $CONFIG before running this command." >&2; exit 2; }
+done
 
 REPO_OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"

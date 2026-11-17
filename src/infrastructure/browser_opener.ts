@@ -3,8 +3,8 @@
 
 export type BrowserOpener = (url: string) => Promise<void>;
 
-/** An http(s) URL in plain characters: all a verification page needs. */
-const PLAIN_URL = /^https?:\/\/[A-Za-z0-9._~:\[\]\/?#=&%+,-]+$/;
+/** An http(s) URL in plain characters: all a verification page needs (and `_open_url.sh`). */
+export const PLAIN_URL = /^https?:\/\/[A-Za-z0-9._~:\[\]\/?#=&%+,-]+$/;
 
 /**
  * What opens `url` on `os`, or null for anything but a plain http(s) URL: the

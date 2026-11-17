@@ -24,12 +24,9 @@ export type UpgradeProjectInput = {
   dryRun: boolean;
   force: boolean;
   /**
-   * `--reset-baseline` flag. Heals stale lock SHAs left by older binaries
-   * (and any other source of disk/lock divergence) by trusting the
-   * on-disk content as the new baseline. Existing files where
-   * `diskSha != lockSha` get their lock SHA force-reset; the plan then
-   * compares disk vs bundle directly. Use after the user confirms they
-   * never edited the affected files.
+   * `--reset-baseline` flag: trust the on-disk content as the new baseline
+   * (`UpgradePlanOptions.resetBaseline` says how far). Use after the user
+   * confirms they never edited the affected files.
    */
   resetBaseline?: boolean;
   /**
@@ -162,6 +159,7 @@ export class UpgradeProjectUseCase {
       managedRoots: step.harness.managedRoots,
       managedFiles: step.harness.managedFiles,
       linkStates: step.links.states,
+      isSupersededEdit: (dest) => step.superseded.has(dest),
     });
     return { plan, newShas };
   }
@@ -244,6 +242,7 @@ type PlanStep = {
   readonly harness: Harness;
   readonly input: UpgradeProjectInput;
   readonly isDeclaredPreserved: (dest: string) => boolean;
+  readonly superseded: ReadonlySet<string>;
 };
 
 /**

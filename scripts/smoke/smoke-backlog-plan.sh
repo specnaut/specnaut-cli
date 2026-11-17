@@ -108,6 +108,9 @@ RC=0; OUT=$(bash .specnaut/scripts/backlog/apply-plan.sh edit --id 1 "$FR/plan.j
 check "_apply_plan.sh refuses a plan read before the tree moved" \
   'said 3 "REFUSED fingerprint header.fingerprint" "RECEIPT: none"'
 
+check "kanban.sh: a local board has no web address; _board.sh names the index, _open_url.sh opens nothing" \
+  '[ "$(PATH="$FR/bin:$PATH" bash .specnaut/scripts/backlog/kanban.sh)" = "LOCAL: .specnaut/backlog.md" ]'
+
 echo "═══ github: what the executor hands gh ═══"
 scaffold github $'repo: "acme/my-app"\nproject_number: 7\n' \
   --backlog-url "https://github.com/orgs/example/projects/1"

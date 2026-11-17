@@ -525,6 +525,30 @@
     },
     {
       "category": "backlog-script",
+      "name": "kanban",
+      "suffix": "kanban.sh",
+      "source": "core/skills/task/scripts/kanban.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_board",
+      "suffix": "_board.sh",
+      "source": "core/skills/task/scripts/local/_board.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_open_url",
+      "suffix": "_open_url.sh",
+      "source": "core/skills/task/scripts/_open_url.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "_clean_text",
       "suffix": "_clean_text.sh",
       "source": "core/skills/task/scripts/_clean_text.sh",
@@ -765,6 +789,30 @@
     },
     {
       "category": "backlog-script",
+      "name": "kanban",
+      "suffix": "kanban.sh",
+      "source": "core/skills/task/scripts/kanban.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_board",
+      "suffix": "_board.sh",
+      "source": "core/skills/task/scripts/github/_board.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_open_url",
+      "suffix": "_open_url.sh",
+      "source": "core/skills/task/scripts/_open_url.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "_clean_text",
       "suffix": "_clean_text.sh",
       "source": "core/skills/task/scripts/_clean_text.sh",
@@ -989,6 +1037,30 @@
     },
     {
       "category": "backlog-script",
+      "name": "kanban",
+      "suffix": "kanban.sh",
+      "source": "core/skills/task/scripts/kanban.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_board",
+      "suffix": "_board.sh",
+      "source": "core/skills/task/scripts/gitlab/_board.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_open_url",
+      "suffix": "_open_url.sh",
+      "source": "core/skills/task/scripts/_open_url.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "_clean_text",
       "suffix": "_clean_text.sh",
       "source": "core/skills/task/scripts/_clean_text.sh",
@@ -1144,6 +1216,30 @@
       "name": "_backlog_args",
       "suffix": "_backlog_args.sh",
       "source": "core/skills/task/scripts/_backlog_args.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "kanban",
+      "suffix": "kanban.sh",
+      "source": "core/skills/task/scripts/kanban.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_board",
+      "suffix": "_board.sh",
+      "source": "core/skills/task/scripts/cloud/_board.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_open_url",
+      "suffix": "_open_url.sh",
+      "source": "core/skills/task/scripts/_open_url.sh",
       "executable": true,
       "backend": "cloud"
     },

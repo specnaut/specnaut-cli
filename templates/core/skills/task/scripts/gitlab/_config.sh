@@ -49,11 +49,10 @@ extract() {
 HOST=$(extract host)
 PROJECT_ID=$(extract project_id)
 
-if [ -z "$HOST" ] || [ -z "$PROJECT_ID" ]; then
-  echo "error: backlog-config.yml is missing 'host' or 'project_id'." >&2
-  echo "Edit $CONFIG before running this command." >&2
-  exit 2
-fi
+for _f in "host:$HOST" "project_id:$PROJECT_ID"; do
+  [ -n "${_f#*:}" ] || { echo "error: backlog-config.yml is missing '${_f%%:*}'." >&2
+    echo "Edit $CONFIG before running this command." >&2; exit 2; }
+done
 
 # glab is handed this host as GITLAB_HOST and signs its requests for it, so
 # it is reached over https only: a bare host (glab's default scheme is https) or an
@@ -142,29 +141,24 @@ require_issue_number() {
 # Browser URL for one item, per `backlog-reference-contract`. Prints nothing
 # when it cannot be resolved — callers degrade rather than guessing. Never
 # fails: a reference must never block a workflow.
-#
-# `project_id` is dual-form. A "group/project" path links directly; a numeric id
-# has no browser path, so it is resolved once through the API. If that lookup
-# fails there is no honest URL to emit, so emit none.
-_GITLAB_PATH_CACHE=""
 item_url() {
-  [ -n "${1:-}" ] || return 0
-  local path="$PROJECT_ID"
-  case "$PROJECT_ID" in
-    *[!0-9]*) ;;                       # already a path — use as-is
-    *)
-      if [ -n "$_GITLAB_PATH_CACHE" ]; then
-        path="$_GITLAB_PATH_CACHE"
-      else
-        path=$(glab api "projects/$PROJECT_ID" 2>/dev/null \
-          | sed -n 's/.*"path_with_namespace"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-          | head -1) || path=""
-        [ -n "$path" ] || return 0
-        _GITLAB_PATH_CACHE="$path"
-      fi
-      ;;
-  esac
-  echo "$(host_base)/$path/-/issues/$1"
+  [ -n "${1:-}" ] && _gitlab_web_path || return 0
+  echo "$(host_base)/$GITLAB_WEB_PATH/-/issues/$1"
+}
+
+# _gitlab_web_path -- sets GITLAB_WEB_PATH, the project's path in a browser URL
+# (item_url, _board.sh); 1 when there is none. `project_id` is dual-form: a
+# path is used as-is, a numeric id is resolved once through the API. A failed
+# lookup, or an answer that is not a plain path, has no honest URL: none.
+GITLAB_WEB_PATH=""
+_gitlab_web_path() {
+  [ -z "$GITLAB_WEB_PATH" ] || return 0
+  case "$PROJECT_ID" in *[!0-9]*) GITLAB_WEB_PATH="$PROJECT_ID"; return 0 ;; esac
+  GITLAB_WEB_PATH=$(glab api "projects/$PROJECT_ID" 2>/dev/null |
+    sed -n 's/.*"path_with_namespace"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+    head -1) || GITLAB_WEB_PATH=""
+  LC_ALL=C grep -Eqx '[A-Za-z0-9_][A-Za-z0-9_./-]*' <<<"$GITLAB_WEB_PATH" ||
+    { GITLAB_WEB_PATH=""; return 1; }
 }
 
 # host_base -- the host's web address: a bare host is reached over https,

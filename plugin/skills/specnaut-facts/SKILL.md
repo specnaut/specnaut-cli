@@ -42,7 +42,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 ### Skills
 
-- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag; opened by the `specnaut scan` map, `--scan` for the map alone), `constitution`.
+- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`, `kanban` — the board in the browser), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag; opened by the `specnaut scan` map, `--scan` for the map alone), `constitution`.
 - `/specnaut` — the framework: `doc`, `list`, `upgrade`, `issue` (reports a Specnaut problem or proposal upstream, after the user approves the exact text).
 - `/ship` — production: `tag`, `release`.
 - `/design` — the project's `DESIGN.md` design system: discovery when absent, edit when present, `audit` for drift. Started by the user only.

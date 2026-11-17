@@ -1,10 +1,11 @@
 ---
 name: task
-description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. `/task <verb> [args]`; `/task` alone prints the overview.
-argument-hint: "<list|next|add|edit|close|groom|resume|plan|implement|review|merge|audit|constitution> [args]"
+description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, open the board, then plan, implement, review and merge them, and audit the code. `/task <verb> [args]`; `/task` alone prints the overview.
+argument-hint: "<list|next|add|edit|close|groom|kanban|resume|plan|implement|review|merge|audit|constitution> [args]"
 when_to_use: |
   Trigger phrases that should route here:
   - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
+  - kanban: "open the board", "show me the kanban", "where is the board?"
   - plan: "plan a feature", "spec out a feature", "I have a rough idea", "clarify requirements"
   - implement / review / merge: "implement the feature", "review the implementation", "merge the branch"
   - resume: "resume task X", "continue where we stopped", "pick up the interrupted chain"
@@ -40,6 +41,7 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 | `close <id> [--not-planned]` | `backlog.md` | Close an item — completed, or not planned |
 | `estimate <id>` | `backlog.md` | Estimate complexity |
 | `status` | `backlog.md` | Dashboard summary |
+| `kanban [--no-open]` | `backlog.md` | Open the configured board in the browser — read-only |
 | `brief <id>` | `backlog.md` | Product-owner business brief |
 | `<id>` | `backlog.md` | Show that item |
 | `groom` | `groom.md` | Full grooming pass |
@@ -88,9 +90,9 @@ The product owner proposes; a bundled executor applies. Every create, edit, move
 including the ones `plan` makes — follows `backlog.md`'s "The session protocol" (`read-items.sh`, the
 dispatch, `apply-plan.sh`), its one home;
 `merge`'s close after a push is the one write it names itself (`phases/merge-close.md`). The
-read-only scripts (`list.sh`, `view.sh`) may be run directly. The product owner decides what its
-"What you decide" section lists: the session neither asks the user those calls nor makes them
-(`backlog.md`, step 2).
+read-only scripts (`list.sh`, `view.sh`, `kanban.sh`) may be run directly. The product owner
+decides what its "What you decide" section lists: the session neither asks the user those calls nor
+makes them (`backlog.md`, step 2).
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)
@@ -147,4 +149,5 @@ A second stop — the review verdict as the merge request, asked once — exists
 `.specnaut/workflow.yml` says `merge: manual`, or the run says so (`--manual-merge`, "stop before
 merging"). Every other boundary is crossed by invoking the next verb yourself, in the same turn.
 
-To run a single verb only: `/task plan --manual "Add OAuth2 login"`.
+To run a single verb only: `/task plan --manual "Add OAuth2 login"`. To see the board itself:
+`/task kanban`.

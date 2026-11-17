@@ -6,42 +6,14 @@ import { linkAction, type PlannableLinkState } from "./link_plan.ts";
 export type { UpgradeAction, UpgradePlan } from "./upgrade_action.ts";
 
 /**
- * Compute the upgrade plan from three SHA256 snapshots:
- *   - `diskShas` : current content SHA of each file (absent = not on disk)
- *   - `lock`     : the .specnaut/installed.lock
- *   - `newShas`  : SHA of each file in the binary's embedded templates
- *
- * Plus two parameters that drive the binary → plugin migration table:
- *   - `pluginInstalled`  : whether the `specnaut-plugin` plugin is on
- *                          the host (probed at use-case entry by the
- *                          `PluginDetector` port).
- *   - `isPluginCovered`  : predicate `(dest) => boolean` returning true
- *                          when the plugin owns a copy of `dest`. See
- *                          `plugin_coverage.ts` for the canonical map.
- *
- * Behavior on plugin-covered dests when the plugin is installed:
- *   - vanilla on disk (SHA matches lock) → `migrate-to-plugin` (the
- *     binary backs the file up, deletes the on-disk copy, and drops
- *     the lock entry; the plugin serves the file going forward).
- *   - customized on disk (SHA differs from lock) → `preserve` with
- *     `pluginAvailable: true` (handler surfaces the reconcile warning).
- *
- * For uncovered dests, or any dest when the plugin is not installed,
- * behavior is identical to before the migration table existed.
- *
- * Emits one UpgradeAction per destination in the new bundle, plus the
- * orphan actions `planOrphans` decides for each lock entry the bundle no
- * longer carries: `remove` when it may go and is still on disk, and
- * `orphan-refused` when it lies outside what `upgrade` may delete. An
- * in-scope orphan no longer on disk produces no action.
- */
-/**
  * Optional inputs that didn't exist in the v1.0 plan signature. Carried as
  * a single object so future additions don't keep growing the positional
  * parameter list.
  */
 export type UpgradePlanOptions = {
+  /** Whether the `specnaut-plugin` plugin is on the host (the `PluginDetector` port). */
   pluginInstalled?: boolean;
+  /** True when the plugin owns a copy of `dest` — `plugin_coverage.ts` holds the map. */
   isPluginCovered?: (dest: string) => boolean;
   /**
    * Predicate identifying `skipIfExists` bundle entries. Such files
@@ -78,6 +50,12 @@ export type UpgradePlanOptions = {
   managedFiles?: ReadonlyArray<string>;
   /** What is on disk at each context-link destination — see `linkAction`. */
   linkStates?: ReadonlyMap<string, PlannableLinkState>;
+  /**
+   * True when `dest`'s only local edit is a verb row the bundle now ships
+   * (`superseded_verb_rows.ts`, cli#803): its disk SHA is its lock SHA. The
+   * declaration reads the lock itself, so a declared preserve still wins.
+   */
+  isSupersededEdit?: (dest: string) => boolean;
 };
 
 /**
@@ -113,6 +91,26 @@ function staleSince(
   };
 }
 
+/**
+ * Compute the upgrade plan from three SHA256 snapshots:
+ *   - `diskShas` : current content SHA of each file (absent = not on disk)
+ *   - `lock`     : the .specnaut/installed.lock
+ *   - `newShas`  : SHA of each file in the binary's embedded templates
+ *
+ * Behavior on plugin-covered dests when the plugin is installed:
+ *   - vanilla on disk (SHA matches lock) → `migrate-to-plugin` (the binary backs the file up,
+ *     deletes the on-disk copy, and drops the lock entry; the plugin serves the file going forward).
+ *   - customized on disk (SHA differs from lock) → `preserve` with `pluginAvailable: true`
+ *     (handler surfaces the reconcile warning).
+ *
+ * For uncovered dests, or any dest when the plugin is not installed,
+ * behavior is identical to before the migration table existed.
+ *
+ * Emits one UpgradeAction per destination in the new bundle, plus the orphan actions
+ * `planOrphans` decides for each lock entry the bundle no longer carries: `remove` when it may
+ * go and is still on disk, and `orphan-refused` when it lies outside what `upgrade` may delete.
+ * An in-scope orphan no longer on disk produces no action.
+ */
 export function computeUpgradePlan(
   diskShas: ReadonlyMap<string, string>,
   lock: InstalledLock,
@@ -136,7 +134,7 @@ export function computeUpgradePlan(
   for (const dest of sortedDests) {
     const newSha = newShas.get(dest)!;
     const diskSha = diskShas.get(dest);
-    let lockSha = lock.entries.get(dest)?.sha256;
+    let lockSha = opts.isSupersededEdit?.(dest) === true ? diskSha : lock.entries.get(dest)?.sha256;
 
     // Declared-preserve wins over everything (spec 011 / issue #367): a path
     // the maintainer listed in .specnaut/preserve.yml is kept regardless of

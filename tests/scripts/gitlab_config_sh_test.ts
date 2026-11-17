@@ -163,5 +163,5 @@ Deno.test("gitlab _config.sh refuses a project_id glab could read as another hos
 Deno.test("gitlab _config.sh reads a value that is only a comment as missing", async () => {
   const r = await source("host: gitlab.example.com\nproject_id: # fill in\n", LIST);
   assertEquals([r.code, r.calls], [2, ""], r.out);
-  assertStringIncludes(r.out, "missing 'host' or 'project_id'");
+  assertStringIncludes(r.out, "missing 'project_id'");
 });

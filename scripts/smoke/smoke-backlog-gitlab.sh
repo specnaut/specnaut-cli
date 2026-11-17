@@ -36,7 +36,7 @@ echo "═══ canonical backlog scripts ═══"
 # greps each smoke file for a literal basename; a name assembled from a loop
 # variable is invisible to it, so this loop covered six scripts while being
 # reported as six gaps.
-for s in list.sh view.sh add.sh move.sh clarify-comment.sh ensure-labels.sh groom-verify.sh; do
+for s in list.sh view.sh add.sh move.sh clarify-comment.sh ensure-labels.sh groom-verify.sh kanban.sh; do
   check "$s present + executable" "[ -x .specnaut/scripts/backlog/$s ]"
 done
 
@@ -84,7 +84,7 @@ grep -q 'item_url()' .specnaut/scripts/backlog/_config.sh \
 grep -q 'path_with_namespace' .specnaut/scripts/backlog/_config.sh \
   && pass "gitlab item_url resolves a numeric project_id to a path" \
   || fail "numeric project_id resolution missing" "$(grep -n 'project_id\|PROJECT_ID' .specnaut/scripts/backlog/_config.sh || true)"
-grep -q '\[ -n "\$path" \] || return 0' .specnaut/scripts/backlog/_config.sh \
+grep -qF '&& _gitlab_web_path || return 0' .specnaut/scripts/backlog/_config.sh \
   && pass "gitlab item_url degrades to no link when the lookup fails" \
   || fail "gitlab item_url would emit a URL with an empty path" "$(grep -n 'return 0' .specnaut/scripts/backlog/_config.sh || true)"
 
@@ -134,5 +134,10 @@ check "close-shipped.sh confirms each close before it moves the card, leaves an 
   'probe_close_shipped 6 "$(printf "DRIFTED 7\nswept: 3 scanned")" 5 6 &&
    close_shipped_was 20 "$(printf "cascade-check 5\nmove 5 Done\ncascade-check 6\nsweep-closed\nmove 7 Done")" "DONE #5" "OPEN #6" "RECONCILED #7" "swept: 3 scanned" &&
    ! grep -qF -- "--passes" .specnaut/scripts/backlog/sweep-closed.sh'
+
+echo "═══ cli#803  kanban.sh — the board's address, from the same path item_url links with ═══"
+check "kanban.sh prints the issue board of the configured project; _board.sh and _open_url.sh beside it" \
+  '[ -f .specnaut/scripts/backlog/_board.sh ] && [ -f .specnaut/scripts/backlog/_open_url.sh ] &&
+   [ "$(bash .specnaut/scripts/backlog/kanban.sh --no-open)" = "URL: https://gitlab.com/example/proj/-/boards" ]'
 
 finish "BACKLOG-GITLAB"

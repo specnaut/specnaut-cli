@@ -2471,10 +2471,10 @@ this verb ever makes; the audited code is never touched.
     suffix: "backlog.md",
     content: `# /task — backlog verbs
 
-\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`estimate\`, \`status\`, \`brief\` and \`<id>\`. The router
-(\`SKILL.md\`, beside this file) dispatched here; \`groom\` has its own document, \`groom.md\`. The
-backend is fixed at init time and recorded in \`.specnaut/installed.lock\`; run
-\`specnaut upgrade --backlog <new>\` to switch.
+\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`estimate\`, \`status\`, \`brief\`, \`kanban\` and \`<id>\`. The
+router (\`SKILL.md\`, beside this file) dispatched here; \`groom\` has its own document, \`groom.md\`. The
+backend is fixed at init time and recorded in \`.specnaut/installed.lock\`; run \`specnaut upgrade
+--backlog <new>\` to switch.
 
 | Input | Action |
 | --- | --- |
@@ -2486,6 +2486,7 @@ backend is fixed at init time and recorded in \`.specnaut/installed.lock\`; run
 | \`estimate <id>\` | Estimate complexity |
 | \`status\` | Dashboard summary |
 | \`brief <id>\` | Product-owner business brief |
+| \`kanban [--no-open]\` | Open the board in the browser, read-only: run \`.specnaut/scripts/backlog/kanban.sh\` alone — no read, no product-owner dispatch, no tracker write. Show its \`URL:\` line as a link (its header defines every line and exit); a \`CLOUD:\` or \`LOCAL:\` line is the board's defined fallback, the local index shown as a repo-relative link. Exit 2 or 13: relay its stderr. |
 | \`<number>\` | Show that item; when it is in progress, point to \`/task resume <number>\` |
 
 ## The session protocol — every product-owner dispatch
@@ -2574,10 +2575,9 @@ repo: myorg/myproject              # GitHub repo (owner/name)
 project_number: <N>                # GitHub Project V2 number
 \`\`\`
 
-Both are placeholders; resolve the number with
-\`gh project list --owner <org>\`. A wrong \`project_number\` is invisible to
-\`list.sh\` / \`view.sh\` — they address the board through \`repo:\` alone — and
-refused up front by every writing script.
+Both are placeholders; resolve the number with \`gh project list --owner <org>\`. A wrong
+\`project_number\` is invisible to \`list.sh\` / \`view.sh\` — they address the board through \`repo:\`
+alone — and refused up front by every writing script.
 
 ### Scripts
 
@@ -5302,7 +5302,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 ### Skills
 
-- \`/task\` — one unit of work: backlog (\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`groom\`), pipeline (\`plan\`, \`implement\`, \`review\`, \`merge\`), \`audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`; every applicable axis with no flag; opened by the \`specnaut scan\` map, \`--scan\` for the map alone), \`constitution\`.
+- \`/task\` — one unit of work: backlog (\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`groom\`, \`kanban\` — the board in the browser), pipeline (\`plan\`, \`implement\`, \`review\`, \`merge\`), \`audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`; every applicable axis with no flag; opened by the \`specnaut scan\` map, \`--scan\` for the map alone), \`constitution\`.
 - \`/specnaut\` — the framework: \`doc\`, \`list\`, \`upgrade\`, \`issue\` (reports a Specnaut problem or proposal upstream, after the user approves the exact text).
 - \`/ship\` — production: \`tag\`, \`release\`.
 - \`/design\` — the project's \`DESIGN.md\` design system: discovery when absent, edit when present, \`audit\` for drift. Started by the user only.
@@ -6859,11 +6859,12 @@ should survive across sessions and isn't captured elsewhere:
     suffix: null,
     content: `---
 name: task
-description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. \`/task <verb> [args]\`; \`/task\` alone prints the overview.
-argument-hint: "<list|next|add|edit|close|groom|resume|plan|implement|review|merge|audit|constitution> [args]"
+description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, open the board, then plan, implement, review and merge them, and audit the code. \`/task <verb> [args]\`; \`/task\` alone prints the overview.
+argument-hint: "<list|next|add|edit|close|groom|kanban|resume|plan|implement|review|merge|audit|constitution> [args]"
 when_to_use: |
   Trigger phrases that should route here:
   - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
+  - kanban: "open the board", "show me the kanban", "where is the board?"
   - plan: "plan a feature", "spec out a feature", "I have a rough idea", "clarify requirements"
   - implement / review / merge: "implement the feature", "review the implementation", "merge the branch"
   - resume: "resume task X", "continue where we stopped", "pick up the interrupted chain"
@@ -6899,6 +6900,7 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 | \`close <id> [--not-planned]\` | \`backlog.md\` | Close an item — completed, or not planned |
 | \`estimate <id>\` | \`backlog.md\` | Estimate complexity |
 | \`status\` | \`backlog.md\` | Dashboard summary |
+| \`kanban [--no-open]\` | \`backlog.md\` | Open the configured board in the browser — read-only |
 | \`brief <id>\` | \`backlog.md\` | Product-owner business brief |
 | \`<id>\` | \`backlog.md\` | Show that item |
 | \`groom\` | \`groom.md\` | Full grooming pass |
@@ -6947,9 +6949,9 @@ The product owner proposes; a bundled executor applies. Every create, edit, move
 including the ones \`plan\` makes — follows \`backlog.md\`'s "The session protocol" (\`read-items.sh\`, the
 dispatch, \`apply-plan.sh\`), its one home;
 \`merge\`'s close after a push is the one write it names itself (\`phases/merge-close.md\`). The
-read-only scripts (\`list.sh\`, \`view.sh\`) may be run directly. The product owner decides what its
-"What you decide" section lists: the session neither asks the user those calls nor makes them
-(\`backlog.md\`, step 2).
+read-only scripts (\`list.sh\`, \`view.sh\`, \`kanban.sh\`) may be run directly. The product owner
+decides what its "What you decide" section lists: the session neither asks the user those calls nor
+makes them (\`backlog.md\`, step 2).
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)
@@ -7006,7 +7008,8 @@ A second stop — the review verdict as the merge request, asked once — exists
 \`.specnaut/workflow.yml\` says \`merge: manual\`, or the run says so (\`--manual-merge\`, "stop before
 merging"). Every other boundary is crossed by invoking the next verb yourself, in the same turn.
 
-To run a single verb only: \`/task plan --manual "Add OAuth2 login"\`.
+To run a single verb only: \`/task plan --manual "Add OAuth2 login"\`. To see the board itself:
+\`/task kanban\`.
 `,
     executable: false,
     backend: null,
@@ -8878,6 +8881,134 @@ texts_json() {
   },
   {
     category: "backlog-script",
+    name: "kanban",
+    suffix: "kanban.sh",
+    content: `#!/usr/bin/env bash
+# kanban.sh [--no-open] -- the configured board, in the browser (cli#803).
+# Read-only: it writes nothing to the tracker or the tree.
+#
+# Prints \`URL: <url>\`, then opens it with the system default browser
+# (_open_url.sh; \`--no-open\` prints only). A backend with no web address for
+# its board prints its defined fallback instead (\`CLOUD: ...\`, \`LOCAL: ...\`)
+# and opens nothing. Where the address comes from is each backend's _board.sh.
+#
+# Exit: 0 printed, a fallback included -- 2 a bad argument, or
+# backlog-config.yml missing or a field unfilled (stderr names it) -- 13 the
+# board could not be resolved (stderr says how to fix access; never a reason
+# to edit the config).
+set -euo pipefail
+
+OPEN=1
+case "\${1:-}" in
+  "") ;;
+  --no-open) OPEN=0 ;;
+  *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
+esac
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# shellcheck source=./_board.sh
+. "\$(dirname "\$0")/_board.sh"
+# shellcheck source=./_open_url.sh
+. "\$(dirname "\$0")/_open_url.sh"
+
+url=\$(board_url)
+if [ -z "\$url" ]; then
+  rc=0
+  board_fallback || rc=\$?
+  exit "\$rc"
+fi
+echo "URL: \$url"
+[ "\$OPEN" = 0 ] || open_url "\$url"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_board",
+    suffix: "_board.sh",
+    content: `#!/usr/bin/env bash
+# The board's address on the local Markdown backend (cli#803). Sourced by
+# kanban.sh after _config.sh.
+
+# board_url -- nothing: a Markdown backlog has no web board to open.
+board_url() {
+  return 0
+}
+
+# board_fallback -- where the board lives instead, repo-relative: the index
+# render-index.sh keeps. Not a failure: status 0, and nothing is opened.
+board_fallback() {
+  echo "LOCAL: .specnaut/backlog.md"
+}
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_open_url",
+    suffix: "_open_url.sh",
+    content: `#!/usr/bin/env bash
+# open_url <url> -- open <url> in the system default browser, the rules of the
+# CLI's own opener (src/infrastructure/browser_opener.ts): only a plain http(s)
+# URL, handed to the launcher as one argument, never through a shell string.
+# Sourced by kanban.sh, the same file on every backend.
+#
+# Says what it did on one line: \`OPEN: <launcher>\`, or \`OPEN: skipped - <why>\`.
+# Never fails: a refused URL, a missing launcher or a headless machine is
+# skipped with status 0 -- the caller has already printed the URL to copy.
+
+# PLAIN_URL in browser_opener.ts, as an ERE; tests/scripts/open_url_sh_test.ts
+# holds the two equal. LC_ALL=C keeps the classes ASCII whatever the locale.
+OPEN_URL_PLAIN='^https?://[][A-Za-z0-9._~:/?#=&%+,-]+\$'
+
+# open_launcher -- the launcher this OS opens a URL with, chosen as
+# browser_opener.ts chooses it: \`open\` on macOS, the URL handler on Windows
+# (Git Bash, MSYS2 or Cygwin), \`xdg-open\` anywhere else.
+open_launcher() {
+  case \$(uname -s 2>/dev/null) in
+    Darwin) echo open ;;
+    MINGW* | MSYS* | CYGWIN*) echo rundll32 ;;
+    *) echo xdg-open ;;
+  esac
+}
+
+open_url() {
+  local url=\${1:-} launcher
+  case \$url in *\$'\\n'* | *\$'\\r'*) url="" ;; esac
+  if ! LC_ALL=C grep -Eq "\$OPEN_URL_PLAIN" <<<"\$url"; then
+    echo "OPEN: skipped - not a plain http(s) URL"
+    return 0
+  fi
+  launcher=\$(open_launcher)
+  if ! command -v "\$launcher" >/dev/null 2>&1; then
+    echo "OPEN: skipped - \$launcher not found"
+    return 0
+  fi
+  _open_launch "\$launcher" "\$url" >/dev/null 2>&1 || { echo "OPEN: skipped - \$launcher failed"; return 0; }
+  echo "OPEN: \$launcher"
+}
+
+# _open_launch <launcher> <url> -- hand <url> to <launcher> as one argument.
+_open_launch() {
+  if [ "\$1" = rundll32 ]; then
+    # MSYS would rewrite an argument that looks like a path; this one is a URL.
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' rundll32 url.dll,FileProtocolHandler "\$2"
+  else
+    "\$1" "\$2"
+  fi
+}
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_clean_text",
     suffix: "_clean_text.sh",
     content: `# shellcheck shell=bash
@@ -9417,11 +9548,10 @@ extract() {
 REPO=\$(extract repo)
 PROJECT_NUMBER=\$(extract project_number)
 
-if [ -z "\$REPO" ] || [ -z "\$PROJECT_NUMBER" ]; then
-  echo "error: backlog-config.yml is missing 'repo' or 'project_number'." >&2
-  echo "Edit \$CONFIG before running this command." >&2
-  exit 2
-fi
+for _f in "repo:\$REPO" "project_number:\$PROJECT_NUMBER"; do
+  [ -n "\${_f#*:}" ] || { echo "error: backlog-config.yml is missing '\${_f%%:*}'." >&2
+    echo "Edit \$CONFIG before running this command." >&2; exit 2; }
+done
 
 REPO_OWNER="\${REPO%%/*}"
 REPO_NAME="\${REPO##*/}"
@@ -12191,6 +12321,149 @@ texts_json() {
   },
   {
     category: "backlog-script",
+    name: "kanban",
+    suffix: "kanban.sh",
+    content: `#!/usr/bin/env bash
+# kanban.sh [--no-open] -- the configured board, in the browser (cli#803).
+# Read-only: it writes nothing to the tracker or the tree.
+#
+# Prints \`URL: <url>\`, then opens it with the system default browser
+# (_open_url.sh; \`--no-open\` prints only). A backend with no web address for
+# its board prints its defined fallback instead (\`CLOUD: ...\`, \`LOCAL: ...\`)
+# and opens nothing. Where the address comes from is each backend's _board.sh.
+#
+# Exit: 0 printed, a fallback included -- 2 a bad argument, or
+# backlog-config.yml missing or a field unfilled (stderr names it) -- 13 the
+# board could not be resolved (stderr says how to fix access; never a reason
+# to edit the config).
+set -euo pipefail
+
+OPEN=1
+case "\${1:-}" in
+  "") ;;
+  --no-open) OPEN=0 ;;
+  *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
+esac
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# shellcheck source=./_board.sh
+. "\$(dirname "\$0")/_board.sh"
+# shellcheck source=./_open_url.sh
+. "\$(dirname "\$0")/_open_url.sh"
+
+url=\$(board_url)
+if [ -z "\$url" ]; then
+  rc=0
+  board_fallback || rc=\$?
+  exit "\$rc"
+fi
+echo "URL: \$url"
+[ "\$OPEN" = 0 ] || open_url "\$url"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_board",
+    suffix: "_board.sh",
+    content: `#!/usr/bin/env bash
+# The board's browser address on the GitHub backend (cli#803). Sourced by
+# kanban.sh after _config.sh, whose REPO_OWNER and PROJECT_NUMBER it reads.
+
+# board_url -- the Project V2 board's URL, or nothing. The owner kind (orgs/
+# or users/) is GitHub's answer, never guessed from the name: \`gh\` reports
+# the project's own \`url\`, and only a plain board URL for the configured
+# number is kept. Never fails; nothing printed is the caller's fallback.
+board_url() {
+  local url
+  url=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json \\
+    --jq .url 2>/dev/null) || return 0
+  url=\${url%\$'\\r'}
+  case \$url in *\$'\\n'*) return 0 ;; esac
+  LC_ALL=C grep -Eq '^https://github\\.com/(orgs|users)/[A-Za-z0-9-]+/projects/[0-9]+\$' \\
+    <<<"\$url" || return 0
+  [ "\${url##*/}" = "\$PROJECT_NUMBER" ] || return 0
+  printf '%s\\n' "\$url"
+}
+
+# board_fallback -- what the user is told when board_url found nothing: the
+# project could not be read, so the URL is not known. Status 13, as for
+# require_project: retry or report, never a reason to edit the config.
+board_fallback() {
+  echo "error: could not read project #\$PROJECT_NUMBER of '\$REPO_OWNER' from GitHub." >&2
+  echo "  Check that gh is installed and signed in: gh auth status" >&2
+  echo "  A token without the project scope: gh auth refresh -s read:project" >&2
+  return 13
+}
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_open_url",
+    suffix: "_open_url.sh",
+    content: `#!/usr/bin/env bash
+# open_url <url> -- open <url> in the system default browser, the rules of the
+# CLI's own opener (src/infrastructure/browser_opener.ts): only a plain http(s)
+# URL, handed to the launcher as one argument, never through a shell string.
+# Sourced by kanban.sh, the same file on every backend.
+#
+# Says what it did on one line: \`OPEN: <launcher>\`, or \`OPEN: skipped - <why>\`.
+# Never fails: a refused URL, a missing launcher or a headless machine is
+# skipped with status 0 -- the caller has already printed the URL to copy.
+
+# PLAIN_URL in browser_opener.ts, as an ERE; tests/scripts/open_url_sh_test.ts
+# holds the two equal. LC_ALL=C keeps the classes ASCII whatever the locale.
+OPEN_URL_PLAIN='^https?://[][A-Za-z0-9._~:/?#=&%+,-]+\$'
+
+# open_launcher -- the launcher this OS opens a URL with, chosen as
+# browser_opener.ts chooses it: \`open\` on macOS, the URL handler on Windows
+# (Git Bash, MSYS2 or Cygwin), \`xdg-open\` anywhere else.
+open_launcher() {
+  case \$(uname -s 2>/dev/null) in
+    Darwin) echo open ;;
+    MINGW* | MSYS* | CYGWIN*) echo rundll32 ;;
+    *) echo xdg-open ;;
+  esac
+}
+
+open_url() {
+  local url=\${1:-} launcher
+  case \$url in *\$'\\n'* | *\$'\\r'*) url="" ;; esac
+  if ! LC_ALL=C grep -Eq "\$OPEN_URL_PLAIN" <<<"\$url"; then
+    echo "OPEN: skipped - not a plain http(s) URL"
+    return 0
+  fi
+  launcher=\$(open_launcher)
+  if ! command -v "\$launcher" >/dev/null 2>&1; then
+    echo "OPEN: skipped - \$launcher not found"
+    return 0
+  fi
+  _open_launch "\$launcher" "\$url" >/dev/null 2>&1 || { echo "OPEN: skipped - \$launcher failed"; return 0; }
+  echo "OPEN: \$launcher"
+}
+
+# _open_launch <launcher> <url> -- hand <url> to <launcher> as one argument.
+_open_launch() {
+  if [ "\$1" = rundll32 ]; then
+    # MSYS would rewrite an argument that looks like a path; this one is a URL.
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' rundll32 url.dll,FileProtocolHandler "\$2"
+  else
+    "\$1" "\$2"
+  fi
+}
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_clean_text",
     suffix: "_clean_text.sh",
     content: `# shellcheck shell=bash
@@ -13018,11 +13291,10 @@ extract() {
 HOST=\$(extract host)
 PROJECT_ID=\$(extract project_id)
 
-if [ -z "\$HOST" ] || [ -z "\$PROJECT_ID" ]; then
-  echo "error: backlog-config.yml is missing 'host' or 'project_id'." >&2
-  echo "Edit \$CONFIG before running this command." >&2
-  exit 2
-fi
+for _f in "host:\$HOST" "project_id:\$PROJECT_ID"; do
+  [ -n "\${_f#*:}" ] || { echo "error: backlog-config.yml is missing '\${_f%%:*}'." >&2
+    echo "Edit \$CONFIG before running this command." >&2; exit 2; }
+done
 
 # glab is handed this host as GITLAB_HOST and signs its requests for it, so
 # it is reached over https only: a bare host (glab's default scheme is https) or an
@@ -13111,29 +13383,24 @@ require_issue_number() {
 # Browser URL for one item, per \`backlog-reference-contract\`. Prints nothing
 # when it cannot be resolved — callers degrade rather than guessing. Never
 # fails: a reference must never block a workflow.
-#
-# \`project_id\` is dual-form. A "group/project" path links directly; a numeric id
-# has no browser path, so it is resolved once through the API. If that lookup
-# fails there is no honest URL to emit, so emit none.
-_GITLAB_PATH_CACHE=""
 item_url() {
-  [ -n "\${1:-}" ] || return 0
-  local path="\$PROJECT_ID"
-  case "\$PROJECT_ID" in
-    *[!0-9]*) ;;                       # already a path — use as-is
-    *)
-      if [ -n "\$_GITLAB_PATH_CACHE" ]; then
-        path="\$_GITLAB_PATH_CACHE"
-      else
-        path=\$(glab api "projects/\$PROJECT_ID" 2>/dev/null \\
-          | sed -n 's/.*"path_with_namespace"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' \\
-          | head -1) || path=""
-        [ -n "\$path" ] || return 0
-        _GITLAB_PATH_CACHE="\$path"
-      fi
-      ;;
-  esac
-  echo "\$(host_base)/\$path/-/issues/\$1"
+  [ -n "\${1:-}" ] && _gitlab_web_path || return 0
+  echo "\$(host_base)/\$GITLAB_WEB_PATH/-/issues/\$1"
+}
+
+# _gitlab_web_path -- sets GITLAB_WEB_PATH, the project's path in a browser URL
+# (item_url, _board.sh); 1 when there is none. \`project_id\` is dual-form: a
+# path is used as-is, a numeric id is resolved once through the API. A failed
+# lookup, or an answer that is not a plain path, has no honest URL: none.
+GITLAB_WEB_PATH=""
+_gitlab_web_path() {
+  [ -z "\$GITLAB_WEB_PATH" ] || return 0
+  case "\$PROJECT_ID" in *[!0-9]*) GITLAB_WEB_PATH="\$PROJECT_ID"; return 0 ;; esac
+  GITLAB_WEB_PATH=\$(glab api "projects/\$PROJECT_ID" 2>/dev/null |
+    sed -n 's/.*"path_with_namespace"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' |
+    head -1) || GITLAB_WEB_PATH=""
+  LC_ALL=C grep -Eqx '[A-Za-z0-9_][A-Za-z0-9_./-]*' <<<"\$GITLAB_WEB_PATH" ||
+    { GITLAB_WEB_PATH=""; return 1; }
 }
 
 # host_base -- the host's web address: a bare host is reached over https,
@@ -14799,6 +15066,141 @@ texts_json() {
   },
   {
     category: "backlog-script",
+    name: "kanban",
+    suffix: "kanban.sh",
+    content: `#!/usr/bin/env bash
+# kanban.sh [--no-open] -- the configured board, in the browser (cli#803).
+# Read-only: it writes nothing to the tracker or the tree.
+#
+# Prints \`URL: <url>\`, then opens it with the system default browser
+# (_open_url.sh; \`--no-open\` prints only). A backend with no web address for
+# its board prints its defined fallback instead (\`CLOUD: ...\`, \`LOCAL: ...\`)
+# and opens nothing. Where the address comes from is each backend's _board.sh.
+#
+# Exit: 0 printed, a fallback included -- 2 a bad argument, or
+# backlog-config.yml missing or a field unfilled (stderr names it) -- 13 the
+# board could not be resolved (stderr says how to fix access; never a reason
+# to edit the config).
+set -euo pipefail
+
+OPEN=1
+case "\${1:-}" in
+  "") ;;
+  --no-open) OPEN=0 ;;
+  *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
+esac
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# shellcheck source=./_board.sh
+. "\$(dirname "\$0")/_board.sh"
+# shellcheck source=./_open_url.sh
+. "\$(dirname "\$0")/_open_url.sh"
+
+url=\$(board_url)
+if [ -z "\$url" ]; then
+  rc=0
+  board_fallback || rc=\$?
+  exit "\$rc"
+fi
+echo "URL: \$url"
+[ "\$OPEN" = 0 ] || open_url "\$url"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_board",
+    suffix: "_board.sh",
+    content: `#!/usr/bin/env bash
+# The board's browser address on the GitLab backend (cli#803). Sourced by
+# kanban.sh after _config.sh, whose host_base and _gitlab_web_path it uses.
+
+# board_url -- the project's issue board, \`<host>/<group>/<project>/-/boards\`,
+# or nothing: the path is the one item_url links with, numeric ids resolved
+# the same way. Never fails; nothing printed is the caller's fallback.
+board_url() {
+  _gitlab_web_path || return 0
+  echo "\$(host_base)/\$GITLAB_WEB_PATH/-/boards"
+}
+
+# board_fallback -- what the user is told when board_url found nothing: a
+# numeric project_id could not be resolved to its path. Status 13: retry or
+# report, never a reason to edit the config.
+board_fallback() {
+  echo "error: could not resolve GitLab project \$PROJECT_ID to its path on \$HOST." >&2
+  echo "  Check that glab is installed and signed in to that host: glab auth status" >&2
+  echo "  Or set project_id to the group/project path in \$CONFIG." >&2
+  return 13
+}
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_open_url",
+    suffix: "_open_url.sh",
+    content: `#!/usr/bin/env bash
+# open_url <url> -- open <url> in the system default browser, the rules of the
+# CLI's own opener (src/infrastructure/browser_opener.ts): only a plain http(s)
+# URL, handed to the launcher as one argument, never through a shell string.
+# Sourced by kanban.sh, the same file on every backend.
+#
+# Says what it did on one line: \`OPEN: <launcher>\`, or \`OPEN: skipped - <why>\`.
+# Never fails: a refused URL, a missing launcher or a headless machine is
+# skipped with status 0 -- the caller has already printed the URL to copy.
+
+# PLAIN_URL in browser_opener.ts, as an ERE; tests/scripts/open_url_sh_test.ts
+# holds the two equal. LC_ALL=C keeps the classes ASCII whatever the locale.
+OPEN_URL_PLAIN='^https?://[][A-Za-z0-9._~:/?#=&%+,-]+\$'
+
+# open_launcher -- the launcher this OS opens a URL with, chosen as
+# browser_opener.ts chooses it: \`open\` on macOS, the URL handler on Windows
+# (Git Bash, MSYS2 or Cygwin), \`xdg-open\` anywhere else.
+open_launcher() {
+  case \$(uname -s 2>/dev/null) in
+    Darwin) echo open ;;
+    MINGW* | MSYS* | CYGWIN*) echo rundll32 ;;
+    *) echo xdg-open ;;
+  esac
+}
+
+open_url() {
+  local url=\${1:-} launcher
+  case \$url in *\$'\\n'* | *\$'\\r'*) url="" ;; esac
+  if ! LC_ALL=C grep -Eq "\$OPEN_URL_PLAIN" <<<"\$url"; then
+    echo "OPEN: skipped - not a plain http(s) URL"
+    return 0
+  fi
+  launcher=\$(open_launcher)
+  if ! command -v "\$launcher" >/dev/null 2>&1; then
+    echo "OPEN: skipped - \$launcher not found"
+    return 0
+  fi
+  _open_launch "\$launcher" "\$url" >/dev/null 2>&1 || { echo "OPEN: skipped - \$launcher failed"; return 0; }
+  echo "OPEN: \$launcher"
+}
+
+# _open_launch <launcher> <url> -- hand <url> to <launcher> as one argument.
+_open_launch() {
+  if [ "\$1" = rundll32 ]; then
+    # MSYS would rewrite an argument that looks like a path; this one is a URL.
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' rundll32 url.dll,FileProtocolHandler "\$2"
+  else
+    "\$1" "\$2"
+  fi
+}
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_clean_text",
     suffix: "_clean_text.sh",
     content: `# shellcheck shell=bash
@@ -15337,11 +15739,10 @@ extract() {
 API_URL=\$(extract api_url)
 PROJECT_KEY=\$(extract project_key)
 
-if [ -z "\$API_URL" ] || [ -z "\$PROJECT_KEY" ]; then
-  echo "error: backlog-config.yml is missing api_url or project_key." >&2
-  echo "Run \\\`specnaut cloud login\\\` to authenticate and link a project." >&2
-  exit 2
-fi
+for _f in "api_url:\$API_URL" "project_key:\$PROJECT_KEY"; do
+  [ -n "\${_f#*:}" ] || { echo "error: backlog-config.yml is missing '\${_f%%:*}'." >&2
+    echo "Run \\\`specnaut cloud login\\\` to authenticate and link a project." >&2; exit 2; }
+done
 
 # The key reaches every request's query string and the name of reconcile.sh's
 # cursor file: letters, digits, \`_\` and \`-\`, nothing a URL or a path reads
@@ -16656,6 +17057,136 @@ texts_json() {
   [ "\$#" -gt 0 ] || { echo "\${0##*/}: texts_json needs -- before its texts" >&2; exit 2; }
   shift
   printf '%s\\0' "\$@" | jq_lf -c -Rs \${opts[@]+"\${opts[@]}"} "split(\\"\\\\u0000\\") | \$filter"
+}
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "kanban",
+    suffix: "kanban.sh",
+    content: `#!/usr/bin/env bash
+# kanban.sh [--no-open] -- the configured board, in the browser (cli#803).
+# Read-only: it writes nothing to the tracker or the tree.
+#
+# Prints \`URL: <url>\`, then opens it with the system default browser
+# (_open_url.sh; \`--no-open\` prints only). A backend with no web address for
+# its board prints its defined fallback instead (\`CLOUD: ...\`, \`LOCAL: ...\`)
+# and opens nothing. Where the address comes from is each backend's _board.sh.
+#
+# Exit: 0 printed, a fallback included -- 2 a bad argument, or
+# backlog-config.yml missing or a field unfilled (stderr names it) -- 13 the
+# board could not be resolved (stderr says how to fix access; never a reason
+# to edit the config).
+set -euo pipefail
+
+OPEN=1
+case "\${1:-}" in
+  "") ;;
+  --no-open) OPEN=0 ;;
+  *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
+esac
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# shellcheck source=./_board.sh
+. "\$(dirname "\$0")/_board.sh"
+# shellcheck source=./_open_url.sh
+. "\$(dirname "\$0")/_open_url.sh"
+
+url=\$(board_url)
+if [ -z "\$url" ]; then
+  rc=0
+  board_fallback || rc=\$?
+  exit "\$rc"
+fi
+echo "URL: \$url"
+[ "\$OPEN" = 0 ] || open_url "\$url"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_board",
+    suffix: "_board.sh",
+    content: `#!/usr/bin/env bash
+# The board's browser address on the Specnaut Cloud backend (cli#803).
+# Sourced by kanban.sh after _config.sh, whose PROJECT_KEY it reads.
+
+# board_url -- nothing, yet. The public HTTP contract exposes no web address
+# for a board, and an API base is not a web origin: NEVER derive one from the
+# configured api_url. When the contract carries a board address, read it here.
+board_url() {
+  return 0
+}
+
+# board_fallback -- the defined no-link answer: the project key, and where the
+# board is reached. Not a failure: status 0.
+board_fallback() {
+  echo "CLOUD: project \$PROJECT_KEY - open the board from the Specnaut Cloud web app"
+}
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_open_url",
+    suffix: "_open_url.sh",
+    content: `#!/usr/bin/env bash
+# open_url <url> -- open <url> in the system default browser, the rules of the
+# CLI's own opener (src/infrastructure/browser_opener.ts): only a plain http(s)
+# URL, handed to the launcher as one argument, never through a shell string.
+# Sourced by kanban.sh, the same file on every backend.
+#
+# Says what it did on one line: \`OPEN: <launcher>\`, or \`OPEN: skipped - <why>\`.
+# Never fails: a refused URL, a missing launcher or a headless machine is
+# skipped with status 0 -- the caller has already printed the URL to copy.
+
+# PLAIN_URL in browser_opener.ts, as an ERE; tests/scripts/open_url_sh_test.ts
+# holds the two equal. LC_ALL=C keeps the classes ASCII whatever the locale.
+OPEN_URL_PLAIN='^https?://[][A-Za-z0-9._~:/?#=&%+,-]+\$'
+
+# open_launcher -- the launcher this OS opens a URL with, chosen as
+# browser_opener.ts chooses it: \`open\` on macOS, the URL handler on Windows
+# (Git Bash, MSYS2 or Cygwin), \`xdg-open\` anywhere else.
+open_launcher() {
+  case \$(uname -s 2>/dev/null) in
+    Darwin) echo open ;;
+    MINGW* | MSYS* | CYGWIN*) echo rundll32 ;;
+    *) echo xdg-open ;;
+  esac
+}
+
+open_url() {
+  local url=\${1:-} launcher
+  case \$url in *\$'\\n'* | *\$'\\r'*) url="" ;; esac
+  if ! LC_ALL=C grep -Eq "\$OPEN_URL_PLAIN" <<<"\$url"; then
+    echo "OPEN: skipped - not a plain http(s) URL"
+    return 0
+  fi
+  launcher=\$(open_launcher)
+  if ! command -v "\$launcher" >/dev/null 2>&1; then
+    echo "OPEN: skipped - \$launcher not found"
+    return 0
+  fi
+  _open_launch "\$launcher" "\$url" >/dev/null 2>&1 || { echo "OPEN: skipped - \$launcher failed"; return 0; }
+  echo "OPEN: \$launcher"
+}
+
+# _open_launch <launcher> <url> -- hand <url> to <launcher> as one argument.
+_open_launch() {
+  if [ "\$1" = rundll32 ]; then
+    # MSYS would rewrite an argument that looks like a path; this one is a URL.
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' rundll32 url.dll,FileProtocolHandler "\$2"
+  else
+    "\$1" "\$2"
+  fi
 }
 `,
     executable: true,

@@ -50,6 +50,9 @@ SURFACES=(
   'templates/core/skills/task/scripts/_clean_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_issue_text.sh|smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/read-items.sh|smoke-backlog-plan.sh|backlog-shared-body'
+  # cli#803: the board verb and its opener, installed by all four backends.
+  'templates/core/skills/task/scripts/kanban.sh|smoke-backlog-github.sh smoke-backlog-gitlab.sh smoke-backlog-cloud.sh smoke-backlog-plan.sh|backlog-shared-body'
+  'templates/core/skills/task/scripts/_open_url.sh|smoke-backlog-github.sh smoke-backlog-gitlab.sh smoke-backlog-cloud.sh smoke-backlog-plan.sh|backlog-shared-body'
   'templates/core/skills/task/scripts/_close_shipped.sh|smoke-backlog-github.sh smoke-backlog-gitlab.sh smoke-backlog-local.sh smoke-backlog-cloud.sh|backlog-shared-body'
   'templates/core/skills/status-audit/scripts/*|smoke-features.sh smoke-contracts.sh|skill-script'
   # #562 split two contracts out of the board skill (now `/task`, spec 037).

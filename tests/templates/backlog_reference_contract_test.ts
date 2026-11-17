@@ -1,8 +1,14 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
-import { fromFileUrl } from "@std/path";
 import { skillDocName } from "../../src/domain/core_bundle.ts";
 import { linkTargetPath } from "../../src/domain/context_link.ts";
+import {
+  backendHarness,
+  type Run,
+  runSourced,
+  scriptSource,
+  stub,
+} from "../scripts/backend_scripts_fixture.ts";
 
 /**
  * Locks the backlog-reference rule to a single canonical home.
@@ -147,58 +153,8 @@ Deno.test("merge.md's confirmation prompt no longer names a bare number", () => 
 // Behaviour of the per-backend `item_url` helpers.
 // ---------------------------------------------------------------------------
 
-const SCRIPTS = "../../templates/core/skills/task/scripts";
-
-/**
- * Lays a backend's scripts out so `_config.sh` resolves a project root three
- * levels up, and drops the given backlog-config.yml beside it.
- */
-async function backendHarness(backend: string, config: string | null): Promise<string> {
-  const tmp = await Deno.makeTempDir({ prefix: `item-url-${backend}-` });
-  const dir = `${tmp}/task/scripts/${backend}`;
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.mkdir(`${tmp}/.specnaut`, { recursive: true });
-  const src = fromFileUrl(new URL(`${SCRIPTS}/${backend}/_config.sh`, import.meta.url));
-  await Deno.copyFile(src, `${dir}/_config.sh`);
-  if (config !== null) {
-    await Deno.writeTextFile(`${tmp}/.specnaut/backlog-config.yml`, config);
-  }
-  return tmp;
-}
-
-/**
- * `_config.sh` resolves the project root from `dirname "$0"`, so it must be
- * sourced *by a script in the same directory* — sourcing it from `bash -c`
- * would make `$0` "bash" and break the lookup. This wrapper is how the real
- * backend scripts consume it.
- */
-async function runItemUrl(
-  tmp: string,
-  backend: string,
-  args: string,
-): Promise<{ code: number; out: string }> {
-  const dir = `${tmp}/task/scripts/${backend}`;
-  await Deno.writeTextFile(
-    `${dir}/probe.sh`,
-    `#!/usr/bin/env bash\nset -euo pipefail\n. "$(dirname "$0")/_config.sh"\n${args}\n`,
-  );
-  // `${tmp}/bin` is where a test stubs a CLI (gitlabHarness). PATH goes through
-  // the process environment, not an `export` inside the script: on Windows,
-  // bash converts an inherited PATH to POSIX form at startup, but a native path
-  // assigned inside the script is left as-is and the stub becomes unfindable.
-  // That failure is silent — the helper degrades to no output — so the
-  // degradation case would pass for the wrong reason.
-  const { code, stdout } = await new Deno.Command("bash", {
-    args: [`${dir}/probe.sh`],
-    env: { PATH: `${tmp}/bin:${Deno.env.get("PATH")}` },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  return { code, out: new TextDecoder().decode(stdout).trim() };
-}
-
 async function itemUrl(tmp: string, backend: string, num: string): Promise<string> {
-  const { out } = await runItemUrl(tmp, backend, `item_url ${num}`);
+  const { out } = await runSourced(tmp, backend, `item_url ${num}`);
   return out;
 }
 
@@ -210,9 +166,7 @@ Deno.test("github item_url builds the issue URL from `repo`", async () => {
 Deno.test("cloud item_url emits nothing — the documented no-link fallback", async () => {
   // Cloud carries an API base, not a web origin. Deriving one would send the
   // user somewhere that does not exist, so the contract says: no link.
-  const src = await Deno.readTextFile(
-    fromFileUrl(new URL(`${SCRIPTS}/cloud/_config.sh`, import.meta.url)),
-  );
+  const src = await Deno.readTextFile(scriptSource("cloud/_config.sh"));
   assertStringIncludes(src, "item_url()");
   assert(
     !/item_url\(\)[\s\S]{0,400}\$API_URL[^\n]*echo/.test(src),
@@ -230,14 +184,12 @@ async function gitlabHarness(projectId: string, glabBody: string): Promise<strin
     "gitlab",
     `host: "https://gitlab.example.com"\nproject_id: "${projectId}"\n`,
   );
-  await Deno.mkdir(`${tmp}/bin`, { recursive: true });
-  await Deno.writeTextFile(`${tmp}/bin/glab`, `#!/usr/bin/env bash\n${glabBody}\n`);
-  await Deno.chmod(`${tmp}/bin/glab`, 0o755);
+  await stub(tmp, "glab", glabBody);
   return tmp;
 }
 
-function gitlabItemUrl(tmp: string, num: string): Promise<{ code: number; out: string }> {
-  return runItemUrl(tmp, "gitlab", `item_url ${num}`);
+function gitlabItemUrl(tmp: string, num: string): Promise<Run> {
+  return runSourced(tmp, "gitlab", `item_url ${num}`);
 }
 
 Deno.test("gitlab item_url links directly when project_id is a path", async () => {
@@ -293,7 +245,7 @@ Deno.test("item_url never fails, whatever the state", async () => {
       backend,
       backend === "github" ? 'repo: "acme/my-app"\nproject_number: 7\n' : null,
     );
-    const { code } = await runItemUrl(tmp, backend, 'item_url\nitem_url ""');
+    const { code } = await runSourced(tmp, backend, 'item_url\nitem_url ""');
     assertEquals(code, 0, `${backend} item_url must not fail on a missing argument`);
   }
 });

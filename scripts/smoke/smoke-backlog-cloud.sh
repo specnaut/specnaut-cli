@@ -35,7 +35,8 @@ check "credentials are NOT written into the config" \
 
 echo
 echo "═══ the scripts the PO contract depends on ═══"
-for s in _config.sh add.sh clarify-comment.sh columns.sh list.sh move.sh reconcile.sh view.sh groom-verify.sh; do
+for s in _config.sh add.sh clarify-comment.sh columns.sh list.sh move.sh reconcile.sh view.sh groom-verify.sh \
+  kanban.sh _board.sh _open_url.sh; do
   check "$s scaffolded" "[ -f .specnaut/scripts/backlog/$s ]"
 done
 check "_config.sh reads api_url + project_key, not a stored credential" \

@@ -55,11 +55,10 @@ extract() {
 API_URL=$(extract api_url)
 PROJECT_KEY=$(extract project_key)
 
-if [ -z "$API_URL" ] || [ -z "$PROJECT_KEY" ]; then
-  echo "error: backlog-config.yml is missing api_url or project_key." >&2
-  echo "Run \`specnaut cloud login\` to authenticate and link a project." >&2
-  exit 2
-fi
+for _f in "api_url:$API_URL" "project_key:$PROJECT_KEY"; do
+  [ -n "${_f#*:}" ] || { echo "error: backlog-config.yml is missing '${_f%%:*}'." >&2
+    echo "Run \`specnaut cloud login\` to authenticate and link a project." >&2; exit 2; }
+done
 
 # The key reaches every request's query string and the name of reconcile.sh's
 # cursor file: letters, digits, `_` and `-`, nothing a URL or a path reads

@@ -1,9 +1,9 @@
 # /task — backlog verbs
 
-`list`, `next`, `add`, `edit`, `close`, `estimate`, `status`, `brief` and `<id>`. The router
-(`SKILL.md`, beside this file) dispatched here; `groom` has its own document, `groom.md`. The
-backend is fixed at init time and recorded in `.specnaut/installed.lock`; run
-`specnaut upgrade --backlog <new>` to switch.
+`list`, `next`, `add`, `edit`, `close`, `estimate`, `status`, `brief`, `kanban` and `<id>`. The
+router (`SKILL.md`, beside this file) dispatched here; `groom` has its own document, `groom.md`. The
+backend is fixed at init time and recorded in `.specnaut/installed.lock`; run `specnaut upgrade
+--backlog <new>` to switch.
 
 | Input | Action |
 | --- | --- |
@@ -15,6 +15,7 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run
 | `estimate <id>` | Estimate complexity |
 | `status` | Dashboard summary |
 | `brief <id>` | Product-owner business brief |
+| `kanban [--no-open]` | Open the board in the browser, read-only: run `.specnaut/scripts/backlog/kanban.sh` alone — no read, no product-owner dispatch, no tracker write. Show its `URL:` line as a link (its header defines every line and exit); a `CLOUD:` or `LOCAL:` line is the board's defined fallback, the local index shown as a repo-relative link. Exit 2 or 13: relay its stderr. |
 | `<number>` | Show that item; when it is in progress, point to `/task resume <number>` |
 
 ## The session protocol — every product-owner dispatch
@@ -103,10 +104,9 @@ repo: myorg/myproject              # GitHub repo (owner/name)
 project_number: <N>                # GitHub Project V2 number
 ```
 
-Both are placeholders; resolve the number with
-`gh project list --owner <org>`. A wrong `project_number` is invisible to
-`list.sh` / `view.sh` — they address the board through `repo:` alone — and
-refused up front by every writing script.
+Both are placeholders; resolve the number with `gh project list --owner <org>`. A wrong
+`project_number` is invisible to `list.sh` / `view.sh` — they address the board through `repo:`
+alone — and refused up front by every writing script.
 
 ### Scripts
 
