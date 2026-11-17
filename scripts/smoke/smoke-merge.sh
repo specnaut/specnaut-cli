@@ -183,13 +183,11 @@ for s in land-feature fold-fixups epic-status remove-spec; do
   check "$s.sh scaffolded + executable (spec 042)" \
     "[ -x .specnaut/scripts/bash/$s.sh ]"
 done
-check "_verifier.sh scaffolded beside land-feature.sh, which sources it" \
-  '[ -f .specnaut/scripts/bash/_verifier.sh ] && grep -qF "/_verifier.sh" .specnaut/scripts/bash/land-feature.sh'
 check "close-shipped.sh scaffolded + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
 # Instruction only: which script the doc tells the agent to land with, and no inline copy.
-check "merge.md lands through land-feature.sh, not inline git (spec 042)" \
-  'grep -qF "bash .specnaut/scripts/bash/land-feature.sh" .claude/skills/task/phases/merge.md &&
+check "merge.md lands through land-feature.sh, not inline git (spec 042), which sources _verifier.sh" \
+  'grep -qF "bash .specnaut/scripts/bash/land-feature.sh" .claude/skills/task/phases/merge.md && grep -qF "/_verifier.sh" .specnaut/scripts/bash/land-feature.sh && [ -f .specnaut/scripts/bash/_verifier.sh ] &&
    ! grep -qE "git merge --ff-only|git branch -d" .claude/skills/task/phases/merge.md'
 # Instruction only: which script the doc tells the agent to fold with, and no inline copy.
 check "epic-fixups.md folds through fold-fixups.sh, not an inline rebase (spec 042)" \
