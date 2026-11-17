@@ -56,8 +56,7 @@ in the mechanism for a tool name to be written: the declaration is yours, the
 runner executes what it reads, and neither this document nor the script has a
 default to fall back to. The one sanctioned place where runners are named is
 `phases/review-gates.md`'s auto-detect table, which recognises common toolchains by
-their marker files; it is detection, not a default this mechanism falls back
-to.
+their marker files; it is detection, not a default to fall back to.
 
 ## Running one
 
@@ -143,12 +142,13 @@ owner whose record differs, or that exists on one side only, is affected. So is 
 owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-the `fallback:` line: a path name that is not UTF-8 or holds a newline, an unowned path, a
-`full_on` match, a gitlink, a symlink or a type change; a declaration, an `adapter.files`
-entry, `gates.yml` or `.specnaut/scripts/` that differs from a given base, or from the
-merge-base with the default branch; any of those not a tracked regular file; an adapter that
-fails or answers anything invalid; a malformed declaration; a base that does not resolve or
-was never fetched; `jq` absent, older than 1.6, or failing where its answer decides the run.
+`fallback:`: a path name not UTF-8 or holding a newline; the root `.gitattributes`, `.lfsconfig` or
+`.gitmodules` in any ASCII case, even `inert` (`checkout-config:`); an unowned path, a `full_on`
+match, a gitlink, a symlink or a type change; a declaration, an `adapter.files` entry, `gates.yml`
+or `.specnaut/scripts/` that differs from a given base, or from the merge-base with the default
+branch; any of those not a tracked regular file; an adapter that fails or answers anything invalid;
+a malformed declaration; a base that does not resolve or was never fetched; `jq` absent, older than
+1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
