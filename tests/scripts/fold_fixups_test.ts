@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { git, run, sandbox } from "./git_sandbox.ts";
+import { git, run, sandbox, SKIP_C } from "./git_sandbox.ts";
 
 /** spec 042 — fold-fixups.sh folds each fixup into its own child and proves nothing else moved. */
 
@@ -39,7 +39,7 @@ Deno.test("it folds on a git older than 2.44, where --autosquash needs --interac
   try {
     // git < 2.44 ignores --autosquash unless the rebase is interactive.
     const r = await sb.scriptWithGit(
-      `if [ "$1" = rebase ] && [[ " $* " != *" -i "* && " $* " != *" --interactive "* ]]; then
+      `${SKIP_C}if [ "$sub" = rebase ] && [[ " $* " != *" -i "* && " $* " != *" --interactive "* ]]; then
   args=(); for a in "$@"; do [ "$a" = --autosquash ] || args+=("$a"); done; set -- "\${args[@]}"
 fi
 exec "$REAL_GIT" "$@"`,
@@ -240,7 +240,8 @@ Deno.test("a rebase that fails without stopping writes no record and is 3", {
   const sb = await epicWithFixup();
   try {
     const r = await sb.scriptWithGit(
-      `[ "$1" = rebase ] && exit 1\nexec "$REAL_GIT" "$@"`,
+      // fold-fixups runs git with `-c` pairs before the subcommand (no hook runs): skip them.
+      `${SKIP_C}[ "$sub" = rebase ] && exit 1\nexec "$REAL_GIT" "$@"`,
       "fold-fixups.sh",
     );
     assertEquals(r.code, 3, r.stderr);

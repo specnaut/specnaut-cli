@@ -36,6 +36,13 @@ export const REFUSALS_ON_BASE: Readonly<
   },
 };
 
+/**
+ * A shim's first bash line: `sub` is git's subcommand, past the `-c <key>=<value>` pairs a script
+ * passes before it (fold-fixups.sh, remove-spec.sh and land-feature.sh run git with no hook).
+ */
+export const SKIP_C =
+  'a=("$@"); i=0; while [ "${a[i]}" = -c ]; do i=$((i + 2)); done; sub="${a[i]}"\n';
+
 export interface Run {
   code: number;
   stdout: string;

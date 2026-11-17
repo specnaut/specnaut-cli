@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { git, sandbox } from "./git_sandbox.ts";
+import { git, sandbox, SKIP_C } from "./git_sandbox.ts";
 import { BRANCH, files, shipped, state } from "./remove_spec_fixture.ts";
 
 /**
@@ -124,7 +124,8 @@ Deno.test(
     try {
       const head = await git(sb.work, "rev-parse", "HEAD");
       const r = await sb.scriptWithGit(
-        `if [ "$1" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
+        // remove-spec runs git with `-c` pairs before the subcommand (no hook runs): skip them.
+        `${SKIP_C}if [ "$sub" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
 exec "$REAL_GIT" "$@"`,
         "remove-spec.sh",
         "--marker-only",

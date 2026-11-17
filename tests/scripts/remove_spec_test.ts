@@ -1,6 +1,6 @@
 import { assertEquals, assertNotEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { git } from "./git_sandbox.ts";
+import { git, SKIP_C } from "./git_sandbox.ts";
 import { BRANCH, files, shipped, state } from "./remove_spec_fixture.ts";
 
 /** spec 042 — remove-spec.sh removes one shipped feature directory, and nothing else. */
@@ -140,8 +140,7 @@ Deno.test(
       // A concurrent writer: it stages its own file right after the script's `git rm`.
       const r = await sb.scriptWithGit(
         // The script passes `-c` pairs before the subcommand (it runs no hook): skip them.
-        `a=("$@"); i=0; while [ "\${a[i]}" = -c ]; do i=$((i + 2)); done
-if [ "\${a[i]}" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
+        `${SKIP_C}if [ "$sub" = rm ]; then "$REAL_GIT" "$@" || exit; echo x > other.txt; exec "$REAL_GIT" add other.txt; fi
 exec "$REAL_GIT" "$@"`,
         "remove-spec.sh",
         BRANCH,
