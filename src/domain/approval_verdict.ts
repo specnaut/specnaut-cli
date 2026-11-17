@@ -1,4 +1,5 @@
 import { SCRIPTS_DIR, type Untrusted } from "./script_trust.ts";
+import { REASON } from "./trust_reason.ts";
 
 /**
  * Whether a user's yes still binds the tree judged now. A merge that stopped on an untrusted
@@ -48,10 +49,27 @@ export function approvalVerdict(
 }
 
 /**
- * Whether a yes can cover the scripts' verdict: only reasons inside the scripts folder, whose bytes
+ * The reasons a yes can bind: each names bytes `SCRIPTS_DIGEST` covers, or a file's absence, which
+ * it covers too. A link (the digest holds its path, never its target nor what it leads to), a
+ * non-file, an unreadable entry, a hard link (its bytes can change under another name), a
+ * submodule or a walk that stopped are not: no digest names what would run, so no yes holds it.
+ */
+const APPROVABLE: ReadonlySet<string> = new Set([
+  REASON.differs,
+  REASON.notOnBase,
+  REASON.firstInstall,
+  REASON.missing,
+  REASON.caseDiffers,
+  REASON.lineEndings,
+  REASON.behind,
+  REASON.baseNotRegular,
+]);
+
+/**
+ * Whether a yes can cover the scripts' verdict: only a reason inside the scripts folder whose bytes
  * the digest names. A reason outside it (the local base ahead of origin, the lock at the base) is
  * one no yes makes hold, so the merge stops on it whatever the digest says.
  */
 export function scriptsApprovable(untrusted: readonly Untrusted[]): boolean {
-  return untrusted.every((u) => u.path.startsWith(`${SCRIPTS_DIR}/`));
+  return untrusted.every((u) => u.path.startsWith(`${SCRIPTS_DIR}/`) && APPROVABLE.has(u.reason));
 }

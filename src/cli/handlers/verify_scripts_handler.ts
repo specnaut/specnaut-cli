@@ -145,8 +145,9 @@ async function answer(
   const approval = Object.keys(approved).length === 0
     ? null
     : approvalOf(outcome, config, approved);
-  const namesFile = await deps.writeNames(names);
-  deps.out(reportLines(outcome, config, namesFile, approval?.lines ?? []).join("\n"));
+  const lines = reportLines(outcome, config, await deps.writeNames(names));
+  const last = outcome.verdict.trusted ? "VERDICT scripts trusted" : UNTRUSTED;
+  deps.out([...lines, ...(approval?.lines ?? []).map(approvalLine), last].join("\n"));
   return (approval?.holds ?? outcome.verdict.trusted) ? EXIT.trusted : EXIT.untrusted;
 }
 
@@ -163,13 +164,12 @@ function approvalOf(outcome: Outcome, config: Judged, approved: ApprovedDigests)
   });
 }
 
-/** Exits 0 and 1's lines, in the order the header gives. */
-function reportLines(
-  outcome: Outcome,
-  config: Judged,
-  namesFile: string,
-  approval: readonly ApprovalLine[],
-): string[] {
+function approvalLine(l: ApprovalLine): string {
+  return `APPROVAL ${l.class} ${l.holds ? "holds" : "moved"} ${l.digest}`;
+}
+
+/** Exits 0 and 1's lines, in the order the header gives, up to the approval and last lines. */
+function reportLines(outcome: Outcome, config: Judged, namesFile: string): string[] {
   return [
     `BASE ${outcome.base}`,
     `BASE_TIP ${outcome.baseTip}`,
@@ -182,8 +182,6 @@ function reportLines(
     ...outcome.verdict.untrusted.map((u) =>
       `UNTRUSTED ${terminalText(u.path)} ${terminalText(u.reason)}`
     ),
-    ...approval.map((l) => `APPROVAL ${l.class} ${l.holds ? "holds" : "moved"} ${l.digest}`),
-    outcome.verdict.trusted ? "VERDICT scripts trusted" : UNTRUSTED,
   ];
 }
 

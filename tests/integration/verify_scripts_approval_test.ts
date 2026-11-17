@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import { commitAll, fixture, git, GIT_READ, verify, write } from "./verify_scripts_fixture.ts";
 
 /**
@@ -98,4 +99,18 @@ Deno.test("a malformed or repeated flag is the parser's exit 2, no VERDICT line"
     const v = await verify(root, args);
     assertEquals([v.code, v.lines.some((l) => l.startsWith("VERDICT"))], [2, false], args[0]);
   }
+});
+
+Deno.test({
+  name: "a link under the scripts folder is never held: the digest does not name what it leads to",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    const { root } = await fixture();
+    await Deno.symlink("/bin/sh", join(root, ".specnaut/scripts/bash/run.sh"));
+    await commitAll(root, "a link");
+    const digest = (await verify(root)).field("SCRIPTS_DIGEST")!;
+    const v = await verify(root, ["--approved-scripts", digest]);
+    assertEquals(v.code, 1, v.stderr);
+    assertEquals(tail(v.lines), [`APPROVAL scripts moved ${digest}`, "VERDICT scripts untrusted"]);
+  },
 });
