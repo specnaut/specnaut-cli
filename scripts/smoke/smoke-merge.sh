@@ -183,6 +183,8 @@ for s in land-feature fold-fixups epic-status remove-spec; do
   check "$s.sh scaffolded + executable (spec 042)" \
     "[ -x .specnaut/scripts/bash/$s.sh ]"
 done
+check "_verifier.sh scaffolded beside land-feature.sh, which sources it" \
+  '[ -f .specnaut/scripts/bash/_verifier.sh ] && grep -qF "/_verifier.sh" .specnaut/scripts/bash/land-feature.sh'
 check "close-shipped.sh scaffolded + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
 # Instruction only: which script the doc tells the agent to land with, and no inline copy.

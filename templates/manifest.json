@@ -2359,6 +2359,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_verifier.sh",
+      "source": "core/specnaut/scripts/bash/_verifier.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/remove-spec.sh",
       "source": "core/specnaut/scripts/bash/remove-spec.sh",
       "executable": true
