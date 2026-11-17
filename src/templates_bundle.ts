@@ -3883,17 +3883,36 @@ gate reads § The config verdicts.
 
 Every block that runs the verifier runs this one first, in the same shell, and then calls \`"\$sn"
 verify-scripts\`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
-\`specnaut\` of its own. It sets \`sn\` to the physical file \`specnaut\` resolves to, following each
+\`specnaut\` of its own. Before git runs, it judges the PATH itself, every command being looked up on
+it: an entry that is empty or relative (searched from the working folder), holds a \`.\` or \`..\`, or
+sits in the tree (the nearest folder holding a \`.git\`) can supply any command, and the first one is
+refused by name. Then it sets \`sn\` to the physical file \`specnaut\` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. \`-ef\` compares device and inode, so
-neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository.
-\`land-feature.sh\` holds the same rule as \`resolve_specnaut\`, in \`_verifier.sh\` beside it.
+neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository. It runs
+in bash and in zsh alike. \`land-feature.sh\` holds the same rule as \`refuse_unsafe_path\` and
+\`resolve_specnaut\`, in \`_verifier.sh\` beside it; the Claude Code hooks drop such entries instead.
 
 <!-- script-gate: resolve-verifier -->
 \`\`\`bash
-sn=""; why=""; n=0; p=\$(command -v specnaut); top=\$(git rev-parse --show-toplevel)
-case \$p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
-[ -n "\$why" ] || [ -n "\$top" ] || why="has no repository to be judged outside of"
+sn=""; why=""; n=0; p=""; top=""; d=\$(pwd -P); rest=\${PATH-}:
+while [ -z "\$top" ]; do [ -e "\$d/.git" ] && top=\${d:-/}; [ -n "\$d" ] || break; d=\${d%/*}; done
+[ -n "\$top" ] || why="has no repository to be judged outside of"
+while [ -z "\$why" ] && [ -n "\$rest" ]; do
+  e=\${rest%%:*}; rest=\${rest#*:}; a=\$e
+  case \$e in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /\$e/ in */./* | */../*) [ -n "\$why" ] || why="has a . or .. component" ;; esac
+  while [ -z "\$why" ] && ! [ -e "\$a" ] && ! [ -L "\$a" ]; do a=\${a%/*}; a=\${a:-/}; done
+  [ -n "\$why" ] || a=\$(cd -P "\$a" 2>/dev/null && pwd) || why="names a folder that cannot be entered"
+  while [ -z "\$why" ] && [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do a=\${a%/*}; a=\${a:-/}; done
+  [ -n "\$why" ] || ! [ "\$a" -ef "\$top" ] || why="is inside the repository"
+  [ -z "\$why" ] || { p="PATH entry '\$e'"; why="\$why - start the session from a shell without that entry"; }
+done
+if [ -z "\$why" ]; then
+  p=\$(command -v specnaut); top=\$(git rev-parse --show-toplevel)
+  case \$p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
+  [ -n "\$why" ] || [ -n "\$top" ] || why="has no repository to be judged outside of"
+fi
 while [ -z "\$why" ]; do
   d=\$(cd -P "\${p%/*}/" && pwd) || { why="names a folder that cannot be entered"; break; }
   p="\$d/\${p##*/}"; a=\$d
@@ -3907,8 +3926,8 @@ done
 [ -n "\$sn" ] || echo "VERIFIER REFUSED: \${p:-specnaut} \$why"
 \`\`\`
 
-A \`VERIFIER REFUSED: <path> <why>\` line leaves \`sn\` empty, and the call after it fails: stop and
-say so, quoting the line. The verifier is an installed release: one that runs this checkout's own
+A \`VERIFIER REFUSED: <path> <why>\` line, or \`VERIFIER REFUSED: PATH entry '<entry>' <why>\`, leaves
+\`sn\` empty, and the call after it fails: stop and say so, quoting the line. The verifier is an installed release: one that runs this checkout's own
 source is the branch's.
 
 ## The gate
@@ -32448,7 +32467,8 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 #   13 HEAD's instructions or helper scripts are neither trusted nor the
 #      digest passed, as the verifier judges them (without --scripts-digest
 #      only a local base ahead of origin passes, to exit 6); or it could not
-#      judge HEAD, or \`specnaut\` resolved to a path it refuses (VERIFIER REFUSED);
+#      judge HEAD, or \`specnaut\` resolved to a path it refuses, or the PATH holds an
+#      empty, relative or in-repository entry (VERIFIER REFUSED, naming it);
 #      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
 #      Nothing moved
 # (8 is retired: a branch that will not delete after the push is 11, never
@@ -32475,7 +32495,10 @@ export GIT_OPTIONAL_LOCKS=0
 # \`if\`, and a function's body escapes the caller's \`if\` under -E.
 shopt -s expand_aliases
 alias git='git -c core.hooksPath=/dev/null'
-here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# This script's folder, read with builtins: the PATH is judged before any command it names runs.
+here=\${BASH_SOURCE[0]}
+case \$here in */*) here=\${here%/*} ;; *) here=. ;; esac
+here=\$(CDPATH="" cd "\${here:-/}" && pwd)
 # \`set -e\` alone would exit with git's own code, which no table lists.
 # In a command substitution the trap only passes the code out: the line that ran it decides, by its
 # own \`||\` or by this trap, as it did before -E.
@@ -32488,6 +32511,8 @@ trap 'unexpected \$? "\$BASH_COMMAND"' ERR
 
 # shellcheck source=./_verifier.sh
 . "\$here/_verifier.sh"
+# Before the first command looked up on the PATH: \`bash\` below is one.
+refuse_unsafe_path
 
 usage="usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]"
 scripts_digest=""
@@ -32596,6 +32621,73 @@ fi
 # after it set its git alias, under its \`set -Eeuo pipefail\` and ERR trap;
 # \`base\`, \`scripts_digest\` and \`instructions_digest\` are set before the calls.
 # Exit 13 is land-feature.sh's: its header says what the code means.
+
+# The PATH, judged before the first command it names runs - \`bash\`, \`git\` and \`specnaut\` are all
+# looked up on it. An empty or a relative entry is searched from the working folder, and an entry
+# in the tree finds what the branch put there, so either can supply any command: the first one is
+# refused by name. Builtins only, git included: it is one of those commands. The rule of
+# phases/script-gate.md § Resolving the verifier and of the Claude Code hooks; one test runs all.
+refuse_unsafe_path() {
+  local rest=\${PATH-}: e top why
+  tree_top "\$(pwd -P)"
+  if [ -z "\$top" ]; then
+    echo "land-feature: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was landed" >&2
+    exit 13
+  fi
+  while [ -n "\$rest" ]; do
+    e=\${rest%%:*}
+    rest=\${rest#*:}
+    entry_unsafe "\$e" || continue
+    echo "land-feature: VERIFIER REFUSED: PATH entry '\$e' \$why - start the session from a shell without that entry. Nothing was landed" >&2
+    exit 13
+  done
+}
+
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
+# found without git. Empty with none.
+tree_top() {
+  local d=\$1
+  top=""
+  while :; do
+    if [ -e "\$d/.git" ]; then
+      top=\${d:-/}
+      return 0
+    fi
+    [ -n "\$d" ] || return 0
+    d=\${d%/*}
+  done
+}
+
+# Whether PATH entry \$1 can supply a command from the tree, its reason into \`why\`: empty, not
+# absolute, a \`.\` or \`..\` component, or in the tree under \`top\`.
+entry_unsafe() {
+  why=""
+  case \$1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /\$1/ in */./* | */../*) [ -n "\$why" ] || why="has a . or .. component" ;; esac
+  [ -n "\$why" ] || entry_in_tree "\$1"
+}
+
+# Whether the absolute entry \$1 is in the tree, \`why\` naming how. Its longest part that is there
+# is entered with \`cd -P\`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by \`-ef\`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=\$1
+  while ! [ -e "\$a" ] && ! [ -L "\$a" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  if ! a=\$(cd -P "\$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  [ "\$a" -ef "\$top" ] || return 1
+  why="is inside the repository"
+}
 
 # The verifier, resolved before it runs, into \`sn\`: \`specnaut\` on the PATH must be an absolute
 # path, and neither its folder nor any link on the way to it may sit in this repository - the PATH
@@ -38914,12 +39006,109 @@ exit 0
 # work (\`specnaut record-checkout\` reads this hook's input on stdin and says
 # which sources take a record); this script only calls it.
 #
-# With no \`specnaut\` on PATH nothing is recorded, and a check that needs the
-# record refuses. Always exits 0 and prints nothing on stdout: a SessionStart
-# hook's stdout is added to the session's context.
-command -v specnaut >/dev/null 2>&1 || exit 0
+# With no \`specnaut\` on PATH, or one that resolves into the tree, nothing is
+# recorded, and a check that needs the record refuses. Always exits 0 and
+# prints nothing on stdout: a SessionStart hook's stdout is added to the
+# session's context.
 cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
-specnaut record-checkout >/dev/null || true
+dir=\$(pwd -P)
+# The PATH, cleaned before the first command it names runs. An empty or a relative entry is searched
+# from the working folder, and an entry in the tree finds what a branch put there, so either could
+# supply \`git\`, \`cat\` or \`specnaut\` itself. The hook drops such entries rather than refuse: it runs
+# before every call of every session, review or not, and removal gives the same guarantee. The rule
+# of phases/script-gate.md § Resolving the verifier and of _verifier.sh; one test runs all of them.
+# Builtins only until PATH is exported: git is one of the commands it judges.
+
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
+# found without git. Empty with none.
+tree_top() {
+  local d=\$1
+  top=""
+  while :; do
+    if [ -e "\$d/.git" ]; then
+      top=\${d:-/}
+      return 0
+    fi
+    [ -n "\$d" ] || return 0
+    d=\${d%/*}
+  done
+}
+
+# Whether PATH entry \$1 can supply a command from the tree, its reason into \`why\`: empty, not
+# absolute, a \`.\` or \`..\` component, or in the tree under \`top\`.
+entry_unsafe() {
+  why=""
+  case \$1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /\$1/ in */./* | */../*) [ -n "\$why" ] || why="has a . or .. component" ;; esac
+  [ -n "\$why" ] || entry_in_tree "\$1"
+}
+
+# Whether the absolute entry \$1 is in the tree, \`why\` naming how. Its longest part that is there
+# is entered with \`cd -P\`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by \`-ef\`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=\$1
+  while ! [ -e "\$a" ] && ! [ -L "\$a" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  if ! a=\$(cd -P "\$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  [ "\$a" -ef "\$top" ] || return 1
+  why="is inside the repository"
+}
+
+# PATH rebuilt from the entries the rule keeps, in order, and exported, so every command of this
+# hook and the binary it starts resolve on it; the first entry dropped, and why, into \`dropped\`.
+# With none kept, \`/dev/null\`: an empty PATH is searched from the working folder.
+clean_path() {
+  local rest=\${PATH-}: e kept=""
+  dropped=""
+  while [ -n "\$rest" ]; do
+    e=\${rest%%:*}
+    rest=\${rest#*:}
+    if ! entry_unsafe "\$e"; then
+      kept=\${kept:+\$kept:}\$e
+    elif [ -z "\$dropped" ]; then
+      dropped="PATH entry '\$e' \$why"
+    fi
+  done
+  export PATH=\${kept:-/dev/null}
+}
+
+# \`specnaut\`, into \`sn\`, as _verifier.sh's resolve_specnaut resolves it: the physical file, each
+# link followed one hop at a time, neither its folder nor a link on the way in the tree. A refusal
+# leaves \`why\` naming the path and the reason; no \`specnaut\` on the PATH leaves it empty.
+resolve_sn() {
+  local p d a t n=0
+  sn="" why=""
+  p=\$(command -v specnaut) || return 1
+  case \$p in /*) ;; *) why="is not an absolute path" ;; esac
+  while [ -z "\$why" ]; do
+    if ! d=\$(cd -P "\${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
+    p="\$d/\${p##*/}"; a=\$d
+    while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do a=\${a%/*}; a=\${a:-/}; done
+    if [ "\$a" -ef "\$top" ]; then why="is inside the repository"; break; fi
+    if ! [ -L "\$p" ]; then sn=\$p; return 0; fi
+    n=\$((n + 1)); if [ "\$n" -gt 40 ]; then why="links more than 40 times"; break; fi
+    if ! t=\$(readlink "\$p"); then why="is a link that cannot be read"; break; fi
+    case \$t in /*) p=\$t ;; *) p="\$d/\$t" ;; esac
+  done
+  why="\$p \$why"
+  return 1
+}
+tree_top "\$dir"
+top=\${top:-\$dir}
+clean_path
+resolve_sn || exit 0
+"\$sn" record-checkout >/dev/null || true
 exit 0
 `,
       executable: true,
@@ -38940,20 +39129,112 @@ exit 0
 # \`specnaut\` on PATH, \`specnaut review start\` cannot run either, so nothing is
 # stopped here. Before any of that, every time, the pass a gated line left is
 # removed: a pass lives only until the next command, and a check stopped
-# part-way leaves none behind.
-input=\$(cat)
+# part-way leaves none behind. A \`specnaut\` that resolves into the tree stops
+# a review's command: it would be the tree judging itself.
 refuse() {
   echo "review-gate: \$1" >&2
   exit 2
+}
+dir=\$(cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P) ||
+  refuse "cannot enter the project folder"
+# The PATH, cleaned before the first command it names runs. An empty or a relative entry is searched
+# from the working folder, and an entry in the tree finds what a branch put there, so either could
+# supply \`git\`, \`cat\` or \`specnaut\` itself. The hook drops such entries rather than refuse: it runs
+# before every call of every session, review or not, and removal gives the same guarantee. The rule
+# of phases/script-gate.md § Resolving the verifier and of _verifier.sh; one test runs all of them.
+# Builtins only until PATH is exported: git is one of the commands it judges.
+
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
+# found without git. Empty with none.
+tree_top() {
+  local d=\$1
+  top=""
+  while :; do
+    if [ -e "\$d/.git" ]; then
+      top=\${d:-/}
+      return 0
+    fi
+    [ -n "\$d" ] || return 0
+    d=\${d%/*}
+  done
+}
+
+# Whether PATH entry \$1 can supply a command from the tree, its reason into \`why\`: empty, not
+# absolute, a \`.\` or \`..\` component, or in the tree under \`top\`.
+entry_unsafe() {
+  why=""
+  case \$1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /\$1/ in */./* | */../*) [ -n "\$why" ] || why="has a . or .. component" ;; esac
+  [ -n "\$why" ] || entry_in_tree "\$1"
+}
+
+# Whether the absolute entry \$1 is in the tree, \`why\` naming how. Its longest part that is there
+# is entered with \`cd -P\`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by \`-ef\`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=\$1
+  while ! [ -e "\$a" ] && ! [ -L "\$a" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  if ! a=\$(cd -P "\$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  [ "\$a" -ef "\$top" ] || return 1
+  why="is inside the repository"
+}
+
+# PATH rebuilt from the entries the rule keeps, in order, and exported, so every command of this
+# hook and the binary it starts resolve on it; the first entry dropped, and why, into \`dropped\`.
+# With none kept, \`/dev/null\`: an empty PATH is searched from the working folder.
+clean_path() {
+  local rest=\${PATH-}: e kept=""
+  dropped=""
+  while [ -n "\$rest" ]; do
+    e=\${rest%%:*}
+    rest=\${rest#*:}
+    if ! entry_unsafe "\$e"; then
+      kept=\${kept:+\$kept:}\$e
+    elif [ -z "\$dropped" ]; then
+      dropped="PATH entry '\$e' \$why"
+    fi
+  done
+  export PATH=\${kept:-/dev/null}
+}
+
+# \`specnaut\`, into \`sn\`, as _verifier.sh's resolve_specnaut resolves it: the physical file, each
+# link followed one hop at a time, neither its folder nor a link on the way in the tree. A refusal
+# leaves \`why\` naming the path and the reason; no \`specnaut\` on the PATH leaves it empty.
+resolve_sn() {
+  local p d a t n=0
+  sn="" why=""
+  p=\$(command -v specnaut) || return 1
+  case \$p in /*) ;; *) why="is not an absolute path" ;; esac
+  while [ -z "\$why" ]; do
+    if ! d=\$(cd -P "\${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
+    p="\$d/\${p##*/}"; a=\$d
+    while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do a=\${a%/*}; a=\${a:-/}; done
+    if [ "\$a" -ef "\$top" ]; then why="is inside the repository"; break; fi
+    if ! [ -L "\$p" ]; then sn=\$p; return 0; fi
+    n=\$((n + 1)); if [ "\$n" -gt 40 ]; then why="links more than 40 times"; break; fi
+    if ! t=\$(readlink "\$p"); then why="is a link that cannot be read"; break; fi
+    case \$t in /*) p=\$t ;; *) p="\$d/\$t" ;; esac
+  done
+  why="\$p \$why"
+  return 1
 }
 # Removes the pass where git keeps it. When git cannot say where that is (a
 # repository it refuses to read, say), the \`.git\` above the folder does; a
 # folder with none holds no pass. One whose git directory still cannot be
 # found might: the command is stopped, never let through.
 drop_pass() {
-  local dir git_dir
-  dir=\$(cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P) ||
-    refuse "cannot enter the project folder"
+  local git_dir
   git_dir=\$(cd "\$dir" && git rev-parse --absolute-git-dir 2>/dev/null) ||
     git_dir=\$(git_dir_above "\$dir") || return 0
   [ -n "\$git_dir" ] && [ -d "\$git_dir" ] ||
@@ -38983,11 +39264,18 @@ git_dir_above() {
     dir=\$up
   done
 }
+tree_top "\$dir"
+top=\${top:-\$dir}
+clean_path
+input=\$(cat)
 drop_pass
 case "\$input" in *review*) ;; *) exit 0 ;; esac
-command -v specnaut >/dev/null 2>&1 || exit 0
-cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || refuse "cannot enter the project folder"
-printf '%s' "\$input" | specnaut review gate && exit 0
+if ! resolve_sn; then
+  [ -z "\$why" ] || refuse "VERIFIER REFUSED: \$why"
+  exit 0
+fi
+cd "\$dir" || refuse "cannot enter the project folder"
+printf '%s' "\$input" | "\$sn" review gate && exit 0
 exit 2
 `,
       executable: true,
@@ -39010,14 +39298,111 @@ exit 2
 # checkout's git directory is refused, and so is one whose copy cannot be told
 # absent (a file, or a folder the hook may not search, on the way to it), which
 # the binary refuses too. A lock with no \`specnaut\` on PATH to judge it stops
-# the call.
-input=\$(cat)
+# the call, and so does one whose PATH held an entry the hook dropped, or whose
+# \`specnaut\` resolves into the tree: the lock is not judged by what the tree
+# may have supplied.
 refuse() {
   echo "review-lock: \$1" >&2
   exit 2
 }
 dir=\$(cd "\${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P) ||
   refuse "cannot enter the project folder"
+# The PATH, cleaned before the first command it names runs. An empty or a relative entry is searched
+# from the working folder, and an entry in the tree finds what a branch put there, so either could
+# supply \`git\`, \`cat\` or \`specnaut\` itself. The hook drops such entries rather than refuse: it runs
+# before every call of every session, review or not, and removal gives the same guarantee. The rule
+# of phases/script-gate.md § Resolving the verifier and of _verifier.sh; one test runs all of them.
+# Builtins only until PATH is exported: git is one of the commands it judges.
+
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
+# found without git. Empty with none.
+tree_top() {
+  local d=\$1
+  top=""
+  while :; do
+    if [ -e "\$d/.git" ]; then
+      top=\${d:-/}
+      return 0
+    fi
+    [ -n "\$d" ] || return 0
+    d=\${d%/*}
+  done
+}
+
+# Whether PATH entry \$1 can supply a command from the tree, its reason into \`why\`: empty, not
+# absolute, a \`.\` or \`..\` component, or in the tree under \`top\`.
+entry_unsafe() {
+  why=""
+  case \$1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /\$1/ in */./* | */../*) [ -n "\$why" ] || why="has a . or .. component" ;; esac
+  [ -n "\$why" ] || entry_in_tree "\$1"
+}
+
+# Whether the absolute entry \$1 is in the tree, \`why\` naming how. Its longest part that is there
+# is entered with \`cd -P\`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by \`-ef\`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=\$1
+  while ! [ -e "\$a" ] && ! [ -L "\$a" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  if ! a=\$(cd -P "\$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do
+    a=\${a%/*}
+    a=\${a:-/}
+  done
+  [ "\$a" -ef "\$top" ] || return 1
+  why="is inside the repository"
+}
+
+# PATH rebuilt from the entries the rule keeps, in order, and exported, so every command of this
+# hook and the binary it starts resolve on it; the first entry dropped, and why, into \`dropped\`.
+# With none kept, \`/dev/null\`: an empty PATH is searched from the working folder.
+clean_path() {
+  local rest=\${PATH-}: e kept=""
+  dropped=""
+  while [ -n "\$rest" ]; do
+    e=\${rest%%:*}
+    rest=\${rest#*:}
+    if ! entry_unsafe "\$e"; then
+      kept=\${kept:+\$kept:}\$e
+    elif [ -z "\$dropped" ]; then
+      dropped="PATH entry '\$e' \$why"
+    fi
+  done
+  export PATH=\${kept:-/dev/null}
+}
+
+# \`specnaut\`, into \`sn\`, as _verifier.sh's resolve_specnaut resolves it: the physical file, each
+# link followed one hop at a time, neither its folder nor a link on the way in the tree. A refusal
+# leaves \`why\` naming the path and the reason; no \`specnaut\` on the PATH leaves it empty.
+resolve_sn() {
+  local p d a t n=0
+  sn="" why=""
+  p=\$(command -v specnaut) || return 1
+  case \$p in /*) ;; *) why="is not an absolute path" ;; esac
+  while [ -z "\$why" ]; do
+    if ! d=\$(cd -P "\${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
+    p="\$d/\${p##*/}"; a=\$d
+    while [ "\$a" != / ] && ! [ "\$a" -ef "\$top" ]; do a=\${a%/*}; a=\${a:-/}; done
+    if [ "\$a" -ef "\$top" ]; then why="is inside the repository"; break; fi
+    if ! [ -L "\$p" ]; then sn=\$p; return 0; fi
+    n=\$((n + 1)); if [ "\$n" -gt 40 ]; then why="links more than 40 times"; break; fi
+    if ! t=\$(readlink "\$p"); then why="is a link that cannot be read"; break; fi
+    case \$t in /*) p=\$t ;; *) p="\$d/\$t" ;; esac
+  done
+  why="\$p \$why"
+  return 1
+}
+tree_top "\$dir"
+top=\${top:-\$dir}
+clean_path
+input=\$(cat)
 # The same pattern as isSessionId (src/domain/session_record.ts).
 id_pattern='^\\{"session_id":"([A-Za-z0-9][A-Za-z0-9_-]{0,127})"'
 id=""
@@ -39076,10 +39461,14 @@ if [ "\$mine" = 0 ]; then
     [ -e "\$own" ] || [ -L "\$own" ] || ! absent "\$own" || exit 0
   fi
 fi
-command -v specnaut >/dev/null 2>&1 ||
+[ -z "\$dropped" ] ||
+  refuse "VERIFIER REFUSED: \$dropped - start the session from a shell without that entry"
+if ! resolve_sn; then
+  [ -z "\$why" ] || refuse "VERIFIER REFUSED: \$why"
   refuse "a review lock is held here and specnaut is not on PATH to judge this call"
+fi
 cd "\$dir" || refuse "cannot enter the project folder"
-printf '%s' "\$input" | specnaut review guard && exit 0
+printf '%s' "\$input" | "\$sn" review guard && exit 0
 exit 2
 `,
       executable: true,

@@ -9,17 +9,36 @@ gate reads § The config verdicts.
 
 Every block that runs the verifier runs this one first, in the same shell, and then calls `"$sn"
 verify-scripts`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
-`specnaut` of its own. It sets `sn` to the physical file `specnaut` resolves to, following each
+`specnaut` of its own. Before git runs, it judges the PATH itself, every command being looked up on
+it: an entry that is empty or relative (searched from the working folder), holds a `.` or `..`, or
+sits in the tree (the nearest folder holding a `.git`) can supply any command, and the first one is
+refused by name. Then it sets `sn` to the physical file `specnaut` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
-neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository.
-`land-feature.sh` holds the same rule as `resolve_specnaut`, in `_verifier.sh` beside it.
+neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository. It runs
+in bash and in zsh alike. `land-feature.sh` holds the same rule as `refuse_unsafe_path` and
+`resolve_specnaut`, in `_verifier.sh` beside it; the Claude Code hooks drop such entries instead.
 
 <!-- script-gate: resolve-verifier -->
 ```bash
-sn=""; why=""; n=0; p=$(command -v specnaut); top=$(git rev-parse --show-toplevel)
-case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
-[ -n "$why" ] || [ -n "$top" ] || why="has no repository to be judged outside of"
+sn=""; why=""; n=0; p=""; top=""; d=$(pwd -P); rest=${PATH-}:
+while [ -z "$top" ]; do [ -e "$d/.git" ] && top=${d:-/}; [ -n "$d" ] || break; d=${d%/*}; done
+[ -n "$top" ] || why="has no repository to be judged outside of"
+while [ -z "$why" ] && [ -n "$rest" ]; do
+  e=${rest%%:*}; rest=${rest#*:}; a=$e
+  case $e in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /$e/ in */./* | */../*) [ -n "$why" ] || why="has a . or .. component" ;; esac
+  while [ -z "$why" ] && ! [ -e "$a" ] && ! [ -L "$a" ]; do a=${a%/*}; a=${a:-/}; done
+  [ -n "$why" ] || a=$(cd -P "$a" 2>/dev/null && pwd) || why="names a folder that cannot be entered"
+  while [ -z "$why" ] && [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+  [ -n "$why" ] || ! [ "$a" -ef "$top" ] || why="is inside the repository"
+  [ -z "$why" ] || { p="PATH entry '$e'"; why="$why - start the session from a shell without that entry"; }
+done
+if [ -z "$why" ]; then
+  p=$(command -v specnaut); top=$(git rev-parse --show-toplevel)
+  case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
+  [ -n "$why" ] || [ -n "$top" ] || why="has no repository to be judged outside of"
+fi
 while [ -z "$why" ]; do
   d=$(cd -P "${p%/*}/" && pwd) || { why="names a folder that cannot be entered"; break; }
   p="$d/${p##*/}"; a=$d
@@ -33,8 +52,8 @@ done
 [ -n "$sn" ] || echo "VERIFIER REFUSED: ${p:-specnaut} $why"
 ```
 
-A `VERIFIER REFUSED: <path> <why>` line leaves `sn` empty, and the call after it fails: stop and
-say so, quoting the line. The verifier is an installed release: one that runs this checkout's own
+A `VERIFIER REFUSED: <path> <why>` line, or `VERIFIER REFUSED: PATH entry '<entry>' <why>`, leaves
+`sn` empty, and the call after it fails: stop and say so, quoting the line. The verifier is an installed release: one that runs this checkout's own
 source is the branch's.
 
 ## The gate

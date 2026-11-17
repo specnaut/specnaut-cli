@@ -15,14 +15,111 @@
 # checkout's git directory is refused, and so is one whose copy cannot be told
 # absent (a file, or a folder the hook may not search, on the way to it), which
 # the binary refuses too. A lock with no `specnaut` on PATH to judge it stops
-# the call.
-input=$(cat)
+# the call, and so does one whose PATH held an entry the hook dropped, or whose
+# `specnaut` resolves into the tree: the lock is not judged by what the tree
+# may have supplied.
 refuse() {
   echo "review-lock: $1" >&2
   exit 2
 }
 dir=$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P) ||
   refuse "cannot enter the project folder"
+# The PATH, cleaned before the first command it names runs. An empty or a relative entry is searched
+# from the working folder, and an entry in the tree finds what a branch put there, so either could
+# supply `git`, `cat` or `specnaut` itself. The hook drops such entries rather than refuse: it runs
+# before every call of every session, review or not, and removal gives the same guarantee. The rule
+# of phases/script-gate.md § Resolving the verifier and of _verifier.sh; one test runs all of them.
+# Builtins only until PATH is exported: git is one of the commands it judges.
+
+# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`,
+# found without git. Empty with none.
+tree_top() {
+  local d=$1
+  top=""
+  while :; do
+    if [ -e "$d/.git" ]; then
+      top=${d:-/}
+      return 0
+    fi
+    [ -n "$d" ] || return 0
+    d=${d%/*}
+  done
+}
+
+# Whether PATH entry $1 can supply a command from the tree, its reason into `why`: empty, not
+# absolute, a `.` or `..` component, or in the tree under `top`.
+entry_unsafe() {
+  why=""
+  case $1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /$1/ in */./* | */../*) [ -n "$why" ] || why="has a . or .. component" ;; esac
+  [ -n "$why" ] || entry_in_tree "$1"
+}
+
+# Whether the absolute entry $1 is in the tree, `why` naming how. Its longest part that is there
+# is entered with `cd -P`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by `-ef`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=$1
+  while ! [ -e "$a" ] && ! [ -L "$a" ]; do
+    a=${a%/*}
+    a=${a:-/}
+  done
+  if ! a=$(cd -P "$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do
+    a=${a%/*}
+    a=${a:-/}
+  done
+  [ "$a" -ef "$top" ] || return 1
+  why="is inside the repository"
+}
+
+# PATH rebuilt from the entries the rule keeps, in order, and exported, so every command of this
+# hook and the binary it starts resolve on it; the first entry dropped, and why, into `dropped`.
+# With none kept, `/dev/null`: an empty PATH is searched from the working folder.
+clean_path() {
+  local rest=${PATH-}: e kept=""
+  dropped=""
+  while [ -n "$rest" ]; do
+    e=${rest%%:*}
+    rest=${rest#*:}
+    if ! entry_unsafe "$e"; then
+      kept=${kept:+$kept:}$e
+    elif [ -z "$dropped" ]; then
+      dropped="PATH entry '$e' $why"
+    fi
+  done
+  export PATH=${kept:-/dev/null}
+}
+
+# `specnaut`, into `sn`, as _verifier.sh's resolve_specnaut resolves it: the physical file, each
+# link followed one hop at a time, neither its folder nor a link on the way in the tree. A refusal
+# leaves `why` naming the path and the reason; no `specnaut` on the PATH leaves it empty.
+resolve_sn() {
+  local p d a t n=0
+  sn="" why=""
+  p=$(command -v specnaut) || return 1
+  case $p in /*) ;; *) why="is not an absolute path" ;; esac
+  while [ -z "$why" ]; do
+    if ! d=$(cd -P "${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
+    p="$d/${p##*/}"; a=$d
+    while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+    if [ "$a" -ef "$top" ]; then why="is inside the repository"; break; fi
+    if ! [ -L "$p" ]; then sn=$p; return 0; fi
+    n=$((n + 1)); if [ "$n" -gt 40 ]; then why="links more than 40 times"; break; fi
+    if ! t=$(readlink "$p"); then why="is a link that cannot be read"; break; fi
+    case $t in /*) p=$t ;; *) p="$d/$t" ;; esac
+  done
+  why="$p $why"
+  return 1
+}
+tree_top "$dir"
+top=${top:-$dir}
+clean_path
+input=$(cat)
 # The same pattern as isSessionId (src/domain/session_record.ts).
 id_pattern='^\{"session_id":"([A-Za-z0-9][A-Za-z0-9_-]{0,127})"'
 id=""
@@ -81,8 +178,12 @@ if [ "$mine" = 0 ]; then
     [ -e "$own" ] || [ -L "$own" ] || ! absent "$own" || exit 0
   fi
 fi
-command -v specnaut >/dev/null 2>&1 ||
+[ -z "$dropped" ] ||
+  refuse "VERIFIER REFUSED: $dropped - start the session from a shell without that entry"
+if ! resolve_sn; then
+  [ -z "$why" ] || refuse "VERIFIER REFUSED: $why"
   refuse "a review lock is held here and specnaut is not on PATH to judge this call"
+fi
 cd "$dir" || refuse "cannot enter the project folder"
-printf '%s' "$input" | specnaut review guard && exit 0
+printf '%s' "$input" | "$sn" review guard && exit 0
 exit 2

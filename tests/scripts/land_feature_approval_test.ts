@@ -4,8 +4,8 @@ import { git, hermetic, run, type Sandbox, sandbox } from "./git_sandbox.ts";
 
 /**
  * land-feature.sh with the CLI from source as its verifier: a `specnaut` the branch put inside the
- * repository is refused before it runs, the same file outside it is not, and the digests a yes
- * covers land only while the binary says they still hold.
+ * repository is refused before it runs, whether its folder or a link names it, the same file
+ * outside it is not, and the digests a yes covers land only while the binary says they still hold.
  */
 
 const POSIX = Deno.build.os !== "windows";
@@ -63,6 +63,17 @@ Deno.test({
       assertEquals(r.code, 13, r.stderr);
       assertStringIncludes(
         r.stderr,
+        `VERIFIER REFUSED: PATH entry '${inside}' is inside the repository`,
+      );
+      await nothingLanded(sb, before);
+      // A folder outside holding a link to the branch's file: the entry passes, the file does not.
+      const links = join(sb.root, "links");
+      await Deno.mkdir(links);
+      await Deno.symlink(join(inside, "specnaut"), join(links, "specnaut"));
+      const linked = await landFrom(sb, links);
+      assertEquals(linked.code, 13, linked.stderr);
+      assertStringIncludes(
+        linked.stderr,
         `VERIFIER REFUSED: ${inside}/specnaut is inside the repository`,
       );
       await nothingLanded(sb, before);

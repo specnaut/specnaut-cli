@@ -4,6 +4,7 @@ import { bundleForLock } from "../../src/application/lock_bundle.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { hookTools } from "./hook_tools.ts";
 import { LOCK } from "./verify_scripts_fixture.ts";
 
 /**
@@ -19,6 +20,9 @@ const HOOK = fromFileUrl(
 async function runHook(input: string, stubExit: number, path?: string, project?: string) {
   const dir = await Deno.makeTempDir({ prefix: "review-hook-" });
   try {
+    // A project of its own: the stub's folder, inside it, would be a PATH entry the hook drops.
+    const here = project ?? join(dir, "project");
+    if (project === undefined) await Deno.mkdir(here);
     const seen = join(dir, "seen");
     const held = join(dir, "held");
     const stub = `#!/usr/bin/env bash\n{ echo "$*"; cat; } >"${seen}"\n` +
@@ -27,7 +31,7 @@ async function runHook(input: string, stubExit: number, path?: string, project?:
     await Deno.writeTextFile(join(dir, "specnaut"), stub, { mode: 0o755 });
     const out = await new Deno.Command("bash", {
       args: [HOOK],
-      env: { PATH: path ?? `${dir}:${Deno.env.get("PATH")}`, CLAUDE_PROJECT_DIR: project ?? dir },
+      env: { PATH: path ?? `${dir}:${await hookTools()}`, CLAUDE_PROJECT_DIR: here },
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",

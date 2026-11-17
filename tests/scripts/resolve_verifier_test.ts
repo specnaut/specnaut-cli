@@ -1,164 +1,155 @@
 import { assertEquals } from "@std/assert";
-import { DELIMITER, fromFileUrl, join } from "@std/path";
-import { git, run } from "./git_sandbox.ts";
+import { DELIMITER, join } from "@std/path";
+import { type Answer, answers, CALL, hook } from "./resolve_verifier_fixture.ts";
+import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
 
 /**
- * The rule that resolves `specnaut` before it runs has two spellings that cannot share code:
- * `phases/script-gate.md` § Resolving the verifier, which runs before any script of the tree is
- * trusted, and `resolve_specnaut` in `_verifier.sh`, which `land-feature.sh` sources. One table of
- * PATHs runs both, and each case must get the same answer from each: the physical file, or a
- * refusal naming why.
+ * The rule that judges the PATH and resolves `specnaut` before anything runs has five spellings
+ * that cannot share code: `phases/script-gate.md` § Resolving the verifier, which runs before any
+ * script of the tree is trusted; `_verifier.sh`, which `land-feature.sh` sources; and the three
+ * Claude Code hooks, which run before any of them. One table of PATHs runs all five, and each case
+ * must get the same answer from each.
+ *
+ * A PATH entry that is empty, relative, holds a `.` or `..`, or sits in the tree can supply any
+ * command the scripts look up, and the branch under review or being landed can put one there.
+ * The doc block and the landing refuse such a PATH, naming its first entry. The hooks run before
+ * every tool call of every session, so a refusal would stop work that has nothing to do with a
+ * review: they drop the entries instead, and the binary they start is given what is left. The one
+ * hook that judges a held lock refuses, as the landing does, before handing anything over.
  */
 
-const ROOT = new URL("../../templates/core/", import.meta.url);
-const LIB = fromFileUrl(new URL("specnaut/scripts/bash/_verifier.sh", ROOT));
-
-/** The bash block after the resolve anchor in the gate doc, as written. */
-function docBlock(): string {
-  const doc = Deno.readTextFileSync(new URL("skills/task/phases/script-gate.md", ROOT));
-  const after = doc.split("<!-- script-gate: resolve-verifier -->")[1];
-  const m = /^\s*```bash\n([\s\S]*?)\n```/.exec(after ?? "");
-  if (!m) throw new Error("script-gate.md lost its resolve block");
-  return m[1];
-}
-
-/** `resolve_specnaut` as land-feature.sh runs it: its shell options, alias and ERR trap first. */
-const LAND = `set -Eeuo pipefail
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
-trap 'echo "ERR trap: $BASH_COMMAND" >&2; exit 12' ERR
-. '${LIB}'
-resolve_specnaut`;
-
-type Answer = { resolved: string } | { refused: string };
-
-/** Each spelling's answer, `PATH` set to `path` in `cwd`; bash itself is named by its full path. */
-async function answers(bash: string, path: string, cwd: string): Promise<Answer[]> {
-  const env = { PATH: path };
-  const doc = await run(bash, ["-c", `${docBlock()}\nprintf 'SN %s\\n' "$sn"`], cwd, env);
-  const land = await run(bash, ["-c", `${LAND}\nprintf 'SN %s\\n' "$sn"`], cwd, env);
-  const sn = (out: string) => /^SN (.+)$/m.exec(out)?.[1];
-  const why = (out: string) =>
-    /VERIFIER REFUSED: \S+ (.+?)( - could not judge.*)?$/m.exec(out)?.[1];
-  const docAnswer: Answer = sn(doc.stdout)
-    ? { resolved: sn(doc.stdout)! }
-    : { refused: why(doc.stdout) ?? `no refusal line: ${doc.stdout}${doc.stderr}` };
-  const landAnswer: Answer = land.code === 0 && sn(land.stdout)
-    ? { resolved: sn(land.stdout)! }
-    : land.code === 13
-    ? { refused: why(land.stderr) ?? `no refusal line: ${land.stderr}` }
-    : { refused: `exit ${land.code}: ${land.stderr}` };
-  return [docAnswer, landAnswer];
-}
-
-async function stub(dir: string): Promise<string> {
-  await Deno.mkdir(dir, { recursive: true });
-  const file = join(dir, "specnaut");
-  await Deno.writeTextFile(file, "#!/bin/sh\necho stub\n");
-  await Deno.chmod(file, 0o755);
-  return file;
-}
-
-/** One PATH, where it runs from, and the answer both spellings must give. */
-type Case = { name: string; path: string; cwd: string; expect: Answer; skip?: string };
-
-/** The folders and files the cases name, all under one physical temp folder. */
-type Layout = {
-  tmp: string;
-  repo: string;
-  tools: string;
-  inRepo: string;
-  outside: string;
-  sibling: string;
-  caseBlind: boolean;
+/** One PATH, where it runs from, and either its first unsafe entry or the answer past the PATH. */
+type Case = {
+  name: string;
+  entries: string[];
+  cwd: string;
+  bad?: [index: number, why: string];
+  spec?: Answer;
+  skip?: string;
 };
 
-/** A folder holding only the tools both spellings run, each a link to the real one. */
-async function toolsIn(tmp: string): Promise<string> {
-  const tools = join(tmp, "tools");
-  await Deno.mkdir(tools);
-  for (const tool of ["git", "readlink"]) {
-    const real = (await run("bash", ["-c", `command -v ${tool}`], tmp)).stdout.trim();
-    await Deno.symlink(real, join(tools, tool));
-  }
-  return tools;
+const RELATIVE = "is not an absolute path";
+const INSIDE = "is inside the repository";
+
+/** A case whose first entry is bad, followed by a stub outside and the tools folder. */
+function bad(l: Layout, name: string, entry: string, why: string, cwd = l.repo): Case {
+  return { name, entries: [entry, join(l.tmp, "outside", "real"), l.tools], cwd, bad: [0, why] };
 }
 
-/** A repository, stubs inside, outside and beside it, and the tools. */
-async function layout(tmp: string): Promise<Layout> {
-  const repo = join(tmp, "repo");
-  await Deno.mkdir(repo);
-  await git(repo, "init", "--quiet");
-  const l: Layout = {
-    tmp,
-    repo,
-    tools: await toolsIn(tmp),
-    inRepo: await stub(join(repo, "bin")),
-    outside: await stub(join(tmp, "outside", "real")),
-    sibling: await stub(join(tmp, "repo-x", "bin")),
-    caseBlind: await Deno.stat(join(tmp, "REPO", "bin")).then(() => true, () => false),
-  };
-  await links(l);
-  return l;
-}
-
-/** A linked parent, links across the repository's edge both ways, and a chain of relative links. */
-async function links(l: Layout) {
-  await Deno.symlink(l.repo, join(l.tmp, "alias"));
-  await Deno.mkdir(join(l.tmp, "outside", "links"));
-  await Deno.symlink(l.inRepo, join(l.tmp, "outside", "links", "specnaut"));
-  await Deno.mkdir(join(l.repo, "linkbin"));
-  await Deno.symlink(l.outside, join(l.repo, "linkbin", "specnaut"));
-  const chain = join(l.tmp, "outside", "chain");
-  await Deno.mkdir(chain);
-  await Deno.symlink(l.outside, join(chain, "c2"));
-  await Deno.symlink("c2", join(chain, "c1"));
-  await Deno.symlink("../chain/c1", join(chain, "specnaut"));
-}
-
-const inside = { refused: "is inside the repository" };
-const relative = { refused: "is not an absolute path" };
-
-/** Every case, its PATH ending with the tools folder. */
-function casesFor(l: Layout): Case[] {
-  const at = (...entries: string[]) => [...entries, l.tools].join(DELIMITER);
-  const bin = join(l.repo, "bin");
+/** Entries that are not absolute paths: searched from the working folder, which holds markers. */
+function spelledBad(l: Layout): Case[] {
+  const o = join(l.tmp, "outside", "real");
   // deno-fmt-ignore
   return [
-    { name: "a relative entry", path: at("bin"), cwd: l.repo, expect: relative },
-    { name: "an empty entry", path: `${DELIMITER}${l.tools}`, cwd: bin, expect: relative },
-    { name: "a `.` entry", path: at("."), cwd: bin, expect: relative },
-    { name: "no specnaut at all", path: l.tools, cwd: l.repo, expect: { refused: "is not on the PATH" } },
-    { name: "an in-repo folder", path: at(bin), cwd: l.repo, expect: inside },
-    { name: "an in-repo folder through a linked parent", path: at(join(l.tmp, "alias", "bin")), cwd: l.repo, expect: inside },
-    { name: "a link outside naming an in-repo file", path: at(join(l.tmp, "outside", "links")), cwd: l.repo, expect: inside },
-    { name: "a link inside naming an outside file", path: at(join(l.repo, "linkbin")), cwd: l.repo, expect: inside },
-    { name: "the repository named in another case", path: at(join(l.tmp, "REPO", "bin")), cwd: l.repo, expect: inside, skip: l.caseBlind ? undefined : "this file system tells case apart" },
-    { name: "a sibling `<repo>-x`", path: at(join(l.tmp, "repo-x", "bin")), cwd: l.repo, expect: { resolved: l.sibling } },
-    { name: "a chain of relative links outside", path: at(join(l.tmp, "outside", "chain")), cwd: l.repo, expect: { resolved: l.outside } },
-    { name: "outside the repository", path: at(join(l.tmp, "outside", "real")), cwd: l.repo, expect: { resolved: l.outside } },
+    bad(l, "a relative entry", "bin", RELATIVE),
+    bad(l, "a leading empty entry", "", "is empty", l.bin),
+    { name: "a middle empty entry", entries: [o, "", l.tools], cwd: l.bin, bad: [1, "is empty"] },
+    { name: "a trailing empty entry", entries: [o, l.tools, ""], cwd: l.bin, bad: [2, "is empty"] },
+    bad(l, "a `.` entry", ".", RELATIVE, l.bin),
+    bad(l, "a `~` entry, a `~` folder in the working folder", "~/bin", RELATIVE),
   ];
 }
 
+/** Absolute entries that reach into the tree, however they are spelled. */
+function inTree(l: Layout): Case[] {
+  const t = (...p: string[]) => join(l.tmp, ...p);
+  const blind = l.caseBlind ? undefined : "this file system tells case apart";
+  // deno-fmt-ignore
+  return [
+    bad(l, "an in-repo folder", l.bin, INSIDE),
+    bad(l, "an in-repo folder not made yet", join(l.repo, "nothere"), INSIDE),
+    bad(l, "an in-repo folder through a linked parent", t("alias", "bin"), INSIDE),
+    bad(l, "a link outside naming an in-repo folder", t("binlink"), INSIDE),
+    bad(l, "a missing tail under a link into the repository", t("alias", "nothere", "bin"), INSIDE),
+    // Spelled by hand: join() would fold the `..` away.
+    bad(l, "a `..` component", `${l.tmp}/outside/../repo/bin`, "has a . or .. component"),
+    bad(l, "a dangling link on the way", t("dangling", "bin"), "names a folder that cannot be entered"),
+    bad(l, "an in-repo folder holding a link outside", join(l.repo, "linkbin"), INSIDE),
+    { ...bad(l, "the repository named in another case", t("REPO", "bin"), INSIDE), skip: blind },
+  ];
+}
+
+/** PATHs every entry of which is kept: the answer is `specnaut`'s resolution. */
+function pastThePath(l: Layout): Case[] {
+  const t = (...p: string[]) => join(l.tmp, ...p);
+  const kept = (name: string, entry: string, spec: Answer): Case => ({
+    name,
+    entries: [entry, l.tools],
+    cwd: l.repo,
+    spec,
+  });
+  // deno-fmt-ignore
+  return [
+    kept("a sibling `<repo>-x`", t("repo-x", "bin"), { resolved: l.sibling }),
+    kept("a chain of relative links outside", t("outside", "chain"), { resolved: l.outside }),
+    kept("outside the repository", t("outside", "real"), { resolved: l.outside }),
+    kept("a link outside naming an in-repo file", t("outside", "links"), { refused: INSIDE }),
+    { name: "no specnaut at all", entries: [l.tools], cwd: l.repo, spec: { refused: "is not on the PATH" } },
+  ];
+}
+
+/**
+ * What `spelling` must answer. A bad entry: refused by name, except by the hooks that clean the
+ * PATH, whose binary runs with that entry gone. Otherwise the answer past the PATH, which the hooks
+ * give with the PATH their binary saw; with no `specnaut`, the lock stops the call and the others
+ * let it through, and the record is never more than a silent exit.
+ */
+function expected(c: Case, spelling: string, l: Layout): Answer | undefined {
+  const cleans = spelling === "gate" || spelling === "record";
+  const joined = (entries: string[]) => entries.join(DELIMITER);
+  if (c.bad) {
+    const [i, why] = c.bad;
+    if (!cleans) return { refused: why, entry: c.entries[i] };
+    return { resolved: l.outside, path: joined(c.entries.filter((_, j) => j !== i)) };
+  }
+  if (spelling === "landScript") return undefined;
+  const spec = c.spec!;
+  const hook = cleans || spelling === "lock";
+  if ("resolved" in spec) return hook ? { ...spec, path: joined(c.entries) } : spec;
+  if ("refused" in spec && spec.refused === "is not on the PATH" && hook) {
+    return { exit: cleans ? 0 : 2 };
+  }
+  return spelling === "record" ? { exit: 0 } : spec;
+}
+
 Deno.test({
-  name: "both spellings of the verifier's resolution answer every case alike",
+  name: "every spelling of the PATH check and the verifier's resolution answers every case alike",
   // Symlinks need a privilege Windows runners lack, and the stub needs POSIX exec bits.
   ignore: Deno.build.os === "windows",
-  fn: async () => {
-    const tmp = await Deno.realPath(await Deno.makeTempDir({ prefix: "resolve-verifier-" }));
-    try {
-      const bash = (await run("bash", ["-c", "command -v bash"], tmp)).stdout.trim();
-      for (const c of casesFor(await layout(tmp))) {
+  fn: () =>
+    inLayout(async (l, shells) => {
+      for (const c of [...spelledBad(l), ...inTree(l), ...pastThePath(l)]) {
         if (c.skip) {
           console.warn(`skipped "${c.name}": ${c.skip}`);
           continue;
         }
-        const [doc, land] = await answers(bash, c.path, c.cwd);
-        assertEquals(doc, c.expect, `the gate doc, ${c.name}`);
-        assertEquals(land, c.expect, `_verifier.sh, ${c.name}`);
+        const got = await answers(l, { entries: c.entries, cwd: c.cwd, ...shells });
+        for (const [spelling, answer] of Object.entries(got)) {
+          const want = expected(c, spelling === "zsh" ? "doc" : spelling, l);
+          if (want) assertEquals(answer, want, `${spelling}, ${c.name}`);
+        }
+        assertEquals(await fired(l), "", `a command the PATH entry supplied ran, ${c.name}`);
       }
-    } finally {
-      await Deno.remove(tmp, { recursive: true });
-    }
-  },
+    }),
+});
+
+Deno.test({
+  name:
+    "with an in-repo PATH entry and no lock, the call runs and the pass is still removed, by the real tools",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout(async (l, { bash }) => {
+      await Deno.remove(join(l.state, "specnaut", "review-lock", "s-1.json"));
+      // The markers' folder first: had it been searched, its `git` and `rm` would have run.
+      const r = { entries: [l.bin, join(l.tmp, "outside", "real"), l.tools], cwd: l.repo, bash };
+      assertEquals(await hook(l, r, "review-lock.sh", CALL), { exit: 0 }, "no lock");
+      const pass = join(l.repo, ".git", "specnaut", "review-pass.json");
+      await Deno.mkdir(join(l.repo, ".git", "specnaut"));
+      await Deno.writeTextFile(pass, "{}\n");
+      const ls = '{"tool_input":{"command":"ls"}}';
+      assertEquals(await hook(l, r, "review-gate.sh", ls), { exit: 0 }, "a command not a review");
+      const left = await Deno.lstat(pass).then(() => true, () => false);
+      assertEquals(left, false, "the pass outlived ls");
+      assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
+    }),
 });

@@ -34,7 +34,8 @@
 #   13 HEAD's instructions or helper scripts are neither trusted nor the
 #      digest passed, as the verifier judges them (without --scripts-digest
 #      only a local base ahead of origin passes, to exit 6); or it could not
-#      judge HEAD, or `specnaut` resolved to a path it refuses (VERIFIER REFUSED);
+#      judge HEAD, or `specnaut` resolved to a path it refuses, or the PATH holds an
+#      empty, relative or in-repository entry (VERIFIER REFUSED, naming it);
 #      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
 #      Nothing moved
 # (8 is retired: a branch that will not delete after the push is 11, never
@@ -61,7 +62,10 @@ export GIT_OPTIONAL_LOCKS=0
 # `if`, and a function's body escapes the caller's `if` under -E.
 shopt -s expand_aliases
 alias git='git -c core.hooksPath=/dev/null'
-here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# This script's folder, read with builtins: the PATH is judged before any command it names runs.
+here=${BASH_SOURCE[0]}
+case $here in */*) here=${here%/*} ;; *) here=. ;; esac
+here=$(CDPATH="" cd "${here:-/}" && pwd)
 # `set -e` alone would exit with git's own code, which no table lists.
 # In a command substitution the trap only passes the code out: the line that ran it decides, by its
 # own `||` or by this trap, as it did before -E.
@@ -74,6 +78,8 @@ trap 'unexpected $? "$BASH_COMMAND"' ERR
 
 # shellcheck source=./_verifier.sh
 . "$here/_verifier.sh"
+# Before the first command looked up on the PATH: `bash` below is one.
+refuse_unsafe_path
 
 usage="usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]"
 scripts_digest=""

@@ -4,6 +4,73 @@
 # `base`, `scripts_digest` and `instructions_digest` are set before the calls.
 # Exit 13 is land-feature.sh's: its header says what the code means.
 
+# The PATH, judged before the first command it names runs - `bash`, `git` and `specnaut` are all
+# looked up on it. An empty or a relative entry is searched from the working folder, and an entry
+# in the tree finds what the branch put there, so either can supply any command: the first one is
+# refused by name. Builtins only, git included: it is one of those commands. The rule of
+# phases/script-gate.md § Resolving the verifier and of the Claude Code hooks; one test runs all.
+refuse_unsafe_path() {
+  local rest=${PATH-}: e top why
+  tree_top "$(pwd -P)"
+  if [ -z "$top" ]; then
+    echo "land-feature: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was landed" >&2
+    exit 13
+  fi
+  while [ -n "$rest" ]; do
+    e=${rest%%:*}
+    rest=${rest#*:}
+    entry_unsafe "$e" || continue
+    echo "land-feature: VERIFIER REFUSED: PATH entry '$e' $why - start the session from a shell without that entry. Nothing was landed" >&2
+    exit 13
+  done
+}
+
+# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`,
+# found without git. Empty with none.
+tree_top() {
+  local d=$1
+  top=""
+  while :; do
+    if [ -e "$d/.git" ]; then
+      top=${d:-/}
+      return 0
+    fi
+    [ -n "$d" ] || return 0
+    d=${d%/*}
+  done
+}
+
+# Whether PATH entry $1 can supply a command from the tree, its reason into `why`: empty, not
+# absolute, a `.` or `..` component, or in the tree under `top`.
+entry_unsafe() {
+  why=""
+  case $1 in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
+  case /$1/ in */./* | */../*) [ -n "$why" ] || why="has a . or .. component" ;; esac
+  [ -n "$why" ] || entry_in_tree "$1"
+}
+
+# Whether the absolute entry $1 is in the tree, `why` naming how. Its longest part that is there
+# is entered with `cd -P`, every link on it followed - a link to a folder of the tree is in the
+# tree - and walked up against the top by `-ef`, so neither case nor a spelling hides it. A part
+# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+entry_in_tree() {
+  local a=$1
+  while ! [ -e "$a" ] && ! [ -L "$a" ]; do
+    a=${a%/*}
+    a=${a:-/}
+  done
+  if ! a=$(cd -P "$a" 2>/dev/null && pwd); then
+    why="names a folder that cannot be entered"
+    return 0
+  fi
+  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do
+    a=${a%/*}
+    a=${a:-/}
+  done
+  [ "$a" -ef "$top" ] || return 1
+  why="is inside the repository"
+}
+
 # The verifier, resolved before it runs, into `sn`: `specnaut` on the PATH must be an absolute
 # path, and neither its folder nor any link on the way to it may sit in this repository - the PATH
 # can name a folder of the tree, where the branch being landed puts a `specnaut` of its own. Each

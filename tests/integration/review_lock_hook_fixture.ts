@@ -1,4 +1,5 @@
 import { fromFileUrl, join } from "@std/path";
+import { hookTools } from "./hook_tools.ts";
 
 /**
  * The `PreToolUse` hook that runs `specnaut review guard`, as Claude Code runs it: its input on
@@ -30,7 +31,7 @@ export async function runHook(
     const stub = `#!/usr/bin/env bash\n{ echo "$*"; cat; } >"${seen}"\nexit ${stubExit}\n`;
     await Deno.writeTextFile(join(bin, "specnaut"), stub, { mode: 0o755 });
     const env = {
-      PATH: path ?? `${bin}:${Deno.env.get("PATH")}`,
+      PATH: path ?? `${bin}:${await hookTools()}`,
       CLAUDE_PROJECT_DIR: project,
       XDG_STATE_HOME: STATE,
       ...more.env,
