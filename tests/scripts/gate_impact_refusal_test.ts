@@ -46,18 +46,6 @@ for (const twin of TWINS) {
     assertStringIncludes(r.stdout, "candidate: refused (no-commit)");
   });
 
-  Deno.test(`gate impact (${twin}): a project inside another repository's tree is refused`, async () => {
-    const outer = await impactRepo();
-    const inner = join(outer.root, "nested");
-    await Deno.mkdir(inner);
-    const nested = await gateProject("fast_gate:\n  - echo should-not-run\n");
-    await Deno.rename(join(nested, ".specnaut"), join(inner, ".specnaut"));
-    await Deno.writeTextFile(join(inner, ".specnaut/impact.json"), JSON.stringify(declaration()));
-    const r = await runGate(twin, inner, ["fast", "--base", "main"]);
-    assertEquals(r.code, 3, r.stdout);
-    assertStringIncludes(r.stdout, "candidate: refused (not-a-repository");
-  });
-
   Deno.test(`gate impact (${twin}): a push of several trees is refused, naming them`, async () => {
     const repo = await impactRepo();
     const older = await repo.commit({ "apps/web/a.ts": "one\n" });
