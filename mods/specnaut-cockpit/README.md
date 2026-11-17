@@ -2,24 +2,23 @@
 
 A [Claude Code mod](https://code.claude.com/docs/en/plugins/mods/overview) for developers who work
 with Specnaut in Claude Code. It shows how much of your usage limits is spent, keeps a local history
-of what your work costs, follows the `/specnaut` chain as the autopilot runs it, and stops the
-autopilot cleanly before a limit would cut a phase off halfway.
+of what your work costs, and stops the autopilot cleanly before a limit would cut a phase off
+halfway.
 
 ## What it shows
 
 A band above the prompt, sized to your terminal:
 
 ```text
-5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ implement ● review ○ merge ○
+5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12
 ```
 
 - **5h / 7d**: the 5-hour and weekly usage windows, with the time until each resets. Yellow from the
   warning threshold, red from the hold threshold.
 - **ctx**: how full the context window is.
 - **$**: what this session has cost so far.
-- **▸**: where the Specnaut chain is: done ✓, in progress ●, still to come ○.
 
-A narrow terminal drops the reset times and the chain's detail first. The windows stay.
+A narrow terminal drops the reset times first, then context and cost. The windows stay.
 
 A toast announces each window once when it crosses the warning threshold, and once more at the hold
 threshold. It does not repeat on every turn.
@@ -58,7 +57,7 @@ Set these in `/config` or with `/plugin configure specnaut-cockpit@specnaut-mark
 The band, the pane and the toasts appear in Claude Code in a terminal and in the Code tab of the
 desktop app. In the IDE extension's chat panel and in `claude -p`, nothing is drawn, but the hold
 still applies. Rate-limit windows appear on plans that have them. With an API key, the band shows
-context, cost and the chain.
+context and cost.
 
 ## Privacy
 

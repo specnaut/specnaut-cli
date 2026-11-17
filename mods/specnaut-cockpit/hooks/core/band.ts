@@ -1,10 +1,9 @@
 // The band above the prompt, as segments of text and tone, sized to its width.
 //
 // It is built in decreasing detail and the first form that fits wins, so a
-// narrow terminal loses the reset times and the chain's detail before it loses
+// narrow terminal loses the reset times, then context and cost, before it loses
 // a limit: the windows are the reason the band exists.
 
-import { chainLine, chainShort, type ChainState } from "./chain.ts";
 import {
   formatCost,
   formatPercent,
@@ -19,24 +18,17 @@ import {
 
 export type Segment = { text: string; tone: Tone | "dim" };
 
-type Detail = {
-  resets: boolean;
-  context: boolean;
-  cost: boolean;
-  chain: "full" | "short" | "none";
-};
+type Detail = { resets: boolean; context: boolean; cost: boolean };
 
 const FORMS: Detail[] = [
-  { resets: true, context: true, cost: true, chain: "full" },
-  { resets: true, context: true, cost: true, chain: "short" },
-  { resets: false, context: true, cost: true, chain: "short" },
-  { resets: false, context: false, cost: false, chain: "short" },
-  { resets: false, context: false, cost: false, chain: "none" },
+  { resets: true, context: true, cost: true },
+  { resets: false, context: true, cost: true },
+  { resets: false, context: false, cost: false },
 ];
 
 const SEP: Segment = { text: " · ", tone: "dim" };
 
-function build(r: Reading | null, chain: ChainState, t: Thresholds, now: number, d: Detail) {
+function build(r: Reading | null, t: Thresholds, now: number, d: Detail) {
   const groups: Segment[][] = [];
   for (const w of ordered(r?.windows ?? [])) {
     const eta = d.resets ? untilReset(w.resetsAt, now) : undefined;
@@ -55,8 +47,6 @@ function build(r: Reading | null, chain: ChainState, t: Thresholds, now: number,
   if (d.cost && r?.costUsd !== undefined) {
     groups.push([{ text: formatCost(r.costUsd), tone: "normal" }]);
   }
-  const line = d.chain === "full" ? chainLine(chain) : d.chain === "short" ? chainShort(chain) : "";
-  if (line) groups.push([{ text: `▸ ${line}`, tone: "normal" }]);
   return groups.flatMap((g, i) => (i === 0 ? g : [SEP, ...g]));
 }
 
@@ -67,14 +57,13 @@ export function width(segments: readonly Segment[]): number {
 /** The most detailed form that fits in `columns`; [] when there is nothing to show. */
 export function bandSegments(
   r: Reading | null,
-  chain: ChainState,
   t: Thresholds,
   columns: number,
   now: number,
 ): Segment[] {
   let last: Segment[] = [];
   for (const d of FORMS) {
-    last = build(r, chain, t, now, d);
+    last = build(r, t, now, d);
     if (width(last) <= columns) return last;
   }
   return last;

@@ -20,3 +20,7 @@ and notarized, so the Keychain keeps "Always Allow" across `self-update`.
 `specnaut upgrade` declared, so the `specnaut-cockpit` mod never loaded. The marketplace is now
 declared in a form Claude Code refreshes, still pinned to your Specnaut release, and the next
 `specnaut upgrade` repairs a project's existing declaration.
+
+**The Cockpit no longer draws the chain.** The `plan ● implement ○ …` segment of the band and the
+pane's chain row stayed "in progress" long after a chain had stopped, so they are gone. Usage
+windows, context, cost and the quota hold are unchanged.

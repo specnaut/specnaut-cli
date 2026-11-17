@@ -96,7 +96,7 @@ test(
   },
 );
 
-test("below the threshold the chain goes through, and the band shows its phase", async ($, on) => {
+test("below the threshold the chain goes through, and the band draws no chain", async ($, on) => {
   world(on);
   let ran = false;
   on("tool.call", { tool: "Skill" }, () => {
@@ -107,7 +107,7 @@ test("below the threshold the chain goes through, and the band shows its phase",
   await $.tool.call({ tool: "Skill", skill: "task", args: "implement" });
   expect(ran).toBe(true);
   const ui = await $.ui.mount(band());
-  expect(await ui.find({ type: "Text", text: /implement ●/ })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /implement|▸/ })).toBeUndefined();
   expect(await ui.find({ type: "Text", text: /5h/ })).toBeDefined();
   await ui.unmount();
 });

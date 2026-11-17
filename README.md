@@ -117,9 +117,9 @@ per-harness tool-mapping references. The website and documentation source live i
 ## Claude Code cockpit
 
 If you work in Claude Code, the **Specnaut Cockpit** mod puts your usage limits in front of you: the
-5-hour and weekly windows with their reset times, the context fill, the session's cost, and the
-chain's progress while the autopilot runs. It sits in a band above the prompt. `/cockpit` opens a
-pane with seven days of history, per day and per branch, kept on your machine.
+5-hour and weekly windows with their reset times, the context fill, and the session's cost. It sits
+in a band above the prompt. `/cockpit` opens a pane with seven days of history, per day and per
+branch, kept on your machine.
 
 It also stops the autopilot **cleanly**: when a window reaches 90%, the chain halts before
 `implement`, `review` or `merge` instead of being cut off halfway, and resumes with `/task <phase>`

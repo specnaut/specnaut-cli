@@ -3,7 +3,6 @@
 // them to elements.
 
 import type { Segment } from "./band.ts";
-import { chainLine, type ChainState } from "./chain.ts";
 import { type History, lastDays, topBranches } from "./history.ts";
 import {
   formatCost,
@@ -37,13 +36,12 @@ function dayLabel(day: string): string {
 
 export function paneRows(input: {
   reading: Reading | null;
-  chain: ChainState;
   history: History;
   today: string;
   thresholds: Thresholds;
   now: number;
 }): Row[] {
-  const { reading, chain, history, today, thresholds: t, now } = input;
+  const { reading, history, today, thresholds: t, now } = input;
   const rows: Row[] = [heading("Limits")];
   const windows = ordered(reading?.windows ?? []);
   if (windows.length === 0) {
@@ -79,8 +77,6 @@ export function paneRows(input: {
     reading?.costUsd !== undefined ? `cost ${formatCost(reading.costUsd)}` : "",
   ].filter(Boolean);
   rows.push([{ text: `  ${parts.join(" · ") || "nothing measured yet"}`, tone: "normal" }]);
-  const line = chainLine(chain);
-  if (line) rows.push([{ text: `  chain  ${line}`, tone: "normal" }]);
 
   rows.push([], heading("Last 7 days"));
   const days = lastDays(history, today);

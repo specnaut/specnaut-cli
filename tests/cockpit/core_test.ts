@@ -8,14 +8,6 @@ import {
   type Window,
 } from "../../mods/specnaut-cockpit/hooks/core/usage.ts";
 import { alertsFor } from "../../mods/specnaut-cockpit/hooks/core/alerts.ts";
-import {
-  advance,
-  chainLine,
-  chainShort,
-  IDLE,
-  promptSubmitted,
-  turnEnded,
-} from "../../mods/specnaut-cockpit/hooks/core/chain.ts";
 import { holdFor, lift } from "../../mods/specnaut-cockpit/hooks/core/hold.ts";
 import { bandSegments, width } from "../../mods/specnaut-cockpit/hooks/core/band.ts";
 import {
@@ -105,29 +97,9 @@ Deno.test("jumping past both thresholds announces the higher one only", () => {
   assertEquals(r.toasts, ["weekly usage window at 93%"]);
 });
 
-// ── chain ── which routers are recognised: chain_routers_test.ts ─────────
-
-Deno.test("the chain line marks done, current and pending phases", () => {
-  const s = advance(IDLE, "implement");
-  assertEquals(chainLine(s), "plan ✓ implement ● review ○ merge ○");
-  assertEquals(chainShort(s), "implement 2/4");
-  assertEquals(chainLine(IDLE), "");
-});
-
-Deno.test("the turn that ran merge finishes the chain; the next plain prompt clears it", () => {
-  let s = turnEnded(advance(IDLE, "merge"));
-  assert(s.finished);
-  assertEquals(chainLine(s), "plan ✓ implement ✓ review ✓ merge ✓");
-  assertEquals(chainShort(s), "merged ✓");
-  s = promptSubmitted(s, null);
-  assertEquals(s, IDLE);
-});
-
-Deno.test("a turn that ends mid-chain keeps the chain in view", () => {
-  const s = advance(IDLE, "review");
-  assertEquals(turnEnded(s), s);
-  assertEquals(promptSubmitted(s, null), s);
-});
+// ── chain ── which router calls the hold sees: chain_routers_test.ts ──────
+// The band and the pane draw no chain (cli#797): a Skill call says a phase
+// starts, never that one finished, so a drawn chain stayed "in progress".
 
 // ── hold ─────────────────────────────────────────────────────────────────
 
@@ -185,33 +157,30 @@ const READING = {
 };
 
 Deno.test("the band shows everything when it fits", () => {
-  const s = bandSegments(READING, advance(IDLE, "implement"), T, 200, NOW);
+  const s = bandSegments(READING, T, 200, NOW);
   const text = s.map((x) => x.text).join("");
-  assertEquals(
-    text,
-    "5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ implement ● review ○ merge ○",
-  );
+  assertEquals(text, "5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12");
   assertEquals(s.find((x) => x.text === "82%")?.tone, "warn");
 });
 
 Deno.test("a narrow band drops detail before it drops a limit", () => {
-  const chain = advance(IDLE, "implement");
   for (const cols of [90, 60, 40, 30]) {
-    const s = bandSegments(READING, chain, T, cols, NOW);
+    const s = bandSegments(READING, T, cols, NOW);
     assert(width(s) <= cols, `${cols} columns: ${s.map((x) => x.text).join("")}`);
     const text = s.map((x) => x.text).join("");
     assertStringIncludes(text, "5h 82%");
     assertStringIncludes(text, "7d 31%");
+    assert(!text.includes("▸"), `${cols} columns drew a chain: ${text}`);
   }
 });
 
-Deno.test("nothing measured and no chain: the band is empty", () => {
-  assertEquals(bandSegments(null, IDLE, T, 120, NOW), []);
-  assertEquals(bandSegments({ windows: [] }, IDLE, T, 120, NOW), []);
+Deno.test("nothing measured: the band is empty", () => {
+  assertEquals(bandSegments(null, T, 120, NOW), []);
+  assertEquals(bandSegments({ windows: [] }, T, 120, NOW), []);
 });
 
-Deno.test("no rate limits (an API key): context, cost and chain still show", () => {
-  const s = bandSegments({ windows: [], contextPercent: 12, costUsd: 0.5 }, IDLE, T, 120, NOW);
+Deno.test("no rate limits (an API key): context and cost still show", () => {
+  const s = bandSegments({ windows: [], contextPercent: 12, costUsd: 0.5 }, T, 120, NOW);
   assertEquals(s.map((x) => x.text).join(""), "ctx 12% · $0.50");
 });
 
@@ -304,7 +273,6 @@ Deno.test("the pane lists limits, the session, seven days and the branches", () 
   });
   const text = paneRows({
     reading: READING,
-    chain: advance(IDLE, "review"),
     history: h,
     today: "2026-10-06",
     thresholds: T,
@@ -314,7 +282,7 @@ Deno.test("the pane lists limits, the session, seven days and the branches", () 
   assertStringIncludes(text, "resets in 2h10");
   assertStringIncludes(text, "holds before implement, review and merge at 90%");
   assertStringIncludes(text, "context 48% · cost $3.12");
-  assertStringIncludes(text, "chain  plan ✓ implement ✓ review ● merge ○");
+  assert(!text.includes("chain"), "the pane draws a chain row");
   assertStringIncludes(text, "Tue 06 (today)");
   assertStringIncludes(text, "peak 5h 82%");
   assertStringIncludes(text, "app · feat/x");
@@ -323,7 +291,6 @@ Deno.test("the pane lists limits, the session, seven days and the branches", () 
 Deno.test("the pane says when the hold is off and when nothing is measured", () => {
   const text = paneRows({
     reading: null,
-    chain: IDLE,
     history: emptyHistory(),
     today: "2026-10-06",
     thresholds: { warnAt: 80, holdAt: 100 },

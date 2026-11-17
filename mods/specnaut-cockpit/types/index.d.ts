@@ -1,5 +1,5 @@
 // The cockpit's session state, as Claude Code requires it: self-contained.
-// The shapes mirror ./hooks/core/ (Window, Reading, ChainState, AlertMemo,
+// The shapes mirror ./hooks/core/ (Window, Reading, AlertMemo,
 // Lifted); `tsc -p` over the mod holds the two together, because the hooks
 // module writes core values into these slots.
 
@@ -11,18 +11,11 @@ export type CockpitReading = {
   costUsd?: number;
 };
 
-export type CockpitChain = {
-  current: "plan" | "implement" | "review" | "merge" | null;
-  finished: boolean;
-};
-
 declare module "claude-code" {
   interface PluginState {
     "specnaut-cockpit": {
       /** The last measurement the engine pushed. */
       reading: CockpitReading | null;
-      /** Where the Specnaut chain stands. */
-      chain: CockpitChain;
       /** The person hid the band for this session. */
       isHidden: boolean;
       /** Thresholds already announced, per window kind. */

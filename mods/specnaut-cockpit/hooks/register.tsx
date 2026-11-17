@@ -5,7 +5,7 @@
 // pushes, keeps it in session state, and draws it.
 //
 // What it does, and the one place it acts rather than observes:
-//   - draws a band above the prompt: usage windows, context, cost, chain;
+//   - draws a band above the prompt: usage windows, context, cost;
 //   - announces a window once per threshold, as a toast;
 //   - keeps a local history of cost and peaks per day and per git branch;
 //   - serves `/cockpit` (a pane), `/cockpit hide` and `/cockpit show`;
@@ -18,7 +18,7 @@ import type { EngineInterface, Register } from "claude-code";
 
 import { alertsFor } from "./core/alerts.ts";
 import { bandSegments, type Segment } from "./core/band.ts";
-import { IDLE, phaseOf, phaseOfPrompt, promptSubmitted, turnEnded } from "./core/chain.ts";
+import { phaseOf } from "./core/chain.ts";
 import { asHistory, costDelta, localDay, prune, record } from "./core/history.ts";
 import { holdFor, lift } from "./core/hold.ts";
 import { paneRows } from "./core/pane.ts";
@@ -28,7 +28,6 @@ const PANE = "cockpit";
 const HISTORY_KEY = "history";
 
 const reading = atom({ plugin: "specnaut-cockpit", key: "reading" } as const, null);
-const chain = atom({ plugin: "specnaut-cockpit", key: "chain" } as const, IDLE);
 const isHidden = atom({ plugin: "specnaut-cockpit", key: "isHidden" } as const, false);
 const alerts = atom({ plugin: "specnaut-cockpit", key: "alerts" } as const, {});
 const held = atom({ plugin: "specnaut-cockpit", key: "held" } as const, []);
@@ -96,7 +95,7 @@ export const register: Register = (on, options) => {
     const started = await next(e);
     await $.command.register({
       name: "cockpit",
-      description: "Usage limits, cost history and the Specnaut chain (hide | show)",
+      description: "Usage limits and cost history (hide | show)",
       argumentHint: "[hide|show]",
       immediate: true,
     });
@@ -136,7 +135,7 @@ export const register: Register = (on, options) => {
     return next(e);
   });
 
-  // The quota hold, and the chain's progress as the autopilot crosses phases.
+  // The quota hold, as the autopilot crosses phases.
   on("tool.call", { tool: "Skill" }, async ($, e, next) => {
     const phase = phaseOf(e.skill, e.args);
     if (!phase) return next(e);
@@ -157,7 +156,6 @@ export const register: Register = (on, options) => {
       );
       return { deny: hold.reason };
     }
-    await update($, chain, (s) => promptSubmitted(s, phase));
     return next(e);
   }).catch((_$, e, next) => next(e)); // a cockpit fault never blocks a tool call
 
@@ -169,19 +167,8 @@ export const register: Register = (on, options) => {
       await update($, lifted, (l) => lift(l, pending));
       await update($, held, () => []);
     }
-    await update($, chain, (s) => promptSubmitted(s, phaseOfPrompt(e.text)));
     return next(e);
   }).catch((_$, e, next) => next(e)); // nor a prompt
-
-  on("turn.complete", async ($, e, next) => {
-    await update($, chain, turnEnded);
-    return next(e);
-  });
-
-  on("session.end", async ($, e, next) => {
-    if (e.reason === "clear") await update($, chain, () => IDLE);
-    return next(e);
-  });
 
   on("command.run", { command: "cockpit" }, async ($, e) => {
     const arg = e.args.trim();
@@ -201,7 +188,6 @@ export const register: Register = (on, options) => {
     if (!showBand || e.props.hasSurvey || (await read($, isHidden))) return next(e);
     const segments = bandSegments(
       await read($, reading),
-      await read($, chain),
       t,
       e.props.bodyColumns,
       await $.clock.now(),
@@ -223,7 +209,6 @@ export const register: Register = (on, options) => {
     const today = localDay(now, offsetMinutes);
     const rows = paneRows({
       reading: await read($, reading),
-      chain: await read($, chain),
       history: asHistory(await $.store.get(HISTORY_KEY)),
       today,
       thresholds: t,

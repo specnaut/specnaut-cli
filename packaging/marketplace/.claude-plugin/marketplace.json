@@ -23,7 +23,7 @@
     },
     {
       "name": "specnaut-cockpit",
-      "description": "A Claude Code mod: it runs a hooks module inside Claude Code with your permissions. Shows usage limits, context, cost and the Specnaut chain above the prompt, and refuses one call: the step that would start implement, review or merge past the quota threshold.",
+      "description": "A Claude Code mod: it runs a hooks module inside Claude Code with your permissions. Shows usage limits, context and cost above the prompt, and refuses one call: the step that would start implement, review or merge past the quota threshold.",
       "category": "productivity",
       "tags": [
         "usage",
