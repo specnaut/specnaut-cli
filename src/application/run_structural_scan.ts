@@ -1,8 +1,8 @@
 import { estimateCodeUnits, type UnitEstimate } from "../domain/code_units/estimate_units.ts";
 import { classifyPath } from "../domain/code_units/language_table.ts";
 import { SIZE_LIMITS_CONFIG_PATH } from "../domain/constitution_paths.ts";
+import { binaryByAttribute } from "../domain/binary_sniff.ts";
 import {
-  binaryByAttribute,
   exemptGlobsProblem,
   type ExemptRules,
   exemptRules,

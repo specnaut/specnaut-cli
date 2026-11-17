@@ -1,13 +1,13 @@
 import type { FileRead, ReadRequest } from "../application/structural_scan_ports.ts";
 import { MAX_TEXT_BYTES } from "../domain/code_units/estimate_units.ts";
-import { BINARY_SNIFF_BYTES, binaryBySize, hasNulPrefix } from "../domain/size_exempt.ts";
+import { BINARY_SNIFF_BYTES, binaryBySize, hasNulPrefix } from "../domain/binary_sniff.ts";
 import { countNewlines } from "../domain/size_limits.ts";
 
 /**
  * How the bytes of a file `git_tracked_files.ts` has already admitted are counted (plan § 5, "How a
  * file is read"): up to the estimator's cap in one `readFile`, above it streamed through one fixed
  * buffer and counted on bytes, never decoded. Whether a path may be opened, and what counts as
- * binary (`size_exempt.ts`), are not decided here: it only asks.
+ * binary (`binary_sniff.ts`), are not decided here: it only asks.
  */
 
 /** The streaming buffer: larger than git's sniff window, so the first chunk holds all of it. */
