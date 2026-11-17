@@ -10,8 +10,8 @@ import { live, LIVE_IMAGE, probed, runIn, withLayout } from "./sandbox_live_fixt
  * Inside a container on a real engine, under the CLI's own syscall profile: making a user
  * namespace fails (`unshare`, `clone` with CLONE_NEWUSER, `clone3`), and so does a vsock socket,
  * its family carried in the low 32 bits or not, beside a fork and a unix socket that succeed. One
- * call shows the profile in force is the CLI's and not the engine's default: `personality` with
- * ADDR_NO_RANDOMIZE, which both docker's and podman's default refuse and this profile allows. On
+ * call shows the profile in force is the CLI's and not the engine's default: the `personality`
+ * query `0xffffffff`, which both docker's and podman's default allow and this profile refuses. On
  * x86_64, an x32 call kills its process, as no architecture but the engine's own is filtered.
  *
  * Run on each engine this host offers a run (podman, docker, or both); skipped, saying why, where
@@ -37,7 +37,7 @@ sub child { my $r = shift; POSIX::_exit(0) if $r == 0; waitpid($r, 0) if $r > 0;
 my $pid = fork(); POSIX::_exit(0) if $pid == 0; waitpid($pid, 0);
 print "fork $?\n";
 print "unix ", result(syscall($socket, 1, 1, 0)), "\n";
-print "personality ", result(syscall($personality, 0x0040000)), "\n";
+print "personality ", result(syscall($personality, 0xffffffff)), "\n";
 print "unshare ", result(syscall($unshare, $newuser)), "\n";
 print "clone ", child(syscall($clone, $newuser | $sigchld, 0, 0, 0, 0)), "\n";
 my $args = pack("Q11", $newuser, 0, 0, 0, $sigchld, 0, 0, 0, 0, 0, 0);
@@ -46,11 +46,11 @@ print "vsock ", result(syscall($socket, $vsock, 1, 0)), "\n";
 print "vsock64 ", result(syscall($socket, (1 << 32) | $vsock, 1, 0)), "\n";
 `;
 
-/** A fork, a unix socket and `personality` succeed; the rest fail with EPERM, clone3 ENOSYS. */
+/** A fork and a unix socket succeed; the rest fail with EPERM, clone3 with ENOSYS. */
 const EXPECTED = [
   "fork 0",
   "unix made",
-  "personality made",
+  "personality 1",
   "unshare 1",
   "clone 1",
   "clone3 38",

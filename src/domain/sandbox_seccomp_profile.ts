@@ -5,8 +5,9 @@
  * `seccomp_profile` nor a daemon.json `seccomp-profile` can weaken or remove it.
  *
  * Layered as "allow, but these", like bubblewrap's filter, and built from the same list
- * (`DENIED_SYSCALLS`, `AF_VSOCK`), so the two refuse the same calls. The list is shared, not how an
- * argument is compared: each filter does that its own way, and both read the socket family as the
+ * (`DENIED_SYSCALLS`, `AF_VSOCK`), so the two refuse the same calls by name. `personality`'s
+ * argument rules below are this profile's own: bubblewrap's filter does not read it. The list is
+ * shared, not how an argument is compared: each filter does that its own way, and both read the socket family as the
  * kernel does, its low 32 bits. It is not built on the engine's default profile: that default is
  * the engine's to change, and an allow-list copied here would be a second list to keep current
  * with every kernel. The calls the engine's default refuses and this profile allows are, in the
@@ -19,6 +20,19 @@
  * No architecture is named: the engine then filters its own only, and libseccomp kills a call made
  * under any other (32-bit, or x32 on x86_64), as bubblewrap's filter does. A name an architecture
  * lacks (`iopl` on aarch64) is skipped by the runtime, as in the engines' own profiles.
+ *
+ * `personality` is held to the values the engines' default profiles allow it: one rule per flag
+ * outside `PER_LINUX32 | UNAME26`, so `0`, `8`, `0x20000` and `0x20008` pass and any other persona
+ * or flag (no ASLR, read-implies-exec, page zero mapped) is refused. A rule's conditions on one
+ * argument are split by the runtime into rules of their own, OR-ed (runc), so "only these values"
+ * cannot be one rule; and the engines' extra allowance, the read-only query `0xffffffff`, has every
+ * flag set and is refused too: stricter than the engines. The tools that ask it (sanitizer
+ * runtimes, a debugger disabling randomisation) take the -1 as "cannot" and carry on.
+ *
+ * A call newer than these lists is allowed: the default action is ALLOW, on purpose. An allow-list
+ * would refuse every call a newer kernel or C library adds before this file names it, breaking
+ * builds on the newest systems first, and would be a second list of every syscall to keep current.
+ * The calls that reach the whole host or other processes are named instead, as above.
  *
  * Pure: the caller writes it to a file.
  */
@@ -47,6 +61,16 @@ export const CLONE_NAMESPACE_FLAGS = {
   CLONE_NEWPID: 0x20000000,
   CLONE_NEWNET: 0x40000000,
 } as const;
+
+/** The persona flags the engines' default profiles allow: PER_LINUX32 (8) and UNAME26 (0x20000). */
+const PERSONALITY_ALLOWED = 0x20008;
+
+/** Every other bit of `personality`'s 32-bit argument, each refused by a rule of its own. */
+const PERSONALITY_REFUSED_FLAGS: readonly number[] = Array.from(
+  { length: 32 },
+  (_, b) => 2 ** b,
+)
+  .filter((bit) => (PERSONALITY_ALLOWED & bit) === 0);
 
 export type ProfileArg = {
   readonly index: number;
@@ -82,6 +106,9 @@ export function seccompProfile(): SeccompProfile {
       ),
       refused(["clone3"], ENOSYS),
       refused(["socket"], EPERM, [firstArg(INT, AF_VSOCK)]),
+      ...PERSONALITY_REFUSED_FLAGS.map((flag) =>
+        refused(["personality"], EPERM, [firstArg(flag, flag)])
+      ),
     ],
   };
 }

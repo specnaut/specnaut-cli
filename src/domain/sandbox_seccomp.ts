@@ -12,7 +12,8 @@
  * which reaches the hypervisor or the host from a virtual machine.
  *
  * {@link DENIED_SYSCALLS} and {@link AF_VSOCK} also build the container backend's profile
- * (`sandbox_seccomp_profile.ts`): one list, so the two backends refuse the same calls.
+ * (`sandbox_seccomp_profile.ts`): one list, so the two backends refuse the same calls by name
+ * (the container profile alone also reads `personality`'s argument).
  *
  * Pure: the launcher hands the bytes to bubblewrap on {@link SECCOMP_FD}.
  */
@@ -38,6 +39,10 @@ export const DENIED_SYSCALLS = [
   ...["bpf", "perf_event_open", "userfaultfd", "io_uring_setup", "io_uring_enter"],
   ...["io_uring_register", "name_to_handle_at", "open_by_handle_at", "move_pages"],
   "migrate_pages",
+  // Comparing other processes' kernel objects, watching the whole filesystem, and the memory
+  // placement policy: a build needs none, and the engines' default profiles refuse them too.
+  ...["kcmp", "fanotify_init", "mbind", "set_mempolicy", "get_mempolicy"],
+  "set_mempolicy_home_node",
   // Ports and the old library loader, on x86_64 only.
   ...["iopl", "ioperm", "uselib"],
 ] as const;
@@ -57,6 +62,7 @@ const UNIFIED = {
   fspick: 433,
   mount_setattr: 442,
   quotactl_fd: 443,
+  set_mempolicy_home_node: 450,
 } as const;
 
 /** Each denied call's number, per architecture; a call an architecture lacks is absent. */
@@ -70,6 +76,7 @@ export const SYSCALL_NUMBERS: Readonly<Record<FilterArch, Partial<Record<Denied,
     ...{ quotactl: 179, vhangup: 153, nfsservctl: 180, lookup_dcookie: 212, bpf: 321 },
     ...{ perf_event_open: 298, userfaultfd: 323, name_to_handle_at: 303 },
     ...{ open_by_handle_at: 304, move_pages: 279, migrate_pages: 256 },
+    ...{ kcmp: 312, fanotify_init: 300, mbind: 237, set_mempolicy: 238, get_mempolicy: 239 },
     ...{ iopl: 172, ioperm: 173, uselib: 134 },
   },
   aarch64: {
@@ -81,6 +88,7 @@ export const SYSCALL_NUMBERS: Readonly<Record<FilterArch, Partial<Record<Denied,
     ...{ quotactl: 60, vhangup: 58, nfsservctl: 42, lookup_dcookie: 18, bpf: 280 },
     ...{ perf_event_open: 241, userfaultfd: 282, name_to_handle_at: 264 },
     ...{ open_by_handle_at: 265, move_pages: 239, migrate_pages: 238 },
+    ...{ kcmp: 272, fanotify_init: 262, mbind: 235, set_mempolicy: 237, get_mempolicy: 236 },
   },
 };
 

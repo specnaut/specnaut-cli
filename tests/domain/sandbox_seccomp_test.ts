@@ -146,3 +146,16 @@ Deno.test("isFilterArch: a filter exists for x86_64 and aarch64 only", () => {
 Deno.test("SECCOMP_FD: past the three standard streams", () => {
   assertEquals(SECCOMP_FD, 3);
 });
+
+Deno.test("the shared list's newest calls have a number on both architectures", () => {
+  const expected = {
+    x86_64: { kcmp: 312, fanotify_init: 300, mbind: 237, set_mempolicy: 238, get_mempolicy: 239 },
+    aarch64: { kcmp: 272, fanotify_init: 262, mbind: 235, set_mempolicy: 237, get_mempolicy: 236 },
+  } as const;
+  for (const arch of ["x86_64", "aarch64"] as const) {
+    for (const [name, nr] of Object.entries(expected[arch])) {
+      assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>)[name], nr, `${arch} ${name}`);
+    }
+    assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>).set_mempolicy_home_node, 450);
+  }
+});

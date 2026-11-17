@@ -120,3 +120,38 @@ Deno.test("containerArgs: on either engine, the run carries the CLI's own syscal
     assertThrows(() => containerArgs(policyOf("container"), run, COMMAND), Error, "", seccomp);
   }
 });
+
+// The values the engines' default profiles let `personality` take, and what this one adds on top
+// of them: the read-only query `0xffffffff`, which has every flag set, is refused too.
+const PERSONAS = { PER_LINUX: 0, PER_LINUX32: 8, UNAME26: 0x20000, BOTH: 0x20008 };
+const ADDR_NO_RANDOMIZE = 0x40000;
+const READ_IMPLIES_EXEC = 0x400000;
+const MMAP_PAGE_ZERO = 0x100000;
+
+Deno.test("seccompProfile: personality takes the engines' persona values and nothing else", () => {
+  for (const [name, v] of Object.entries(PERSONAS)) {
+    assertEquals(refusal("personality", [v]), null, name);
+  }
+  for (const v of [ADDR_NO_RANDOMIZE, READ_IMPLIES_EXEC, MMAP_PAGE_ZERO]) {
+    assertEquals(refusal("personality", [v | 8]), EPERM, v.toString(16));
+  }
+  // Every bit on its own, independently of the profile's list: only PER_LINUX32 and UNAME26 pass.
+  for (let b = 0; b < 32; b++) {
+    const bit = 2 ** b;
+    const expected = bit === 8 || bit === 0x20000 ? null : EPERM;
+    assertEquals(refusal("personality", [bit]), expected, `bit ${b}`);
+    assertEquals(refusal("personality", [bit | 8]), expected, `bit ${b} | 8`);
+  }
+  assertEquals(
+    refusal("personality", [0xffffffff]),
+    EPERM,
+    "the query is refused, stricter than the engines",
+  );
+});
+
+Deno.test("seccompProfile: kcmp, fanotify_init and the memory-policy calls are refused", () => {
+  for (const name of ["kcmp", "fanotify_init", "mbind", "set_mempolicy", "get_mempolicy"]) {
+    assertEquals(refusal(name), EPERM, name);
+  }
+  assertEquals(refusal("set_mempolicy_home_node"), EPERM);
+});
