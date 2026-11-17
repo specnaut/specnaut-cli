@@ -1,12 +1,19 @@
-import { IMPORT_REASON, type ImportedFile, type ImportSides } from "../domain/claude_imports.ts";
+import {
+  IMPORT_REASON,
+  type ImportedFile,
+  type ImportSides,
+  importTarget,
+} from "../domain/claude_imports.ts";
 import { type PathIndex, pathIndex, throughLinks, twinsAtHead } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
-import type { Untrusted } from "../domain/script_trust.ts";
+import type { BaseEntry, Untrusted } from "../domain/script_trust.ts";
 import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
 
 /**
- * One target of the instruction class's walk (`instruction_imports.ts`): a path a judged file
- * names, read at HEAD, the base's tip and the merge base, and recorded with its three sides.
+ * One target of the instruction class's walk: a path a judged file names, by an `@` import
+ * (`instruction_imports.ts`) or a command (`instruction_commands.ts`), read at HEAD, the base's
+ * tip and the merge base, and recorded with its three sides. Both readers share one walk, so a
+ * file both name is read once and named once.
  */
 
 export type ImportBase = {
@@ -31,6 +38,18 @@ export type Walk = ImportRead & {
 
 export function targetWalk(git: GitObjectReader, base: ImportBase): Walk {
   return { git, base, files: new Map(), reasons: [], indexes: new Map() };
+}
+
+/**
+ * A judged file the walk starts from, as `commit` holds it: a file by its bytes, a link by its
+ * end's (read from the link's folder); `null` for a submodule, or an end that is not a file there.
+ */
+export async function sourceAt(walk: Walk, commit: string, e: BaseEntry): Promise<Source | null> {
+  if (e.kind === "blob") return { path: e.path, bytes: e.bytes };
+  if (e.kind !== "link") return null;
+  const end = importTarget(e.path, e.target ?? "");
+  const read = end === null ? null : await walk.git.readFile(commit, end);
+  return end !== null && read?.kind === "blob" ? { path: end, bytes: read.bytes } : null;
 }
 
 /** `commit`'s listing as a lookup, read at the first call for it. */

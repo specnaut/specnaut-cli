@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { targetWalk } from "../../src/application/head_targets.ts";
 import { readImports } from "../../src/application/instruction_imports.ts";
 import type { BaseFile, GitObjectReader } from "../../src/application/script_trust_ports.ts";
 import { IMPORT_REASON } from "../../src/domain/claude_imports.ts";
@@ -27,8 +28,11 @@ function reader(files: Record<string, Record<string, string | "link">>): GitObje
 const link = (path: string, target: string): BaseEntry => ({ kind: "link", path, target });
 
 Deno.test("a linked CLAUDE.md imports from its end's folder", async () => {
-  const git = reader({ H: { "docs/main.md": "@notes.md", "docs/notes.md": "x" } });
-  const read = await readImports(git, BASE, { head: [link("CLAUDE.md", "docs/main.md")], tip: [] });
+  const read = targetWalk(
+    reader({ H: { "docs/main.md": "@notes.md", "docs/notes.md": "x" } }),
+    BASE,
+  );
+  await readImports(read, { head: [link("CLAUDE.md", "docs/main.md")], tip: [] });
   assertEquals([...read.files.keys()], ["docs/notes.md"]);
   assertEquals(read.reasons, []);
 });
@@ -36,15 +40,14 @@ Deno.test("a linked CLAUDE.md imports from its end's folder", async () => {
 Deno.test("a linked CLAUDE.md whose end HEAD cannot read is named, never skipped", async () => {
   const git = reader({ H: { "chain.md": "link" } });
   for (const target of ["gone.md", "chain.md", "../../outside.md", "/etc/rules.md"]) {
-    const read = await readImports(git, BASE, { head: [link("CLAUDE.md", target)], tip: [] });
+    const read = targetWalk(git, BASE);
+    await readImports(read, { head: [link("CLAUDE.md", target)], tip: [] });
     assertEquals(read.reasons, [{ path: "CLAUDE.md", reason: IMPORT_REASON.linkEnd }], target);
   }
 });
 
 Deno.test("the tip's link to an end it cannot read is only nothing to follow", async () => {
-  const read = await readImports(reader({}), BASE, {
-    head: [],
-    tip: [link("CLAUDE.md", "gone.md")],
-  });
+  const read = targetWalk(reader({}), BASE);
+  await readImports(read, { head: [], tip: [link("CLAUDE.md", "gone.md")] });
   assertEquals(read.reasons, []);
 });

@@ -11,11 +11,10 @@ import {
   type ImportBase,
   type ImportRead,
   type Source,
-  targetWalk,
+  sourceAt,
   visit,
   type Walk,
 } from "./head_targets.ts";
-import type { GitObjectReader } from "./script_trust_ports.ts";
 
 /**
  * The files the judged instruction files import (`claude_imports.ts`), as HEAD and as the base's
@@ -35,15 +34,11 @@ export type ImportSources = {
   readonly tip: readonly BaseEntry[];
 };
 
-export async function readImports(
-  git: GitObjectReader,
-  base: ImportBase,
-  sources: ImportSources,
-): Promise<ImportRead> {
-  const walk = targetWalk(git, base);
+/** Walks the imports of `sources` into `walk`, which records each target and each reason. */
+export async function readImports(walk: Walk, sources: ImportSources): Promise<void> {
   let wave = [
-    ...await startsAt(walk, base.head, sources.head, true),
-    ...await startsAt(walk, base.tip, sources.tip, false),
+    ...await startsAt(walk, walk.base.head, sources.head, true),
+    ...await startsAt(walk, walk.base.tip, sources.tip, false),
   ];
   const seen = new Set<string>();
   for (let hop = 0; hop < IMPORT_DEPTH && wave.length > 0; hop++) {
@@ -53,7 +48,6 @@ export async function readImports(
     }
     wave = next;
   }
-  return { files: walk.files, reasons: walk.reasons };
 }
 
 /**
@@ -63,16 +57,12 @@ export async function readImports(
  */
 async function startsAt(walk: Walk, commit: string, entries: readonly BaseEntry[], head: boolean) {
   const out: Source[] = [];
-  for (const e of entries) {
-    if (!importsFrom(e.path) || e.kind === "submodule") continue;
-    if (e.kind === "blob") {
-      out.push({ path: e.path, bytes: e.bytes });
-      continue;
+  for (const e of entries.filter((e) => importsFrom(e.path))) {
+    const source = await sourceAt(walk, commit, e);
+    if (source !== null) out.push(source);
+    else if (head && e.kind === "link") {
+      walk.reasons.push({ path: e.path, reason: IMPORT_REASON.linkEnd });
     }
-    const end = importTarget(e.path, e.target ?? "");
-    const read = end === null ? null : await walk.git.readFile(commit, end);
-    if (end !== null && read?.kind === "blob") out.push({ path: end, bytes: read.bytes });
-    else if (head) walk.reasons.push({ path: e.path, reason: IMPORT_REASON.linkEnd });
   }
   return out;
 }

@@ -7,7 +7,9 @@ import {
 } from "../domain/instruction_trust.ts";
 import { PARENT_NAMES, parentReasons, type ParentSides } from "../domain/instruction_parents.ts";
 import { importReasons } from "../domain/claude_imports.ts";
-import { importedAtHead, readImports } from "./instruction_imports.ts";
+import { targetWalk, type Walk } from "./head_targets.ts";
+import { readCommands } from "./instruction_commands.ts";
+import { importedAtHead, type ImportSources, readImports } from "./instruction_imports.ts";
 import { isNested, keptAtHead, nestedRoots } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
@@ -36,8 +38,9 @@ export type InstructionOutcome = {
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
  * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class,
  * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`), the files above a
- * project in a subfolder (`instruction_parents.ts`), and what the judged CLAUDE.md files import
- * (`instruction_imports.ts`).
+ * project in a subfolder (`instruction_parents.ts`), what the judged CLAUDE.md files import
+ * (`instruction_imports.ts`), and the files the judged configs' commands run
+ * (`instruction_commands.ts`).
  */
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
@@ -50,14 +53,14 @@ export async function verifyInstructions(
   const symlinks = await deps.git.symlinks();
   const files = head.flatMap((e) => e.kind === "tree" ? [] : [e]);
   const parents = await readParents(deps.git, base);
-  const imports = await readImports(deps.git, base, {
+  const targets = await readTargets(deps.git, base, {
     head: [...files, ...parents.head],
     tip: [...tip, ...parents.tip, ...tipOverrides(committed)],
   });
   const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
-  extra.push(...importReasons(imports.files), ...imports.reasons);
+  extra.push(...importReasons(targets.files), ...targets.reasons);
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
-  const landing = [...files, ...parents.head, ...importedAtHead(imports.files)];
+  const landing = [...files, ...parents.head, ...importedAtHead(targets.files)];
   return { verdicts, digest: await digestOf(deps.git, base.head, landing, verdicts) };
 }
 
@@ -70,6 +73,18 @@ async function digestOf(
 ): Promise<string> {
   const shown = verdicts.flatMap((v) => v.trusted ? [] : [{ path: v.path, reason: v.reason }]);
   return await headDigest(landing, await linkEnds(git, head, landing), shown);
+}
+
+/** What `sources` import and the files their commands run, walked as one (`head_targets.ts`). */
+async function readTargets(
+  git: GitObjectReader,
+  base: InstructionBase,
+  sources: ImportSources,
+): Promise<Walk> {
+  const walk = targetWalk(git, base);
+  await readImports(walk, sources);
+  await readCommands(walk, sources);
+  return walk;
 }
 
 /** The committed overrides the tip holds, as entries: a source of imports too. */
