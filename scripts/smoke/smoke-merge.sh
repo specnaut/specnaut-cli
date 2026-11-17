@@ -155,7 +155,7 @@ check "merge.md folds fixups before merging an epic (#559)" \
   'grep -qF "phases/epic-fixups.md" .claude/skills/task/phases/merge.md'
 # Instruction only: how the agent writes a fixup; the next check folds one written so.
 check "a fixup is written against its own child, not matched afterwards (#559)" \
-  'grep -qF "git commit --fixup=" .claude/skills/task/phases/epic-fixups.md'
+  'grep -qF "commit --fixup=" .claude/skills/task/phases/epic-fixups.md'
 # Spec 042 moved the fold's checks into fold-fixups.sh. The tree is compared
 # with the one recorded BEFORE the fold (PRE), never with the result itself.
 check "the fold folds the fixup into its own child and keeps the tree (#559 AC5)" \

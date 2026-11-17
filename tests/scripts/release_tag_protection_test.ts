@@ -57,7 +57,10 @@ async function run(world: World, script = `bash '${SCRIPT}'`) {
     await writeGhStub(dir, bin, world);
     const out = await new Deno.Command("bash", {
       args: ["-c", script],
-      env: { PATH: `${bin}:${Deno.env.get("PATH")}`, REPO: "o/r", repo: "o/r" },
+      env: {
+        PATH: `${bin}${Deno.build.os === "windows" ? ";" : ":"}${Deno.env.get("PATH")}`,
+        REPO: "o/r",
+      },
     }).output();
     // No calls file when gh never ran (REPO unset); any other read error is a failure.
     const calls = await Deno.readTextFile(join(dir, "calls")).catch((e) => {
@@ -155,7 +158,9 @@ Deno.test("preflight's block fails the release on the gate's failure and survive
   const src = (await Deno.readTextFile(PREFLIGHT)).replaceAll("\r\n", "\n");
   const m = src.match(/# BEGIN tag-protection-gate\n([\s\S]*?)# END tag-protection-gate/);
   assert(m, "preflight.sh has no tag-protection-gate block");
-  const block = `set -euo pipefail\ntrap "" PIPE\ncd '${ROOT}'\n${m[1]}\necho GATE-PASSED >&2`;
+  const block = `set -euo pipefail\ntrap "" PIPE\nrepo=o/r\ncd '${ROOT}'\n${
+    m[1]
+  }\necho GATE-PASSED >&2`;
   const passed = await run({}, block);
   assertEquals(passed.code, 0, passed.out);
   assertStringIncludes(passed.calls, "rulesets?targets=tag");
