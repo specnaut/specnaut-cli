@@ -3,6 +3,11 @@ import {
   mergeClaudeSettings,
   pluginDeclarationNotes,
 } from "../../src/domain/claude_settings_merge.ts";
+import {
+  describeSource,
+  specnautMarketplaceRef,
+  specnautMarketplaceSource,
+} from "../../src/domain/specnaut_marketplace.ts";
 
 // Split out of claude_settings_merge_test.ts (spec 036) to keep both under the
 // size target; the shipped file and the destination are the same.
@@ -23,10 +28,10 @@ const SHIPPED_SOURCE = JSON.parse(SHIPPED).extraKnownMarketplaces?.["specnaut-ma
 Deno.test("claude settings: the shipped marketplace is this repository's catalog, pinned to a tag (#642)", () => {
   // Pinned, so a teammate who trusts the project installs the cockpit of the
   // binary that scaffolded it — not whatever a branch holds at install time.
-  assertEquals(SHIPPED_SOURCE.source, "github");
-  assertEquals(SHIPPED_SOURCE.repo, "specnaut/specnaut-cli");
-  assertEquals(SHIPPED_SOURCE.path, "packaging/marketplace/.claude-plugin/marketplace.json");
-  assertEquals(/^v\d+\.\d+\.\d+$/.test(SHIPPED_SOURCE.ref), true, SHIPPED_SOURCE.ref);
+  // By URL, not `github` + `path`: Claude Code does not refresh the latter (cli#783).
+  const ref = specnautMarketplaceRef(SHIPPED_SOURCE);
+  assertEquals(/^v\d+\.\d+\.\d+$/.test(ref ?? ""), true, JSON.stringify(SHIPPED_SOURCE));
+  assertEquals(SHIPPED_SOURCE, specnautMarketplaceSource(ref!));
   assertEquals(JSON.parse(SHIPPED).enabledPlugins?.[COCKPIT], true);
 });
 
@@ -56,17 +61,19 @@ Deno.test("mergeClaudeSettings: a marketplace the user re-pointed is left as the
 });
 
 Deno.test("mergeClaudeSettings: Specnaut's own marketplace is re-pinned to this release (#642)", () => {
-  const older = { ...SHIPPED_SOURCE, ref: "v0.0.1" };
+  const older = specnautMarketplaceSource("v0.0.1");
   const existing = JSON.stringify({
     extraKnownMarketplaces: { "specnaut-marketplace": { source: older } },
   });
   const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST).content);
   assertEquals(
-    merged.extraKnownMarketplaces["specnaut-marketplace"].source.ref,
-    SHIPPED_SOURCE.ref,
+    merged.extraKnownMarketplaces["specnaut-marketplace"].source,
+    SHIPPED_SOURCE,
   );
   assertEquals(pluginDeclarationNotes(existing, SHIPPED, DEST), [
-    `${DEST}: re-pinned the marketplace specnaut-marketplace from v0.0.1 to ${SHIPPED_SOURCE.ref}`,
+    `${DEST}: re-pinned the marketplace specnaut-marketplace from v0.0.1 to ${
+      specnautMarketplaceRef(SHIPPED_SOURCE)
+    }`,
     `${DEST}: enabled ${COCKPIT} — Claude Code offers to install it when the project is trusted; it runs code in Claude Code. Set it to false to decline`,
   ]);
 });
@@ -94,4 +101,48 @@ Deno.test("pluginDeclarationNotes: nothing to say on a fresh scaffold or a proje
     pluginDeclarationNotes(mergeClaudeSettings(null, SHIPPED, DEST).content, SHIPPED, DEST),
     [],
   );
+});
+
+// ── The github source Claude Code cannot refresh (cli#783) ─────────────────
+// Releases up to 9.4.0 declared the catalog as `github` + `path`, which Claude
+// Code does not refresh, so the cockpit never loaded. An upgrade replaces it.
+
+const LEGACY = {
+  source: "github",
+  repo: "specnaut/specnaut-cli",
+  ref: "v9.4.0",
+  path: "packaging/marketplace/.claude-plugin/marketplace.json",
+};
+const withEntry = (entry: unknown) =>
+  JSON.stringify({ extraKnownMarketplaces: { "specnaut-marketplace": entry } });
+
+Deno.test("mergeClaudeSettings: the legacy github source is replaced, and said (cli#783)", () => {
+  const existing = withEntry({ source: LEGACY, autoUpdate: true });
+  const once = mergeClaudeSettings(existing, SHIPPED, DEST).content;
+  const merged = JSON.parse(once);
+  // Only `source` is replaced: another key the user set on the entry stays.
+  assertEquals(merged.extraKnownMarketplaces["specnaut-marketplace"], {
+    source: SHIPPED_SOURCE,
+    autoUpdate: true,
+  });
+  const notes = pluginDeclarationNotes(existing, SHIPPED, DEST);
+  assertEquals(notes[0].startsWith(`${DEST}: repaired the marketplace specnaut-marketplace`), true);
+  assertEquals(notes[0].includes(describeSource(SHIPPED_SOURCE)), true, notes[0]);
+});
+
+Deno.test("mergeClaudeSettings: once repaired, a second merge changes and says nothing (cli#783)", () => {
+  const once = mergeClaudeSettings(withEntry({ source: LEGACY }), SHIPPED, DEST).content;
+  assertEquals(mergeClaudeSettings(once, SHIPPED, DEST).changed, false);
+  const notes = pluginDeclarationNotes(once, SHIPPED, DEST);
+  assertEquals(notes.filter((n) => n.includes("marketplace")), []);
+});
+
+Deno.test("merge and notes agree on a key with no source: kept, and said (cli#783)", () => {
+  for (const entry of [{}, null, { source: null }]) {
+    const existing = withEntry(entry);
+    const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST).content);
+    assertEquals(merged.extraKnownMarketplaces["specnaut-marketplace"], entry);
+    const [note] = pluginDeclarationNotes(existing, SHIPPED, DEST);
+    assertEquals(note.includes("kept the marketplace specnaut-marketplace"), true, note);
+  }
 });

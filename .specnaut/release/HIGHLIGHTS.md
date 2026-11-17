@@ -15,3 +15,8 @@ binary itself, with no network needed.
 **`/task` starts no new work while an earlier landing is unsettled**, and text sent to Specnaut
 Cloud is checked for credentials before it leaves your machine. The macOS binaries are now signed
 and notarized, so the Keychain keeps "Always Allow" across `self-update`.
+
+**The cockpit loads on Claude Code again.** Claude Code could not refresh the marketplace that
+`specnaut upgrade` declared, so the `specnaut-cockpit` mod never loaded. The marketplace is now
+declared in a form Claude Code refreshes, still pinned to your Specnaut release, and the next
+`specnaut upgrade` repairs a project's existing declaration.

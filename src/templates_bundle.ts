@@ -37895,10 +37895,8 @@ prompts cost more tokens and drift out of relevance.
   "extraKnownMarketplaces": {
     "specnaut-marketplace": {
       "source": {
-        "source": "github",
-        "repo": "specnaut/specnaut-cli",
-        "ref": "v9.4.0",
-        "path": "packaging/marketplace/.claude-plugin/marketplace.json"
+        "source": "url",
+        "url": "https://raw.githubusercontent.com/specnaut/specnaut-cli/v9.4.0/packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
   },

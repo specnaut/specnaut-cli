@@ -12,25 +12,37 @@
 // Exit 0 = every entry of every catalog is pinned to the tag; 1 = not (each
 // problem printed); 2 = usage.
 
+import {
+  CLAUDE_CATALOG_PATH,
+  specnautMarketplaceRef,
+  specnautMarketplaceSource,
+} from "../src/domain/specnaut_marketplace.ts";
+
 export const CATALOG_FILES = [
-  "packaging/marketplace/.claude-plugin/marketplace.json",
+  CLAUDE_CATALOG_PATH,
   "packaging/marketplace/.github/plugin/marketplace.json",
 ] as const;
 
 /**
  * The scaffolded Claude Code settings declare Specnaut's marketplace, read from
  * this repository at the release tag — so a project gets the cockpit of the
- * binary that scaffolded it, not whatever a branch holds at install time.
+ * binary that scaffolded it, not whatever a branch holds at install time. The
+ * tag sits in the source's URL; `specnaut_marketplace.ts` owns that shape
+ * (cli#783), and this stamps and checks through it.
  */
 export const SETTINGS_TEMPLATE = "templates/harness-specific/claude/settings.json";
 const MARKETPLACE = "specnaut-marketplace";
 
-type Settings = { extraKnownMarketplaces?: Record<string, { source?: { ref?: unknown } }> };
+type Settings = { extraKnownMarketplaces?: Record<string, { source?: unknown }> };
 
 export function stampDeclarationRef(text: string, tag: string): string {
   const settings = JSON.parse(text) as Settings;
-  const source = settings.extraKnownMarketplaces?.[MARKETPLACE]?.source;
-  if (source && typeof source === "object") source.ref = tag;
+  const entry = settings.extraKnownMarketplaces?.[MARKETPLACE];
+  // Only Specnaut's own source is re-pinned; any other shape is left for the
+  // check to name, never rewritten into one.
+  if (entry && specnautMarketplaceRef(entry.source) !== null) {
+    entry.source = specnautMarketplaceSource(tag);
+  }
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
@@ -41,14 +53,16 @@ export function declarationRefProblems(text: string, tag: string): string[] {
   } catch (err) {
     return [`not valid JSON: ${(err as Error).message}`];
   }
-  const source = settings.extraKnownMarketplaces?.[MARKETPLACE]?.source;
-  if (!source) return [`declares no ${MARKETPLACE} marketplace`];
-  if (source.ref === undefined) {
-    return [`${MARKETPLACE} has no ref — it would read the default branch`];
+  const entry = settings.extraKnownMarketplaces?.[MARKETPLACE];
+  if (!entry) return [`declares no ${MARKETPLACE} marketplace`];
+  const ref = specnautMarketplaceRef(entry.source);
+  if (ref === null) {
+    return [
+      `${MARKETPLACE} is not Specnaut's url source (${JSON.stringify(entry.source)}) — ` +
+      "Claude Code would not refresh it, or it is not this repository's catalog",
+    ];
   }
-  return source.ref === tag
-    ? []
-    : [`${MARKETPLACE} is pinned to ${JSON.stringify(source.ref)}, not ${tag}`];
+  return ref === tag ? [] : [`${MARKETPLACE} is pinned to ${JSON.stringify(ref)}, not ${tag}`];
 }
 
 /**

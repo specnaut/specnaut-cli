@@ -28,7 +28,7 @@ check "SubagentStart hook registered" 'grep -q "SubagentStart" .claude/settings.
 check "SessionStart hook registered" 'grep -q "SessionStart" .claude/settings.json'
 # cli#642: Claude Code offers the cockpit mod when the project is trusted.
 check "Specnaut marketplace declared, pinned to a release" \
-  'jq -e ".extraKnownMarketplaces[\"specnaut-marketplace\"].source | .repo == \"specnaut/specnaut-cli\" and (.ref | startswith(\"v\"))" .claude/settings.json >/dev/null'
+  'jq -e ".extraKnownMarketplaces[\"specnaut-marketplace\"].source | .source == \"url\" and (.url | test(\"^https://raw\\\\.githubusercontent\\\\.com/specnaut/specnaut-cli/v[0-9][^/]*/packaging/marketplace/\\\\.claude-plugin/marketplace\\\\.json$\"))" .claude/settings.json >/dev/null'
 check "cockpit mod enabled" \
   'jq -e ".enabledPlugins[\"specnaut-cockpit@specnaut-marketplace\"] == true" .claude/settings.json >/dev/null'
 # Spelled out, not looped: audit.sh counts a path as covered only where it is written.

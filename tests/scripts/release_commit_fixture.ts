@@ -1,6 +1,7 @@
 import { assert } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { writeVersions } from "../../scripts/bump-version.ts";
+import { specnautMarketplaceSource } from "../../src/domain/specnaut_marketplace.ts";
 import { hermetic } from "./git_sandbox.ts";
 
 /**
@@ -135,11 +136,10 @@ async function writeRelease(
     await Deno.writeTextFile(`${dir}/${p}`, catalog);
   }
   await Deno.mkdir(`${dir}/templates/harness-specific/claude`, { recursive: true });
+  const source = specnautMarketplaceSource(`v${version}`);
   await Deno.writeTextFile(
     `${dir}/templates/harness-specific/claude/settings.json`,
-    JSON.stringify({
-      extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: `v${version}` } } },
-    }),
+    JSON.stringify({ extraKnownMarketplaces: { "specnaut-marketplace": { source } } }),
   );
   await Deno.writeTextFile(
     `${dir}/README.md`,

@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { computeNextVersion, VERSIONED_FILES, writeVersions } from "../../scripts/bump-version.ts";
+import { specnautMarketplaceSource } from "../../src/domain/specnaut_marketplace.ts";
 
 Deno.test("computeNextVersion patch bump", () => {
   assertEquals(computeNextVersion("0.1.0", "patch"), "0.1.1");
@@ -103,7 +104,9 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     await Deno.writeTextFile(
       join(tmp, "templates/harness-specific/claude/settings.json"),
       JSON.stringify({
-        extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: "v1.2.3" } } },
+        extraKnownMarketplaces: {
+          "specnaut-marketplace": { source: specnautMarketplaceSource("v1.2.3") },
+        },
       }),
     );
 

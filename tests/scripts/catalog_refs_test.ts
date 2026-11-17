@@ -1,4 +1,5 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { specnautMarketplaceSource } from "../../src/domain/specnaut_marketplace.ts";
 import {
   catalogRefProblems,
   declarationRefProblems,
@@ -74,21 +75,43 @@ const settings = (source?: object) =>
   JSON.stringify(source ? { extraKnownMarketplaces: { "specnaut-marketplace": { source } } } : {});
 
 Deno.test("the scaffolded marketplace declaration is stamped and checked like a catalog", () => {
-  const stamped = stampDeclarationRef(settings({ repo: "r", ref: "v1.0.0" }), "v2.0.0");
+  const stamped = stampDeclarationRef(settings(specnautMarketplaceSource("v1.0.0")), "v2.0.0");
   assertEquals(
-    JSON.parse(stamped).extraKnownMarketplaces["specnaut-marketplace"].source.ref,
-    "v2.0.0",
+    JSON.parse(stamped).extraKnownMarketplaces["specnaut-marketplace"].source,
+    specnautMarketplaceSource("v2.0.0"),
   );
   assertEquals(declarationRefProblems(stamped, "v2.0.0"), []);
-  assertEquals(declarationRefProblems(settings({ ref: "v1.0.0" }), "v2.0.0"), [
+  assertEquals(declarationRefProblems(settings(specnautMarketplaceSource("v1.0.0")), "v2.0.0"), [
     'specnaut-marketplace is pinned to "v1.0.0", not v2.0.0',
-  ]);
-  assertEquals(declarationRefProblems(settings({ repo: "r" }), "v2.0.0"), [
-    "specnaut-marketplace has no ref — it would read the default branch",
   ]);
   assertEquals(declarationRefProblems(settings(), "v2.0.0"), [
     "declares no specnaut-marketplace marketplace",
   ]);
+});
+
+// cli#783: the tag lives in the URL. A gate that read a `ref` field would pass
+// a declaration Claude Code serves from the previous release.
+Deno.test("a leftover ref field makes the declaration not Specnaut's, whatever it says", () => {
+  const stale = { ...specnautMarketplaceSource("v1.0.0"), ref: "v2.0.0" };
+  const [problem] = declarationRefProblems(settings(stale), "v2.0.0");
+  assertStringIncludes(problem, "is not Specnaut's url source");
+});
+
+Deno.test("the declaration check refuses the github source Claude Code cannot refresh (cli#783)", () => {
+  const legacy = {
+    source: "github",
+    repo: "specnaut/specnaut-cli",
+    ref: "v2.0.0",
+    path: "packaging/marketplace/.claude-plugin/marketplace.json",
+  };
+  const [problem] = declarationRefProblems(settings(legacy), "v2.0.0");
+  assertStringIncludes(problem, "is not Specnaut's url source");
+  // And the stamp never rewrites a shape it does not own into one it does.
+  assertEquals(
+    JSON.parse(stampDeclarationRef(settings(legacy), "v3.0.0"))
+      .extraKnownMarketplaces["specnaut-marketplace"].source,
+    legacy,
+  );
 });
 
 // ── The README's OpenCode install line (cli#667) ────────────────────────────
