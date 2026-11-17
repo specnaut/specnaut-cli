@@ -1,15 +1,14 @@
 import {
   IMPORT_DEPTH,
   IMPORT_REASON,
-  type ImportedFile,
   importsFrom,
   type ImportSides,
   importsIn,
   importTarget,
-  nearAtHead,
 } from "../domain/claude_imports.ts";
-import type { BaseEntry, Untrusted } from "../domain/script_trust.ts";
-import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
+import type { BaseEntry } from "../domain/script_trust.ts";
+import { type ImportBase, type ImportRead, type Source, visit, type Walk } from "./head_targets.ts";
+import type { GitObjectReader } from "./script_trust_ports.ts";
 
 /**
  * The files the judged instruction files import (`claude_imports.ts`), as HEAD and as the base's
@@ -21,31 +20,12 @@ import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
  * is judged here too: `judgeInstructions` keeps one line per path, the walk's first.
  */
 
-export type ImportBase = {
-  readonly head: string;
-  readonly tip: string;
-  readonly mergeBase: string;
-};
+export type { ImportBase, ImportRead };
 
 /** The judged files each commit holds: where the walk starts. */
 export type ImportSources = {
   readonly head: readonly BaseEntry[];
   readonly tip: readonly BaseEntry[];
-};
-
-/** Each imported file's three sides, and the reasons the walk itself found. */
-export type ImportRead = {
-  readonly files: Map<string, ImportSides>;
-  readonly reasons: Untrusted[];
-};
-
-type Source = { readonly path: string; readonly bytes: Uint8Array };
-type Paths = { path: string; kind: string }[];
-type Walk = ImportRead & {
-  readonly git: GitObjectReader;
-  readonly base: ImportBase;
-  /** HEAD's whole listing, read once, at the first target HEAD lacks as written. */
-  pathsAtHead?: Promise<Paths>;
 };
 
 export async function readImports(
@@ -90,25 +70,6 @@ async function startsAt(walk: Walk, commit: string, entries: readonly BaseEntry[
   return out;
 }
 
-/** Reads `target`'s three sides, records them, and returns what to follow from it. */
-async function visit(walk: Walk, target: string): Promise<Source[]> {
-  const sides = await readSides(walk, target);
-  walk.files.set(target, sides);
-  const next = [sides.head, sides.tip].flatMap((b) =>
-    b instanceof Uint8Array ? [{ path: target, bytes: b }] : []
-  );
-  if (sides.head !== "absent") return next;
-  walk.pathsAtHead ??= walk.git.listPaths(walk.base.head);
-  const near = nearAtHead(target, await walk.pathsAtHead);
-  if (near.link !== undefined) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${near.link}` });
-  } else if (near.match !== undefined) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.caseDiffers}: ${near.match}` });
-    next.push(...await visit(walk, near.match));
-  }
-  return next;
-}
-
 /** HEAD's bytes of each imported file it holds: what the digest frames them by. */
 export function importedAtHead(files: ReadonlyMap<string, ImportSides>): BaseEntry[] {
   return [...files].flatMap(([path, s]) =>
@@ -122,15 +83,4 @@ function targetsOf(wave: readonly Source[]): string[] {
     importsIn(decoder.decode(s.bytes)).flatMap((w) => importTarget(s.path, w) ?? [])
   );
   return [...new Set(targets)];
-}
-
-async function readSides(walk: Walk, path: string): Promise<ImportSides> {
-  const { git, base } = walk;
-  const head = imported(await git.readFile(base.head, path));
-  const tip = imported(await git.readFile(base.tip, path));
-  return { head, tip, mergeBase: imported(await git.readFile(base.mergeBase, path)) };
-}
-
-function imported(file: BaseFile): ImportedFile {
-  return file.kind === "blob" ? file.bytes : file.kind;
 }
