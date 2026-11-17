@@ -3,15 +3,25 @@ import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { refinedReason } from "./trust_reason.ts";
 
 /**
- * The instruction files above a project that lives in a subfolder (part of the instruction class,
+ * The files above a project that lives in a subfolder (part of the instruction class,
  * `instruction_trust.ts`): a harness started in the project reads `AGENTS.md` and `CLAUDE.md` in
- * every folder up to the repository's top. They are judged as HEAD commits them against the base's
+ * every folder up to the repository's top, and git reads `.gitattributes` there. They are judged as HEAD commits them against the base's
  * tip, named relative to the project's folder (`../AGENTS.md`). The work tree's copies are not
  * walked: the walk stays inside the project, and the landing refuses a tree that is not clean.
  */
 
-/** The names a harness reads in each folder above the project. */
-export const PARENT_INSTRUCTIONS: readonly string[] = ["AGENTS.md", "CLAUDE.md"];
+/**
+ * The names read in each folder above the project: the instruction files a harness reads, the
+ * `.gitattributes` git applies to every file below it, and `.lfsconfig`. git-lfs reads that one
+ * only at the repository's top, so reading it in a folder between is reading too much: it only
+ * names a file the branch changed.
+ */
+export const PARENT_NAMES: readonly string[] = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".gitattributes",
+  ".lfsconfig",
+];
 
 /** The parent files at HEAD, the base's tip and the merge base, as `listParents` lists them. */
 export type ParentSides = {
@@ -43,7 +53,7 @@ const lostReason = (hadIt: boolean) => hadIt ? REASON.missing : REASON.behind;
 function headReason(e: BaseEntry, atTip?: BaseEntry, atOld?: BaseEntry): string | null {
   if (sameEntry(e, atTip)) return null;
   const name = e.path.slice(e.path.lastIndexOf("/") + 1);
-  if (atTip === undefined && !PARENT_INSTRUCTIONS.includes(name)) return REASON.caseDiffers;
+  if (atTip === undefined && !PARENT_NAMES.includes(name)) return REASON.caseDiffers;
   const otherwise = atTip === undefined ? REASON.notOnBase : REASON.differs;
   if (e.kind !== "blob") return sameEntry(e, atOld) ? REASON.behind : otherwise;
   const tipBytes = atTip?.kind === "blob" ? atTip.bytes : undefined;

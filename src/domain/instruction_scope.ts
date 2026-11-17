@@ -1,9 +1,4 @@
-import {
-  inScopeRoot,
-  INSTRUCTION_NAMES,
-  isInstructionFile,
-  type ScopeRoot,
-} from "./checkout_scope.ts";
+import { inScopeRoot, isNestedSurface, NESTED_NAMES, type ScopeRoot } from "./checkout_scope.ts";
 import type { ConfigFile } from "./config_trust.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 
@@ -18,13 +13,13 @@ import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./scri
 /**
  * The instruction files, and every other surface a harness loads from the checkout and acts on:
  * skills, agents and their memory, hooks and the settings that name them, slash commands, rules,
- * output styles, MCP servers, Codex's config, Specnaut's own hooks. `.gitattributes` too: it
- * decides how git shows and checks out every other file. Each is a root of the checked files
+ * output styles, MCP servers, Codex's config, Specnaut's own hooks. `.gitattributes` and
+ * `.lfsconfig` too: they decide how git shows and checks out every other file. Each is a root of the checked files
  * (`checkout_scope.ts` holds them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files there.
  */
 // deno-fmt-ignore
 export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
-  { dir: ".", deep: false, names: ["AGENTS.md", "CLAUDE.md", ".mcp.json", ".gitattributes"] },
+  { dir: ".", deep: false, names: ["AGENTS.md", "CLAUDE.md", ".mcp.json", ".gitattributes", ".lfsconfig"] },
   { dir: ".claude", deep: false, names: ["CLAUDE.md", "settings.json"] },
   { dir: ".claude/skills", deep: true },
   { dir: ".claude/agents", deep: true },
@@ -68,10 +63,10 @@ const OVERRIDES = COMMITTED_INSTRUCTIONS.map((p) => p.toLowerCase());
 const inRoots = (path: string) => INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, path.toLowerCase()));
 
 /**
- * Whether `path` is an instruction file below the root that no root of the class holds: a harness
- * reads one in whatever folder it finds it (`isInstructionFile` in `checkout_scope.ts`).
+ * Whether `path` is a nested name below the root that no root of the class holds: a harness, or
+ * git, reads one in whatever folder it finds it (`isNestedSurface` in `checkout_scope.ts`).
  */
-export const isNested = (path: string): boolean => isInstructionFile(path) && !inRoots(path);
+export const isNested = (path: string): boolean => isNestedSurface(path) && !inRoots(path);
 
 /** Whether `path` is an instruction path, its letter case aside. */
 const foldedInScope = (path: string) => inRoots(path) || isNested(path);
@@ -79,21 +74,21 @@ const foldedInScope = (path: string) => inRoots(path) || isNested(path);
 /** Whether `path` is an instruction path as written: a root's own folder and a listed name. */
 export function exactlyInScope(path: string): boolean {
   const name = path.slice(path.lastIndexOf("/") + 1);
-  if (isNested(path)) return (INSTRUCTION_NAMES as readonly string[]).includes(name);
+  if (isNested(path)) return NESTED_NAMES.includes(name);
   return INSTRUCTION_SCOPE.some((r) =>
     inScopeRoot(r, path) && (r.names === undefined || r.names.includes(name))
   );
 }
 
 /**
- * The folders holding nested instruction files (`paths`, at HEAD, the tip or the merge base), each
- * once, as roots the work tree's walk reads for the four names alone. A file only the work tree
+ * The folders holding nested files (`paths`, at HEAD, the tip or the merge base), each once, as
+ * roots the work tree's walk reads for {@link NESTED_NAMES} alone. A file only the work tree
  * holds, in a folder where no commit holds one, is not walked: the landing refuses a tree with an
  * untracked file, and git keeps out only what the project ignores.
  */
 export function nestedRoots(paths: readonly string[]): ScopeRoot[] {
   const dirs = new Set(paths.filter(isNested).map((p) => p.slice(0, p.lastIndexOf("/"))));
-  return [...dirs].sort().map((dir) => ({ dir, deep: false, names: [...INSTRUCTION_NAMES] }));
+  return [...dirs].sort().map((dir) => ({ dir, deep: false, names: NESTED_NAMES }));
 }
 
 /** A link counts only into a folder this class compares whole: `.specnaut/addenda/`. */

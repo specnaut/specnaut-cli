@@ -11,8 +11,8 @@ export type ScopeRoot = {
 };
 
 /**
- * The instruction and config files a session or a review reads, `.gitattributes` (how git shows and
- * checks out the rest), and the version-manager files that could put another `specnaut`, `git` or
+ * The instruction and config files a session or a review reads, `.gitattributes` and `.lfsconfig`
+ * (how git shows and checks out the rest), and the version-manager files that could put another `specnaut`, `git` or
  * `gh` first on the PATH. `.specnaut/scripts/` is not here:
  * the script check judges it, with the bundle as a second copy.
  */
@@ -21,7 +21,7 @@ export const CHECKOUT_SCOPE: readonly ScopeRoot[] = [
   { dir: ".", deep: false, names: [
     "CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "AGENTS.override.md", ".mcp.json",
     ".tool-versions", "mise.toml", ".mise.toml", "mise.local.toml", ".mise.local.toml",
-    ".rtx.toml", ".envrc", ".prototools", "devbox.json", ".gitattributes",
+    ".rtx.toml", ".envrc", ".prototools", "devbox.json", ".gitattributes", ".lfsconfig",
   ] },
   { dir: ".claude", deep: true },
   { dir: ".codex", deep: true },
@@ -63,16 +63,23 @@ export const INSTRUCTION_NAMES = [
   "CLAUDE.local.md",
 ] as const;
 
-const FOLDED_NAMES = INSTRUCTION_NAMES.map((n) => n.toLowerCase());
+/**
+ * The names read in any folder below the root, not only there: the instruction files, and
+ * `.gitattributes`, which git reads in every folder for the files below it. The one list every
+ * reader of a nested name goes through.
+ */
+export const NESTED_NAMES: readonly string[] = [...INSTRUCTION_NAMES, ".gitattributes"];
 
-/** Whether `path` is one of {@link INSTRUCTION_NAMES} in a folder below the root, case aside. */
-export function isInstructionFile(path: string): boolean {
+const FOLDED_NAMES = NESTED_NAMES.map((n) => n.toLowerCase());
+
+/** Whether `path` is one of {@link NESTED_NAMES} in a folder below the root, case aside. */
+export function isNestedSurface(path: string): boolean {
   const at = path.lastIndexOf("/");
   return at >= 0 && FOLDED_NAMES.includes(path.slice(at + 1).toLowerCase());
 }
 
-/** Whether `path` is one of the checked files: in a root, or an instruction file at any depth. */
+/** Whether `path` is one of the checked files: in a root, or a nested name at any depth. */
 export function inCheckoutScope(path: string): boolean {
   return !path.startsWith(`${SCRIPTS_DIR}/`) &&
-    (CHECKOUT_SCOPE.some((r) => inScopeRoot(r, path)) || isInstructionFile(path));
+    (CHECKOUT_SCOPE.some((r) => inScopeRoot(r, path)) || isNestedSurface(path));
 }
