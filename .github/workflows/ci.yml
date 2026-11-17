@@ -196,7 +196,7 @@ jobs:
           fi
           # And each backend's path must have produced a pass, not merely an absence of skips.
           for want in 'isolation live: on container' 'isolation live: on bwrap' \
-            'caps live: on container' 'caps live: on bwrap' 'bwrap live: in a user scope'; do
+            'caps live: on container' 'caps live: on bwrap' 'bwrap live: in a user scope' 'podman hooks live'; do
             grep -F "$want" sandbox.log | grep -q ' ok (' ||
               { echo "::error::no passing test for: $want"; exit 1; }
           done

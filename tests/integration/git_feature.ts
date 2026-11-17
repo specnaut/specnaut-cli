@@ -27,7 +27,10 @@ export function gitTest(feature: GitFeature, name: string, fn: () => Promise<voi
     name: feature.present ? name : `${name} [needs ${feature.name}]`,
     ignore: !feature.present && Deno.env.get("CI") !== "true",
     fn: async () => {
-      assert(feature.present, `this git lacks ${feature.name}, which CI must run this test with`);
+      assert(
+        feature.present,
+        `this git is ${MAJOR}.${MINOR} and lacks ${feature.name}, which CI must run this test with`,
+      );
       await fn();
     },
   });

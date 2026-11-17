@@ -91,7 +91,8 @@ export const NO_DROPS = { dropped: [], cpus: null } as const;
 /**
  * A test that runs a `ContainerRunner`. No container is run on Windows (the backend probe offers
  * none there), and a run's syscall profile is written to the temporary folder, a Windows path no
- * container argument accepts: there the test is skipped, not failed.
+ * container argument accepts: there the test is skipped, not failed. The skip holds only while no
+ * container runs on Windows; the work that adds one removes it.
  */
 export function containerTest(name: string, fn: () => Promise<void> | void): void {
   Deno.test({ name, ignore: !POSIX, fn });

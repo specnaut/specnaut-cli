@@ -18,7 +18,6 @@ import {
   IMAGE,
   type Launch,
   NO_DROPS,
-  POSIX,
   withWallClock,
 } from "./sandbox_runner_fixture.ts";
 
@@ -154,10 +153,9 @@ case "$1" in
 esac
 `;
 
-Deno.test({
-  name: "ContainerRunner: past the wall clock, stdout holds the command's output and nothing else",
-  ignore: !POSIX,
-  fn: async () => {
+containerTest(
+  "ContainerRunner: past the wall clock, stdout holds the command's output and nothing else",
+  async () => {
     const dir = await Deno.makeTempDir({ prefix: "specnaut-engine-" });
     try {
       const engine = join(dir, "engine");
@@ -177,4 +175,4 @@ Deno.test({
       await Deno.remove(dir, { recursive: true });
     }
   },
-});
+);

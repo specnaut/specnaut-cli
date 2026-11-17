@@ -59,6 +59,25 @@ async function annotationsOf(name: string): Promise<string | null> {
   return null;
 }
 
+/** A user's containers.conf naming a hooks directory whose one hook writes to `marker`. */
+async function hookedConf(scratch: string): Promise<{ conf: string; marker: string }> {
+  const hooks = join(scratch, "hooks.d");
+  const marker = join(scratch, "hook-fired");
+  await Deno.mkdir(hooks);
+  await Deno.writeTextFile(join(hooks, "marker.json"), hook(marker));
+  const conf = join(scratch, "containers.conf");
+  await Deno.writeTextFile(conf, userConf(hooks));
+  return { conf, marker };
+}
+
+/** The positive control: a plain podman run under that conf fires the hook; the marker is then cleared for the sandbox run. */
+async function assertPlainRunFiresHook(marker: string): Promise<void> {
+  const plain = ["run", "--rm", "--pull", "never", "--network", "none", LIVE_IMAGE, "true"];
+  assertEquals((await plainPodman(plain)).code, 0, "a plain run failed");
+  assertStringIncludes(await read(marker), ANNOTATION, "a plain run fired no hook");
+  await Deno.remove(marker);
+}
+
 Deno.test({
   name: live(
     "podman hooks live: a user's hooks and annotations reach no sandbox run",
@@ -67,17 +86,9 @@ Deno.test({
   ignore: NO_LOCAL_PODMAN !== null,
   fn: () =>
     withLayout("container", async ({ policy, scratch }) => {
-      const hooks = join(scratch, "hooks.d");
-      const marker = join(scratch, "hook-fired");
-      await Deno.mkdir(hooks);
-      await Deno.writeTextFile(join(hooks, "marker.json"), hook(marker));
-      const conf = join(scratch, "containers.conf");
-      await Deno.writeTextFile(conf, userConf(hooks));
+      const { conf, marker } = await hookedConf(scratch);
       await withEnv({ CONTAINERS_CONF: conf }, async () => {
-        const plain = ["run", "--rm", "--pull", "never", "--network", "none", LIVE_IMAGE, "true"];
-        assertEquals((await plainPodman(plain)).code, 0, "a plain run failed");
-        assertStringIncludes(await read(marker), ANNOTATION, "a plain run fired no hook");
-        await Deno.remove(marker);
+        await assertPlainRunFiresHook(marker);
         const running = runIn(
           (l) =>
             new ContainerRunner("podman", LIVE_IMAGE, l, { dropped: [], cpus: null }, () => NAME),
