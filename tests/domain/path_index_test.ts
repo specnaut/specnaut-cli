@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import {
+  fold,
   type IndexedPath,
   linkOnTheWay,
   pathIndex,
@@ -75,4 +76,15 @@ Deno.test("a submodule on a path's way is moved when HEAD and the tip hold other
   assertEquals(submoduleMoved("vendor/tool/run.sh", a, b), "vendor/tool");
   assertEquals(submoduleMoved("vendor/tool/run.sh", a, pathIndex([])), "vendor/tool");
   assertEquals(submoduleMoved("other/run.sh", a, b), undefined);
+});
+
+Deno.test("a letter with two lower-case forms folds to one", () => {
+  const index = pathIndex([
+    at("docs/style.md"),
+    at("docs/\u017ftyle.md"),
+    at("docs/stra\u00dfe.md"),
+  ]);
+  assertEquals(twinsAtHead("docs/style.md", index), ["docs/\u017ftyle.md"]);
+  assertEquals(twinsAtHead("docs/strasse.md", index), ["docs/stra\u00dfe.md"]);
+  assertEquals(fold("\u03c2"), fold("\u03c3"));
 });

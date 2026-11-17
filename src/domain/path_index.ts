@@ -20,8 +20,11 @@ export type IndexedPath = {
 /** A commit's paths by their folded name. */
 export type PathIndex = ReadonlyMap<string, readonly IndexedPath[]>;
 
-/** A name as a case-blind, normalisation-blind disk compares it. */
-export const fold = (path: string): string => path.normalize("NFC").toLowerCase();
+/**
+ * A name as a case-blind, normalisation-blind disk compares it. Upper case first, then lower: a
+ * letter whose lower case has two forms folds to one (`ſ` and `s`, `ς` and `σ`, `ß` and `ss`).
+ */
+export const fold = (path: string): string => path.normalize("NFC").toUpperCase().toLowerCase();
 
 export function pathIndex(paths: readonly IndexedPath[]): PathIndex {
   const index = new Map<string, IndexedPath[]>();

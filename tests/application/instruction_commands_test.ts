@@ -44,3 +44,9 @@ Deno.test("a word that names nothing HEAD or the tip holds visits nothing", asyn
   await readCommands(walk, { head: [settings("echo done > out.log; tools/gone.sh")], tip: [] });
   assertEquals([...walk.files.keys()], []);
 });
+
+Deno.test("a helper script's folder in another spelling is walked: the script check reads it as written", async () => {
+  const walk = targetWalk(reader([".Specnaut/scripts/bash/y.sh"]), BASE);
+  await readCommands(walk, { head: [settings("bash .Specnaut/scripts/bash/y.sh")], tip: [] });
+  assertEquals([...walk.files.keys()], [".Specnaut/scripts/bash/y.sh"]);
+});

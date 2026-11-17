@@ -85,5 +85,5 @@ function heldAs(prefix: string, word: string, head: PathIndex, tip: PathIndex): 
   return [...new Set(held)].filter((p) => !judgedElsewhere(p));
 }
 
-const judgedElsewhere = (path: string) =>
-  keptAtHead(path) || fold(path).startsWith(`${SCRIPTS_DIR}/`);
+/** The script check reads its folder as written, as `checkout_scope.ts` does: another spelling is walked. */
+const judgedElsewhere = (path: string) => keptAtHead(path) || path.startsWith(`${SCRIPTS_DIR}/`);
