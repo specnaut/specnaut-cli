@@ -593,8 +593,7 @@ in the mechanism for a tool name to be written: the declaration is yours, the
 runner executes what it reads, and neither this document nor the script has a
 default to fall back to. The one sanctioned place where runners are named is
 \`phases/review-gates.md\`'s auto-detect table, which recognises common toolchains by
-their marker files; it is detection, not a default this mechanism falls back
-to.
+their marker files; it is detection, not a default to fall back to.
 
 ## Running one
 
@@ -680,12 +679,13 @@ owner whose record differs, or that exists on one side only, is affected. So is 
 owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-the \`fallback:\` line: a path name that is not UTF-8 or holds a newline, an unowned path, a
-\`full_on\` match, a gitlink, a symlink or a type change; a declaration, an \`adapter.files\`
-entry, \`gates.yml\` or \`.specnaut/scripts/\` that differs from a given base, or from the
-merge-base with the default branch; any of those not a tracked regular file; an adapter that
-fails or answers anything invalid; a malformed declaration; a base that does not resolve or
-was never fetched; \`jq\` absent, older than 1.6, or failing where its answer decides the run.
+\`fallback:\`: a path name not UTF-8 or holding a newline; the root \`.gitattributes\`, \`.lfsconfig\` or
+\`.gitmodules\` in any ASCII case, even \`inert\` (\`checkout-config:\`); an unowned path, a \`full_on\`
+match, a gitlink, a symlink or a type change; a declaration, an \`adapter.files\` entry, \`gates.yml\`
+or \`.specnaut/scripts/\` that differs from a given base, or from the merge-base with the default
+branch; any of those not a tracked regular file; an adapter that fails or answers anything invalid;
+a malformed declaration; a base that does not resolve or was never fetched; \`jq\` absent, older than
+1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -30963,10 +30963,17 @@ gate_graph_pair() {
 }
 
 # The jq both steps below read a path with: which roots hold it, and who owns it.
+# checkout_config: a root file that changes how every other path is checked out or fetched,
+# whatever the declaration calls it. ASCII case folds, as a case-insensitive file system hands
+# git \`.GitAttributes\` for \`.gitattributes\`. A non-ASCII letter some file systems also fold
+# (U+017F to s) is not chased: that name is unowned, so it widens unless declared. The
+# PowerShell twin's Test-GateCheckoutConfig holds the same list.
 GATE_GRAPH_DEFS='
     def holds(\$p): . as \$r | if endswith("/") then (\$p | startswith(\$r)) else \$p == \$r end;
     def listed(\$list; \$p): \$list | any(holds(\$p));
-    def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);'
+    def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);
+    def checkout_config(\$p): (\$p | ascii_downcase) as \$l
+      | [".gitattributes", ".lfsconfig", ".gitmodules"] | any(. == \$l);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing. Every base is walked against its own snapshot: a
@@ -30977,6 +30984,7 @@ gate_graph_cause() {
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
     | [\$pairs[] as \$b | \$b.changes[] as \$p
         | if (\$p | contains("\\ufffd") or contains("\\n")) then "path-unreadable: \\(\$p)"
+          elif checkout_config(\$p) then "checkout-config: \\(\$p)"
           elif listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
           elif listed(\$d.inert; \$p) then empty
           elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
@@ -37243,13 +37251,30 @@ function Get-GateOwnersOf(\$Owners, [string]\$Path) {
     return , \$out
 }
 
-# The first path that cannot be compared, no snapshot on its own pair's sides owns, or a
-# full_on one. A path must be owned on its own pair's sides, or an owner only another base
-# knows would stop it being unowned. Returns the cause, or ''.
+# A root file that changes how every other path is checked out or fetched, whatever the
+# declaration calls it. ASCII case folds, as a case-insensitive file system hands git
+# \`.GitAttributes\` for \`.gitattributes\`, and only ASCII, as the bash twin's jq folds: no .NET
+# casing. A non-ASCII letter some file systems also fold (U+017F to s) is not chased: that
+# name is unowned, so it widens unless declared. The bash twin's checkout_config holds the
+# same list.
+function Test-GateCheckoutConfig([string]\$Path) {
+    \$chars = \$Path.ToCharArray()
+    for (\$i = 0; \$i -lt \$chars.Length; \$i++) {
+        if ([int]\$chars[\$i] -ge 65 -and [int]\$chars[\$i] -le 90) { \$chars[\$i] = [char]([int]\$chars[\$i] + 32) }
+    }
+    \$folded = -join \$chars
+    foreach (\$name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame \$folded \$name) { return \$true } }
+    return \$false
+}
+
+# The first path that cannot be compared, a checkout-config one, a full_on one, or one no
+# snapshot on its own pair's sides owns. A path must be owned on its own pair's sides, or an
+# owner only another base knows would stop it being unowned. Returns the cause, or ''.
 function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
     foreach (\$pair in \$Pairs) {
         foreach (\$path in \$pair.Changes) {
             if (\$path.Contains([char]0xFFFD) -or \$path.Contains("\`n")) { return "path-unreadable: \$path" }
+            if (Test-GateCheckoutConfig \$path) { return "checkout-config: \$path" }
             if (Test-GateListed \$Declared.FullOn \$path) { return "full-on: \$path" }
             if (Test-GateListed \$Declared.Inert \$path) { continue }
             \$held = (Get-GateOwnersOf \$Candidate \$path).Count + (Get-GateOwnersOf \$pair.Snapshot \$path).Count

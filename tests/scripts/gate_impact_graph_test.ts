@@ -4,6 +4,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { FULL_MARKS, scoped } from "./gate_impact_case.ts";
+import { CHECKOUT_CONFIG } from "./gate_impact_corpus_checkout.ts";
 import { declaration, impactRepo, labelled, type Repo } from "./gate_impact_fixture.ts";
 import { gateProject, runGate, spawn, TWINS } from "./run_gate_fixture.ts";
 
@@ -146,4 +147,19 @@ Deno.test("the impact graphs run git only through the wrapper that obeys no repl
   assertStringIncludes(bash, "--no-replace-objects");
   const pwsh = bodyOf(await codeOf("powershell/_gate_candidate.ps1"), "function Invoke-GateGit(");
   assertStringIncludes(pwsh, "'--no-replace-objects'");
+});
+
+// The root files that always widen live in one list per twin; both must name what the corpus runs.
+Deno.test("the impact graphs widen on the same checkout-config files", async () => {
+  const listOf = (code: string, around: RegExp) => {
+    const list = code.match(around);
+    assert(list, `${around} not found`);
+    return [...list[1].matchAll(/["']([^"']+)["']/g)].map((m) => m[1]);
+  };
+  const jq = /def checkout_config\(\$p\):[^[]*\[([^\]]*)\]/;
+  const ps = /function Test-GateCheckoutConfig\([^)]*\) \{[^@]*@\(([^)]*)\)/;
+  const bash = listOf(await codeOf("bash/_gate_impact_graph.sh"), jq);
+  const pwsh = listOf(await codeOf("powershell/_gate_impact_graph.ps1"), ps);
+  assertEquals(pwsh, bash, "the twins hold different lists");
+  assertEquals(bash, CHECKOUT_CONFIG, "the corpus does not run every name");
 });

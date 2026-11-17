@@ -63,13 +63,30 @@ function Get-GateOwnersOf($Owners, [string]$Path) {
     return , $out
 }
 
-# The first path that cannot be compared, no snapshot on its own pair's sides owns, or a
-# full_on one. A path must be owned on its own pair's sides, or an owner only another base
-# knows would stop it being unowned. Returns the cause, or ''.
+# A root file that changes how every other path is checked out or fetched, whatever the
+# declaration calls it. ASCII case folds, as a case-insensitive file system hands git
+# `.GitAttributes` for `.gitattributes`, and only ASCII, as the bash twin's jq folds: no .NET
+# casing. A non-ASCII letter some file systems also fold (U+017F to s) is not chased: that
+# name is unowned, so it widens unless declared. The bash twin's checkout_config holds the
+# same list.
+function Test-GateCheckoutConfig([string]$Path) {
+    $chars = $Path.ToCharArray()
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+        if ([int]$chars[$i] -ge 65 -and [int]$chars[$i] -le 90) { $chars[$i] = [char]([int]$chars[$i] + 32) }
+    }
+    $folded = -join $chars
+    foreach ($name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame $folded $name) { return $true } }
+    return $false
+}
+
+# The first path that cannot be compared, a checkout-config one, a full_on one, or one no
+# snapshot on its own pair's sides owns. A path must be owned on its own pair's sides, or an
+# owner only another base knows would stop it being unowned. Returns the cause, or ''.
 function Get-GatePathCause($Pairs, $Candidate, $Declared) {
     foreach ($pair in $Pairs) {
         foreach ($path in $pair.Changes) {
             if ($path.Contains([char]0xFFFD) -or $path.Contains("`n")) { return "path-unreadable: $path" }
+            if (Test-GateCheckoutConfig $path) { return "checkout-config: $path" }
             if (Test-GateListed $Declared.FullOn $path) { return "full-on: $path" }
             if (Test-GateListed $Declared.Inert $path) { continue }
             $held = (Get-GateOwnersOf $Candidate $path).Count + (Get-GateOwnersOf $pair.Snapshot $path).Count

@@ -61,10 +61,17 @@ gate_graph_pair() {
 }
 
 # The jq both steps below read a path with: which roots hold it, and who owns it.
+# checkout_config: a root file that changes how every other path is checked out or fetched,
+# whatever the declaration calls it. ASCII case folds, as a case-insensitive file system hands
+# git `.GitAttributes` for `.gitattributes`. A non-ASCII letter some file systems also fold
+# (U+017F to s) is not chased: that name is unowned, so it widens unless declared. The
+# PowerShell twin's Test-GateCheckoutConfig holds the same list.
 GATE_GRAPH_DEFS='
     def holds($p): . as $r | if endswith("/") then ($p | startswith($r)) else $p == $r end;
     def listed($list; $p): $list | any(holds($p));
-    def owners_of($p): .owners | to_entries | map(select(.value.roots | any(holds($p))) | .key);'
+    def owners_of($p): .owners | to_entries | map(select(.value.roots | any(holds($p))) | .key);
+    def checkout_config($p): ($p | ascii_downcase) as $l
+      | [".gitattributes", ".lfsconfig", ".gitmodules"] | any(. == $l);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing. Every base is walked against its own snapshot: a
@@ -75,6 +82,7 @@ gate_graph_cause() {
     . as $pairs | $cand[0] as $c | $declared[0] as $d
     | [$pairs[] as $b | $b.changes[] as $p
         | if ($p | contains("\ufffd") or contains("\n")) then "path-unreadable: \($p)"
+          elif checkout_config($p) then "checkout-config: \($p)"
           elif listed($d.full_on; $p) then "full-on: \($p)"
           elif listed($d.inert; $p) then empty
           elif (($c | owners_of($p)) + ($b.snapshot | owners_of($p))) == [] then "unowned: \($p)"
