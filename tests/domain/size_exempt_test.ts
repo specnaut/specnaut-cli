@@ -5,13 +5,13 @@ import {
   binaryBySize,
   exemptGlobsProblem,
   exemptRules,
-  globMatches,
   hasNulPrefix,
   heldBy,
   MAX_EXEMPT_GLOBS,
   MAX_GLOB_LENGTH,
   MAX_GLOBS_TOTAL,
 } from "../../src/domain/size_exempt.ts";
+import { globMatches } from "../../src/domain/case_glob.ts";
 
 const rules = (globs: string[] = [], managed: string[] = []) =>
   exemptRules(new Set(managed), globs);
