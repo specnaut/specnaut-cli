@@ -3,6 +3,7 @@ import {
   type IndexedPath,
   linkOnTheWay,
   pathIndex,
+  submoduleMoved,
   throughLinks,
   twinsAtHead,
 } from "../../src/domain/path_index.ts";
@@ -65,4 +66,13 @@ Deno.test("a path leads through each link on its way to the file a session reads
   assertEquals(throughLinks("app/", "loop/x.md", index), { outside: "loop/x.md" });
   assertEquals(throughLinks("app/", "../top/a.md", index), { end: "../x/a.md" });
   assertEquals(throughLinks("", "../top/a.md", pathIndex([])), { end: "../top/a.md" });
+});
+
+Deno.test("a submodule on a path's way is moved when HEAD and the tip hold other commits", () => {
+  const gitlink = (commit: string) => ({ path: "vendor/tool", kind: "submodule" as const, commit });
+  const [a, b] = [pathIndex([gitlink("a")]), pathIndex([gitlink("b")])];
+  assertEquals(submoduleMoved("vendor/tool/run.sh", a, a), undefined);
+  assertEquals(submoduleMoved("vendor/tool/run.sh", a, b), "vendor/tool");
+  assertEquals(submoduleMoved("vendor/tool/run.sh", a, pathIndex([])), "vendor/tool");
+  assertEquals(submoduleMoved("other/run.sh", a, b), undefined);
 });

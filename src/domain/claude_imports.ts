@@ -21,6 +21,7 @@ export const IMPORT_REASON = {
   linkEnd: "a link whose end cannot be read for its imports",
   caseDiffers: "imported in another letter case than HEAD's file",
   linkOnTheWay: "a link on the way at HEAD",
+  submoduleMoved: "a submodule on the way moved",
 } as const;
 
 /**

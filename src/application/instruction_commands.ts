@@ -1,6 +1,6 @@
 import { COMMAND_REASON, commandPaths, isCommandSource } from "../domain/command_targets.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
-import { fold, linkOnTheWay, type PathIndex } from "../domain/path_index.ts";
+import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
 import { type BaseEntry, SCRIPTS_DIR } from "../domain/script_trust.ts";
 import { indexAt, sourceAt, visit, type Walk } from "./head_targets.ts";
@@ -65,7 +65,8 @@ async function sourcesAt(walk: Walk, commit: string, entries: readonly BaseEntry
 
 /**
  * The paths `word` names that HEAD or the tip hold, as each spells them (a disk that folds names
- * runs either), and the word itself when a link HEAD holds is on its way: a file or a link, never
+ * runs either), and the word itself when a link HEAD holds, or a submodule HEAD or the tip
+ * holds, is on its way (`visit` names a submodule the branch moved): a file or a link, never
  * a folder or a submodule, which no file of its own stands for. A file this class
  * already judges, and a helper script under {@link SCRIPTS_DIR} (judged against the shipped
  * bundle by the script check), are left to them.
@@ -75,7 +76,12 @@ function heldAs(prefix: string, word: string, head: PathIndex, tip: PathIndex): 
   if (path === null) return [];
   const held = [...head.get(fold(path)) ?? [], ...tip.get(fold(path)) ?? []]
     .filter((p) => p.kind === "blob" || p.kind === "link").map((p) => p.path);
-  if (linkOnTheWay(path, head) !== undefined) held.push(path);
+  const way = [
+    linkOnTheWay(path, head),
+    submoduleOnTheWay(path, head),
+    submoduleOnTheWay(path, tip),
+  ];
+  if (way.some((p) => p !== undefined)) held.push(path);
   return [...new Set(held)].filter((p) => !judgedElsewhere(p));
 }
 

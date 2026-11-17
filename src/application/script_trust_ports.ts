@@ -59,7 +59,7 @@ export interface GitObjectReader {
    * Every path of `commit`'s whole tree with its kind, folders included, and no bytes read: what a
    * lookup of a name in another letter case searches. The whole repository, not only the project's
    * folder, written relative to it (`project_path.ts`): `../shared.md` above it, `.` the project's
-   * own folder, `..` each folder above it. A link carries its target, read from its blob.
+   * own folder, `..` each folder above it. A link carries its target, read from its blob; a submodule its commit.
    */
   listPaths(commit: string): Promise<IndexedPath[]>;
   /**

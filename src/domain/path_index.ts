@@ -13,6 +13,8 @@ export type IndexedPath = {
   readonly path: string;
   readonly kind: CommitEntry["kind"];
   readonly target?: string;
+  /** A submodule's commit. */
+  readonly commit?: string;
 };
 
 /** A commit's paths by their folded name. */
@@ -56,15 +58,31 @@ export function twinsAtHead(target: string, head: PathIndex): string[] {
  * names opens). A link beside an entry spelled as written is not on the way: `twinsAtHead` names
  * the path through it as another file to judge.
  */
-export function linkOnTheWay(path: string, index: PathIndex): IndexedPath | undefined {
+export const linkOnTheWay = (path: string, index: PathIndex) => onTheWay(path, index, "link");
+
+/** The first submodule on `path`'s way, taken as {@link linkOnTheWay} takes a link. */
+export const submoduleOnTheWay = (path: string, index: PathIndex) =>
+  onTheWay(path, index, "submodule");
+
+function onTheWay(path: string, index: PathIndex, kind: IndexedPath["kind"]) {
   const parts = path.split("/");
   for (let i = 1; i <= parts.length; i++) {
     const step = parts.slice(0, i).join("/");
     const at = index.get(fold(step)) ?? [];
-    const taken = at.find((p) => p.path === step) ?? at.find((p) => p.kind === "link");
-    if (taken?.kind === "link") return taken;
+    const taken = at.find((p) => p.path === step) ?? at.find((p) => p.kind === kind);
+    if (taken?.kind === kind) return taken;
   }
   return undefined;
+}
+
+/**
+ * The submodule on `path`'s way at HEAD or the tip, when the two do not hold it at the same
+ * commit: what a session reads inside it changes with no file of the repository changing.
+ */
+export function submoduleMoved(path: string, head: PathIndex, tip: PathIndex): string | undefined {
+  const [atHead, atTip] = [submoduleOnTheWay(path, head), submoduleOnTheWay(path, tip)];
+  if (atHead?.path === atTip?.path && atHead?.commit === atTip?.commit) return undefined;
+  return (atHead ?? atTip)!.path;
 }
 
 /** Where a path leads through the links on its way: a path in the repository, or the link that leaves it. */

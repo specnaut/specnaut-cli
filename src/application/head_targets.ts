@@ -4,7 +4,13 @@ import {
   type ImportSides,
   importTarget,
 } from "../domain/claude_imports.ts";
-import { type PathIndex, pathIndex, throughLinks, twinsAtHead } from "../domain/path_index.ts";
+import {
+  type PathIndex,
+  pathIndex,
+  submoduleMoved,
+  throughLinks,
+  twinsAtHead,
+} from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
 import type { BaseEntry, Untrusted } from "../domain/script_trust.ts";
 import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
@@ -73,15 +79,28 @@ export async function visit(walk: Walk, written: string): Promise<string[]> {
   if (target === null || walk.files.has(target)) return [];
   const { sides, ends, outside } = await readSides(walk, target);
   walk.files.set(target, sides);
-  const twins = twinsAtHead(target, await indexAt(walk, walk.base.head));
-  if (outside !== undefined) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${outside}` });
-  } else if (sides.head === "absent" && twins.length > 0) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.caseDiffers}: ${twins[0]}` });
-  }
+  const head = await indexAt(walk, walk.base.head);
+  const twins = twinsAtHead(target, head);
+  const moved = submoduleMoved(target, head, await indexAt(walk, walk.base.tip));
+  const reason = wayReason(sides, { outside, moved, twin: twins[0] });
+  if (reason !== null) walk.reasons.push({ path: target, reason });
   const recorded = [target];
   for (const next of [...ends, ...twins]) recorded.push(...await visit(walk, next));
   return recorded;
+}
+
+/**
+ * What the way to a target says, when its bytes do not: a link HEAD holds that leaves the
+ * repository, a submodule on the way at another commit than the tip's, or, for a target HEAD
+ * lacks as written, the spelling HEAD holds.
+ */
+function wayReason(sides: ImportSides, way: { outside?: string; moved?: string; twin?: string }) {
+  if (way.outside !== undefined) return `${IMPORT_REASON.linkOnTheWay}: ${way.outside}`;
+  if (way.moved !== undefined) return `${IMPORT_REASON.submoduleMoved}: ${way.moved}`;
+  if (sides.head === "absent" && way.twin !== undefined) {
+    return `${IMPORT_REASON.caseDiffers}: ${way.twin}`;
+  }
+  return null;
 }
 
 /** What reading a target's sides found beside its bytes. */

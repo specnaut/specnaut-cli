@@ -107,6 +107,7 @@ export class GitObjects implements GitObjectReader {
     const targets = new Map(links.map((l) => [l.path, l.kind === "link" ? l.target : undefined]));
     return records.map((r) => {
       const at = { path: toProject(this.projectPrefix, r.path), kind: r.kind };
+      if (r.kind === "submodule") return { ...at, commit: r.commit };
       return r.kind === "link" ? { ...at, target: targets.get(r.path) } : at;
     });
   }

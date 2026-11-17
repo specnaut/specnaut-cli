@@ -1,5 +1,5 @@
 import { assertEquals, assertNotEquals } from "@std/assert";
-import { commitAll, fixture, GIT_READ, verify, write } from "./verify_scripts_fixture.ts";
+import { commitAll, fixture, git, GIT_READ, verify, write } from "./verify_scripts_fixture.ts";
 import { base, lines } from "./verify_instructions_fixture.ts";
 
 /**
@@ -118,5 +118,23 @@ Deno.test("a source too large to parse is named itself, never trusted on what wa
   await edit(root, { "notes.md": "x\n" });
   assertEquals(await lines(root), [
     "VERDICT instructions untrusted .claude/settings.json commands not fully read",
+  ]);
+});
+
+/** Commits the gitlink `path` at the commit HEAD is on: no folder backs it. */
+async function commitGitlink(root: string, path: string) {
+  const sha = (await git(root, "rev-parse", "HEAD")).trim();
+  await git(root, "update-index", "--add", "--cacheinfo", `160000,${sha},${path}`);
+  await git(root, "commit", "-q", "-m", `point ${path}`);
+}
+
+Deno.test("a hook into a submodule whose commit the branch moves is named", async () => {
+  const root = await project({ ".claude/settings.json": hook("vendor/tool/run.sh") });
+  await commitGitlink(root, "vendor/tool");
+  await git(root, "push", "-q", "origin", "HEAD:main");
+  assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+  await commitGitlink(root, "vendor/tool");
+  assertEquals(await lines(root), [
+    "VERDICT instructions untrusted vendor/tool/run.sh a submodule on the way moved: vendor/tool",
   ]);
 });
