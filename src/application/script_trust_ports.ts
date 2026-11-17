@@ -1,5 +1,6 @@
 import type { ScopeRoot } from "../domain/checkout_scope.ts";
 import type { CheckoutWalk } from "../domain/checkout_trust.ts";
+import type { IndexedPath } from "../domain/path_index.ts";
 import type { BaseEntry, CommitEntry, TreeWalk } from "../domain/script_trust.ts";
 
 /**
@@ -58,9 +59,9 @@ export interface GitObjectReader {
    * Every path of `commit`'s whole tree with its kind, folders included, and no bytes read: what a
    * lookup of a name in another letter case searches. The whole repository, not only the project's
    * folder, written relative to it (`project_path.ts`): `../shared.md` above it, `.` the project's
-   * own folder, `..` each folder above it.
+   * own folder, `..` each folder above it. A link carries its target, read from its blob.
    */
-  listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]>;
+  listPaths(commit: string): Promise<IndexedPath[]>;
   /**
    * The files directly in each folder above the project's, up to the repository's top, whose name
    * is one of `names` but for letter case, a link with its target; none when the project is at the

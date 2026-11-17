@@ -7,7 +7,14 @@ import {
   importTarget,
 } from "../domain/claude_imports.ts";
 import type { BaseEntry } from "../domain/script_trust.ts";
-import { type ImportBase, type ImportRead, type Source, visit, type Walk } from "./head_targets.ts";
+import {
+  type ImportBase,
+  type ImportRead,
+  type Source,
+  targetWalk,
+  visit,
+  type Walk,
+} from "./head_targets.ts";
 import type { GitObjectReader } from "./script_trust_ports.ts";
 
 /**
@@ -33,7 +40,7 @@ export async function readImports(
   base: ImportBase,
   sources: ImportSources,
 ): Promise<ImportRead> {
-  const walk: Walk = { git, base, files: new Map(), reasons: [] };
+  const walk = targetWalk(git, base);
   let wave = [
     ...await startsAt(walk, base.head, sources.head, true),
     ...await startsAt(walk, base.tip, sources.tip, false),
@@ -42,7 +49,7 @@ export async function readImports(
   for (let hop = 0; hop < IMPORT_DEPTH && wave.length > 0; hop++) {
     const next: Source[] = [];
     for (const target of targetsOf(wave).filter((t) => !seen.has(t) && seen.add(t))) {
-      next.push(...await visit(walk, target));
+      next.push(...sourcesOf(walk, await visit(walk, target)));
     }
     wave = next;
   }
@@ -83,4 +90,14 @@ function targetsOf(wave: readonly Source[]): string[] {
     importsIn(decoder.decode(s.bytes)).flatMap((w) => importTarget(s.path, w) ?? [])
   );
   return [...new Set(targets)];
+}
+
+/** The bytes HEAD and the tip hold for each of `paths` the walk recorded: what imports next. */
+function sourcesOf(walk: Walk, paths: readonly string[]): Source[] {
+  return paths.flatMap((path) => {
+    const sides = walk.files.get(path)!;
+    return [sides.head, sides.tip].flatMap((b) =>
+      b instanceof Uint8Array ? [{ path, bytes: b }] : []
+    );
+  });
 }

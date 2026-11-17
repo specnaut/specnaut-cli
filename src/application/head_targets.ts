@@ -1,9 +1,5 @@
-import {
-  IMPORT_REASON,
-  type ImportedFile,
-  type ImportSides,
-  nearAtHead,
-} from "../domain/claude_imports.ts";
+import { IMPORT_REASON, type ImportedFile, type ImportSides } from "../domain/claude_imports.ts";
+import { type PathIndex, pathIndex, throughLinks, twinsAtHead } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
 import type { Untrusted } from "../domain/script_trust.ts";
 import type { BaseFile, GitObjectReader } from "./script_trust_ports.ts";
@@ -26,43 +22,73 @@ export type ImportRead = {
 };
 
 export type Source = { readonly path: string; readonly bytes: Uint8Array };
-type Paths = { path: string; kind: string }[];
 export type Walk = ImportRead & {
   readonly git: GitObjectReader;
   readonly base: ImportBase;
-  /** HEAD's whole listing, read once, at the first target HEAD lacks as written. */
-  pathsAtHead?: Promise<Paths>;
+  /** Each commit's whole listing as a lookup (`path_index.ts`), read once, at the first target. */
+  readonly indexes: Map<string, Promise<PathIndex>>;
 };
 
-/**
- * Reads `written`'s three sides, records them, and returns what to follow from it. The path is
- * written one way first (`canonical`): `../app/x.md` from the project `app/` is `x.md`.
- */
-export async function visit(walk: Walk, written: string): Promise<Source[]> {
-  const target = canonical(walk.git.projectPrefix, written);
-  if (target === null) return [];
-  const sides = await readSides(walk, target);
-  walk.files.set(target, sides);
-  const next = [sides.head, sides.tip].flatMap((b) =>
-    b instanceof Uint8Array ? [{ path: target, bytes: b }] : []
-  );
-  if (sides.head !== "absent") return next;
-  walk.pathsAtHead ??= walk.git.listPaths(walk.base.head);
-  const near = nearAtHead(target, await walk.pathsAtHead);
-  if (near.link !== undefined) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${near.link}` });
-  } else if (near.match !== undefined) {
-    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.caseDiffers}: ${near.match}` });
-    next.push(...await visit(walk, near.match));
-  }
-  return next;
+export function targetWalk(git: GitObjectReader, base: ImportBase): Walk {
+  return { git, base, files: new Map(), reasons: [], indexes: new Map() };
 }
 
-async function readSides(walk: Walk, path: string): Promise<ImportSides> {
-  const { git, base } = walk;
-  const head = imported(await git.readFile(base.head, path));
-  const tip = imported(await git.readFile(base.tip, path));
-  return { head, tip, mergeBase: imported(await git.readFile(base.mergeBase, path)) };
+/** `commit`'s listing as a lookup, read at the first call for it. */
+export function indexAt(walk: Walk, commit: string): Promise<PathIndex> {
+  let index = walk.indexes.get(commit);
+  if (index === undefined) {
+    index = walk.git.listPaths(commit).then(pathIndex);
+    walk.indexes.set(commit, index);
+  }
+  return index;
+}
+
+/**
+ * Reads `written`'s three sides, records them, and returns every path it recorded: the target,
+ * then the end of each link it leads through and each of HEAD's names that fold to it (its twins),
+ * each visited in turn. A path already recorded is not visited again: two twins name each other.
+ * The path is written one way first (`canonical`): `../app/x.md` from the project `app/` is `x.md`.
+ */
+export async function visit(walk: Walk, written: string): Promise<string[]> {
+  const target = canonical(walk.git.projectPrefix, written);
+  if (target === null || walk.files.has(target)) return [];
+  const { sides, ends, outside } = await readSides(walk, target);
+  walk.files.set(target, sides);
+  const twins = twinsAtHead(target, await indexAt(walk, walk.base.head)).map((t) => t.path);
+  if (outside !== undefined) {
+    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${outside}` });
+  } else if (sides.head === "absent" && twins.length > 0) {
+    walk.reasons.push({ path: target, reason: `${IMPORT_REASON.caseDiffers}: ${twins[0]}` });
+  }
+  const recorded = [target];
+  for (const next of [...ends, ...twins]) recorded.push(...await visit(walk, next));
+  return recorded;
+}
+
+/** What reading a target's sides found beside its bytes. */
+type Found = { readonly ends: string[]; outside?: string };
+
+/**
+ * `path` at HEAD, the tip and the merge base, each through the links that commit holds on its way
+ * (`throughLinks`): the bytes a session reads there. Each end other than `path` is returned, to be
+ * judged as a file of its own; a link HEAD holds that leaves the repository is `outside`.
+ */
+async function readSides(walk: Walk, path: string): Promise<Found & { sides: ImportSides }> {
+  const found: Found = { ends: [] };
+  const at = (commit: string) => sideAt(walk, commit, path, found);
+  const { head, tip, mergeBase } = walk.base;
+  const sides = { head: await at(head), tip: await at(tip), mergeBase: await at(mergeBase) };
+  return { sides, ...found };
+}
+
+async function sideAt(walk: Walk, commit: string, path: string, found: Found) {
+  const through = throughLinks(walk.git.projectPrefix, path, await indexAt(walk, commit));
+  if ("outside" in through) {
+    if (commit === walk.base.head) found.outside ??= through.outside;
+    return imported(await walk.git.readFile(commit, path));
+  }
+  if (through.end !== path && !found.ends.includes(through.end)) found.ends.push(through.end);
+  return imported(await walk.git.readFile(commit, through.end));
 }
 
 function imported(file: BaseFile): ImportedFile {

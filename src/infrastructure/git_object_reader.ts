@@ -1,6 +1,7 @@
 import type { BaseFile, GitObjectReader } from "../application/script_trust_ports.ts";
 import { inScopeRoot, type ScopeRoot } from "../domain/checkout_scope.ts";
 import { isFullSha } from "../domain/commit_sha.ts";
+import type { IndexedPath } from "../domain/path_index.ts";
 import { fromTop, toProject } from "../domain/project_path.ts";
 import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
 import { catFiles, lsTree, withBytes } from "./git_tree_records.ts";
@@ -100,9 +101,14 @@ export class GitObjects implements GitObjectReader {
     return [...folders, ...await withBytes(this.#git, commit, kept)];
   }
 
-  async listPaths(commit: string): Promise<{ path: string; kind: CommitEntry["kind"] }[]> {
+  async listPaths(commit: string): Promise<IndexedPath[]> {
     const records = await lsTree(this.#git, "", commit, ["-r", "-t"], true);
-    return records.map((r) => ({ path: toProject(this.projectPrefix, r.path), kind: r.kind }));
+    const links = await withBytes(this.#git, commit, records.filter((r) => r.kind === "link"));
+    const targets = new Map(links.map((l) => [l.path, l.kind === "link" ? l.target : undefined]));
+    return records.map((r) => {
+      const at = { path: toProject(this.projectPrefix, r.path), kind: r.kind };
+      return r.kind === "link" ? { ...at, target: targets.get(r.path) } : at;
+    });
   }
 
   async listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]> {
@@ -122,8 +128,10 @@ export class GitObjects implements GitObjectReader {
   async readFile(commit: string, path: string): Promise<BaseFile> {
     const top = fromTop(this.projectPrefix, path);
     if (top === null) return { kind: "absent" };
-    const [record] = await lsTree(this.#git, "", commit, ["--", top]);
-    if (record === undefined || record.path !== top) return { kind: "absent" };
+    // git precomposes a pathspec on macOS, so a decomposed name is found in the whole listing.
+    const args = /^[\x20-\x7e]*$/.test(top) ? ["--", top] : ["-r"];
+    const record = (await lsTree(this.#git, "", commit, args)).find((r) => r.path === top);
+    if (record === undefined) return { kind: "absent" };
     if (record.kind !== "blob") return { kind: "not_regular" };
     return { kind: "blob", bytes: (await catFiles(this.#git, commit, [record])).get(record.sha)! };
   }
