@@ -58,7 +58,11 @@ function unreadable(what: string, reason: string): ScanOutcome {
   return { kind: "unreadable", what, reason };
 }
 
-type Candidate = { readonly path: string; readonly unit: "file" | "constitution" };
+type Candidate = {
+  readonly path: string;
+  readonly unit: "file" | "constitution";
+  readonly marker: boolean;
+};
 
 /** Each entry's rule; the exempt and the index's links and submodules folded, never opened. */
 function held(entries: readonly TrackedEntry[], rules: ExemptRules, fold: ScanFold): Candidate[] {
@@ -67,7 +71,7 @@ function held(entries: readonly TrackedEntry[], rules: ExemptRules, fold: ScanFo
     const rule = heldBy(path, rules);
     if (rule.kind === "exempt") fold.exempt(rule.reason);
     else if (mode !== "file") fold.skipped(mode);
-    else candidates.push({ path, unit: rule.unit });
+    else candidates.push({ path, unit: rule.unit, marker: rule.marker });
   }
   return candidates;
 }
@@ -83,7 +87,8 @@ async function measureAll(repo: ScanRepository, candidates: Candidate[], fold: S
   }
   await eachPooled(reads, READ_POOL, async ({ candidate, sniff }) => {
     const decode = classifyPath(candidate.path).kind === "read";
-    foldRead(fold, candidate, await repo.read(candidate.path, { sniff, decode }));
+    const { marker } = candidate;
+    foldRead(fold, candidate, await repo.read(candidate.path, { sniff, decode, marker }));
   });
 }
 
@@ -92,6 +97,7 @@ function foldRead(fold: ScanFold, { path, unit }: Candidate, read: FileRead): vo
   if (read.kind === "missing") fold.missing();
   else if (read.kind === "skipped") fold.skipped(read.reason);
   else if (read.kind === "binary") fold.exempt("binary");
+  else if (read.kind === "generated") fold.exempt("generated");
   else fold.measured({ path, unit, lines: read.lines, estimate: estimateOf(path, read.text) });
 }
 

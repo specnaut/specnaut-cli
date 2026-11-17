@@ -22,14 +22,22 @@ export type TrackedListing = {
   readonly undecodable: number;
 };
 
-/** `sniff`: binariness is the bytes' to tell. `decode`: the text is wanted, within the read cap. */
-export type ReadRequest = { readonly sniff: boolean; readonly decode: boolean };
+/**
+ * `sniff`: binariness is the bytes' to tell. `decode`: the text is wanted, within the read cap.
+ * `marker`: a generated header in the first bytes exempts the file, whatever `sniff` says.
+ */
+export type ReadRequest = {
+  readonly sniff: boolean;
+  readonly decode: boolean;
+  readonly marker: boolean;
+};
 
 /** What reading one tracked path found. `text` is null when not asked for, or over the cap. */
 export type FileRead =
   | { readonly kind: "missing" }
   | { readonly kind: "skipped"; readonly reason: SkipReason }
   | { readonly kind: "binary" }
+  | { readonly kind: "generated" }
   | { readonly kind: "text"; readonly lines: number; readonly text: string | null };
 
 /** The paths `.specnaut/installed.lock` lists, or why it cannot be read. */

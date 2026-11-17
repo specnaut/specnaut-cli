@@ -40,7 +40,13 @@ Deno.test("every tracked path ends in one disposition, each counted by its reaso
   assertEquals(result.code, 0, result.stderr);
   const t = json.totals;
   assertEquals(dispositions(json), { tracked: 14, sum: 14 });
-  assertEquals(t.exempt_by, { specnaut: 3, installed_lock: 1, exempt_glob: 1, binary: 2 });
+  assertEquals(t.exempt_by, {
+    specnaut: 3,
+    installed_lock: 1,
+    exempt_glob: 1,
+    binary: 2,
+    generated: 0,
+  });
   assertEquals(t.missing, 1);
   // `diff` set: text whatever its bytes, so its NUL does not make it binary.
   assertEquals(t.measured, 6);

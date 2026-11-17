@@ -2,6 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import {
   exemptGlobsProblem,
   exemptRules,
+  type HeldBy,
   heldBy,
   MAX_EXEMPT_GLOBS,
   MAX_GLOB_LENGTH,
@@ -16,6 +17,7 @@ Deno.test("heldBy: the constitution is held first, even under a glob that takes 
   assertEquals(heldBy("docs/constitution.md", rules(["*"])), {
     kind: "unit",
     unit: "constitution",
+    marker: false,
   });
 });
 
@@ -25,8 +27,39 @@ Deno.test("heldBy: Specnaut's tree, then the lock's entries, then the globs", ()
   assertEquals(heldBy(".claude/agents/a.md", r), { kind: "exempt", reason: "installed_lock" });
   assertEquals(heldBy("deep/dir/deno.lock", r), { kind: "exempt", reason: "exempt_glob" });
   assertEquals(heldBy("gen/a/b.ts", r), { kind: "exempt", reason: "exempt_glob" });
-  assertEquals(heldBy("src/gen/b.ts", r), { kind: "unit", unit: "file" });
-  assertEquals(heldBy("specnaut/x.sh", r), { kind: "unit", unit: "file" });
+  assertEquals(heldBy("src/gen/b.ts", r), { kind: "unit", unit: "file", marker: true });
+  assertEquals(heldBy("specnaut/x.sh", r), { kind: "unit", unit: "file", marker: true });
+});
+
+Deno.test("heldBy: a generated name is exempt with no entry, after every config glob", () => {
+  assertEquals(heldBy("src/api.gen.ts", rules()), { kind: "exempt", reason: "generated" });
+  assertEquals(heldBy("src/api.gen.ts", rules(["src/*"])), {
+    kind: "exempt",
+    reason: "exempt_glob",
+  });
+});
+
+Deno.test("heldBy: a `!` entry keeps a file measured by name and by header, never a glob", () => {
+  const r = rules(["!src/api.gen.ts", "!*.lock", "!src/schema.ts"]);
+  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  assertEquals(heldBy("src/api.gen.ts", r), measured);
+  assertEquals(heldBy("deep/Cargo.lock", r), measured);
+  assertEquals(heldBy("src/schema.ts", r), measured);
+  assertEquals(heldBy("src/other.gen.ts", r), { kind: "exempt", reason: "generated" });
+  // `!` is never a positive glob, and never undoes one.
+  assertEquals(heldBy("!src/api.gen.ts", r), { kind: "exempt", reason: "generated" });
+  assertEquals(heldBy("src/x.ts", rules(["src/*", "!src/x.ts"])), {
+    kind: "exempt",
+    reason: "exempt_glob",
+  });
+});
+
+Deno.test("heldBy: a name holding a newline is never exempt, as the ratchet holds it", () => {
+  const r = rules(["*"], ["a\nb"]);
+  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  for (const path of ["a\nb", ".specnaut/a\nb", "x\ny.ts", "a\nb.gen.ts"]) {
+    assertEquals(heldBy(path, r), measured, JSON.stringify(path));
+  }
 });
 
 Deno.test("exemptGlobsProblem: a config over a bound is refused, never trimmed", () => {
@@ -97,7 +130,8 @@ Deno.test("heldBy: a glob takes a path when bash takes the path or /path, plain 
   const answers = await bashCase(pairs);
   const differ = pairs.filter(([g, s], i) => {
     if (i % 2 === 1) return false;
-    const exempt = heldBy(s, rules([g])).kind === "exempt";
+    const held = heldBy(s, rules([g]));
+    const exempt = held.kind === "exempt" && held.reason === "exempt_glob";
     return exempt !== (answers[i] || answers[i + 1]);
   });
   assertEquals(differ, [], "heldBy and bash disagree");

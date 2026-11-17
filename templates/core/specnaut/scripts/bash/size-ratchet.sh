@@ -33,10 +33,11 @@
 #
 # Exempt without asking: `.specnaut/**` and every file `.specnaut/installed.lock`
 # lists — Specnaut's own artefacts, which `specnaut upgrade` rewrites — plus
-# binary files and the config's `exempt:` globs. One file is the exception:
-# `docs/constitution.md`, loaded into every session, is held to the
-# `constitution` unit whenever it changes. `exempt:` globs do not reach it; a
-# project that wants no limit sets its `target` and `ceiling` to `none`.
+# binary files, the config's `exempt:` globs and generated code, each such file
+# printed as `generated:` (`_size_exempt.sh` says what counts). One file is the
+# exception: `docs/constitution.md`, loaded into every session, is held to the
+# `constitution` unit whenever it changes. No exemption reaches it; a project
+# that wants no limit sets its `target` and `ceiling` to `none`.
 #
 # `--report` also prints every checked file, `path: before → after`.
 #
@@ -142,11 +143,14 @@ while IFS= read -r -d '' status; do
     t="$c_target" c="$c_ceiling" label=" (unit constitution, source: $c_source)"
   else
     size_exempt "$path" && continue
+    size_generated_by_path "$status" "$old" "$path" && continue
     t="$target" c="$ceiling" label=""
   fi
   # A literal pathspec: as a glob, `*.ts` also matches whichever file sorts first.
   numstat="$(git --literal-pathspecs diff "${diff_args[@]}" --numstat -- "$path" | head -n 1)"
   case "$numstat" in -$'\t'-*) continue ;; esac
+  [ "$path" != "$CONSTITUTION" ] &&
+    size_generated_by_marker "$status" "$old" "$path" "$head_prefix" "$base" && continue
 
   if [ -n "$base" ]; then before="$(count_at "$base:$old")"; else before=0; fi
   after="$(count_at "$head_prefix$path")"

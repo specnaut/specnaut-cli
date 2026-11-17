@@ -38,7 +38,8 @@
       "specnaut": 1,
       "installed_lock": 0,
       "exempt_glob": 0,
-      "binary": 1
+      "binary": 1,
+      "generated": 0
     },
     "skipped_by": {
       "symlink": 0,
