@@ -120,21 +120,44 @@ Deno.test("only the merge passes the verifier a digest", async () => {
   assertEquals(strays, []);
 });
 
-Deno.test("merge step 0 reads Approved and Moved, and step 3 passes both digests", () => {
+/** The gate doc from § Merge's step 0 outcomes on, its whitespace folded. */
+const outcomes = () => {
   const g = flat(gate());
-  const outcomes = g.slice(g.indexOf("## Merge's step 0 outcomes"));
-  const approved = outcomes.indexOf("- **Approved** — the run passed a digest, exit 0");
-  const moved = outcomes.indexOf("- **Moved** — the run passed a digest and exited 1");
-  assert(approved > 0 && moved > approved && moved < outcomes.indexOf("- **Exit 1, read only"));
-  assertStringIncludes(outcomes, "the phase never compares digests itself");
-  assertStringIncludes(outcomes, "An `APPROVAL <class> moved` line voids that class's yes");
+  return g.slice(g.indexOf("## Merge's step 0 outcomes"));
+};
+
+Deno.test("merge step 0 reads Approved, Moved on a moved line, then Held, before the exit-1 case", () => {
+  const o = outcomes();
+  const at = (row: string) => o.indexOf(`- **${row}** — `);
+  assert(at("Approved") > 0, "no Approved row");
+  assertStringIncludes(o, "- **Approved** — the run passed a digest, exit 0");
+  assertStringIncludes(o, "- **Moved** — an `APPROVAL <class> moved` line, whatever the exit");
+  assertStringIncludes(o, "- **Held** — the run passed a digest, exit 1, and every `APPROVAL`");
+  const order = ["Approved", "Moved", "Held", "Exit 1, read only"].map((r) =>
+    o.indexOf(`- **${r}`)
+  );
+  assertEquals(order, [...order].sort((a, b) => a - b), "rows out of order");
+});
+
+Deno.test("Moved asks again from a run without the flag; Held counts a held class as trusted", () => {
+  const o = outcomes();
+  assertStringIncludes(o, "the phase never compares digests itself");
+  assertStringIncludes(o, "Run step 0 again without that flag and read that run from the top");
   assertStringIncludes(
-    g,
+    o,
+    "Read the run as one without flags, each class whose line holds counted as trusted: the " +
+      "scripts by the cases below, the instructions by § The instructions verdict, whose question " +
+      "is asked before step 3.",
+  );
+  assertStringIncludes(
+    flat(gate()),
     "its `APPROVAL instructions holds` line answers this question: it is not asked again",
   );
-  const merge = flat(read(`${TASK}phases/merge.md`));
+});
+
+Deno.test("merge step 3 passes both digests", () => {
   assertStringIncludes(
-    merge,
+    flat(read(`${TASK}phases/merge.md`)),
     "land-feature.sh [--scripts-digest <SCRIPTS_DIGEST>] [--instructions-digest <INSTRUCTIONS_DIGEST>]",
   );
 });

@@ -73,11 +73,13 @@ flag; the phase never compares digests itself. The first case that matches decid
 - **Trusted** — exit 0, a full `BASE` sha, and the last line `VERDICT scripts trusted`: go on.
 - **Approved** — the run passed a digest, exit 0, a full `BASE` sha, and an `APPROVAL <class>
   holds` line for each digest passed: go on under the yes.
-- **Moved** — the run passed a digest and exited 1: nothing goes on under the yes. An `APPROVAL
-  <class> moved` line voids that class's yes: the tree is not the one the user said yes to. Read
-  the run as below, a class whose `APPROVAL` line holds counting as answered: any other class not
-  trusted asks its question again (the scripts' here, the instructions' in § The instructions
-  verdict).
+- **Moved** — an `APPROVAL <class> moved` line, whatever the exit: that class's yes is void, the
+  tree is not the one the user said yes to. Run step 0 again without that flag and read that run
+  from the top: a class it finds untrusted asks its question again.
+- **Held** — the run passed a digest, exit 1, and every `APPROVAL` line holds: a class with no
+  flag is not trusted. Read the run as one without flags, each class whose line holds counted as
+  trusted: the scripts by the cases below, the instructions by § The instructions verdict, whose
+  question is asked before step 3.
 - **Exit 1, read only with a `BASE` line, at least one `UNTRUSTED` line and the last line
   `VERDICT scripts untrusted`** — otherwise it is *anything else*, below.
   - An `UNTRUSTED` path outside `.specnaut/scripts/` (`local <base> ahead of origin`, the lock at
