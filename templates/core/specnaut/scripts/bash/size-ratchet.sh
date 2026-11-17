@@ -8,10 +8,11 @@
 #                                               only (_explicit_head.sh)
 #
 # Reads the `file` and `constitution` units and the `exempt:` globs of
-# `.specnaut/size-limits.yml` through `_config.sh` beside it. A unit the file
-# does not set — every unit, with no file — takes the defaults of
-# `.specnaut/memory/size-limits.md`. That file states the rules; this script is
-# their deterministic half, and the one measurer the review phase calls.
+# `.specnaut/size-limits.yml` through `_config.sh` beside it, and leaves out
+# what `_size_exempt.sh` exempts. A unit the file does not set — every unit,
+# with no file — takes the defaults of `.specnaut/memory/size-limits.md`. That
+# file states the rules; this script is their deterministic half, and the one
+# measurer the review phase calls.
 #
 # "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #
@@ -56,8 +57,9 @@ set -uo pipefail
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
-{ . "$here/_config.sh" && . "$here/_explicit_head.sh" && . "$here/_size_ratchet_args.sh"; } || {
-  echo "size-ratchet: _config.sh, _explicit_head.sh or _size_ratchet_args.sh is missing beside the script" >&2
+{ . "$here/_config.sh" && . "$here/_explicit_head.sh" && . "$here/_size_ratchet_args.sh" &&
+  . "$here/_size_exempt.sh"; } || {
+  echo "size-ratchet: _config.sh, _explicit_head.sh, _size_ratchet_args.sh or _size_exempt.sh is missing beside the script" >&2
   exit 3
 }
 git() { explicit_head_git "$@"; } # every git call below: an --objects folder, read safely
@@ -80,25 +82,14 @@ limits="$(config_size_limits "$CONFIG_SIZE_LIMITS")" || {
   echo "size-ratchet: $CONFIG_SIZE_LIMITS: $limits" >&2
   exit 2
 }
-exempt=()
 while read -r unit rest; do
   case "$unit" in
     file) read -r target ceiling source_label <<<"$rest" ;;
     constitution) read -r c_target c_ceiling c_source <<<"$rest" ;;
-    exempt) exempt+=("$rest") ;;
   esac
 done <<<"$limits"
 
-# Specnaut's own files: the lock's entries.
-managed="$(config_lock_entries "$LOCK")"
-
-# A name holding a newline is never exempt: grep reads such a pattern as several
-# lines, any of which could name a managed file.
-is_exempt() {
-  case "$1" in *$'\n'*) return 1 ;; .specnaut/*) return 0 ;; esac
-  if [ -n "$managed" ] && printf '%s\n' "$managed" | grep -Fxq -- "$1"; then return 0; fi
-  config_exempt "$1" ${exempt[@]+"${exempt[@]}"}
-}
+size_exempt_init "$limits" "$LOCK" # Specnaut's own files and the `exempt:` globs
 
 count_at() { # <rev-spec> → line count, 0 when the blob does not exist
   git show "$1" 2>/dev/null | wc -l | tr -d ' '
@@ -150,7 +141,7 @@ while IFS= read -r -d '' status; do
   if [ "$path" = "$CONSTITUTION" ]; then
     t="$c_target" c="$c_ceiling" label=" (unit constitution, source: $c_source)"
   else
-    is_exempt "$path" && continue
+    size_exempt "$path" && continue
     t="$target" c="$ceiling" label=""
   fi
   # A literal pathspec: as a glob, `*.ts` also matches whichever file sorts first.
