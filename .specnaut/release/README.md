@@ -3,8 +3,9 @@
 These scripts compose the Specnaut CLI release pipeline alongside the bundled tag + notes scripts.
 The design spec (2026-05-26, "release flow") lives in the maintainer workspace.
 
-- `preflight.sh` — runs before any release mutation: branch, cleanliness, the `ci` AND `smoke`
-  workflows green on HEAD, smoke audit, bundle, test. Exits non-zero on any gate failure.
+- `preflight.sh` — runs before any release mutation: branch, cleanliness, open security alerts,
+  release-tag protection configured, the `ci` AND `smoke` workflows green on HEAD, smoke audit,
+  bundle, test. Exits non-zero on any gate failure.
 - `pretag.sh <tag> [binary]` — runs after the version bump, `deno task bundle` and the tests, before
   the tag: compiles the host target with `scripts/build.ts` (or takes `[binary]`) and runs
   `smoke-upgrade.sh <tag>` on it with an absolute path. It cannot be part of `preflight.sh`, because

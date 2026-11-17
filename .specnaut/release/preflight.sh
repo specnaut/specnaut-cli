@@ -107,6 +107,16 @@ found=0
 say "  ✓ no blocking alert: secret scanning, dependabot, code scanning, private advisories all read"
 # END alert-gate
 
+say "▶ release tags protected (read with your own gh credentials)"
+# BEGIN tag-protection-gate
+# Captured, then printed through `cat … || true`: a closed stdout must cost the
+# message, never turn a pass into a failure (see the pipe note at the top).
+tp_log="$(mktemp)"; tp_rc=0
+REPO="$repo" bash scripts/release/require-tag-protection.sh >"$tp_log" 2>&1 || tp_rc=$?
+cat "$tp_log" 2>/dev/null || true; rm -f "$tp_log"
+[ "$tp_rc" -eq 0 ] || exit 1
+# END tag-protection-gate
+
 say "▶ ci and smoke green on HEAD"
 sha="$(git rev-parse HEAD)"
 # BEGIN workflow-gate
