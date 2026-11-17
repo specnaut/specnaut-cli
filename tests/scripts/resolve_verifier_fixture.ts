@@ -1,6 +1,6 @@
 import { DELIMITER, fromFileUrl, join } from "@std/path";
 import { run } from "./git_sandbox.ts";
-import type { Layout, Shells } from "./resolve_verifier_layout.ts";
+import { ifMissing, type Layout, type Shells } from "./resolve_verifier_layout.ts";
 
 /**
  * The five spellings of the rule that judges the PATH and resolves `specnaut` before anything runs:
@@ -32,23 +32,28 @@ trap 'echo "ERR trap: $BASH_COMMAND" >&2; exit 12' ERR
 refuse_unsafe_path
 resolve_specnaut`;
 
-/** A stub's answer: the file that ran and the PATH it was given; or a refusal; or only an exit. */
+/**
+ * A stub's answer: the file that ran and the PATH it was given; or a refusal and the exit it came
+ * with, a refusal that lets the call run being none; or only an exit.
+ */
 export type Answer =
   | { resolved: string; path?: string }
-  | { refused: string; entry?: string }
+  | { refused: string; entry?: string; exit: number }
   | { exit: number };
 
-/** The refusal a run printed, its PATH entry named apart. */
-function refusal(text: string): Answer | undefined {
+/** The refusal a run printed, its PATH entry named apart, with the run's exit `code`. */
+function refusal(text: string, code: number): Answer | undefined {
   const m = /VERIFIER REFUSED: (?:PATH entry '(.*)'|\S+) (.+?)(?: - .*)?$/m.exec(text);
   if (!m) return undefined;
-  return m[1] === undefined ? { refused: m[2] } : { refused: m[2], entry: m[1] };
+  return m[1] === undefined
+    ? { refused: m[2], exit: code }
+    : { refused: m[2], entry: m[1], exit: code };
 }
 
 /** What a stub recorded, removed so the next run starts with none. */
 async function seen(l: Layout): Promise<Answer | undefined> {
   const file = join(l.tmp, "seen");
-  const text = await Deno.readTextFile(file).catch(() => undefined);
+  const text = await Deno.readTextFile(file).catch(ifMissing(undefined));
   if (text === undefined) return undefined;
   await Deno.remove(file);
   const [ran, path] = text.split("\n");
@@ -63,14 +68,18 @@ async function resolver(shell: string, flags: string[], code: string, r: Run): P
   const out = await run(shell, [...flags, `${code}\nprintf 'SN %s\\n' "$sn"`], r.cwd, path(r));
   const sn = /^SN (.+)$/m.exec(out.stdout)?.[1];
   if (sn) return { resolved: sn };
-  return refusal(`${out.stdout}${out.stderr}`) ?? { exit: out.code };
+  return refusal(`${out.stdout}${out.stderr}`, out.code) ?? { exit: out.code };
 }
 
 const path = (r: Run) => ({ PATH: r.entries.join(DELIMITER) });
 
-/** A tool call of session s-1, whose lock is held; a shell command that starts a review. */
+/**
+ * A tool call of session s-1, whose lock is held; a shell command that starts a review, which runs
+ * on the session's own PATH; one that names a review and starts none.
+ */
 export const CALL = '{"session_id":"s-1","tool_name":"Bash"}';
-const START = '{"tool_input":{"command":"specnaut review start 1"}}';
+export const START = '{"tool_input":{"command":"specnaut review start 1"}}';
+const MENTION = '{"tool_input":{"command":"specnaut review status"}}';
 
 /** The answer of each spelling, in one shell's run each; `zsh` only where it is installed. */
 export async function answers(l: Layout, r: Run): Promise<Record<string, Answer>> {
@@ -81,6 +90,7 @@ export async function answers(l: Layout, r: Run): Promise<Record<string, Answer>
     landScript: await landScript(r),
     lock: await hook(l, r, "review-lock.sh", CALL),
     gate: await hook(l, r, "review-gate.sh", START),
+    mention: await hook(l, r, "review-gate.sh", MENTION),
     record: await hook(l, r, "record-checkout.sh", ""),
   };
   if (r.zsh) all.zsh = await resolver(r.zsh, ["-f", "-c"], block, r);
@@ -90,7 +100,7 @@ export async function answers(l: Layout, r: Run): Promise<Record<string, Answer>
 /** land-feature.sh itself, as far as its first refusal. */
 async function landScript(r: Run): Promise<Answer> {
   const out = await run(r.bash, [join(BASH_DIR, "land-feature.sh")], r.cwd, path(r));
-  return refusal(out.stderr) ?? { exit: out.code };
+  return refusal(out.stderr, out.code) ?? { exit: out.code };
 }
 
 /** A hook as Claude Code runs it, `input` on stdin: what the stub saw, a refusal, or the exit. */
@@ -104,5 +114,5 @@ export async function hook(l: Layout, r: Run, name: string, input: string): Prom
     r.cwd,
     env,
   );
-  return (await seen(l)) ?? refusal(out.stderr) ?? { exit: out.code };
+  return (await seen(l)) ?? refusal(out.stderr, out.code) ?? { exit: out.code };
 }

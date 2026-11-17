@@ -1,4 +1,4 @@
-import { DELIMITER, fromFileUrl, join } from "@std/path";
+import { DELIMITER, fromFileUrl, isAbsolute, join } from "@std/path";
 import { DENO_DIR } from "../integration/spawn_env.ts";
 
 /**
@@ -10,10 +10,17 @@ import { DENO_DIR } from "../integration/spawn_env.ts";
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 let bin: string | undefined;
 
-/** `path` with the folder holding the shim first. */
+/**
+ * `path` with the folder holding the shim first, and without the entries land-feature.sh refuses
+ * (exit 13): empty, relative - a developer's `./node_modules/.bin` - or holding a `.` or `..`. What
+ * is left is absolute and outside every sandbox, each made after the suite's PATH was set.
+ */
 export function withSpecnaut(path: string | undefined): string {
   bin ??= made();
-  return path ? `${bin}${DELIMITER}${path}` : bin;
+  const kept = (path ?? "").split(DELIMITER).filter((e) =>
+    isAbsolute(e) && !/(^|[\\/])\.\.?([\\/]|$)/.test(e)
+  );
+  return [bin, ...kept].join(DELIMITER);
 }
 
 /** `env` with the shim first on its PATH, under the name the platform gives that variable. */

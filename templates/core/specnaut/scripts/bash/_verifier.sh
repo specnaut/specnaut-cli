@@ -49,26 +49,31 @@ entry_unsafe() {
   [ -n "$why" ] || entry_in_tree "$1"
 }
 
-# Whether the absolute entry $1 is in the tree, `why` naming how. Its longest part that is there
-# is entered with `cd -P`, every link on it followed - a link to a folder of the tree is in the
-# tree - and walked up against the top by `-ef`, so neither case nor a spelling hides it. A part
-# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+# Whether $1, or a folder above it as it is spelled, is the top: `-ef` compares device and inode,
+# so neither case nor a spelling hides it.
+under_top() {
+  local a=$1
+  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+  [ "$a" -ef "$top" ]
+}
+
+# Whether the absolute entry $1 is in the tree, `why` naming how. Spelled in the tree, it is in it:
+# a link there points where the branch says. Else its longest part that is there is entered with
+# `cd -P`, every link on it followed - a link to a folder of the tree is in the tree - and walked
+# up the same way. A part that is there and cannot be entered (a file, a dangling link) could be
+# made one: it counts in.
 entry_in_tree() {
   local a=$1
-  while ! [ -e "$a" ] && ! [ -L "$a" ]; do
-    a=${a%/*}
-    a=${a:-/}
-  done
+  why="is inside the repository"
+  under_top "$a" && return 0
+  while ! [ -e "$a" ] && ! [ -L "$a" ]; do a=${a%/*}; a=${a:-/}; done
   if ! a=$(cd -P "$a" 2>/dev/null && pwd); then
     why="names a folder that cannot be entered"
     return 0
   fi
-  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do
-    a=${a%/*}
-    a=${a:-/}
-  done
-  [ "$a" -ef "$top" ] || return 1
-  why="is inside the repository"
+  under_top "$a" && return 0
+  why=""
+  return 1
 }
 
 # The verifier, resolved before it runs, into `sn`: `specnaut` on the PATH must be an absolute

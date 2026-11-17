@@ -12,7 +12,8 @@ verify-scripts`, never the bare name: the PATH can name a folder of the tree, wh
 `specnaut` of its own. Before git runs, it judges the PATH itself, every command being looked up on
 it: an entry that is empty or relative (searched from the working folder), holds a `.` or `..`, or
 sits in the tree (the nearest folder holding a `.git`) can supply any command, and the first one is
-refused by name. Then it sets `sn` to the physical file `specnaut` resolves to, following each
+refused by name. An entry sits in the tree when it is spelled there, whatever a link of the tree
+points at, or when the links on it lead there. Then it sets `sn` to the physical file `specnaut` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
 neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository. It runs
@@ -28,6 +29,8 @@ while [ -z "$why" ] && [ -n "$rest" ]; do
   e=${rest%%:*}; rest=${rest#*:}; a=$e
   case $e in "") why="is empty" ;; /*) ;; *) why="is not an absolute path" ;; esac
   case /$e/ in */./* | */../*) [ -n "$why" ] || why="has a . or .. component" ;; esac
+  while [ -z "$why" ] && [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+  [ -n "$why" ] || ! [ "$a" -ef "$top" ] || why="is inside the repository"; a=$e
   while [ -z "$why" ] && ! [ -e "$a" ] && ! [ -L "$a" ]; do a=${a%/*}; a=${a:-/}; done
   [ -n "$why" ] || a=$(cd -P "$a" 2>/dev/null && pwd) || why="names a folder that cannot be entered"
   while [ -z "$why" ] && [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done

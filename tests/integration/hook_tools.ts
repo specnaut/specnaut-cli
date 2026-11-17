@@ -18,7 +18,7 @@ export async function toolsIn(dir: string, names: readonly string[]): Promise<st
 }
 
 /** What the hooks and their stubs run: the hooks' own commands, and the stubs' `env bash`. */
-export const HOOK_TOOLS = ["bash", "cat", "env", "git", "rm", "dirname", "readlink"] as const;
+const HOOK_TOOLS = ["bash", "cat", "env", "git", "rm", "dirname", "readlink"] as const;
 
 let shared: Promise<string> | undefined;
 

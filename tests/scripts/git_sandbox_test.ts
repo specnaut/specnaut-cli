@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { DELIMITER, join } from "@std/path";
 import { run } from "./git_sandbox.ts";
 
 /**
@@ -40,5 +40,23 @@ Deno.test("a child of run() sees no global git config, no GIT_* variable, and th
       v === undefined ? Deno.env.delete(k) : Deno.env.set(k, v);
     }
     await Deno.remove(home, { recursive: true });
+  }
+});
+
+Deno.test("a child of run() is given only the inherited PATH entries land-feature.sh accepts", async () => {
+  // A developer's `./node_modules/.bin`, an empty entry or a `..`: land-feature.sh refuses each one
+  // with 13, so a PATH carried over from the shell running the suite would fail cases no test set.
+  const saved = Deno.env.get("PATH");
+  const leaks = ["", "node_modules/.bin", "./bin", "/opt/../usr/bin"];
+  try {
+    Deno.env.set("PATH", [...leaks, saved ?? ""].join(DELIMITER));
+    const r = await run("bash", ["-c", 'printf %s "$PATH"'], Deno.cwd());
+    const entries = r.stdout.split(DELIMITER);
+    for (const leak of leaks) {
+      assertEquals(entries.includes(leak), false, `'${leak}' reached the sandbox`);
+    }
+    assertEquals(entries.length > 1, true, "the sandbox lost the inherited PATH");
+  } finally {
+    saved === undefined ? Deno.env.delete("PATH") : Deno.env.set("PATH", saved);
   }
 });

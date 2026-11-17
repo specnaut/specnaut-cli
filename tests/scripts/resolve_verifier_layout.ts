@@ -57,7 +57,7 @@ async function layout(tmp: string): Promise<Layout> {
     outside: await stub({ tmp }, join(tmp, "outside", "real")),
     sibling: await stub({ tmp }, join(tmp, "repo-x", "bin")),
     state: await lockCopy(tmp),
-    caseBlind: await Deno.stat(join(tmp, "REPO", "bin")).then(() => true, () => false),
+    caseBlind: await Deno.stat(join(tmp, "REPO", "bin")).then(() => true, ifMissing(false)),
   };
   await links(l);
   return l;
@@ -86,7 +86,10 @@ export async function inLayout(fn: (l: Layout, shells: Shells) => Promise<void>)
   }
 }
 
-/** Linked parents and folders, links across the repository's edge both ways, a chain, a dangler. */
+/**
+ * Linked parents and folders, links across the repository's edge both ways (a folder of the tree
+ * that is a link to one outside included), a chain, a dangler.
+ */
 async function links(l: Layout) {
   await Deno.symlink(l.repo, join(l.tmp, "alias"));
   await Deno.symlink(l.bin, join(l.tmp, "binlink"));
@@ -95,6 +98,7 @@ async function links(l: Layout) {
   await Deno.symlink(join(l.bin, "specnaut"), join(l.tmp, "outside", "links", "specnaut"));
   await Deno.mkdir(join(l.repo, "linkbin"));
   await Deno.symlink(l.outside, join(l.repo, "linkbin", "specnaut"));
+  await Deno.symlink(join(l.tmp, "outside", "real"), join(l.repo, "outlink"));
   const chain = join(l.tmp, "outside", "chain");
   await Deno.mkdir(chain);
   await Deno.symlink(l.outside, join(chain, "c2"));
@@ -105,7 +109,13 @@ async function links(l: Layout) {
 /** The markers that ran, removed so the next run starts with none. */
 export async function fired(l: Layout): Promise<string> {
   const file = join(l.tmp, "fired");
-  const text = await Deno.readTextFile(file).catch(() => "");
-  await Deno.remove(file).catch(() => {});
+  const text = await Deno.readTextFile(file).catch(ifMissing(""));
+  await Deno.remove(file).catch(ifMissing(undefined));
   return text;
 }
+
+/** A rejection handler: `value` when the file is not there; any other failure is the test's. */
+export const ifMissing = <T>(value: T) => (e: unknown): T => {
+  if (e instanceof Deno.errors.NotFound) return value;
+  throw e;
+};

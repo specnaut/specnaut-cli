@@ -42,26 +42,31 @@ entry_unsafe() {
   [ -n "$why" ] || entry_in_tree "$1"
 }
 
-# Whether the absolute entry $1 is in the tree, `why` naming how. Its longest part that is there
-# is entered with `cd -P`, every link on it followed - a link to a folder of the tree is in the
-# tree - and walked up against the top by `-ef`, so neither case nor a spelling hides it. A part
-# that is there and cannot be entered (a file, a dangling link) could be made one: it counts in.
+# Whether $1, or a folder above it as it is spelled, is the top: `-ef` compares device and inode,
+# so neither case nor a spelling hides it.
+under_top() {
+  local a=$1
+  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
+  [ "$a" -ef "$top" ]
+}
+
+# Whether the absolute entry $1 is in the tree, `why` naming how. Spelled in the tree, it is in it:
+# a link there points where the branch says. Else its longest part that is there is entered with
+# `cd -P`, every link on it followed - a link to a folder of the tree is in the tree - and walked
+# up the same way. A part that is there and cannot be entered (a file, a dangling link) could be
+# made one: it counts in.
 entry_in_tree() {
   local a=$1
-  while ! [ -e "$a" ] && ! [ -L "$a" ]; do
-    a=${a%/*}
-    a=${a:-/}
-  done
+  why="is inside the repository"
+  under_top "$a" && return 0
+  while ! [ -e "$a" ] && ! [ -L "$a" ]; do a=${a%/*}; a=${a:-/}; done
   if ! a=$(cd -P "$a" 2>/dev/null && pwd); then
     why="names a folder that cannot be entered"
     return 0
   fi
-  while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do
-    a=${a%/*}
-    a=${a:-/}
-  done
-  [ "$a" -ef "$top" ] || return 1
-  why="is inside the repository"
+  under_top "$a" && return 0
+  why=""
+  return 1
 }
 
 # PATH rebuilt from the entries the rule keeps, in order, and exported, so every command of this
@@ -86,15 +91,14 @@ clean_path() {
 # link followed one hop at a time, neither its folder nor a link on the way in the tree. A refusal
 # leaves `why` naming the path and the reason; no `specnaut` on the PATH leaves it empty.
 resolve_sn() {
-  local p d a t n=0
+  local p d t n=0
   sn="" why=""
   p=$(command -v specnaut) || return 1
   case $p in /*) ;; *) why="is not an absolute path" ;; esac
   while [ -z "$why" ]; do
     if ! d=$(cd -P "${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
-    p="$d/${p##*/}"; a=$d
-    while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
-    if [ "$a" -ef "$top" ]; then why="is inside the repository"; break; fi
+    p="$d/${p##*/}"
+    if under_top "$d"; then why="is inside the repository"; break; fi
     if ! [ -L "$p" ]; then sn=$p; return 0; fi
     n=$((n + 1)); if [ "$n" -gt 40 ]; then why="links more than 40 times"; break; fi
     if ! t=$(readlink "$p"); then why="is a link that cannot be read"; break; fi
