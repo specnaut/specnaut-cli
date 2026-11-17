@@ -21,7 +21,7 @@ Deno.test("a twin is any other path under the folded name, a folder aside", () =
     at("docs/RULES.MD", "tree"),
     at("docs/other.md"),
   ]);
-  assertEquals(twinsAtHead("docs/rules.md", index).map((t) => t.path), [
+  assertEquals(twinsAtHead("docs/rules.md", index), [
     "docs/Rules.md",
     "Docs/RULES.md",
     "DOCS/rules.md",
@@ -32,7 +32,7 @@ Deno.test("a twin is any other path under the folded name, a folder aside", () =
 Deno.test("a name in another Unicode normalisation is a twin: the disk folds it too", () => {
   const nfd = "docs/café.md";
   const index = pathIndex([at("docs/café.md"), at(nfd)]);
-  assertEquals(twinsAtHead("docs/café.md", index).map((t) => t.path), [nfd]);
+  assertEquals(twinsAtHead("docs/café.md", index), [nfd]);
 });
 
 Deno.test("the first link on a path's way, the path itself included, folded", () => {
@@ -40,6 +40,13 @@ Deno.test("the first link on a path's way, the path itself included, folded", ()
   assertEquals(linkOnTheWay("Shared/a/b.md", index)?.path, "shared");
   assertEquals(linkOnTheWay("x.md", index)?.path, "x.md");
   assertEquals(linkOnTheWay("docs/a.md", index), undefined);
+});
+
+Deno.test("a link beside a folder spelled as written is no link on the way, but a path to judge", () => {
+  const index = pathIndex([at("docs", "tree"), at("docs/rules.md"), at("Docs", "link", "evil")]);
+  assertEquals(linkOnTheWay("docs/rules.md", index), undefined);
+  assertEquals(linkOnTheWay("DOCS/rules.md", index)?.path, "Docs");
+  assertEquals(twinsAtHead("docs/rules.md", index), ["Docs/rules.md"]);
 });
 
 Deno.test("a path leads through each link on its way to the file a session reads", () => {

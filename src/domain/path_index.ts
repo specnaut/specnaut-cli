@@ -31,21 +31,38 @@ export function pathIndex(paths: readonly IndexedPath[]): PathIndex {
 }
 
 /**
- * Every other path HEAD holds under `target`'s folded name, whatever its kind but a folder: on a
- * disk that folds names, any of them may be the file a session opens, whether or not HEAD also
- * holds `target` as written.
+ * Every other spelling of `target` HEAD holds that a disk folding names may open instead: a path
+ * under its folded name whatever its kind (a folder aside), and the target read through a link
+ * under another spelling of one of its folders (`docs/rules.md` through a `Docs` link beside the
+ * `docs/` folder). Whether or not HEAD also holds `target` as written.
  */
-export function twinsAtHead(target: string, head: PathIndex): IndexedPath[] {
-  return (head.get(fold(target)) ?? []).filter((p) => p.path !== target && p.kind !== "tree");
+export function twinsAtHead(target: string, head: PathIndex): string[] {
+  const parts = target.split("/");
+  const out: string[] = [];
+  for (let i = 1; i <= parts.length; i++) {
+    const step = parts.slice(0, i).join("/");
+    const last = i === parts.length;
+    for (const p of head.get(fold(step)) ?? []) {
+      if (p.path === step || (last ? p.kind === "tree" : p.kind !== "link")) continue;
+      out.push([p.path, ...parts.slice(i)].join("/"));
+    }
+  }
+  return out;
 }
 
-/** The first link among `path`'s folders, or `path` itself, folded. */
+/**
+ * The first link on `path`'s way, `path` itself included: at each folder, the entry spelled as
+ * written when the commit holds one, else one under another spelling (the one a disk folding
+ * names opens). A link beside an entry spelled as written is not on the way: `twinsAtHead` names
+ * the path through it as another file to judge.
+ */
 export function linkOnTheWay(path: string, index: PathIndex): IndexedPath | undefined {
   const parts = path.split("/");
   for (let i = 1; i <= parts.length; i++) {
-    const at = index.get(fold(parts.slice(0, i).join("/")));
-    const link = at?.find((p) => p.kind === "link");
-    if (link !== undefined) return link;
+    const step = parts.slice(0, i).join("/");
+    const at = index.get(fold(step)) ?? [];
+    const taken = at.find((p) => p.path === step) ?? at.find((p) => p.kind === "link");
+    if (taken?.kind === "link") return taken;
   }
   return undefined;
 }

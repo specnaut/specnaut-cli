@@ -73,7 +73,7 @@ export async function visit(walk: Walk, written: string): Promise<string[]> {
   if (target === null || walk.files.has(target)) return [];
   const { sides, ends, outside } = await readSides(walk, target);
   walk.files.set(target, sides);
-  const twins = twinsAtHead(target, await indexAt(walk, walk.base.head)).map((t) => t.path);
+  const twins = twinsAtHead(target, await indexAt(walk, walk.base.head));
   if (outside !== undefined) {
     walk.reasons.push({ path: target, reason: `${IMPORT_REASON.linkOnTheWay}: ${outside}` });
   } else if (sides.head === "absent" && twins.length > 0) {
@@ -90,7 +90,8 @@ type Found = { readonly ends: string[]; outside?: string };
 /**
  * `path` at HEAD, the tip and the merge base, each through the links that commit holds on its way
  * (`throughLinks`): the bytes a session reads there. Each end other than `path` is returned, to be
- * judged as a file of its own; a link HEAD holds that leaves the repository is `outside`.
+ * judged as a file of its own; a link HEAD holds that leaves the repository is `outside`, and that
+ * side reads as absent.
  */
 async function readSides(walk: Walk, path: string): Promise<Found & { sides: ImportSides }> {
   const found: Found = { ends: [] };
@@ -103,8 +104,9 @@ async function readSides(walk: Walk, path: string): Promise<Found & { sides: Imp
 async function sideAt(walk: Walk, commit: string, path: string, found: Found) {
   const through = throughLinks(walk.git.projectPrefix, path, await indexAt(walk, commit));
   if ("outside" in through) {
+    // Nothing in the repository is read there: the reason below names it, at HEAD.
     if (commit === walk.base.head) found.outside ??= through.outside;
-    return imported(await walk.git.readFile(commit, path));
+    return "absent";
   }
   if (through.end !== path && !found.ends.includes(through.end)) found.ends.push(through.end);
   return imported(await walk.git.readFile(commit, through.end));
