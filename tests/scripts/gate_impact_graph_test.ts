@@ -29,11 +29,13 @@ const codeOf = async (file: string) =>
   (await Deno.readTextFile(join(SCRIPTS, file))).split("\n")
     .filter((l) => !l.trim().startsWith("#")).join("\n");
 
-/** The body of the function `name` opens, up to its closing brace in column 1. */
+/** The function `opening` starts, up to its closing brace in column 1. */
 const bodyOf = (code: string, opening: string) => {
   const start = code.indexOf(opening);
   assert(start >= 0, `${opening} not found`);
-  return code.slice(start, code.indexOf("\n}", start));
+  const end = code.indexOf("\n}", start);
+  assert(end >= 0, `${opening} has no closing brace in column 1`);
+  return code.slice(start, end);
 };
 
 for (const twin of TWINS) {
@@ -134,7 +136,8 @@ Deno.test({
 Deno.test("the impact graphs run git only through the wrapper that obeys no replace ref", async () => {
   for (const file of ["bash/_gate_impact_graph.sh", "powershell/_gate_impact_graph.ps1"]) {
     const code = await codeOf(file);
-    assert(!/(^|[^\w-])['"]?git['"]?(\s|$)/m.test(code), `${file} runs git itself`);
+    // A bare token, however it is quoted or followed: `git`, `'git',`, `('git')`, `git.exe`.
+    assert(!/(^|[^\w-])['"]?git(\.exe)?['"]?(?![\w-])/m.test(code), `${file} runs git itself`);
     const lsTrees = code.split("\n").filter((l) => l.includes("ls-tree"));
     assert(lsTrees.length > 0, `${file} reads no tree`);
     for (const l of lsTrees) assertStringIncludes(l, "--full-tree", file);
