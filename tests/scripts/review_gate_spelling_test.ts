@@ -12,9 +12,8 @@ import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
 
 /**
  * The spellings of a line review-gate.sh reads past the quoting of resolve_verifier_hooks_test.ts:
- * dollar quoting, a backslash-newline the shell keeps, the Windows launcher names, a PATH the line
- * assigns, and a pattern of its own the shell cannot compile. Each run plants markers in the
- * dropped entry; none may fire.
+ * dollar quoting, a kept backslash-newline, the Windows launcher names, PATH named on the line, a
+ * pattern the shell cannot compile, the locale. Markers in the dropped entry: none may fire.
  */
 
 /** The hook's input for a Bash call of `command`, with a description if given. */
@@ -55,6 +54,9 @@ Deno.test({
         "$'\\x73'pecnaut x",
         'spec$""naut x',
         '/opt/x/specnaut re$""view start 1',
+        // Past a line continuation, which the shell joins before it reads the quote.
+        "$\\\n'\\x73'pecnaut x",
+        'spec$\\\n""naut x',
       ];
       assertEquals(await gate(l, r, lines), each(lines, want));
       const said = bashCall("ls", "Split on $'\\n'");
@@ -88,25 +90,42 @@ Deno.test({
     }),
 });
 
+/** Lines that start a review and name PATH bare, so it can be set, by any spelling or letter case. */
+const NAMES_PATH = [
+  "PATH=./bin:$PATH specnaut review start 1",
+  'export PATH="$PWD/bin:$PATH"; specnaut review start 1',
+  "env PATH=bin specnaut review start 1",
+  "PATH+=:bin; specnaut review start 1",
+  "path+=(bin); specnaut review start 1",
+  "PATH[0]=bin:$PATH specnaut review start 1",
+  "read PATH; specnaut review start 1",
+  "PA\\\nTH=bin specnaut review start 1",
+  "ls # note\\\nPATH=bin specnaut review start 1",
+];
+
+/** Lines that start a review and only read PATH, name another variable, or quote the word. */
+const READS_PATH = [
+  "MYPATH=x specnaut review start 1",
+  'echo "$PATH"; specnaut review start 1',
+  'echo "a \\" in PATH"; specnaut review start 1',
+  "GOPATH=/go NODE_PATH=lib echo $PATH ${PATH%%:*}; specnaut review start 1",
+];
+
 Deno.test({
-  name: "a line that starts a review and assigns PATH is refused, with no entry dropped",
+  name: "a line that starts a review and names PATH is refused, with no entry dropped",
   ignore: Deno.build.os === "windows",
   fn: () =>
     inLayout(async (l, { bash }) => {
       const r = { entries: [join(l.tmp, "outside", "real"), l.tools], cwd: l.repo, bash };
-      const assigned = [
-        "PATH=./bin:$PATH specnaut review start 1",
-        'export PATH="$PWD/bin:$PATH"; specnaut review start 1',
-        "env PATH=bin specnaut review start 1",
-        "PATH+=:bin; specnaut review start 1",
-      ];
-      const want = { refused: "is assigned on the line that starts a review", exit: 2 };
-      assertEquals(await gate(l, r, assigned), each(assigned, want));
+      const want = {
+        refused: "is named on the line that starts a review, where it can be set",
+        exit: 2,
+      };
+      assertEquals(await gate(l, r, NAMES_PATH), each(NAMES_PATH, want));
       // The gate judges these, review-untrusted.md's start among them: the stub records itself.
-      const documented = `${docBlock()}\nout=$("$sn" review start "1" --expect "abc")`;
-      const read = ["MYPATH=x specnaut review start 1", 'echo "$PATH"; specnaut review start 1'];
+      const read = [...READS_PATH, `${docBlock()}\nout=$("$sn" review start "1" --expect "abc")`];
       const gated = { resolved: l.outside, path: r.entries.join(DELIMITER) };
-      assertEquals(await gate(l, r, [...read, documented]), each([...read, documented], gated));
+      assertEquals(await gate(l, r, read), each(read, gated));
     }),
 });
 
@@ -143,5 +162,37 @@ Deno.test({
         assertStringIncludes(out.stderr, "review-gate: a pattern this shell cannot compile", name);
       }
       assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
+    }),
+});
+
+Deno.test({
+  name:
+    "with an entry dropped, a command holding `$'` is refused for that, and says how to write it",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout(async (l, { bash }) => {
+      const { r } = dropping(l, bash);
+      const out = await hookAt(l, r, join(HOOKS, "review-gate.sh"), bashCall("grep 'x$' f"));
+      assertEquals(out.code, 2, out.stderr);
+      assertStringIncludes(out.stderr, `PATH entry '${l.bin}' is inside the repository`);
+      assertStringIncludes(out.stderr, "the command holds $', whose escapes can spell any name");
+      assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
+    }),
+});
+
+Deno.test({
+  name: "with an entry dropped, the session's locale does not decide what the hook matches",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout(async (l, { bash }) => {
+      const { r } = dropping(l, bash);
+      // A byte no UTF-8 decodes: in a UTF-8 locale, a pattern then matches nothing on the line.
+      const [head, tail] = bashCall("@; specnaut x").split("@").map((t) =>
+        new TextEncoder().encode(t)
+      );
+      const bytes = new Uint8Array([...head, 0xff, ...tail]);
+      const out = await hookAt(l, r, join(HOOKS, "review-gate.sh"), bytes, { LC_ALL: "C.UTF-8" });
+      assertEquals(out.code, 2, out.stderr);
+      assertStringIncludes(out.stderr, `PATH entry '${l.bin}' is inside the repository`);
     }),
 });

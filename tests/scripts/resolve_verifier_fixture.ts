@@ -149,17 +149,23 @@ const hookEnv = (l: Layout, r: Run) => ({
   XDG_STATE_HOME: l.state,
 });
 
-/** The hook script at `file`, run by bash as `hook` runs one: its exit and its stderr, as written. */
-export function hookAt(l: Layout, r: Run, file: string, input: string) {
-  return spawnWith([r.bash, file], r.cwd, hookEnv(l, r), input);
+/**
+ * The hook script at `file`, run by bash as `hook` runs one, `more` added to its variables: its exit
+ * and its stderr, as written. `input` may be bytes no string encodes.
+ */
+export function hookAt(l: Layout, r: Run, file: string, input: Input, more = {}) {
+  return spawnWith([r.bash, file], r.cwd, { ...hookEnv(l, r), ...more }, input);
 }
+
+/** What a run is fed on stdin: text, written as UTF-8, or bytes as they are. */
+type Input = string | Uint8Array;
 
 /** `argv` started with exactly `env`, `input` on stdin: its exit and what it wrote on stderr. */
 export async function spawnWith(
   [cmd, ...args]: string[],
   cwd: string,
   env: Record<string, string>,
-  input: string,
+  input: Input,
 ): Promise<{ code: number; stderr: string }> {
   const child = new Deno.Command(cmd, {
     args,
@@ -179,10 +185,10 @@ export async function spawnWith(
  * `input` written to `stdin`, then closed. A hook that refuses may exit before it reads a byte: the
  * write then breaks its pipe, which is that refusal's own outcome, never the test's failure.
  */
-export async function feed(stdin: WritableStream<Uint8Array>, input: string): Promise<void> {
+export async function feed(stdin: WritableStream<Uint8Array>, input: Input): Promise<void> {
   const writer = stdin.getWriter();
   try {
-    await writer.write(new TextEncoder().encode(input));
+    await writer.write(typeof input === "string" ? new TextEncoder().encode(input) : input);
     await writer.close();
   } catch (err) {
     if (!(err instanceof Deno.errors.BrokenPipe)) throw err;
