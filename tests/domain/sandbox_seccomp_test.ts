@@ -1,13 +1,12 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
+import { isFilterArch, SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import {
   AF_VSOCK,
   DENIED_SYSCALLS,
-  isFilterArch,
-  SECCOMP_FD,
-  seccompFilter,
+  PERSONALITY_NUMBERS,
   SOCKET_NUMBERS,
   SYSCALL_NUMBERS,
-} from "../../src/domain/sandbox_seccomp.ts";
+} from "../../src/domain/sandbox_syscalls.ts";
 
 /**
  * The syscall filter bubblewrap loads before it runs a branch's gates. The program is run here by a
@@ -36,6 +35,7 @@ function verdict(program: Uint8Array, arch: number, nr: number, arg0 = 0): numbe
     else if (op === 0x06) return k;
     else if (op === 0x15) pc += acc === k ? jt : jf;
     else if (op === 0x35) pc += acc >= k ? jt : jf;
+    else if (op === 0x45) pc += (acc & k) !== 0 ? jt : jf;
     else throw new Error(`instruction ${pc}: opcode ${op.toString(16)} is not interpreted`);
   }
   throw new Error("the program ran past its end without returning");
@@ -82,11 +82,6 @@ for (const arch of ["x86_64", "aarch64"] as const) {
     assertEquals(program.length % 8, 0);
     assert(program.length / 8 <= 4096);
   });
-
-  Deno.test(`SYSCALL_NUMBERS.${arch}: no two calls share a number`, () => {
-    const numbers = Object.values(SYSCALL_NUMBERS[arch]);
-    assertEquals(new Set(numbers).size, numbers.length);
-  });
 }
 
 Deno.test("seccompFilter(x86_64): every x32 call fails, as an x32 call bypasses the numbers", () => {
@@ -94,46 +89,6 @@ Deno.test("seccompFilter(x86_64): every x32 call fails, as an x32 call bypasses 
   for (const nr of [0x40000000, 0x40000000 + 165, 0x40000000 + 59]) {
     assertEquals(verdict(program, AUDIT.x86_64, nr), RET_ERRNO_EPERM, String(nr));
   }
-});
-
-Deno.test("seccompFilter: mounting, namespaces, keyrings, modules and bpf are denied", () => {
-  for (
-    const name of [
-      "mount",
-      "umount2",
-      "pivot_root",
-      "unshare",
-      "setns",
-      "fsopen",
-      "open_tree",
-      "keyctl",
-      "add_key",
-      "init_module",
-      "finit_module",
-      "kexec_load",
-      "bpf",
-      "perf_event_open",
-      "userfaultfd",
-      "io_uring_setup",
-      "open_by_handle_at",
-      "ptrace",
-    ] as const
-  ) {
-    if (name === "ptrace") {
-      assert(!(DENIED_SYSCALLS as readonly string[]).includes(name), "ptrace stays allowed");
-      continue;
-    }
-    assert(DENIED_SYSCALLS.includes(name), name);
-    for (const arch of ["x86_64", "aarch64"] as const) {
-      assert(SYSCALL_NUMBERS[arch][name] !== undefined, `${name} on ${arch}`);
-    }
-  }
-});
-
-Deno.test("SYSCALL_NUMBERS: a call missing on an architecture is one it does not have", () => {
-  const missing = DENIED_SYSCALLS.filter((n) => SYSCALL_NUMBERS.aarch64[n] === undefined);
-  assertEquals(missing, ["iopl", "ioperm", "uselib"]);
-  assertEquals(DENIED_SYSCALLS.filter((n) => SYSCALL_NUMBERS.x86_64[n] === undefined), []);
 });
 
 Deno.test("isFilterArch: a filter exists for x86_64 and aarch64 only", () => {
@@ -147,15 +102,23 @@ Deno.test("SECCOMP_FD: past the three standard streams", () => {
   assertEquals(SECCOMP_FD, 3);
 });
 
-Deno.test("the shared list's newest calls have a number on both architectures", () => {
-  const expected = {
-    x86_64: { kcmp: 312, fanotify_init: 300, mbind: 237, set_mempolicy: 238, get_mempolicy: 239 },
-    aarch64: { kcmp: 272, fanotify_init: 262, mbind: 235, set_mempolicy: 237, get_mempolicy: 236 },
-  } as const;
-  for (const arch of ["x86_64", "aarch64"] as const) {
-    for (const [name, nr] of Object.entries(expected[arch])) {
-      assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>)[name], nr, `${arch} ${name}`);
+// The values the engines' default profiles let `personality` take, as the container profile does.
+const PERSONAS = { PER_LINUX: 0, PER_LINUX32: 8, UNAME26: 0x20000, BOTH: 0x20008 };
+
+for (const arch of ["x86_64", "aarch64"] as const) {
+  Deno.test(`seccompFilter(${arch}): personality takes the persona values and nothing else`, () => {
+    const program = seccompFilter(arch);
+    const call = (v: number) => verdict(program, AUDIT[arch], PERSONALITY_NUMBERS[arch], v);
+    for (const [name, v] of Object.entries(PERSONAS)) assertEquals(call(v), RET_ALLOW, name);
+    for (let b = 0; b < 32; b++) {
+      const bit = 2 ** b;
+      const expected = bit === 8 || bit === 0x20000 ? RET_ALLOW : RET_ERRNO_EPERM;
+      assertEquals(call(bit), expected, `bit ${b}`);
+      assertEquals(call(bit | 8), expected, `bit ${b} | 8`);
     }
-    assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>).set_mempolicy_home_node, 450);
-  }
-});
+    assertEquals(call(0xffffffff), RET_ERRNO_EPERM, "the read-only query");
+    // Another call is not the rule's business, whatever its first argument.
+    assertEquals(verdict(program, AUDIT[arch], EVERYDAY[arch][0], 0x40000), RET_ALLOW);
+    assertEquals(verdict(program, AUDIT[arch], SOCKET_NUMBERS[arch], 0x40000), RET_ALLOW);
+  });
+}

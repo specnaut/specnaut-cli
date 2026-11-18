@@ -1,7 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { bwrapArgs, scopeArgs, userBus } from "../../src/domain/sandbox_bwrap_args.ts";
 import { LIMITS } from "../../src/domain/sandbox_limits.ts";
-import { DENIED_SYSCALLS, SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
+import { SECCOMP_FD } from "../../src/domain/sandbox_seccomp.ts";
+import { DENIED_SYSCALLS } from "../../src/domain/sandbox_syscalls.ts";
 import { after, PATHS, policyOf, SCRATCH_HOME, SCRATCH_TMP } from "./sandbox_fixture.ts";
 
 /** Bubblewrap's arguments carry the policy and nothing else, every isolation flag present. */

@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
-import { AF_VSOCK, DENIED_SYSCALLS } from "../../src/domain/sandbox_seccomp.ts";
+import { AF_VSOCK, DENIED_SYSCALLS } from "../../src/domain/sandbox_syscalls.ts";
 import {
   CLONE_NAMESPACE_FLAGS,
   type ProfileRule,
@@ -154,4 +154,8 @@ Deno.test("seccompProfile: kcmp, fanotify_init and the memory-policy calls are r
     assertEquals(refusal(name), EPERM, name);
   }
   assertEquals(refusal("set_mempolicy_home_node"), EPERM);
+});
+
+Deno.test("seccompProfile: open_tree_attr is refused, as open_tree is", () => {
+  assertEquals(refusal("open_tree_attr"), EPERM);
 });

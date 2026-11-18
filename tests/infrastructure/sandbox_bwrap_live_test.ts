@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { userBus } from "../../src/domain/sandbox_bwrap_args.ts";
-import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_seccomp.ts";
+import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_syscalls.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
 import { exists, live, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
@@ -49,6 +49,22 @@ Deno.test({
 });
 
 Deno.test({
+  name: live("bwrap live: open_tree_attr fails with EPERM inside, on any kernel", NO_PYTHON),
+  ignore: NO_PYTHON !== null,
+  fn: () =>
+    withLayout("bwrap", async ({ policy }) => {
+      // open_tree_attr(AT_FDCWD, ".", 0, NULL, 0): an fd on a kernel that has it, ENOSYS on one
+      // that does not; EPERM only from the filter.
+      const nr = SYSCALL_NUMBERS[Deno.build.arch as "x86_64" | "aarch64"].open_tree_attr;
+      const py = "import ctypes; c = ctypes.CDLL(None, use_errno=True); " +
+        `r = c.syscall(${nr}, -100, b".", 0, None, 0); print(r, ctypes.get_errno())`;
+      const { outcome, out } = await runIn(linux, policy, [PYTHON, "-c", py]);
+      assertEquals(outcome, { kind: "exited", code: 0 });
+      assertEquals(out.trim(), "-1 1");
+    }),
+});
+
+Deno.test({
   name: live("bwrap live: a vsock socket is refused inside, a unix socket is not", NO_PYTHON),
   ignore: NO_PYTHON !== null,
   fn: () =>
@@ -60,6 +76,27 @@ Deno.test({
       const { outcome, out } = await runIn(linux, policy, [PYTHON, "-c", py]);
       assertEquals(outcome, { kind: "exited", code: 0 });
       assertEquals(out.trim().split("\n"), ["opened", "1"]);
+    }),
+});
+
+Deno.test({
+  name: live("bwrap live: personality takes the persona values inside, no other flag", NO_PYTHON),
+  ignore: NO_PYTHON !== null,
+  fn: () =>
+    withLayout("bwrap", async ({ policy }) => {
+      // EPERM is the filter's refusal; anything else is the kernel's answer (arm64 without 32-bit
+      // support refuses PER_LINUX32 with EINVAL). The query and no-ASLR are refused, the persona
+      // values pass, and 0 last puts PER_LINUX back.
+      const py = "import ctypes; c = ctypes.CDLL(None, use_errno=True)\n" +
+        "for v in (0x40000, 0xffffffff, 8, 0x20000, 0x20008, 0):\n" +
+        "    r = c.personality(ctypes.c_ulong(v))\n" +
+        "    print('refused' if r == -1 and ctypes.get_errno() == 1 else 'passed')\n";
+      const { outcome, out } = await runIn(linux, policy, [PYTHON, "-c", py]);
+      assertEquals(outcome, { kind: "exited", code: 0 });
+      assertEquals(out.trim().split("\n"), [
+        ...["refused", "refused"],
+        ...["passed", "passed", "passed", "passed"],
+      ]);
     }),
 });
 
