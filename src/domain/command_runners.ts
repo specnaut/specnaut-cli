@@ -3,9 +3,10 @@
  * first word of a command, that manifest is a file the command runs. Only the first word counts:
  * `npm` in a permission rule's text (`Bash(npm test:*)`) runs nothing, and reading it as a runner
  * would judge `package.json` on every dependency bump. The table is closed: a runner it does not
- * list names no manifest.
+ * list names no manifest, a limit `phases/script-gate.md`'s `instructions` row states by naming
+ * each runner here (`tests/templates/instruction_limits_docs_test.ts` keeps the two together).
  */
-const RUNNERS: ReadonlyMap<string, readonly string[]> = new Map([
+export const RUNNERS: ReadonlyMap<string, readonly string[]> = new Map([
   ["npm", ["package.json"]],
   ["pnpm", ["package.json"]],
   ["yarn", ["package.json"]],
