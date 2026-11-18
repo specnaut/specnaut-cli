@@ -49,7 +49,7 @@ export function fetcherOf(w: World, head: string, calls: BranchSource[] = []): B
 export function depsOf(w: World, fetcher: BranchFetcher): ExportDeps {
   return {
     fetcher,
-    objects: (gitDir) => new GitTreeObjects(gitDir),
+    objects: (gitDir) => new GitTreeObjects(gitDir, w.project),
     store: () => new FsExportStore(w.project, w.cache),
     windows: false,
   };

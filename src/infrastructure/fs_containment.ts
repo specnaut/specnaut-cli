@@ -75,7 +75,7 @@ async function realHome(home: string): Promise<string> {
 }
 
 /** The `realPath` errors that mean "no directory there for this process". */
-const UNREACHABLE = [
+export const UNREACHABLE = [
   Deno.errors.NotFound,
   Deno.errors.NotADirectory,
   Deno.errors.FilesystemLoop,

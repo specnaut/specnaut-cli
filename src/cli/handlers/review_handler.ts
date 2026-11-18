@@ -128,15 +128,15 @@ function defaultDeps(): ReviewDeps {
       const forge = new GhPullRequests(new DenoSubprocessRunner(), cwd);
       return decideTrust({ pullRequest: (n) => forge.facts(n) }, pr, head);
     },
-    end: (sha) => closeExport(closeDeps(cache), sha),
+    end: (sha) => closeExport(closeDeps(cache, cwd), sha),
     start: () => startDeps(cwd, cache),
   };
 }
 
-function closeDeps(cache: () => string) {
+function closeDeps(cache: () => string, cwd: string) {
   return {
     kept: (sha: string) => keptExport(cache(), sha),
-    objects: (gitDir: string) => new GitTreeObjects(gitDir),
+    objects: (gitDir: string) => new GitTreeObjects(gitDir, cwd),
     windows: Deno.build.os === "windows",
   };
 }
@@ -152,7 +152,7 @@ async function startDeps(cwd: string, cache: () => string): Promise<StartDeps | 
   if (pass === null || lock === null) return null;
   const exportDeps = {
     fetcher: new GitBranchFetcher(cwd),
-    objects: (gitDir: string) => new GitTreeObjects(gitDir),
+    objects: (gitDir: string) => new GitTreeObjects(gitDir, cwd),
     store: () => new FsExportStore(cwd, cache()),
     windows: Deno.build.os === "windows",
   };

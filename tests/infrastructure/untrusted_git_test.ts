@@ -1,6 +1,7 @@
-import { assertEquals } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { assertEquals, assertRejects } from "@std/assert";
+import { fromFileUrl, join } from "@std/path";
 import {
+  GitRefused,
   LAZY_FETCH_FLAG,
   PLAIN_DIFF_FLAGS,
   UNTRUSTED_GIT_ENV,
@@ -8,6 +9,7 @@ import {
   UntrustedGit,
   untrustedGitEnv,
 } from "../../src/infrastructure/untrusted_git.ts";
+import { callerPath, plantGit, ran, withPath } from "../helpers/planted_git.ts";
 
 /**
  * The binary's hardened git and the shell scripts' hardened git are two copies of one list:
@@ -55,16 +57,17 @@ Deno.test("the variables the script exports are set, and no system configuration
 });
 
 Deno.test("only the allowlist of the caller's environment reaches git, and no GIT_* variable", () => {
+  const bin = Deno.build.os === "windows" ? "C:\\Windows" : "/bin";
   const caller: Record<string, string> = {
-    PATH: "/bin",
+    PATH: bin,
     HOME: "/home/u",
     GIT_DIR: "/elsewhere",
     GIT_CONFIG_GLOBAL: "/elsewhere/config",
     GIT_CONFIG_PARAMETERS: "'core.fsmonitor'='x'",
     EDITOR: "vi",
   };
-  assertEquals(untrustedGitEnv((name) => caller[name]), {
-    PATH: "/bin",
+  assertEquals(untrustedGitEnv((name) => caller[name], Deno.cwd()), {
+    PATH: bin,
     HOME: "/home/u",
     ...UNTRUSTED_GIT_ENV,
   });
@@ -87,4 +90,53 @@ Deno.test("a GIT_DIR in the caller's environment does not redirect the hardened 
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+/** A repository holding a `git` of its own, at its top and in `bin`; where it marks a run. */
+async function plantedRepo(dir: string): Promise<string> {
+  await new Deno.Command("git", { args: ["init", "-q"], cwd: dir }).output();
+  for (const at of [dir, join(dir, "bin")]) await plantGit(at, join(dir, "fired"));
+  return join(dir, "fired");
+}
+
+/** `fn` given a fresh physical temp folder, removed after. */
+async function inTemp(fn: (dir: string) => Promise<void>): Promise<void> {
+  const dir = await Deno.realPath(await Deno.makeTempDir({ prefix: "untrusted-git-" }));
+  try {
+    await fn(dir);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+// The planted git is a POSIX shell script.
+const POSIX_ONLY = Deno.build.os === "windows";
+
+Deno.test({
+  name: "the git the binary starts is looked up only on PATH entries outside the repository",
+  ignore: POSIX_ONLY,
+  fn: () =>
+    inTemp(async (dir) => {
+      const fired = await plantedRepo(dir);
+      const path = ["", ".", "bin", join(dir, "bin"), ...callerPath()];
+      const out = await withPath(path, () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]));
+      assertEquals(new TextDecoder().decode(out).trim(), ".git");
+      assertEquals(await ran(fired), false, "planted git ran");
+    }),
+});
+
+Deno.test({
+  name: "a PATH with no entry outside the repository is refused, never searched",
+  ignore: POSIX_ONLY,
+  fn: () =>
+    inTemp(async (dir) => {
+      const fired = await plantedRepo(dir);
+      await withPath(["", join(dir, "bin")], () =>
+        assertRejects(
+          () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]),
+          GitRefused,
+          "no PATH entry outside the repository",
+        ));
+      assertEquals(await ran(fired), false, "planted git ran");
+    }),
 });

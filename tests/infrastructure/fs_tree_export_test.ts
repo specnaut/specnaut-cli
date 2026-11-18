@@ -49,7 +49,7 @@ async function written(): Promise<Fixture> {
     listed: [],
   };
   const home = await store.claim(head, staged);
-  await store.write(plan, new GitTreeObjects(home.gitDir));
+  await store.write(plan, new GitTreeObjects(home.gitDir, join(base, "project")));
   return { base, store, plan, head };
 }
 
@@ -106,7 +106,10 @@ Deno.test("a file is never written over: writing a top-level file twice is refus
   await withWritten(async (f) => {
     // Top level, so no folder is made on the way and the refusal is the file's own create.
     const once: ExportPlan = { files: [f.plan.files[0]], listed: [] };
-    const objects = new GitTreeObjects(join(f.base, "cache", f.head, "git"));
+    const objects = new GitTreeObjects(
+      join(f.base, "cache", f.head, "git"),
+      join(f.base, "project"),
+    );
     await assertRejects(() => f.store.write(once, objects), Deno.errors.AlreadyExists);
   });
 });

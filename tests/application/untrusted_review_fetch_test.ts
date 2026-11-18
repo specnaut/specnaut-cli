@@ -41,7 +41,7 @@ Deno.test("a branch is fetched and exported from a project that is a linked work
     const head = await commit(remote, await tree(remote, entries), "refs/heads/topic");
     const deps = {
       fetcher: new GitBranchFetcher(linked, { protocols: ["file"] }),
-      objects: (gitDir: string) => new GitTreeObjects(gitDir),
+      objects: (gitDir: string) => new GitTreeObjects(gitDir, linked),
       store: () => new FsExportStore(linked, cache),
       windows: false,
     };

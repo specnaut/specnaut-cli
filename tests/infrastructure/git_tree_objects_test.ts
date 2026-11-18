@@ -28,7 +28,7 @@ Deno.test("an object of the wrong type or a missing one is refused", async () =>
     const repo = await initRepo(dir);
     const id = await blob(repo, "x");
     const root = await tree(repo, [["100644", "a", id]]);
-    const objects = new GitTreeObjects(join(repo, ".git"));
+    const objects = new GitTreeObjects(join(repo, ".git"), repo);
     assertEquals(await objects.treeOf(await commit(repo, root)), root);
     assertEquals(await objects.sizes([id], "blob"), new Map([[id, 1]]));
     await assertRejects(() => objects.sizes([id], "tree"), ExportRefused, "not a tree");
@@ -45,7 +45,7 @@ Deno.test("an id git answers under another spelling is refused, never left unrea
   try {
     const repo = await initRepo(dir);
     const id = await blob(repo, "x");
-    const objects = new GitTreeObjects(join(repo, ".git"));
+    const objects = new GitTreeObjects(join(repo, ".git"), repo);
     const short = id.slice(0, 12);
     await assertRejects(() => objects.sizes([short], "blob"), ExportRefused, "not read back");
     await assertRejects(() => objects.readBlobs([short]), ExportRefused, "not read back");

@@ -12,7 +12,9 @@ import { baseTipOf } from "../../application/verify_scripts.ts";
 import type { ImageSource } from "../../domain/sandbox_image.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
-import { GitRefused } from "../../infrastructure/untrusted_git.ts";
+import { treeTop } from "../../infrastructure/git_path.ts";
+import { decode } from "../../infrastructure/git_text.ts";
+import { GitRefused, type GitResult, UntrustedGit } from "../../infrastructure/untrusted_git.ts";
 import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
 import { FsReviewLock, realLogPath } from "../../infrastructure/fs_review_lock.ts";
 import { exportCacheRoot } from "../../infrastructure/fs_tree_export.ts";
@@ -23,8 +25,7 @@ import type { SandboxDeps } from "./sandbox_handler.ts";
 
 /** `specnaut sandbox` on the real host: its engines, its folders, the checkout's review lock. */
 export function sandboxHostDeps(): SandboxDeps {
-  const subprocess = new DenoSubprocessRunner();
-  const checkout = () => checkoutRoot(subprocess);
+  const checkout = () => checkoutRoot(Deno.cwd());
   const { os, arch } = Deno.build;
   const image = async () => baseImage(await checkout());
   // The engines are asked with the environment a run gives them, and nothing of ours beside it.
@@ -105,9 +106,20 @@ function execDeps(
   };
 }
 
-/** The checkout the command runs from: the repository's top, or the folder itself outside one. */
-async function checkoutRoot(subprocess: DenoSubprocessRunner): Promise<string> {
-  const args = ["-c", "core.fsmonitor=false", "rev-parse", "--show-toplevel"];
-  const top = await subprocess.run("git", args, { cwd: Deno.cwd() });
-  return await Deno.realPath(top.code === 0 ? top.stdout.trim() : Deno.cwd());
+/**
+ * The checkout `cwd` is in: the repository's top, asked of the hardened git so the checkout's own
+ * folders cannot supply the git that answers. When git gives no answer, because it failed or was
+ * refused before it ran (no PATH entry outside the tree, a grafts file), the top is the nearest
+ * folder holding a `.git`, found without git; outside a repository, `cwd` itself. Never a folder
+ * narrower than the checkout: the sandbox keeps every folder of it out of sight.
+ */
+export async function checkoutRoot(cwd: string): Promise<string> {
+  let top: GitResult | undefined;
+  try {
+    top = await new UntrustedGit(cwd).call("rev-parse", ["--show-toplevel"]);
+  } catch (err) {
+    if (!(err instanceof GitRefused)) throw err;
+  }
+  const answer = top?.code === 0 ? decode(top.stdout).trim() : "";
+  return answer === "" ? treeTop(cwd) : await Deno.realPath(answer);
 }

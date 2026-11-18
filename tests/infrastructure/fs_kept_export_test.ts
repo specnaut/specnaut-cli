@@ -23,7 +23,7 @@ async function kept(w: World) {
 
 const closeDeps = (w: World) => ({
   kept: (sha: string) => keptExport(w.cache, sha),
-  objects: (gitDir: string) => new GitTreeObjects(gitDir),
+  objects: (gitDir: string) => new GitTreeObjects(gitDir, w.project),
   windows: !posix,
 });
 

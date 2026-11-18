@@ -99,7 +99,7 @@ export class GitBranchFetcher implements BranchFetcher {
     const alternates = join(gitDir, "objects", "info", "alternates");
     await Deno.writeTextFile(alternates, `${join(common, "objects")}\n`);
     await this.#git("fetch", gitDir, fetchArgs(url, refspecOf(source), this.#protocols));
-    const head = await new UntrustedGit(gitDir)
+    const head = await new UntrustedGit(gitDir, this.projectDir)
       .run("rev-parse", ["--verify", "--quiet", "--end-of-options", `${FETCHED_REF}^{commit}`])
       .catch(asRefusal);
     return firstLine(head);
@@ -112,11 +112,20 @@ export class GitBranchFetcher implements BranchFetcher {
   /** git with the fetch's environment and timeout; a failure is refused with git's cause. */
   async #git(what: string, cwd: string, args: string[]): Promise<void> {
     const signal = AbortSignal.timeout(this.#timeoutMs);
-    const out = await spawn(cwd, args, fetchEnv(this.#env), signal);
+    const out = await spawn(cwd, args, this.#fetchEnv(), signal);
     if (signal.aborted) {
       throw new ExportRefused(`the fetch did not finish within ${this.#timeoutMs / 1000} s`);
     }
     if (out.code !== 0) throw new ExportRefused(`git ${what} failed: ${causeOf(out.stderr)}`);
+  }
+
+  /** The fetch's environment; a PATH with nothing left outside the project is refused. */
+  #fetchEnv(): Record<string, string> {
+    try {
+      return fetchEnv(this.#env, this.projectDir);
+    } catch (err) {
+      return asRefusal(err);
+    }
   }
 }
 
@@ -153,10 +162,15 @@ function initArgs(format: string, gitDir: string): string[] {
 
 /**
  * The hardened environment, plus the SSH agent an ssh remote authenticates through, and a fixed
- * locale so git's refusals read the same everywhere.
+ * locale so git's refusals read the same everywhere. Its PATH is kept outside the project's tree
+ * whichever folder git runs in: the repository the fetch fills is made by the binary, the project
+ * is the checkout a branch could have put a `git` in.
  */
-function fetchEnv(source: (name: string) => string | undefined): Record<string, string> {
-  const env = untrustedGitEnv(source);
+function fetchEnv(
+  source: (name: string) => string | undefined,
+  project: string,
+): Record<string, string> {
+  const env = untrustedGitEnv(source, project);
   const agent = source("SSH_AUTH_SOCK");
   if (agent !== undefined) env.SSH_AUTH_SOCK = agent;
   return { ...env, LC_ALL: "C", LANG: "C", GIT_PROTOCOL_FROM_USER: "0" };

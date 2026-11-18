@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
+import { entryUnsafe, gitPath, treeTop } from "../../src/infrastructure/git_path.ts";
 import { type Answer, answers } from "./resolve_verifier_fixture.ts";
 import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
 
@@ -17,6 +18,8 @@ import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
  * review: they drop the entries instead, and the binary they start is given what is left. The hook
  * that judges a held lock refuses, as the landing does, before handing anything over; so does the
  * one that gates a review's start, which runs on the session's own PATH, dropped entry and all.
+ * The binary drops the same entries from the PATH it starts git with (`git_path.ts`): the last test
+ * holds its predicate to the same table.
  */
 
 /** The answer past the PATH: the `specnaut` it resolves to, or why it is refused. */
@@ -153,5 +156,22 @@ Deno.test({
         }
         assertEquals(await fired(l), "", `a command the PATH entry supplied ran, ${c.name}`);
       }
+    }),
+});
+
+Deno.test({
+  name: "the binary drops from git's PATH exactly the entries the table names, for its reason",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout((l) => {
+      for (const c of [...spelledBad(l), ...inTree(l), ...pastThePath(l)]) {
+        if (c.skip) continue;
+        const top = treeTop(c.cwd);
+        const why = c.entries.map((_, i) => i === c.bad?.[0] ? c.bad[1] : undefined);
+        assertEquals(c.entries.map((e) => entryUnsafe(e, top)), why, c.name);
+        const kept = c.entries.filter((_, i) => why[i] === undefined).join(DELIMITER);
+        assertEquals(gitPath(c.entries.join(DELIMITER), c.cwd), kept, c.name);
+      }
+      return Promise.resolve();
     }),
 });

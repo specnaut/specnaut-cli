@@ -14,8 +14,9 @@ import { UntrustedGit } from "./untrusted_git.ts";
 export class GitTreeObjects implements TreeObjects {
   readonly #git: UntrustedGit;
 
-  constructor(gitDir: string) {
-    this.#git = new UntrustedGit(gitDir);
+  /** `gitDir` is a cache the binary made; `checkout` is the tree its git must not be found in. */
+  constructor(gitDir: string, checkout: string) {
+    this.#git = new UntrustedGit(gitDir, checkout);
   }
 
   async treeOf(commit: string): Promise<string> {
