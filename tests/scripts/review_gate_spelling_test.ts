@@ -1,45 +1,14 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { DELIMITER, join } from "@std/path";
-import {
-  type Answer,
-  docBlock,
-  hook,
-  hookAt,
-  HOOKS,
-  type Run,
-} from "./resolve_verifier_fixture.ts";
+import { join } from "@std/path";
+import { hook, hookAt, HOOKS } from "./resolve_verifier_fixture.ts";
 import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
+import { bashCall, dropping, each, gate } from "./review_gate_fixture.ts";
 
 /**
  * The spellings of a line review-gate.sh reads past the quoting of resolve_verifier_hooks_test.ts:
- * dollar quoting, a kept backslash-newline, the Windows launcher names, PATH named on the line, a
- * pattern the shell cannot compile, the locale. Markers in the dropped entry: none may fire.
+ * dollar quoting, a kept backslash-newline, the Windows launcher names, a pattern the shell cannot
+ * compile, the locale; review_gate_path_test.ts holds PATH named on the line. No marker may fire.
  */
-
-/** The hook's input for a Bash call of `command`, with a description if given. */
-const bashCall = (command: string, description?: string) =>
-  JSON.stringify({
-    cwd: "/work",
-    tool_input: { command, ...(description ? { description } : {}) },
-  });
-
-/** review-gate.sh's answer to each line, by line, run as `r` says; then no marker may have fired. */
-async function gate(l: Layout, r: Run, lines: string[]): Promise<Record<string, Answer>> {
-  const out: Record<string, Answer> = {};
-  for (const line of lines) out[line] = await hook(l, r, "review-gate.sh", bashCall(line));
-  assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
-  return out;
-}
-
-/** The same `answer` for each line, as `gate` reports them. */
-const each = (lines: string[], answer: Answer) =>
-  Object.fromEntries(lines.map((line) => [line, answer]));
-
-/** A run whose PATH starts with the tree's `bin`, which the hook drops, and what it then answers. */
-const dropping = (l: Layout, bash: string) => ({
-  r: { entries: [l.bin, l.tools], cwd: l.repo, bash },
-  want: { refused: "is inside the repository", entry: l.bin, exit: 2 },
-});
 
 Deno.test({
   name: "with an in-repo PATH entry dropped, dollar quoting hides neither the name nor the start",
@@ -87,45 +56,6 @@ Deno.test({
       assertEquals(await gate(l, r, named), each(named, want));
       const files = ["ls dist/specnaut.exe", "cat specnaut.exe.sha256"];
       assertEquals(await gate(l, r, files), each(files, { exit: 0 }));
-    }),
-});
-
-/** Lines that start a review and name PATH bare, so it can be set, by any spelling or letter case. */
-const NAMES_PATH = [
-  "PATH=./bin:$PATH specnaut review start 1",
-  'export PATH="$PWD/bin:$PATH"; specnaut review start 1',
-  "env PATH=bin specnaut review start 1",
-  "PATH+=:bin; specnaut review start 1",
-  "path+=(bin); specnaut review start 1",
-  "PATH[0]=bin:$PATH specnaut review start 1",
-  "read PATH; specnaut review start 1",
-  "PA\\\nTH=bin specnaut review start 1",
-  "ls # note\\\nPATH=bin specnaut review start 1",
-];
-
-/** Lines that start a review and only read PATH, name another variable, or quote the word. */
-const READS_PATH = [
-  "MYPATH=x specnaut review start 1",
-  'echo "$PATH"; specnaut review start 1',
-  'echo "a \\" in PATH"; specnaut review start 1',
-  "GOPATH=/go NODE_PATH=lib echo $PATH ${PATH%%:*}; specnaut review start 1",
-];
-
-Deno.test({
-  name: "a line that starts a review and names PATH is refused, with no entry dropped",
-  ignore: Deno.build.os === "windows",
-  fn: () =>
-    inLayout(async (l, { bash }) => {
-      const r = { entries: [join(l.tmp, "outside", "real"), l.tools], cwd: l.repo, bash };
-      const want = {
-        refused: "is named on the line that starts a review, where it can be set",
-        exit: 2,
-      };
-      assertEquals(await gate(l, r, NAMES_PATH), each(NAMES_PATH, want));
-      // The gate judges these, review-untrusted.md's start among them: the stub records itself.
-      const read = [...READS_PATH, `${docBlock()}\nout=$("$sn" review start "1" --expect "abc")`];
-      const gated = { resolved: l.outside, path: r.entries.join(DELIMITER) };
-      assertEquals(await gate(l, r, read), each(read, gated));
     }),
 });
 
