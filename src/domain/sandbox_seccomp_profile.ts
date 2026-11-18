@@ -21,6 +21,13 @@
  * under any other (32-bit, or x32 on x86_64), as bubblewrap's filter does. A name an architecture
  * lacks (`iopl` on aarch64) is skipped by the runtime, as in the engines' own profiles.
  *
+ * A name the host's libseccomp does not know is skipped the same way, and without a warning: on an
+ * older host the list in force is shorter than this one, and nothing says so. The newest calls are
+ * the likely ones: `open_tree_attr` (Linux 6.15) first, then `set_mempolicy_home_node` (5.17),
+ * `quotactl_fd` (5.14) and `mount_setattr` (5.12). Such a call is allowed where the kernel has it,
+ * and fails with ENOSYS where it does not. Bubblewrap's filter names each call by its number, not
+ * through libseccomp, so it has no such gap.
+ *
  * `personality` is held to the values the engines' default profiles allow it: one rule per flag
  * outside `PERSONALITY_ALLOWED` (`PER_LINUX32 | UNAME26`), so `0`, `8`, `0x20000` and `0x20008`
  * pass and any other persona or flag (no ASLR, read-implies-exec, page zero mapped) is refused. A
