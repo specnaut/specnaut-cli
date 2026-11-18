@@ -37,7 +37,7 @@ Deno.test("origin without the base is exit 3 and names the push that publishes i
     await git(sb.work, "remote", "set-head", "origin", "--delete");
     const r = await gate(sb);
     assertEquals([r.code, r.stdout], [3, ""]);
-    assertStringIncludes(r.stderr, "git push -u origin main");
+    assertStringIncludes(r.stderr, "git -c core.hooksPath=/dev/null push -u origin main");
     // No origin at all: the local base is the published one, as wip-audit.sh reads it.
     await git(sb.work, "remote", "remove", "origin");
     assertEquals(lines((await gate(sb)).stdout), ["gate clear"]);

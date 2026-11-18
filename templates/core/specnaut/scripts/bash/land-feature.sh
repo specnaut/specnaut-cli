@@ -116,7 +116,7 @@ fi
 default=$(printf '%s\n' "$answer" | awk '$1 == "ref:" && $3 == "HEAD" { print $2; exit }')
 if [ "$default" != "refs/heads/$base" ]; then
   [[ $default =~ ^refs/heads/[A-Za-z0-9._/-]+$ ]] || default="<no readable default>"
-  echo "land-feature: origin's default branch is $default, not refs/heads/$base — refusing to land. Run: git remote set-head origin --auto" >&2
+  echo "land-feature: origin's default branch is $default, not refs/heads/$base - refusing to land. Run: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
   exit 3
 fi
 if ! git merge-base --is-ancestor "refs/remotes/origin/$base" HEAD; then

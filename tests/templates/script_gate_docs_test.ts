@@ -1,5 +1,7 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { flat, phase } from "./task_docs.ts";
+import { scriptsApprovable } from "../../src/domain/approval_verdict.ts";
+import { REASON } from "../../src/domain/trust_reason.ts";
 
 /**
  * The merge's side of the script check: it verifies before any script of the tree runs, again
@@ -59,6 +61,26 @@ Deno.test("an untrusted verdict is a stop whose yes covers one digest; other out
   assertStringIncludes(m, "anything else stays on the branch, nothing landed");
   assertStringIncludes(m, "Nothing lands.");
   assertStringIncludes(m, "Every reason `behind base: rebase`");
+});
+
+Deno.test("step 0 stops, never asking, on a scripts reason the binary lets no yes hold", () => {
+  const g = flat(phase("script-gate").content);
+  const m = g.slice(g.indexOf("## Merge's step 0 outcomes"));
+  const start = m.indexOf("An `UNTRUSTED` reason under `.specnaut/scripts/` that no yes can hold");
+  const end = m.indexOf("Every reason `behind base: rebase`");
+  assert(
+    start >= 0 && end > start,
+    "no stop on an unholdable reason before the rebase and the ask",
+  );
+  const bullet = m.slice(start, end);
+  assertStringIncludes(bullet, "**stop on the branch** and say why");
+  assertStringIncludes(bullet, "`APPROVAL scripts moved`");
+  assertStringIncludes(bullet, "Never asked.");
+  // The doc lists the reasons a yes holds exactly as the binary decides them, none more or less.
+  for (const reason of Object.values(REASON)) {
+    const holdable = scriptsApprovable([{ path: ".specnaut/scripts/bash/x.sh", reason }]);
+    assertEquals(bullet.includes(`\`${reason}\``), holdable, reason);
+  }
 });
 
 Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one question", () => {

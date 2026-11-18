@@ -106,6 +106,13 @@ flag; the phase never compares digests itself. The first case that matches decid
   `VERDICT scripts untrusted`** — otherwise it is *anything else*, below.
   - An `UNTRUSTED` path outside `.specnaut/scripts/` (`local <base> ahead of origin`, the lock at
     base): **stop on the branch** and say so. Never asked: no yes makes it hold.
+  - An `UNTRUSTED` reason under `.specnaut/scripts/` that no yes can hold — any but `differs from
+    base`, `not on base`, `first install: no base copy`, `on base, missing from the tree`, `name
+    differs in case from base`, `line endings differ: the same text but for a CR before LF; a diff
+    can be empty`, `behind base: rebase` and `not a regular file on base` (a link, a non-file, a
+    hard link, a submodule, a walk that stopped): **stop on the branch** and say why: the digest
+    names no bytes that would run, so the binary answers any yes with `APPROVAL scripts moved`, and
+    `land-feature.sh` stops on that line too. Never asked.
   - Every reason `behind base: rebase` — `git -c core.hooksPath=/dev/null rebase
     refs/remotes/origin/<BASE_BRANCH>`, then step 0 again at once. Not a question: the branch only
     lags the base.

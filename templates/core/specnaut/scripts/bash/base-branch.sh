@@ -20,7 +20,7 @@ emit() {
     printf '%s\n' "$1"
     exit 0
   fi
-  echo "base-branch: '$1' is not a branch name this script hands to git — set origin/HEAD to the real base: git remote set-head origin --auto" >&2
+  echo "base-branch: '$1' is not a branch name this script hands to git - set origin/HEAD to the real base: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
   exit 3
 }
 
@@ -30,5 +30,5 @@ fi
 if name=$(git --no-pager -c core.fsmonitor=false config --get init.defaultBranch 2>/dev/null) && [ -n "$name" ]; then
   emit "$name"
 fi
-echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
+echo "base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
 exit 3

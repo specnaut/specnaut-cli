@@ -173,7 +173,7 @@ gate_pushes() {
   if [ -z "$remote" ]; then
     git --no-pager config --get remote.origin.url >/dev/null 2>&1 || s=$?
     [ "$s" -le 1 ] || unread "the origin remote"
-    [ "$s" -ne 0 ] || { echo "wip-audit: origin has no $base branch - publish it first: git push -u origin $base" >&2; exit 3; }
+    [ "$s" -ne 0 ] || { echo "wip-audit: origin has no $base branch - publish it first: git -c core.hooksPath=/dev/null push -u origin $base" >&2; exit 3; }
   elif [ -n "$local" ]; then
     pushes=$(git --no-pager rev-list --reverse "$local" --not "$remote" -- 2>/dev/null) || unread "$local"
   fi

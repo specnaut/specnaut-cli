@@ -104,7 +104,7 @@ git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "
 undo() {
   local rc=$? cmd=$BASH_COMMAND undone="the removal is undone"
   git restore --staged --worktree --source=HEAD -- "${paths[@]}" ||
-    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- ${paths[*]}"
+    undone="the removal could not be undone - run: git -c core.hooksPath=/dev/null restore --staged --worktree --source=HEAD -- ${paths[*]}"
   echo "remove-spec: '$cmd' failed (exit $rc) — $undone, nothing committed" >&2
   exit 25
 }

@@ -1,4 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
+import { walk } from "@std/fs";
+import { fromFileUrl, relative } from "@std/path";
 import { UNTRUSTED_GIT_FLAGS } from "../../src/infrastructure/untrusted_git.ts";
 
 /**
@@ -22,6 +24,7 @@ const READS = new Set([
   "cat-file",
   "for-each-ref",
   "ls-remote",
+  "ls-tree",
 ]);
 
 const hooksOff = "core.hooksPath=/dev/null";
@@ -99,4 +102,54 @@ Deno.test("the sweep sees a write without the flag, and passes reads and mention
     w.join(" ")
   );
   assertEquals(chained, ["git commit -m x", "git push o m"]);
+});
+
+/** The git subcommands a script's message could tell someone to run: any other word is prose. */
+const SUBCOMMANDS = new Set([
+  ...READS,
+  ..."push fetch pull remote commit rebase checkout switch merge reset branch tag add rm mv restore"
+    .split(" "),
+  ..."cherry-pick revert stash worktree am apply clean update-ref symbolic-ref lfs config".split(
+    " ",
+  ),
+]);
+
+/**
+ * The git commands a script's line tells someone to run: a `git` after `: ` or an opening quote,
+ * up to a quote, a `;` or the end. A report of a call that ran (`git … failed`) tells nobody to run
+ * it, and `git` before a word that is no subcommand (`git could`) is prose.
+ */
+function messageCommands(line: string): string[][] {
+  return [...line.matchAll(/(?:: |['`])(git(?: [^'"`;]*)?)/g)]
+    .map((m) => m[1].trim().split(/\s+/))
+    .filter((w) => !w.includes("failed"))
+    .filter((w) =>
+      SUBCOMMANDS.has(w.slice(1).find((x, i, all) => x !== "-c" && all[i - 1] !== "-c") ?? "")
+    );
+}
+
+Deno.test("every git write a shipped script's message names runs no hook", async () => {
+  const root = new URL("../../templates/", import.meta.url);
+  const found: string[] = [];
+  for await (const e of walk(root, { exts: [".sh", ".ps1"], includeDirs: false })) {
+    const lines = (await Deno.readTextFile(e.path)).split("\n");
+    lines.forEach((line, i) => {
+      if (line.trim().startsWith("#")) return;
+      for (const v of messageCommands(line).map(violation).filter((v) => v !== null)) {
+        found.push(`${relative(fromFileUrl(root), e.path)}:${i + 1}: ${v}`);
+      }
+    });
+  }
+  assertEquals(found, []);
+});
+
+Deno.test("the message sweep reads instructions, and passes reports and prose", () => {
+  const cmds = (s: string) => messageCommands(s).map((w) => w.join(" "));
+  assertEquals(cmds(`echo "x: publish it first: git push -u origin main" >&2`), [
+    "git push -u origin main",
+  ]);
+  assertEquals(cmds(`echo "resolve it, 'git rebase --continue', then"`), ["git rebase --continue"]);
+  assertEquals(cmds(`refuse "LFS" "git lfs push origin abc failed"`), []);
+  assertEquals(cmds(`fail "x: git could not read its blob"`), []);
+  assert(violation(messageCommands(`echo "run: git remote set-head origin --auto"`)[0]) !== null);
 });

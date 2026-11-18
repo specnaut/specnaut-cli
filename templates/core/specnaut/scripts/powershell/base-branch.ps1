@@ -9,7 +9,7 @@ function Write-BaseBranch([string]$Name) {
         Write-Output $Name
         exit 0
     }
-    [Console]::Error.WriteLine("base-branch: '$Name' is not a branch name this script hands to git - set origin/HEAD to the real base: git remote set-head origin --auto")
+    [Console]::Error.WriteLine("base-branch: '$Name' is not a branch name this script hands to git - set origin/HEAD to the real base: git -c core.hooksPath=/dev/null remote set-head origin --auto")
     exit 3
 }
 
@@ -21,5 +21,5 @@ $name = & git --no-pager -c core.fsmonitor=false config --get init.defaultBranch
 if ($LASTEXITCODE -eq 0 -and $name) {
     Write-BaseBranch $name
 }
-[Console]::Error.WriteLine('base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto')
+[Console]::Error.WriteLine('base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git -c core.hooksPath=/dev/null remote set-head origin --auto')
 exit 3

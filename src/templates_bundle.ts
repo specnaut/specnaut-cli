@@ -3988,6 +3988,13 @@ flag; the phase never compares digests itself. The first case that matches decid
   \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
   - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
     base): **stop on the branch** and say so. Never asked: no yes makes it hold.
+  - An \`UNTRUSTED\` reason under \`.specnaut/scripts/\` that no yes can hold — any but \`differs from
+    base\`, \`not on base\`, \`first install: no base copy\`, \`on base, missing from the tree\`, \`name
+    differs in case from base\`, \`line endings differ: the same text but for a CR before LF; a diff
+    can be empty\`, \`behind base: rebase\` and \`not a regular file on base\` (a link, a non-file, a
+    hard link, a submodule, a walk that stopped): **stop on the branch** and say why: the digest
+    names no bytes that would run, so the binary answers any yes with \`APPROVAL scripts moved\`, and
+    \`land-feature.sh\` stops on that line too. Never asked.
   - Every reason \`behind base: rebase\` — \`git -c core.hooksPath=/dev/null rebase
     refs/remotes/origin/<BASE_BRANCH>\`, then step 0 again at once. Not a question: the branch only
     lags the base.
@@ -32136,7 +32143,7 @@ emit() {
     printf '%s\\n' "\$1"
     exit 0
   fi
-  echo "base-branch: '\$1' is not a branch name this script hands to git — set origin/HEAD to the real base: git remote set-head origin --auto" >&2
+  echo "base-branch: '\$1' is not a branch name this script hands to git - set origin/HEAD to the real base: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
   exit 3
 }
 
@@ -32146,7 +32153,7 @@ fi
 if name=\$(git --no-pager -c core.fsmonitor=false config --get init.defaultBranch 2>/dev/null) && [ -n "\$name" ]; then
   emit "\$name"
 fi
-echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
+echo "base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
 exit 3
 `,
     executable: true,
@@ -32638,7 +32645,7 @@ gate_pushes() {
   if [ -z "\$remote" ]; then
     git --no-pager config --get remote.origin.url >/dev/null 2>&1 || s=\$?
     [ "\$s" -le 1 ] || unread "the origin remote"
-    [ "\$s" -ne 0 ] || { echo "wip-audit: origin has no \$base branch - publish it first: git push -u origin \$base" >&2; exit 3; }
+    [ "\$s" -ne 0 ] || { echo "wip-audit: origin has no \$base branch - publish it first: git -c core.hooksPath=/dev/null push -u origin \$base" >&2; exit 3; }
   elif [ -n "\$local" ]; then
     pushes=\$(git --no-pager rev-list --reverse "\$local" --not "\$remote" -- 2>/dev/null) || unread "\$local"
   fi
@@ -33108,7 +33115,7 @@ fi
 default=\$(printf '%s\\n' "\$answer" | awk '\$1 == "ref:" && \$3 == "HEAD" { print \$2; exit }')
 if [ "\$default" != "refs/heads/\$base" ]; then
   [[ \$default =~ ^refs/heads/[A-Za-z0-9._/-]+\$ ]] || default="<no readable default>"
-  echo "land-feature: origin's default branch is \$default, not refs/heads/\$base — refusing to land. Run: git remote set-head origin --auto" >&2
+  echo "land-feature: origin's default branch is \$default, not refs/heads/\$base - refusing to land. Run: git -c core.hooksPath=/dev/null remote set-head origin --auto" >&2
   exit 3
 fi
 if ! git merge-base --is-ancestor "refs/remotes/origin/\$base" HEAD; then
@@ -33634,7 +33641,7 @@ git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "
 undo() {
   local rc=\$? cmd=\$BASH_COMMAND undone="the removal is undone"
   git restore --staged --worktree --source=HEAD -- "\${paths[@]}" ||
-    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- \${paths[*]}"
+    undone="the removal could not be undone - run: git -c core.hooksPath=/dev/null restore --staged --worktree --source=HEAD -- \${paths[*]}"
   echo "remove-spec: '\$cmd' failed (exit \$rc) — \$undone, nothing committed" >&2
   exit 25
 }
@@ -37605,7 +37612,7 @@ function Write-BaseBranch([string]\$Name) {
         Write-Output \$Name
         exit 0
     }
-    [Console]::Error.WriteLine("base-branch: '\$Name' is not a branch name this script hands to git - set origin/HEAD to the real base: git remote set-head origin --auto")
+    [Console]::Error.WriteLine("base-branch: '\$Name' is not a branch name this script hands to git - set origin/HEAD to the real base: git -c core.hooksPath=/dev/null remote set-head origin --auto")
     exit 3
 }
 
@@ -37617,7 +37624,7 @@ if (\$LASTEXITCODE -eq 0 -and \$ref) {
 if (\$LASTEXITCODE -eq 0 -and \$name) {
     Write-BaseBranch \$name
 }
-[Console]::Error.WriteLine('base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto')
+[Console]::Error.WriteLine('base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git -c core.hooksPath=/dev/null remote set-head origin --auto')
 exit 3
 `,
     executable: false,
