@@ -95,7 +95,7 @@ Deno.test("an approvals file the tip holds out of form, or as a link, approves n
     files: { ...base(), [SKILL]: MINE, "ok.txt": await approving(MINE) },
   });
   await git(root, "checkout", "-q", "main");
-  await Deno.symlink("../ok.txt", join(root, APPROVALS_FILE));
+  await Deno.symlink("../ok.txt", join(root, APPROVALS_FILE), { type: "file" });
   await commitAll(root, "a linked approvals file");
   await git(root, "push", "-q", "origin", "main");
   await git(root, "checkout", "-q", "feature");
