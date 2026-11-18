@@ -68,10 +68,10 @@ gate_graph_pair() {
 # checkout_config: a root file that changes how every other path is checked out or fetched,
 # whatever the declaration calls it, in any ASCII case. The PowerShell twin's
 # Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a path another
-# fold could read as one the graph matches is not compared but widens as `path-unreadable`
-# (unreadable), judged on every component: a folder name holding a code point above U+007F
-# (U+017F folds to s), a file name holding one that is a dotfile once they are dropped (HFS+
-# ignores U+200C), and any name holding `~` and a digit, as an 8.3 short name (`GITATT~1`) does.
+# fold, a normalisation or HFS+ could read as one the graph matches is not compared but widens
+# as `path-unreadable` (unreadable): one holding a code point above U+007F anywhere (U+017F
+# folds to s, HFS+ ignores U+200C, NFD spells é in two), or a name holding `~` and a digit, as
+# an 8.3 short name (`GITATT~1`) does. A declared root holding either is refused when read.
 # A nested .gitattributes in folder D changes how every path below D is checked out, so it
 # affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
 # being free to nest. Only a folder root that holds it holds every path below D; held by
@@ -93,10 +93,7 @@ GATE_GRAPH_DEFS='
       else [] end;
     def short_name: . as $c | any(range(0; length - 1); $c[.] == 126 and $c[. + 1] >= 48 and $c[. + 1] <= 57);
     def wide: any(. > 127);
-    def dotted: map(select(. < 128)) | .[0] == 46;
-    def unreadable($p): ($p | contains("\ufffd") or contains("\n"))
-      or ($p | split("/") | map(explode) | (.[:-1] | any(wide or short_name))
-        or (last | short_name or (wide and dotted)));'
+    def unreadable($p): ($p | contains("\n")) or ($p | explode | wide or short_name);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.

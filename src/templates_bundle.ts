@@ -658,9 +658,9 @@ is the bare run, to the byte. \`--refs-stdin\` reads a pre-push hook's lines.
   space-separated; they are never spliced into the string. A check with **\`owners\`** is
   omitted when none of them is affected, and given only those that are. **A gate
   command with no check always runs.**
-- A path in \`adapter.files\`, \`full_on\`, \`inert\` and an owner's \`roots\` is a directory prefix ending in \`/\`,
-  or an exact path: relative, with no \`..\`, no \`./\`, no \`//\`, no backslash, no glob and
-  no control character. An owner id matches \`[A-Za-z0-9][A-Za-z0-9._-]{0,63}\`.
+- A path in \`adapter.files\`, \`full_on\`, \`inert\` and an owner's \`roots\` is a directory prefix ending
+  in \`/\`, or an exact path: relative, printable ASCII, with no \`..\`, no \`./\`, no \`//\`, no backslash,
+  no glob and no \`~\` before a digit. An owner id matches \`[A-Za-z0-9][A-Za-z0-9._-]{0,63}\`.
 
 **The adapter.** It is the base's copy, run from a temporary worktree of the base, once
 for each base and once for the candidate. It gets no stdin and no \`GIT_*\` variable, runs
@@ -679,14 +679,14 @@ and is owned only in its own. An owner whose record differs, or that exists on o
 affected. So is every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-\`fallback:\`: a path not UTF-8 or holding a newline, a folder or dotfile name holding a code point
-above U+007F, even before the dot, or a name holding \`~\` and a digit (\`path-unreadable:\`); the root
-\`.gitattributes\`, \`.lfsconfig\` or \`.gitmodules\` in any ASCII case, even \`inert\`
-(\`checkout-config:\`); an unowned path, a \`full_on\` match, a gitlink, a symlink or a type change; a
-declaration, an \`adapter.files\` entry, \`gates.yml\` or \`.specnaut/scripts/\` that differs from a given
-base, or from the merge-base with the default branch; any of those not a tracked regular file; an
-adapter that fails or answers anything invalid; a malformed declaration; a base unresolved or never
-fetched; \`jq\` absent, older than 1.6, or failing where its answer decides the run.
+\`fallback:\`: a path not UTF-8, or holding a newline or a code point above U+007F, or a name holding
+\`~\` and a digit (\`path-unreadable:\`); the root \`.gitattributes\`, \`.lfsconfig\` or \`.gitmodules\` in
+any ASCII case, even \`inert\` (\`checkout-config:\`); an unowned path, a \`full_on\` match, a gitlink, a
+symlink or a type change; a declaration, an \`adapter.files\` entry, \`gates.yml\` or
+\`.specnaut/scripts/\` that differs from a given base, or from the merge-base with the default branch;
+any of those not a tracked regular file; an adapter that fails or answers anything invalid; a
+malformed declaration; a base unresolved or never fetched; \`jq\` absent, older than 1.6, or failing
+where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -31385,12 +31385,14 @@ gate_candidate_read_refs() {
 # is gate-impact.sh's call, not this file's. Requires jq_lf.
 #
 # Anchored with \\A and \\z, because \$ also matches before a final newline, and an id
-# or a path ending in one must not pass.
+# or a path ending in one must not pass. A path holding a code point outside printable
+# ASCII, or \`~\` and a digit, is refused: the graph never compares a changed path holding
+# one (unreadable), so a root holding one could only ever match a path by another reading.
 GATE_READ_DEFS='
 def owner_id: type == "string" and test("\\\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\\\z");
 def clean: type == "string" and length > 0 and (test("[\\\\x00-\\\\x1f\\\\x7f]") | not);
 def path_ok: type == "string" and length > 0
-  and (test("\\\\A/|\\\\\\\\|[*?\\\\[\\\\]{}]|[\\\\x00-\\\\x1f\\\\x7f]|\\\\.\\\\.|//|\\\\./|\\\\A\\\\.\\\\z|/\\\\.\\\\z") | not);
+  and (test("\\\\A/|\\\\\\\\|[*?\\\\[\\\\]{}]|[^\\\\x20-\\\\x7e]|~[0-9]|\\\\.\\\\.|//|\\\\./|\\\\A\\\\.\\\\z|/\\\\.\\\\z") | not);
 def paths_ok: type == "array" and all(path_ok);
 def ids_ok: type == "array" and all(owner_id);
 '
@@ -31598,10 +31600,10 @@ gate_graph_pair() {
 # checkout_config: a root file that changes how every other path is checked out or fetched,
 # whatever the declaration calls it, in any ASCII case. The PowerShell twin's
 # Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a path another
-# fold could read as one the graph matches is not compared but widens as \`path-unreadable\`
-# (unreadable), judged on every component: a folder name holding a code point above U+007F
-# (U+017F folds to s), a file name holding one that is a dotfile once they are dropped (HFS+
-# ignores U+200C), and any name holding \`~\` and a digit, as an 8.3 short name (\`GITATT~1\`) does.
+# fold, a normalisation or HFS+ could read as one the graph matches is not compared but widens
+# as \`path-unreadable\` (unreadable): one holding a code point above U+007F anywhere (U+017F
+# folds to s, HFS+ ignores U+200C, NFD spells é in two), or a name holding \`~\` and a digit, as
+# an 8.3 short name (\`GITATT~1\`) does. A declared root holding either is refused when read.
 # A nested .gitattributes in folder D changes how every path below D is checked out, so it
 # affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
 # being free to nest. Only a folder root that holds it holds every path below D; held by
@@ -31623,10 +31625,7 @@ GATE_GRAPH_DEFS='
       else [] end;
     def short_name: . as \$c | any(range(0; length - 1); \$c[.] == 126 and \$c[. + 1] >= 48 and \$c[. + 1] <= 57);
     def wide: any(. > 127);
-    def dotted: map(select(. < 128)) | .[0] == 46;
-    def unreadable(\$p): (\$p | contains("\\ufffd") or contains("\\n"))
-      or (\$p | split("/") | map(explode) | (.[:-1] | any(wide or short_name))
-        or (last | short_name or (wide and dotted)));'
+    def unreadable(\$p): (\$p | contains("\\n")) or (\$p | explode | wide or short_name);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.
@@ -37979,7 +37978,10 @@ function Read-SelectedRecords(\$Records) {
 # report, which is how it reaches the run's \`fallback:\` line.
 
 \$script:GateOwnerId = '\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z'
-\$script:GateBadPath = '\\A/|\\\\|[*?\\[\\]{}]|[\\x00-\\x1f\\x7f]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z'
+# A path holding a code point outside printable ASCII, or \`~\` and a digit, is refused, as in the
+# bash twin: the graph never compares a changed path holding one, so a root holding one could
+# only ever match a path by another reading.
+\$script:GateBadPath = '\\A/|\\\\|[*?\\[\\]{}]|[^\\x20-\\x7e]|~[0-9]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z'
 
 function Get-JsonProperty(\$Element, [string]\$Name) {
     \$out = [System.Text.Json.JsonElement]::new()
@@ -38283,21 +38285,16 @@ function Test-GateCheckoutConfig([string]\$Path) {
     foreach (\$name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame \$folded \$name) { return \$true } }
     return \$false
 }
-# A path another fold could read as one the graph matches is never compared (the bash twin's
-# unreadable), judged on every component: a path holding U+FFFD or a newline; a folder name holding
-# a code point above U+007F (U+017F folds to s); a file name holding one that is a dotfile once they
-# are dropped (HFS+ ignores U+200C); any name holding \`~\` and a digit, as an 8.3 short name does.
+# A path another fold, a normalisation or HFS+ could read as one the graph matches is never
+# compared (the bash twin's unreadable): one holding a newline or a code point above U+007F
+# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), or a
+# name holding \`~\` and a digit, as an 8.3 short name does. A declared root holding either is refused.
 function Test-GateUnreadable([string]\$Path) {
-    if (\$Path.Contains([char]0xFFFD) -or \$Path.Contains("\`n")) { return \$true }
-    \$names = \$Path.Split('/')
-    for (\$n = 0; \$n -lt \$names.Count; \$n++) {
-        \$name = \$names[\$n]
-        \$ascii = -join @(\$name.ToCharArray() | Where-Object { [int]\$_ -le 127 })
-        \$dotted = \$ascii.StartsWith('.', [StringComparison]::Ordinal)
-        if (\$ascii.Length -lt \$name.Length -and (\$n -lt \$names.Count - 1 -or \$dotted)) { return \$true }
-        for (\$i = 0; \$i + 1 -lt \$name.Length; \$i++) {
-            if (\$name[\$i] -eq [char]'~' -and [int]\$name[\$i + 1] -ge 48 -and [int]\$name[\$i + 1] -le 57) { return \$true }
-        }
+    if (\$Path.Contains("\`n")) { return \$true }
+    for (\$i = 0; \$i -lt \$Path.Length; \$i++) {
+        if ([int]\$Path[\$i] -gt 127) { return \$true }
+        \$next = \$i + 1 -lt \$Path.Length -and [int]\$Path[\$i + 1] -ge 48 -and [int]\$Path[\$i + 1] -le 57
+        if (\$Path[\$i] -eq [char]'~' -and \$next) { return \$true }
     }
     return \$false
 }

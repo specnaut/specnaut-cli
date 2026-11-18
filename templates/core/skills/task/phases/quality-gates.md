@@ -121,9 +121,9 @@ is the bare run, to the byte. `--refs-stdin` reads a pre-push hook's lines.
   space-separated; they are never spliced into the string. A check with **`owners`** is
   omitted when none of them is affected, and given only those that are. **A gate
   command with no check always runs.**
-- A path in `adapter.files`, `full_on`, `inert` and an owner's `roots` is a directory prefix ending in `/`,
-  or an exact path: relative, with no `..`, no `./`, no `//`, no backslash, no glob and
-  no control character. An owner id matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`.
+- A path in `adapter.files`, `full_on`, `inert` and an owner's `roots` is a directory prefix ending
+  in `/`, or an exact path: relative, printable ASCII, with no `..`, no `./`, no `//`, no backslash,
+  no glob and no `~` before a digit. An owner id matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`.
 
 **The adapter.** It is the base's copy, run from a temporary worktree of the base, once
 for each base and once for the candidate. It gets no stdin and no `GIT_*` variable, runs
@@ -142,14 +142,14 @@ and is owned only in its own. An owner whose record differs, or that exists on o
 affected. So is every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-`fallback:`: a path not UTF-8 or holding a newline, a folder or dotfile name holding a code point
-above U+007F, even before the dot, or a name holding `~` and a digit (`path-unreadable:`); the root
-`.gitattributes`, `.lfsconfig` or `.gitmodules` in any ASCII case, even `inert`
-(`checkout-config:`); an unowned path, a `full_on` match, a gitlink, a symlink or a type change; a
-declaration, an `adapter.files` entry, `gates.yml` or `.specnaut/scripts/` that differs from a given
-base, or from the merge-base with the default branch; any of those not a tracked regular file; an
-adapter that fails or answers anything invalid; a malformed declaration; a base unresolved or never
-fetched; `jq` absent, older than 1.6, or failing where its answer decides the run.
+`fallback:`: a path not UTF-8, or holding a newline or a code point above U+007F, or a name holding
+`~` and a digit (`path-unreadable:`); the root `.gitattributes`, `.lfsconfig` or `.gitmodules` in
+any ASCII case, even `inert` (`checkout-config:`); an unowned path, a `full_on` match, a gitlink, a
+symlink or a type change; a declaration, an `adapter.files` entry, `gates.yml` or
+`.specnaut/scripts/` that differs from a given base, or from the merge-base with the default branch;
+any of those not a tracked regular file; an adapter that fails or answers anything invalid; a
+malformed declaration; a base unresolved or never fetched; `jq` absent, older than 1.6, or failing
+where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 

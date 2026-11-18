@@ -8,7 +8,10 @@
 # report, which is how it reaches the run's `fallback:` line.
 
 $script:GateOwnerId = '\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z'
-$script:GateBadPath = '\A/|\\|[*?\[\]{}]|[\x00-\x1f\x7f]|\.\.|//|\./|\A\.\z|/\.\z'
+# A path holding a code point outside printable ASCII, or `~` and a digit, is refused, as in the
+# bash twin: the graph never compares a changed path holding one, so a root holding one could
+# only ever match a path by another reading.
+$script:GateBadPath = '\A/|\\|[*?\[\]{}]|[^\x20-\x7e]|~[0-9]|\.\.|//|\./|\A\.\z|/\.\z'
 
 function Get-JsonProperty($Element, [string]$Name) {
     $out = [System.Text.Json.JsonElement]::new()

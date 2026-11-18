@@ -8,12 +8,14 @@
 # is gate-impact.sh's call, not this file's. Requires jq_lf.
 #
 # Anchored with \A and \z, because $ also matches before a final newline, and an id
-# or a path ending in one must not pass.
+# or a path ending in one must not pass. A path holding a code point outside printable
+# ASCII, or `~` and a digit, is refused: the graph never compares a changed path holding
+# one (unreadable), so a root holding one could only ever match a path by another reading.
 GATE_READ_DEFS='
 def owner_id: type == "string" and test("\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z");
 def clean: type == "string" and length > 0 and (test("[\\x00-\\x1f\\x7f]") | not);
 def path_ok: type == "string" and length > 0
-  and (test("\\A/|\\\\|[*?\\[\\]{}]|[\\x00-\\x1f\\x7f]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z") | not);
+  and (test("\\A/|\\\\|[*?\\[\\]{}]|[^\\x20-\\x7e]|~[0-9]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z") | not);
 def paths_ok: type == "array" and all(path_ok);
 def ids_ok: type == "array" and all(owner_id);
 '

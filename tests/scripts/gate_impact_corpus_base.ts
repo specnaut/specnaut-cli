@@ -131,29 +131,24 @@ export const BASES: Case[] = [
     marks: FULL_MARKS,
   },
   {
-    name: "a non-ASCII unowned path widens, printed in ASCII byte by byte",
+    name: "a non-ASCII path widens, never compared, printed in ASCII byte by byte",
     build: change("stray/\u00e9t\u00e9.txt"),
     code: 0,
     scope: "full",
-    fallback: "unowned: stray/??t??.txt",
+    fallback: "path-unreadable: stray/??t??.txt",
     marks: FULL_MARKS,
   },
   {
-    name: "a path differing from an exact root by a zero-width character is not that root",
+    name: "a path differing from an exact root by a zero-width character widens, never compared",
     build: change(`docs/guide.md${ZWJ}`),
     code: 0,
     scope: "full",
-    fallback: "unowned: docs/guide.md???",
+    fallback: "path-unreadable: docs/guide.md???",
     marks: FULL_MARKS,
   },
   {
     // HFS+ ignores U+200D, so it reads the folder as `apps/web/`: the path is never compared.
     name: "a folder differing from a root only by a zero-width character widens",
-    repo: {
-      owners: OWNERS.map((o) =>
-        o.id === "web" ? { ...o, roots: ["apps/web/", `apps/web${ZWJ}/`] } : o
-      ),
-    },
     build: change(`apps/web${ZWJ}/a.ts`),
     code: 0,
     scope: "full",
@@ -161,7 +156,8 @@ export const BASES: Case[] = [
     marks: FULL_MARKS,
   },
   {
-    name: "a root changed only by a zero-width character is a changed record",
+    // A root is never compared either: one a fold or HFS+ could read as another is refused.
+    name: "a root holding a zero-width character is refused, and widens",
     build: async (r) => {
       await r.commit({
         "docs/guide.md": "changed\n",
@@ -171,8 +167,9 @@ export const BASES: Case[] = [
       });
     },
     code: 0,
-    scope: "owners guide web",
-    marks: ["suite-scoped guide web", "web-scoped web", "always unset"],
+    scope: "full",
+    fallback: "adapter-invalid-root: candidate",
+    marks: FULL_MARKS,
   },
   {
     name: "a gate command differing from a check by a zero-width character is not that check",

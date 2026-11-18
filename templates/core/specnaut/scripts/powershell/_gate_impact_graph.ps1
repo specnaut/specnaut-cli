@@ -79,21 +79,16 @@ function Test-GateCheckoutConfig([string]$Path) {
     foreach ($name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame $folded $name) { return $true } }
     return $false
 }
-# A path another fold could read as one the graph matches is never compared (the bash twin's
-# unreadable), judged on every component: a path holding U+FFFD or a newline; a folder name holding
-# a code point above U+007F (U+017F folds to s); a file name holding one that is a dotfile once they
-# are dropped (HFS+ ignores U+200C); any name holding `~` and a digit, as an 8.3 short name does.
+# A path another fold, a normalisation or HFS+ could read as one the graph matches is never
+# compared (the bash twin's unreadable): one holding a newline or a code point above U+007F
+# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), or a
+# name holding `~` and a digit, as an 8.3 short name does. A declared root holding either is refused.
 function Test-GateUnreadable([string]$Path) {
-    if ($Path.Contains([char]0xFFFD) -or $Path.Contains("`n")) { return $true }
-    $names = $Path.Split('/')
-    for ($n = 0; $n -lt $names.Count; $n++) {
-        $name = $names[$n]
-        $ascii = -join @($name.ToCharArray() | Where-Object { [int]$_ -le 127 })
-        $dotted = $ascii.StartsWith('.', [StringComparison]::Ordinal)
-        if ($ascii.Length -lt $name.Length -and ($n -lt $names.Count - 1 -or $dotted)) { return $true }
-        for ($i = 0; $i + 1 -lt $name.Length; $i++) {
-            if ($name[$i] -eq [char]'~' -and [int]$name[$i + 1] -ge 48 -and [int]$name[$i + 1] -le 57) { return $true }
-        }
+    if ($Path.Contains("`n")) { return $true }
+    for ($i = 0; $i -lt $Path.Length; $i++) {
+        if ([int]$Path[$i] -gt 127) { return $true }
+        $next = $i + 1 -lt $Path.Length -and [int]$Path[$i + 1] -ge 48 -and [int]$Path[$i + 1] -le 57
+        if ($Path[$i] -eq [char]'~' -and $next) { return $true }
     }
     return $false
 }
