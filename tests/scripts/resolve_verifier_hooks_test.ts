@@ -88,3 +88,29 @@ Deno.test({
       assertEquals(await fired(l), "", "BASH_ENV or an exported function ran");
     }),
 });
+
+Deno.test({
+  name: "with an in-repo PATH entry dropped, a review start spelled with shell quoting is refused",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout(async (l, { bash }) => {
+      const r = { entries: [l.bin, l.tools], cwd: l.repo, bash };
+      const want = { refused: "is inside the repository", entry: l.bin, exit: 2 };
+      // The shell removes each quote and backslash below before `specnaut` reads its words.
+      for (
+        const line of [
+          'specnaut "review" start 1',
+          "specnaut 'review' start 1",
+          `specnaut re"vi"ew st'ar't 1`,
+          "specnaut rev\\iew start 1",
+          "specnaut review\\ start 1",
+          "specnaut rev\\\niew start 1",
+          "specnaut $'review' start 1",
+        ]
+      ) {
+        const start = JSON.stringify({ tool_input: { command: line } });
+        assertEquals(await hook(l, r, "review-gate.sh", start), want, line);
+      }
+      assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
+    }),
+});

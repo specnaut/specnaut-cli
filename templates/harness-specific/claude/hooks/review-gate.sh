@@ -71,11 +71,18 @@ clean_path
 without=" - start the session from a shell without that entry"
 IFS= read -r -d '' input || true
 drop_pass
-case "$input" in *review*) ;; *) exit 0 ;; esac
+# The line with every line continuation, quote and backslash removed, JSON-escaped or not, as the
+# shell removes them before `specnaut` reads its words: `"review" start`, `re"vi"ew st'ar't`,
+# `review\ start` and `rev\<newline>iew start` read as the start they run.
+flat=${input//\\\\\\n/}
+flat=${flat//\\\\/}
+flat=${flat//\\\"/}
+flat=${flat//\'/}
+case "$flat" in *review*) ;; *) exit 0 ;; esac
 # A start, as startsReview (src/domain/review_gate.ts) reads one, its blanks as JSON escapes them
 # too: wider than the binary's, never narrower.
 start='review([[:space:]]|\\[nrt\\])+start'
-[[ -z $dropped || ! $input =~ $start ]] || refuse "VERIFIER REFUSED: $dropped$without"
+[[ -z $dropped || ! $flat =~ $start ]] || refuse "VERIFIER REFUSED: $dropped$without"
 if ! resolve_cmd specnaut; then
   [ -z "$why" ] || refuse "VERIFIER REFUSED: $why"
   exit 0
