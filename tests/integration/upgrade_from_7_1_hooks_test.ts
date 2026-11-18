@@ -1,7 +1,13 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
-import { fromFileUrl, isAbsolute, join } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 import { lockText, plant, sha256 } from "./_lock_fixture.ts";
+import {
+  readSettings,
+  type Registration,
+  registrations,
+  scriptsRun,
+} from "./hook_registrations.ts";
 
 /**
  * The hook move, end to end (FR-014, SC-003): a project a 7.1.0 release left —
@@ -54,29 +60,6 @@ const V7_1_SETTINGS = {
     SessionStart: [{ hooks: [hook(".claude/hooks/check-backlog-prereqs.sh", 10)] }],
   },
 };
-
-type Registration = { event: string; matcher: string | undefined; command: string };
-
-// deno-lint-ignore no-explicit-any
-function registrations(settings: any): Registration[] {
-  const out: Registration[] = [];
-  for (const [event, groups] of Object.entries(settings.hooks ?? {})) {
-    // deno-lint-ignore no-explicit-any
-    for (const g of groups as any[]) {
-      for (const h of g.hooks ?? []) out.push({ event, matcher: g.matcher, command: h.command });
-    }
-  }
-  return out;
-}
-
-const readSettings = async (dir: string) =>
-  JSON.parse(await Deno.readTextFile(join(dir, ".claude/settings.json")));
-
-/** Every `.sh` a command runs, as an absolute path in `dir`. */
-function scriptsRun(command: string, dir: string): string[] {
-  const expanded = command.replaceAll("$CLAUDE_PROJECT_DIR", dir);
-  return [...expanded.matchAll(/[^\s"']+\.sh/g)].map(([p]) => isAbsolute(p) ? p : join(dir, p));
-}
 
 /**
  * Turn a fresh init into what 7.1.0 left, and return the registrations the
