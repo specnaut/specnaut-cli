@@ -142,14 +142,14 @@ owner, and an owner whose record differs, or that exists on one side only, is af
 every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-`fallback:`: a path name not UTF-8 or holding a newline, a dotfile name holding a non-ASCII
-letter, or a name holding `~` and a digit (`path-unreadable:`); the root `.gitattributes`,
-`.lfsconfig` or `.gitmodules` in any ASCII case, even `inert` (`checkout-config:`); an unowned
-path, a `full_on` match, a gitlink, a symlink or a type change; a declaration, an `adapter.files`
-entry, `gates.yml` or `.specnaut/scripts/` that differs from a given base, or from the merge-base
-with the default branch; any of those not a tracked regular file; an adapter that fails or answers
-anything invalid; a malformed declaration; a base that does not resolve or was never fetched; `jq`
-absent, older than 1.6, or failing where its answer decides the run.
+`fallback:`: a path name not UTF-8 or holding a newline, a dotfile name holding a code point above
+U+007F, or a name holding `~` and a digit (`path-unreadable:`); the root `.gitattributes`,
+`.lfsconfig` or `.gitmodules` in any ASCII case, even `inert` (`checkout-config:`); an unowned path,
+a `full_on` match, a gitlink, a symlink or a type change; a declaration, an `adapter.files` entry,
+`gates.yml` or `.specnaut/scripts/` that differs from a given base, or from the merge-base with the
+default branch; any of those not a tracked regular file; an adapter that fails or answers anything
+invalid; a malformed declaration; a base that does not resolve or was never fetched; `jq` absent,
+older than 1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -217,18 +217,15 @@ branch has committed; under `review` or `merge`, only under `VERDICT size-limits
 bash .specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
 ```
 
-It holds every changed file to the project's file limits
-(`.specnaut/memory/size-limits.md`, overridden by `.specnaut/size-limits.yml`):
-exit 1 is a failure of the tier it follows, fixed the same way; exit 2 means
-`.specnaut/size-limits.yml` cannot be read — fix the file, never skip the
-check. Any other exit (126, 127: a lost
-executable bit, no bash) means the check did not run, which is a failure of the
-tier, never a pass. Without `--since` it checks the
-staged changes against the branch's merge base, which is the form a pre-commit
-runner calls: an extraction commit followed by an addition passes, as long as
-the file ends no larger than where the branch began. Every review runs it too,
-through the review phase's Phase 0, so a standalone item is held as well. Specnaut installs
-no git hook: wiring it into one is the project's choice.
+It holds every changed file to the project's file limits (`.specnaut/memory/size-limits.md`,
+overridden by `.specnaut/size-limits.yml`): exit 1 is a failure of the tier it follows, fixed the
+same way; exit 2 means `.specnaut/size-limits.yml` cannot be read — fix the file, never skip the
+check. Any other exit (126, 127: a lost executable bit, no bash) means the check did not run, which
+is a failure of the tier, never a pass. Without `--since` it checks the staged changes against the
+branch's merge base, which is the form a pre-commit runner calls: an extraction commit followed by
+an addition passes, as long as the file ends no larger than where the branch began. Every review
+runs it too, through the review phase's Phase 0, so a standalone item is held as well. Specnaut
+installs no git hook: wiring it into one is the project's choice.
 
 ## The import boundary — with every tier
 
