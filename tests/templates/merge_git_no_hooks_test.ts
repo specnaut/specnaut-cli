@@ -115,12 +115,16 @@ const SUBCOMMANDS = new Set([
 ]);
 
 /**
- * The git commands a script's line tells someone to run: a `git` after `: ` or an opening quote,
- * up to a quote, a `;` or the end. A report of a call that ran (`git … failed`) tells nobody to run
- * it, and `git` before a word that is no subcommand (`git could`) is prose.
+ * The git commands a script's line tells someone to run: a `git` right after `: `, a quote or a
+ * backtick, up to a quote, a `;` or the end. A report of a call that ran (`git … failed`) tells
+ * nobody to run it, and `git` before a word that is no subcommand (`git could`) is prose.
+ *
+ * The limit, on purpose: a `git` mid-sentence (`then run git push`) is not read. A line holds no
+ * mark telling that instruction from prose (`the git branch`) or from the script's own call after a
+ * quoted argument (`[ "$x" ] || git checkout`), and a sweep that flags both is one nobody keeps.
  */
 function messageCommands(line: string): string[][] {
-  return [...line.matchAll(/(?:: |['`])(git(?: [^'"`;]*)?)/g)]
+  return [...line.matchAll(/(?:: |['"`])(git(?: [^'"`;]*)?)/g)]
     .map((m) => m[1].trim().split(/\s+/))
     .filter((w) => !w.includes("failed"))
     .filter((w) =>
@@ -149,6 +153,8 @@ Deno.test("the message sweep reads instructions, and passes reports and prose", 
     "git push -u origin main",
   ]);
   assertEquals(cmds(`echo "resolve it, 'git rebase --continue', then"`), ["git rebase --continue"]);
+  assertEquals(cmds(`say "git push -u origin main" >&2`), ["git push -u origin main"]);
+  assertEquals(cmds(`[ "$x" = y ] || git checkout -q "$b"`), []); // the script's own call
   assertEquals(cmds(`refuse "LFS" "git lfs push origin abc failed"`), []);
   assertEquals(cmds(`fail "x: git could not read its blob"`), []);
   assert(violation(messageCommands(`echo "run: git remote set-head origin --auto"`)[0]) !== null);

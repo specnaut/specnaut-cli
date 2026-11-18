@@ -60,7 +60,7 @@ Deno.test("a failing git lfs push is 17: named, redacted, and nothing moves", sh
     const r = await sb.scriptWithGit(lfsShim(log, "git-lfs/3.0.0", fail), "land-feature.sh");
     assertEquals(r.code, 17, r.stderr);
     assertStringIncludes(r.stderr, "LFS PUSH FAILED");
-    assertStringIncludes(r.stderr, "https://<redacted>@lfs.example.test/x");
+    assertStringIncludes(r.stderr, "denied: https://lfs.example.test/<redacted>\n");
     assert(!r.stderr.includes("s3cret"), r.stderr);
     assertEquals((await calls(log)).filter((c) => c.startsWith("push ")), []);
     assertEquals(await git(sb.remote, "rev-parse", "main"), before);

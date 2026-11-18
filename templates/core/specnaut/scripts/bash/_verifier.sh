@@ -14,7 +14,7 @@ refuse_unsafe_path() {
   local rest=${PATH-}: e top why
   tree_top "$(pwd -P)"
   if [ -z "$top" ]; then
-    echo "$me: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was $1" >&2
+    echo "$me: VERIFIER REFUSED: no repository holds the working folder, so its PATH cannot be judged against one - nothing was $1" >&2
     exit 13
   fi
   while [ -n "$rest" ]; do

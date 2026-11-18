@@ -69,13 +69,13 @@ Deno.test("a PATH _verifier.sh refuses is named by the script that ran, with its
         `${name}: VERIFIER REFUSED: PATH entry 'bin' is not an absolute path - start the session` +
           ` from a shell without that entry. Nothing was ${outcome}\n`,
       );
-      // Outside every repository: the other refusal.
+      // Outside every repository: the other refusal, naming what it refused, not HEAD (cli#809).
       const outside = await runWith(script, sb.root, "/");
       assertEquals(outside.code, 13, outside.stderr);
       assertStringIncludes(
         outside.stderr,
-        `${name}: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could` +
-          ` not judge HEAD, nothing was ${outcome}\n`,
+        `${name}: VERIFIER REFUSED: no repository holds the working folder, so its PATH cannot` +
+          ` be judged against one - nothing was ${outcome}\n`,
       );
     }
     assertEquals(await git(sb.remote, "rev-parse", "main"), before);

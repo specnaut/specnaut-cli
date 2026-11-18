@@ -33328,21 +33328,28 @@ judge_lfsconfig() {
   [ "\$was" != "\$now" ] || changed=0
 }
 
-# stdin with every credential a URL carries redacted: its userinfo, and the value of the query
-# parameters X-Amz-Signature, X-Amz-Security-Token, sig, token and access_token, the name kept.
-# In any case, so each letter is spelled in both: macOS's sed has no case-insensitive flag.
+# stdin with every URL cut to its scheme and host (cli#809): a credential can sit in the userinfo
+# (an unencoded \`@\` in it included), a path segment or any query parameter, under a name no list
+# keeps up with, behind \`%26\` or \`&amp;\`. The authority ends at the first \`/\`, \`?\` or \`#\`, the host
+# after its last \`@\`; the port goes too. Anything after the host becomes \`/<redacted>\`, up to a space.
 redact_urls() {
-  local token='[Tt][Oo][Kk][Ee][Nn]' sig='[Ss][Ii][Gg]' q
-  q="[Xx]-[Aa][Mm][Zz]-(\${sig}[Nn][Aa][Tt][Uu][Rr][Ee]|[Ss][Ee][Cc][Uu][Rr][Ii][Tt][Yy]-\$token)"
-  q="\$q|\$sig|([Aa][Cc][Cc][Ee][Ss][Ss]_)?\$token"
-  sed -E -e 's#(://)[^/@[:space:]]+@#\\1<redacted>@#g' -e "s#([?&](\$q)=)[^&[:space:]]+#\\\\1<redacted>#g"
+  local s='([A-Za-z][A-Za-z0-9+.-]*://)' u='([^/?#[:space:]]*@)?' h='(\\[[^]/[:space:]]*\\]|[^]/?#@:[:space:][]*)'
+  # The userinfo goes first, on its own: a \`:\` in it (a token sent as the user name, with no path
+  # after the host) would otherwise read as the host's port and print the token as the host.
+  sed -E -e "s#\$s[^/?#[:space:]]*@#\\1#g" -e "s#\$s\$u\$h[/?#:][^[:space:]]*#\\1\\3/<redacted>#g" \\
+    -e "s#\$s\$u\$h#\\1\\3#g"
 }
 
 # The upload, an incomplete push refused: a \`-c\` outranks every file git-lfs reads its config from.
-# Its output is printed redacted.
+# Its output is printed redacted, and git's and git-lfs's trace variables are cleared for it
+# (cli#809): GIT_CURL_VERBOSE and GIT_TRACE_CURL print the Authorization header, which no URL
+# redaction sees. Every GIT_TRACE* goes by prefix, so a trace git adds later goes with them.
 push_objects() {
   local out
-  if ! out=\$(GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "\$c" 2>&1); then
+  if ! out=\$(
+    unset \${!GIT_TRACE@} GIT_CURL_VERBOSE GIT_TRANSFER_TRACE
+    GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "\$c" 2>&1
+  ); then
     printf '%s\\n' "\$out" | redact_urls >&2
     refuse "LFS PUSH FAILED" "git lfs push origin \${c:0:12} failed"
   fi
@@ -33404,7 +33411,7 @@ refuse_unsafe_path() {
   local rest=\${PATH-}: e top why
   tree_top "\$(pwd -P)"
   if [ -z "\$top" ]; then
-    echo "\$me: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was \$1" >&2
+    echo "\$me: VERIFIER REFUSED: no repository holds the working folder, so its PATH cannot be judged against one - nothing was \$1" >&2
     exit 13
   fi
   while [ -n "\$rest" ]; do

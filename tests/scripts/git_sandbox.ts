@@ -53,6 +53,13 @@ export interface Sandbox {
   script(name: string, ...args: string[]): Promise<Run>;
   /** The same, with `git` on PATH replaced by a bash shim (not on Windows). */
   scriptWithGit(shim: string, name: string, ...args: string[]): Promise<Run>;
+  /** `scriptWithGit`, `env` added to the script's environment (a user's exported variables). */
+  scriptWithGitEnv(
+    env: Record<string, string>,
+    shim: string,
+    name: string,
+    ...args: string[]
+  ): Promise<Run>;
   commit(file: string, content: string, ...message: string[]): Promise<string>;
   /** origin refuses every push until `<root>/allow` exists — a transient rejection. */
   refusePushes(): Promise<void>;
@@ -88,20 +95,8 @@ export async function sandbox(): Promise<Sandbox> {
     remote,
     script: (name, ...args) =>
       run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work),
-    async scriptWithGit(shim, name, ...args) {
-      // The shim stands in for git; `$REAL_GIT` is the one it wraps.
-      const real = (await run("bash", ["-c", "command -v git"], work)).stdout.trim();
-      const bin = join(root, "bin");
-      await Deno.mkdir(bin, { recursive: true });
-      await Deno.writeTextFile(
-        join(bin, "git"),
-        `#!/usr/bin/env bash\nREAL_GIT='${real}'\n${shim}\n`,
-      );
-      await Deno.chmod(join(bin, "git"), 0o755);
-      return run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work, {
-        PATH: `${bin}${DELIMITER}${withSpecnaut(Deno.env.get("PATH"))}`,
-      });
-    },
+    scriptWithGit: (shim, name, ...args) => withGit(root, work, {}, shim, name, args),
+    scriptWithGitEnv: (env, shim, name, ...args) => withGit(root, work, env, shim, name, args),
     async commit(file, content, ...message) {
       await Deno.mkdir(join(work, file, ".."), { recursive: true });
       await Deno.writeTextFile(join(work, file), content);
@@ -120,4 +115,25 @@ export async function sandbox(): Promise<Sandbox> {
     },
     cleanup: () => Deno.remove(root, { recursive: true }),
   };
+}
+
+/** `name` run from `work` with `git` on PATH a shim kept under `root`, and `env` added. */
+async function withGit(
+  root: string,
+  work: string,
+  env: Record<string, string>,
+  shim: string,
+  name: string,
+  args: string[],
+): Promise<Run> {
+  // The shim stands in for git; `$REAL_GIT` is the one it wraps.
+  const real = (await run("bash", ["-c", "command -v git"], work)).stdout.trim();
+  const bin = join(root, "bin");
+  await Deno.mkdir(bin, { recursive: true });
+  await Deno.writeTextFile(join(bin, "git"), `#!/usr/bin/env bash\nREAL_GIT='${real}'\n${shim}\n`);
+  await Deno.chmod(join(bin, "git"), 0o755);
+  return run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work, {
+    ...env,
+    PATH: `${bin}${DELIMITER}${withSpecnaut(Deno.env.get("PATH"))}`,
+  });
 }

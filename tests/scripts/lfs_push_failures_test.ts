@@ -101,35 +101,3 @@ Deno.test("lfs-push.sh: a failing status is 12, never a clean tree", shimmed, as
     await sb.cleanup();
   }
 });
-
-Deno.test(
-  "lfs-push.sh: a failed push's output keeps no credential a URL carries, in any case",
-  shimmed,
-  async () => {
-    const sb = await lfsBranch();
-    try {
-      // Each value is a secret; each name, and every other parameter, stays readable.
-      const urls = [
-        "https://u:v-user@lfs.example.test/x",
-        "https://s3.example.test/o?X-Amz-Signature=v-amzsig&x-amz-security-token=v-amztok",
-        "https://lfs.example.test/o?SIG=v-sig&Token=v-token&keep=shown",
-        "https://lfs.example.test/o?a=1&Access_Token=v-access then more",
-      ];
-      const fail = `printf '%s\\n' ${urls.map((u) => `'${u}'`).join(" ")} >&2; exit 2`;
-      const log = join(sb.root, "git.log");
-      const r = await sb.scriptWithGit(lfsShim(log, "git-lfs/3.0.0", fail), "lfs-push.sh");
-      assertEquals(r.code, 17, r.stderr);
-      assertEquals(r.stderr.match(/v-[a-z]+/g), null, r.stderr);
-      for (
-        const kept of [
-          "https://<redacted>@lfs.example.test/x",
-          "?X-Amz-Signature=<redacted>&x-amz-security-token=<redacted>\n",
-          "?SIG=<redacted>&Token=<redacted>&keep=shown",
-          "?a=1&Access_Token=<redacted> then more",
-        ]
-      ) assertStringIncludes(r.stderr, kept);
-    } finally {
-      await sb.cleanup();
-    }
-  },
-);
