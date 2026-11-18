@@ -143,7 +143,8 @@ existing file, or a rename into a generated name, does not exempt it. The
 constitution is never generated, nor a name holding a control character.
 
 The ratchet prints every file it leaves out this way, as `generated: <path>
-(<why>)`, and `specnaut scan` counts them under `generated`. A seat reviews a
+(<why>)`, on every line a path C-quoted as git quotes it (`"a\033b.ts"`), and
+`specnaut scan` counts them under `generated`. A seat reviews a
 generated-skipped file like any other: a new hand-written file behind a
 generated name or header is judged by its size, at the severity the table above
 gives a new file of that size.

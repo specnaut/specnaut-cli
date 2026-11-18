@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { SCRIPT } from "./size_ratchet_fixture.ts";
+import { quoted, SCRIPT } from "./size_ratchet_fixture.ts";
 import { git, lines, POSIX, repo, scanJson, write } from "../integration/scan_fixture.ts";
 
 /**
@@ -8,9 +8,10 @@ import { git, lines, POSIX, repo, scanJson, write } from "../integration/scan_fi
  * framework's tree, the lock's entries, `exempt:` globs on the path and on `/path`, `-diff` and
  * `diff` attributes, a NUL sniff, the constitution held under a glob that would exempt it, and
  * generated code: by name, by header (with `diff` set), a header past the 8000-byte window, a
- * `!` entry, and a generated name holding an escape (cli#802). Every file is new since the base,
- * so the ratchet judges each at its full size, and a header marker on a new file is enough for
- * both.
+ * `!` entry, and generated names holding a C0 escape, a C1 CSI or a DEL (cli#802, cli#807).
+ * Every file is new since the base, so the ratchet judges each at its full size, and a header
+ * marker on a new file is enough for both. The ratchet prints a path C-quoted, the scan's JSON
+ * holds it raw: the scan's side is quoted as git quotes it before the two are compared.
  */
 
 const nul = (n: number) => new TextEncoder().encode(`a\0\n${lines(n - 1)}`);
@@ -19,8 +20,12 @@ const LOCK = "version: 2\nharness: claude\ntemplates_version: 0.0.1\nentries:\n"
   "  .claude/agents/a.md:\n    sha256: x\n    installed_at: '2026-01-01T00:00:00.000Z'\n" +
   "    templates_version: 0.0.1\n";
 
-/** A generated name holding a control character, which no Windows file name can hold. */
-const CONTROL: Record<string, string> = { "esc\x1b[2J.gen.ts": lines(900) };
+/** Generated names holding a control character, which no Windows file name can hold. */
+const CONTROL: Record<string, string> = {
+  "esc\x1b[2J.gen.ts": lines(900),
+  "csi\u009b2J.gen.ts": lines(900),
+  "del\x7f.gen.ts": lines(900),
+};
 
 const FILES: Record<string, string | Uint8Array> = {
   ".specnaut/size-limits.yml": 'file:\n  target: 200\n  ceiling: 500\nexempt:\n  - "*.lock"\n' +
@@ -90,7 +95,7 @@ async function committedFixture(): Promise<{ dir: string; base: string }> {
 // deno-lint-ignore no-explicit-any
 const filesAt = (json: any, level: string): string[] =>
   json.files.items.filter((f: { level: string }) => f.level === level)
-    .map((f: { path: string }) => f.path).sort();
+    .map((f: { path: string }) => quoted(f.path)).sort();
 
 Deno.test("SC-002: scan and ratchet agree both ways on what is over a ceiling, and over a target", async () => {
   const { dir, base } = await committedFixture();
@@ -112,7 +117,7 @@ Deno.test("SC-002: scan and ratchet agree both ways on what is over a ceiling, a
       "kept.gen.ts",
       "longline.ts",
       "src/gen/kept.ts",
-      ...(POSIX ? Object.keys(CONTROL) : []),
+      ...(POSIX ? ['"esc\\033[2J.gen.ts"', '"csi\\302\\2332J.gen.ts"', '"del\\177.gen.ts"'] : []),
     ].sort(),
   );
   assertEquals(ratchet.target, ["a1.txt", "ok.ts"]);

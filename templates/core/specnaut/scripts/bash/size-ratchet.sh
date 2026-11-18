@@ -33,9 +33,10 @@
 #
 # Exempt without asking: `.specnaut/**` and every file `.specnaut/installed.lock`
 # lists — Specnaut's own artefacts, which `specnaut upgrade` rewrites — plus
-# binary files, the config's `exempt:` globs and generated code, each such file
-# printed as `generated:` (`_size_exempt.sh` says what counts). One file is the
-# exception: `docs/constitution.md`, loaded into every session, is held to the
+# binary files, the config's `exempt:` globs and generated code. Only generated
+# code is named, as `generated:` (`_size_exempt.sh` says what counts); the rest
+# is left out unnamed. Every line names a path through `size_quoted`, C-quoted
+# as git quotes it, never raw. One file is the exception: `docs/constitution.md`, loaded into every session, is held to the
 # `constitution` unit whenever it changes. No exemption reaches it; a project
 # that wants no limit sets its `target` and `ceiling` to `none`.
 #
@@ -155,8 +156,9 @@ while IFS= read -r -d '' status; do
   if [ -n "$base" ]; then before="$(count_at "$base:$old")"; else before=0; fi
   after="$(count_at "$head_prefix$path")"
   checked=$((checked + 1))
-  line="$path: $before → $after (target $t, ceiling $c)$label"
-  [ "$REPORT" = 1 ] && echo "  $path: $before → $after"
+  shown="$(size_quoted "$path")"
+  line="$shown: $before → $after (target $t, ceiling $c)$label"
+  [ "$REPORT" = 1 ] && echo "  $shown: $before → $after"
 
   verdict=""
   if [ "$c" != "none" ] && [ "$after" -gt "$c" ]; then

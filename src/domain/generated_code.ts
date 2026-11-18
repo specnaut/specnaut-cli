@@ -1,5 +1,6 @@
 import { BINARY_SNIFF_BYTES } from "./binary_sniff.ts";
 import { anyGlobTakes, compileGlobs } from "./case_glob.ts";
+import { hasControl } from "./terminal_text.ts";
 
 /**
  * What counts as generated code, which the size limits leave out with no `exempt:` entry (cli#798):
@@ -33,16 +34,14 @@ export const MARKER_LINES = 5;
 
 const COMPILED = compileGlobs(GENERATED_GLOBS);
 
-/** Unicode's control characters: C0 (a newline among them), DEL and C1. */
-const CONTROL = /\p{Cc}/u;
-
 /**
  * Whether the generated defaults may reach `path` at all, by name or by header. Not when it holds
- * a control character (cli#802): the ratchet prints a generated file's name raw, and an escape
- * sequence or a carriage return in it could rewrite the verdict a user reads.
+ * a C0, DEL or C1 control character (cli#802), as `_size_exempt.sh` rules: the ratchet printed a
+ * generated file's name raw then, and prints it escaped since cli#807; the rule stays so both
+ * sides still give the same answer.
  */
 export function generatedMayApply(path: string): boolean {
-  return !CONTROL.test(path);
+  return !hasControl(path);
 }
 
 /** Whether `path` is a generator's output by its name. */

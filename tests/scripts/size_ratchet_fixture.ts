@@ -85,3 +85,34 @@ export const CLEAN = "staged file(s) within the file limits";
  * the script path from `bashPath` (cli#704).
  */
 export const symlinkUnsure = Deno.build.os === "windows";
+
+/** The escapes git's core.quotepath names; every other byte it escapes is octal. */
+const NAMED: Record<number, string> = {
+  0x07: "\\a",
+  0x08: "\\b",
+  0x09: "\\t",
+  0x0a: "\\n",
+  0x0b: "\\v",
+  0x0c: "\\f",
+  0x0d: "\\r",
+  0x22: '\\"',
+  0x5c: "\\\\",
+};
+
+/**
+ * `name` as the ratchet prints every path (cli#807), and git with core.quotepath: quoted when it
+ * holds a control byte, a byte at or above 0x80, a `"` or a `\`, each such byte escaped. Bytes
+ * for a name no string can spell, such as a lone 0x9B.
+ */
+export function quoted(name: string | Uint8Array): string {
+  const bytes = typeof name === "string" ? new TextEncoder().encode(name) : name;
+  let out = "";
+  let escaped = false;
+  for (const b of bytes) {
+    const named = NAMED[b];
+    if (named !== undefined || b < 0x20 || b >= 0x7f) escaped = true;
+    out += named ??
+      (b < 0x20 || b >= 0x7f ? `\\${b.toString(8).padStart(3, "0")}` : String.fromCharCode(b));
+  }
+  return escaped ? `"${out}"` : out;
+}

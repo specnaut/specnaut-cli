@@ -7,9 +7,19 @@
 // line naming the file with its real sizes — a line only the path that read
 // both blobs can print. A pass, or a `0 → 0`, fails the case.
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { FILE, lines, ratchet, repo, run, stage } from "./size_ratchet_fixture.ts";
+import {
+  BASH,
+  FILE,
+  lines,
+  quoted,
+  ratchet,
+  repo,
+  run,
+  SCRIPT,
+  stage,
+} from "./size_ratchet_fixture.ts";
 import { run as child } from "../templates/child_fixture.ts";
 
 /** Commits `name` at `start` lines in a fresh repo held to target 300, ceiling 400. */
@@ -27,12 +37,13 @@ async function assertGrowthRefused(name: string): Promise<void> {
   assertEquals(r.code, 1, r.stdout + r.stderr);
   assertStringIncludes(
     r.stderr,
-    `${name}: 380 → 390 (target 300, ceiling 400) — over the target and grew`,
+    `${quoted(name)}: 380 → 390 (target 300, ceiling 400) — over the target and grew`,
   );
 }
 
 Deno.test("a file with a non-ASCII name is measured, and refused when it grows", async () => {
   await assertGrowthRefused("naïve.ts");
+  assertEquals(quoted("naïve.ts"), '"na\\303\\257ve.ts"'); // as `git -c core.quotepath` shows it
 });
 
 // git does not quote a name that only holds spaces: this case does not
@@ -57,7 +68,7 @@ Deno.test("a renamed file with a non-ASCII name is measured against its old size
   assertEquals(r.code, 1, r.stdout + r.stderr);
   assertStringIncludes(
     r.stderr,
-    "café.ts: 380 → 390 (target 300, ceiling 400) — over the target and grew",
+    '"caf\\303\\251.ts": 380 → 390 (target 300, ceiling 400) — over the target and grew',
   );
 });
 
@@ -113,6 +124,32 @@ Deno.test({
     assertEquals(staged.code, 0, staged.stderr);
     const r = await ratchet(dir);
     assertEquals(r.code, 1, r.stdout + r.stderr);
-    assertStringIncludes(r.stderr, `${name}: 0 → 900 (target 300, ceiling 400) — over the ceiling`);
+    assertStringIncludes(r.stderr, '"grown.ts\\nmanaged.ts": 0 → 900 (target 300, ceiling 400)');
+  },
+});
+
+// cli#807: a name is data. Every line that names a file, the refusal, the note on a pass and the
+// `--report` line, names it C-quoted as git does, so an escape sequence in it never reaches the
+// terminal as one.
+Deno.test({
+  name: "every line the ratchet prints names a file escaped, never raw",
+  ignore: Deno.build.os === "windows", // no Windows file name holds an escape
+  fn: async () => {
+    const dir = await repo(10, FILE(200, 500));
+    await stage(dir, "e\x1b[2J.ts", 600);
+    const over = await run(BASH, [SCRIPT, "--report"], dir);
+    assertEquals(over.code, 1, over.stdout + over.stderr);
+    assertStringIncludes(over.stderr, '  "e\\033[2J.ts": 0 → 600 (target 200, ceiling 500) — over');
+    assertStringIncludes(over.stdout, '  "e\\033[2J.ts": 0 → 600\n');
+    await run("git", ["rm", "-q", "--cached", "e\x1b[2J.ts"], dir);
+    await stage(dir, "n\x9b1m.ts", 300);
+    const note = await ratchet(dir);
+    assertEquals(note.code, 0, note.stdout + note.stderr);
+    assertStringIncludes(
+      note.stdout,
+      '  note: "n\\302\\2331m.ts": 0 → 300 (target 200, ceiling 500)',
+    );
+    const all = [over, note].map((out) => out.stdout + out.stderr).join("");
+    assert(!all.includes("\x1b") && !all.includes("\x9b"), all);
   },
 });
