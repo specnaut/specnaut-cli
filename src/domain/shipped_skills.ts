@@ -16,9 +16,9 @@ import { BASE_LOCK, type BaseEntry, type Untrusted } from "./script_trust.ts";
  * bytes, and holds them from then on; one byte changed, and the copy is asked about again. The
  * approval answers this rule only: it never quiets a reason the branch's own change gets.
  *
- * The lock's digest is a key too, so a branch's change to it is judged here
- * ({@link lockSkillReasons}): the approvals file is the one way a copy Specnaut does not ship
- * is accepted.
+ * The lock is a key too, so a branch's change to it is judged here: a digest it re-stamps
+ * ({@link lockSkillReasons}), and a path it stops shipping ({@link leavingCopies}). The approvals
+ * file is the one way a copy Specnaut does not ship is accepted.
  */
 
 /** The skill folders Specnaut writes, for Claude Code and for Codex. */
@@ -54,6 +54,28 @@ export async function shippedReasons(
     if (copy !== undefined && !await holdsCopy(e, copy)) {
       out.push({ path: e.path, reason: SHIPPED_REASON });
     }
+  }
+  return out;
+}
+
+/**
+ * The copies HEAD's skills are judged against (`tip`), with each path that leaves the shipped set
+ * added: one the merge base's lock ships (`mergeBase`, its copies) and HEAD's (`head`, its paths)
+ * no longer does, its entry dropped or its harness switched so the bundle stops mapping it. Once
+ * that lock lands, the base vouches for the skill as an ordinary file and never asks about it as a
+ * shipped one again; so it is judged here, against the copy shipped (the tip's, else the merge
+ * base's), and no approval holds it: this is the last merge at which it is a shipped skill.
+ */
+export function leavingCopies(
+  tip: ReadonlyMap<string, ShippedCopy>,
+  mergeBase: ReadonlyMap<string, ShippedCopy>,
+  head: ReadonlySet<string>,
+): Map<string, ShippedCopy> {
+  const out = new Map(tip);
+  for (const [path, old] of mergeBase) {
+    if (head.has(path)) continue;
+    const { approvedSha256: _, ...copy } = tip.get(path) ?? old;
+    out.set(path, copy);
   }
   return out;
 }

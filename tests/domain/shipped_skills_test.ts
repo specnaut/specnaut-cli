@@ -3,6 +3,7 @@ import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { BaseEntry } from "../../src/domain/script_trust.ts";
 import {
   isSkillPath,
+  leavingCopies,
   LOCK_SKILL_REASON,
   lockSkillReasons,
   SHIPPED_REASON,
@@ -91,4 +92,15 @@ Deno.test("a lock left as the merge base had it, or set to the bundle's digest, 
   const head = new Map([[SKILL, entry(sha)], [".claude/agents/x.md", entry("d".repeat(64))]]);
   assertEquals(lockSkillReasons(head, new Map([[SKILL, entry(sha)]]), new Map()), []);
   assertEquals(lockSkillReasons(head, undefined, new Map([[SKILL, sha]])), []);
+});
+
+Deno.test("a skill path the merge base ships and HEAD's lock does not is judged, unapproved", () => {
+  const mine: ShippedCopy = { bytes: enc("ship"), approvedSha256: "a".repeat(64) };
+  const old: ShippedCopy = { sha256: "b".repeat(64) };
+  const gone = ".claude/skills/retired/SKILL.md";
+  const kept = ".claude/skills/kept/SKILL.md";
+  const tip = new Map([[SKILL, mine], [kept, mine]]);
+  const out = leavingCopies(tip, new Map([[SKILL, {}], [gone, old], [kept, {}]]), new Set([kept]));
+  assertEquals(out, new Map([[SKILL, { bytes: enc("ship") }], [kept, mine], [gone, old]]));
+  assertEquals(leavingCopies(tip, new Map(), new Set()), tip, "no lock at the merge base");
 });

@@ -133,3 +133,53 @@ Deno.test("a yes to a re-stamped lock covers that digest only: another one moves
   const first = await stamp(MINE);
   assertNotEquals(await stamp(`${MINE}.`), first);
 });
+
+// A lock entry for a skill, as an install records it.
+const locked = async (path: string, text: string) =>
+  `  ${path}:\n    sha256: ${await sha256Hex(text)}\n` +
+  "    installed_at: '2020-01-01T00:00:00Z'\n    templates_version: 0.0.1\n";
+const LOCK_FILE = ".specnaut/installed.lock";
+
+Deno.test("a lock that drops a skill's entry and switches the harness asks about it again", async () => {
+  const lock = base()[LOCK_FILE].replace(
+    "entries: {}\n",
+    `entries:\n${await locked(SKILL, "old")}`,
+  );
+  const files = {
+    ...base(),
+    [LOCK_FILE]: lock,
+    [SKILL]: MINE,
+    [APPROVALS_FILE]: await approving(MINE),
+  };
+  const { root } = await fixture({ files });
+  assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+  await write(root, {
+    [LOCK_FILE]: base()[LOCK_FILE].replace("harness: claude", "harness: codex"),
+  });
+  await commitAll(root, "switch the harness");
+  assertEquals(await lines(root), [NAMED]);
+});
+
+Deno.test("a lock that drops the entry of a skill the bundle does not map asks about it", async () => {
+  const retired = ".claude/skills/retired/SKILL.md";
+  const lock = base()[LOCK_FILE].replace(
+    "entries: {}\n",
+    `entries:\n${await locked(retired, "old")}`,
+  );
+  const approvals = `${await sha256Hex("mine\n")}  ${retired}\n`;
+  const files = { ...base(), [LOCK_FILE]: lock, [retired]: "mine\n", [APPROVALS_FILE]: approvals };
+  const { root } = await fixture({ files });
+  assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+  await write(root, { [LOCK_FILE]: base()[LOCK_FILE] });
+  await commitAll(root, "drop the entry");
+  assertEquals(await lines(root), [`VERDICT instructions untrusted ${retired} ${SHIPPED_REASON}`]);
+});
+
+Deno.test("a skill left as Specnaut ships it asks nothing when the lock stops shipping it", async () => {
+  const { root } = await fixture({ files: { ...base(), [SKILL]: bundled(SKILL) } });
+  await write(root, {
+    [LOCK_FILE]: base()[LOCK_FILE].replace("harness: claude", "harness: codex"),
+  });
+  await commitAll(root, "switch the harness");
+  assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+});
