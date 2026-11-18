@@ -2,10 +2,12 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   backendDir,
   backendHarness,
+  readCalls,
   type Run,
   runScript,
   scriptSource,
   stub,
+  toolsOnlyPath,
 } from "./backend_scripts_fixture.ts";
 
 /**
@@ -34,11 +36,7 @@ async function kanban(
   const tmp = await backendHarness(backend, config, extra);
   for (const [name, body] of Object.entries(stubs)) await stub(tmp, name, logged(body));
   const run = await runScript(tmp, `${backendDir(tmp, backend)}/kanban.sh`, args);
-  const calls = await Deno.readTextFile(`${tmp}/calls`).catch((e) => {
-    if (e instanceof Deno.errors.NotFound) return ""; // no stand-in was called
-    throw e;
-  });
-  return { ...run, calls, tmp };
+  return { ...run, calls: await readCalls(`${tmp}/calls`), tmp };
 }
 
 /** A gh whose answer is `lines`, one a line. */
@@ -95,15 +93,7 @@ Deno.test({
       "_open_url.sh",
       "kanban.sh",
     ]);
-    const tools = `${tmp}/tools`;
-    await Deno.mkdir(tools);
-    for (const tool of ["bash", "dirname", "awk"]) {
-      const which = await new Deno.Command("bash", {
-        args: ["-c", `command -v ${tool}`],
-        stdout: "piped",
-      }).output();
-      await Deno.symlink(new TextDecoder().decode(which.stdout).trim(), `${tools}/${tool}`);
-    }
+    const tools = await toolsOnlyPath(["bash", "dirname", "awk"]);
     const r = await runScript(tmp, `${backendDir(tmp, "github")}/kanban.sh`, ["--no-open"], tools);
     assertEquals([r.code, r.out], [13, ""], r.err);
     assertStringIncludes(r.err, "gh auth status");

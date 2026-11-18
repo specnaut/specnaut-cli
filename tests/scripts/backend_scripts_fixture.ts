@@ -88,3 +88,28 @@ export async function runSourced(tmp: string, backend: string, body: string): Pr
   );
   return await runScript(tmp, probe);
 }
+
+/**
+ * A directory of links to `tools` alone, to pass as `runScript`'s `path`: a
+ * PATH on which every other command, the tracker CLI or a launcher, is
+ * missing. Windows links need a privilege, so a caller skips there.
+ */
+export async function toolsOnlyPath(tools: ReadonlyArray<string>): Promise<string> {
+  const dir = await Deno.makeTempDir({ prefix: "backend-tools-" });
+  for (const tool of tools) {
+    const which = await new Deno.Command("bash", {
+      args: ["-c", `command -v ${tool}`],
+      stdout: "piped",
+    }).output();
+    await Deno.symlink(new TextDecoder().decode(which.stdout).trim(), `${dir}/${tool}`);
+  }
+  return dir;
+}
+
+/** What the stand-ins logged to `path`, one call a line; none called is "". */
+export async function readCalls(path: string): Promise<string> {
+  return await Deno.readTextFile(path).catch((e) => {
+    if (e instanceof Deno.errors.NotFound) return "";
+    throw e;
+  });
+}

@@ -1,6 +1,13 @@
 import { assertEquals } from "@std/assert";
 import { PLAIN_URL } from "../../src/infrastructure/browser_opener.ts";
-import { type Run, runScript, scriptSource, stub } from "./backend_scripts_fixture.ts";
+import {
+  readCalls,
+  type Run,
+  runScript,
+  scriptSource,
+  stub,
+  toolsOnlyPath,
+} from "./backend_scripts_fixture.ts";
 
 /**
  * `_open_url.sh` opens the board with the rules of the CLI's own opener
@@ -44,11 +51,7 @@ async function probe(
     `#!/usr/bin/env bash\nset -euo pipefail\n. "$(dirname "$0")/_open_url.sh"\n${body}\n`,
   );
   const run = await runScript(tmp, `${tmp}/probe.sh`, [], opts.path);
-  const calls = await Deno.readTextFile(`${tmp}/calls`).catch((e) => {
-    if (e instanceof Deno.errors.NotFound) return ""; // no launcher ran
-    throw e;
-  });
-  return { ...run, calls };
+  return { ...run, calls: await readCalls(`${tmp}/calls`) };
 }
 
 Deno.test("each OS gets its launcher, the URL one argument", async () => {
@@ -100,14 +103,7 @@ Deno.test({
   // A PATH of links to the tools the helper runs; Windows links need a privilege.
   ignore: Deno.build.os === "windows",
   fn: async () => {
-    const tools = await Deno.makeTempDir({ prefix: "open-url-tools-" });
-    for (const tool of ["bash", "grep", "dirname", "cat"]) {
-      const which = await new Deno.Command("bash", {
-        args: ["-c", `command -v ${tool}`],
-        stdout: "piped",
-      }).output();
-      await Deno.symlink(new TextDecoder().decode(which.stdout).trim(), `${tools}/${tool}`);
-    }
+    const tools = await toolsOnlyPath(["bash", "grep", "dirname", "cat"]);
     const r = await probe("Linux", 'open_url "$U"', { launchers: {}, path: tools });
     assertEquals([r.code, r.out, r.calls], [0, "OPEN: skipped - xdg-open not found", ""], r.err);
   },
