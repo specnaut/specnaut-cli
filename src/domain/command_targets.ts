@@ -1,7 +1,14 @@
 import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb } from "./project_path.ts";
-import { rawWords, type Reading, reading, valueEntries } from "./command_words.ts";
+import {
+  PARSE_LIMIT,
+  parsedGroups,
+  rawWords,
+  type Reading,
+  reading,
+  valueEntries,
+} from "./command_words.ts";
 import { pathPieces, rawPathValues } from "./command_search_path.ts";
 import { pathOf, pathsIn } from "./command_word_paths.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
@@ -33,8 +40,6 @@ export const isCommandSource = (path: string): boolean =>
 /** The reason a source gets when its commands could not all be read: it is asked about whole. */
 export const COMMAND_REASON = { partial: "commands not fully read" } as const;
 
-/** A source larger than this is not parsed: read from its bytes, and named as not fully read. */
-const PARSE_LIMIT = 256 * 1024;
 /** A longer word is not read: no path is that long. */
 const MAX_WORD = 4096;
 /** At most this many paths are put under the folders one group of words names. */
@@ -69,12 +74,16 @@ export function commandPaths(
   const read = reading(depth);
   const text = new TextDecoder().decode(bytes);
   const entries = isCommandMarkdown(path)
-    ? markdownEntries(text, read, PARSE_LIMIT)
+    ? markdownEntries(text, read)
     : [...parsedEntries(path, text, read), ...rawEntries(text, read)];
-  const paths = new Set(entries.flatMap((words) => entryPaths(words, isFolder, read)));
+  return found(entries.flatMap((words) => entryPaths(words, isFolder, read)), read);
+}
+
+/** The paths found, and what `read` noted on the way: the folders its PATH values name. */
+function found(paths: readonly string[], read: Reading): CommandPaths {
   const onPath = new Set(read.pathValues.flatMap(pathPieces).flatMap((p) => pathOf(p, read)));
   return {
-    paths: [...paths],
+    paths: [...new Set(paths)],
     whole: read.whole,
     onPath: [...onPath],
     programs: [...read.programs],
@@ -128,14 +137,6 @@ function parsedEntries(path: string, text: string, read: Reading): string[][] {
     read.whole = false;
     return [];
   }
-  try {
-    const value = path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text);
-    return valueEntries(value, read);
-  } catch (err) {
-    // Not swallowed: a source that does not parse, or nests too deep to walk, is not read whole,
-    // and its caller names it. Anything else is not a parse failure and goes up.
-    if (!(err instanceof SyntaxError || err instanceof RangeError)) throw err;
-    read.whole = false;
-    return [];
-  }
+  const parse = path.toLowerCase().endsWith(".toml") ? parseToml : parseJsonc;
+  return parsedGroups(read, () => valueEntries(parse(text), read)) ?? [];
 }

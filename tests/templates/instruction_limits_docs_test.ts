@@ -24,11 +24,20 @@ function notRead(): string {
   return row.slice(start, row.indexOf(" | ", start));
 }
 
-Deno.test("the row names every runner whose manifest is read, and says no other's is", () => {
-  const limits = notRead();
-  assert(limits.includes("the manifest of a runner other than"), limits);
-  const missing = [...RUNNERS.keys()].filter((name) => !limits.includes(`\`${name}\``));
-  assertEquals(missing, [], "a runner the judge reads is not named in the stated limit");
+/**
+ * The runners the row names: each code span of its runner limit, up to the `;` that ends it, the
+ * manifests in parentheses aside.
+ */
+function runnersNamed(limits: string): string[] {
+  const lead = "the manifest of a runner other than ";
+  const start = limits.indexOf(lead);
+  assert(start >= 0, limits);
+  const clause = limits.slice(start + lead.length, limits.indexOf(";", start));
+  return [...clause.replace(/\([^)]*\)/g, "").matchAll(/`([^`]+)`/g)].map((m) => m[1]).sort();
+}
+
+Deno.test("the row names exactly the runners whose manifest is read, and says no other's is", () => {
+  assertEquals(runnersNamed(notRead()), [...RUNNERS.keys()].sort());
 });
 
 Deno.test("the row names the commands a skill, an agent or a slash command holds", () => {

@@ -1,5 +1,12 @@
 import { parse as parseYaml } from "@std/yaml";
-import { commandWords, rawWords, type Reading, valueEntries } from "./command_words.ts";
+import {
+  commandWords,
+  PARSE_LIMIT,
+  parsedGroups,
+  rawWords,
+  type Reading,
+  valueEntries,
+} from "./command_words.ts";
 
 /**
  * The commands a Claude Code skill, agent or slash command holds in its own file: the `hooks:` its
@@ -24,14 +31,14 @@ const BANG = /!`([^`]*)`/g;
 
 /**
  * The groups of words `text`'s commands hold: its `!` spans, and its frontmatter's `hooks:` as
- * parsed, so a YAML escape reads as the harness reads it. A frontmatter longer than `limit`, or that
+ * parsed, so a YAML escape reads as the harness reads it. A frontmatter past the parse limit, or that
  * does not parse or nests too deep, is read from all its lines, and the reading is not `whole`: the
  * caller names the file, rather than trust what a parser it disagrees with would run.
  */
-export function markdownEntries(text: string, read: Reading, limit: number): string[][] {
+export function markdownEntries(text: string, read: Reading): string[][] {
   const bangs = [...text.matchAll(BANG)].map((m) => commandWords([m[1]], read));
   const front = frontmatter(text.replace(/^\uFEFF/, "").split(/\r?\n/));
-  return front === null ? bangs : [...frontEntries(front, read, limit), ...bangs];
+  return front === null ? bangs : [...frontEntries(front, read), ...bangs];
 }
 
 /** The lines between a first line `---` and the next, or `null` when there is no frontmatter. */
@@ -41,25 +48,18 @@ function frontmatter(lines: readonly string[]): string[] | null {
   return end < 0 ? null : lines.slice(1, end);
 }
 
-function frontEntries(front: readonly string[], read: Reading, limit: number): string[][] {
+function frontEntries(front: readonly string[], read: Reading): string[][] {
   const text = front.join("\n");
-  const parsed = text.length > limit ? null : hookEntries(text, read);
-  if (parsed === null) {
-    read.whole = false;
-    return front.map(rawWords);
+  if (text.length > PARSE_LIMIT) read.whole = false;
+  else {
+    const parsed = parsedGroups(read, () => valueEntries(hooksOf(parseYaml(text)), read));
+    if (parsed !== null) return parsed;
   }
-  return parsed;
+  return front.map(rawWords);
 }
 
-/** The groups of words the parsed `hooks:` holds, or `null` when it does not parse or nests too deep. */
-function hookEntries(text: string, read: Reading): string[][] | null {
-  try {
-    const value = parseYaml(text);
-    const owns = value !== null && typeof value === "object" && Object.hasOwn(value, "hooks");
-    return valueEntries(owns ? (value as Record<string, unknown>).hooks : undefined, read);
-  } catch (err) {
-    // Not swallowed: the caller reads every line and names the file as not fully read.
-    if (!(err instanceof SyntaxError || err instanceof RangeError)) throw err;
-    return null;
-  }
+/** What a parsed frontmatter declares under `hooks:`, its own key only. */
+function hooksOf(value: unknown): unknown {
+  const owns = value !== null && typeof value === "object" && Object.hasOwn(value, "hooks");
+  return owns ? (value as Record<string, unknown>).hooks : undefined;
 }

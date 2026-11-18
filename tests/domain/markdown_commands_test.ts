@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { commandPaths, isCommandSource } from "../../src/domain/command_targets.ts";
 
 /**
@@ -71,12 +71,14 @@ Deno.test("a hook spelled as YAML escapes is read through the parse", () => {
   has(read(".claude/agents/a.md", text).paths, "tools/stop.sh");
 });
 
-Deno.test("aliases repeated a thousand million times are each read once", () => {
+Deno.test("aliases repeated a thousand million times are each read once, and the reading is whole", () => {
+  // Walked once per use, the aliases would meet the walk's cap (a quarter of a million values,
+  // reached in a moment) and make the reading not whole: a regression fails, and never hangs.
   const levels = Array.from({ length: 30 }, (_, i) => `  l${i + 1}: &l${i + 1} [*l${i}, *l${i}]`);
   const text = ["---", "hooks:", "  l0: &l0 [tools/deep.sh]", ...levels, "---", ""].join("\n");
-  const started = performance.now();
-  has(read(".claude/agents/a.md", text).paths, "tools/deep.sh");
-  assert(performance.now() - started < 5000, "an alias was walked once per use");
+  const found = read(".claude/agents/a.md", text);
+  has(found.paths, "tools/deep.sh");
+  assertEquals(found.whole, true);
 });
 
 Deno.test("a frontmatter past the parse limit is read from its lines, and not whole", () => {
