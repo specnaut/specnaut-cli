@@ -33087,7 +33087,8 @@ set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
 # This script's folder, read with builtins: the PATH is judged before any command it names runs.
 here=\${BASH_SOURCE[0]}
-case \$here in */*) here=\${here%/*} ;; *) here=. ;; esac
+# Git Bash runs a script by its Windows path too (C:\\...\\bash\\<name>.sh): cut at the last \`/\` or \`\\\`.
+case \$here in *[/\\\\]*) here=\${here%[/\\\\]*} ;; *) here=. ;; esac
 here=\$(CDPATH="" cd "\${here:-/}" && pwd)
 # Every git call runs no hook, and an unexpected failure is exit 12: _hooks_off.sh says why.
 # shellcheck source=./_hooks_off.sh
@@ -33244,7 +33245,8 @@ fi
 set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\${BASH_SOURCE[0]}
-case \$here in */*) here=\${here%/*} ;; *) here=. ;; esac
+# Git Bash runs a script by its Windows path too (C:\\...\\bash\\<name>.sh): cut at the last \`/\` or \`\\\`.
+case \$here in *[/\\\\]*) here=\${here%[/\\\\]*} ;; *) here=. ;; esac
 here=\$(CDPATH="" cd "\${here:-/}" && pwd)
 # land-feature.sh's prologue, for its reason: the branch can commit hooks and a hooksPath naming
 # them. An unexpected failure is exit 12.
