@@ -150,13 +150,15 @@ item_url() {
 # (item_url, _board.sh); 1 when there is none. `project_id` is dual-form: a
 # path is used as-is, a numeric id is resolved once through the API. A failed
 # lookup, or an answer that is not a plain path, has no honest URL: none.
+# Piped, glab prints the JSON on one line, and a fork's also holds its
+# upstream's path_with_namespace: only jq reads the top-level one (cli#805).
 GITLAB_WEB_PATH=""
 _gitlab_web_path() {
   [ -z "$GITLAB_WEB_PATH" ] || return 0
   case "$PROJECT_ID" in *[!0-9]*) GITLAB_WEB_PATH="$PROJECT_ID"; return 0 ;; esac
   GITLAB_WEB_PATH=$(glab api "projects/$PROJECT_ID" 2>/dev/null |
-    sed -n 's/.*"path_with_namespace"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-    head -1) || GITLAB_WEB_PATH=""
+    jq_lf -r '.path_with_namespace | strings' 2>/dev/null) || GITLAB_WEB_PATH=""
+  case $GITLAB_WEB_PATH in *$'\n'* | *$'\r'*) GITLAB_WEB_PATH="" ;; esac # grep -x judges each line
   LC_ALL=C grep -Eqx '[A-Za-z0-9_][A-Za-z0-9_./-]*' <<<"$GITLAB_WEB_PATH" ||
     { GITLAB_WEB_PATH=""; return 1; }
 }
