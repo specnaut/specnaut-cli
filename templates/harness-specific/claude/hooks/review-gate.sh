@@ -13,7 +13,12 @@
 # `specnaut` on the cleaned PATH (below), nothing is stopped here: `specnaut
 # review start` cannot run either - unless the hook dropped an entry, as the
 # start runs on the session's own PATH, where that entry could supply the
-# `specnaut` performing it; a line that starts a review is then refused. Before
+# `specnaut` performing it; a line that starts a review, or whose command runs
+# `specnaut` as a word the PATH is searched for (in any letter case: a
+# case-blind disk finds it so), is then refused, whatever it asks. This stops a
+# mistaken start, not a session set on getting past it: a name spelled so the
+# line never holds it - a parameter default, `${IFS}`, brace expansion, `$'...'`
+# or `$"..."`, command substitution, `eval`, an alias - is out of its reach. Before
 # any of that, every time, the pass a gated line left is removed: a pass lives
 # only until the next command, and a check stopped part-way leaves none behind.
 # A `specnaut` that resolves into the tree stops a review's command: it would
@@ -65,6 +70,30 @@ git_dir_above() {
     dir=$up
   done
 }
+# Whether a `command` value of the input runs `specnaut` as a word the PATH is searched for: not
+# after or before a letter, a digit, `.`, `_`, `/` or `-`, so `.specnaut/x`, `specnaut-cli/` and
+# `/opt/bin/specnaut` do not. Every key `command` the input holds is read, the description never: a
+# key is a quote after `{` or `,`, and a quote inside a value is always escaped, so no value adds a
+# key or hides one. A value is read with JSON's own pairing of escapes, an escaped backslash first,
+# so it ends at the quote that ends it, whatever backslashes and quotes it holds. Then the shell's
+# quoting goes as the shell removes it: a line continuation, each backslash and quote; and a
+# JSON-escaped blank reads as a blank.
+runs_specnaut() {
+  local rest=$input v
+  local key='[{,][[:space:]]*"command"[[:space:]]*:[[:space:]]*"(.*)$'
+  local word='(^|[^A-Za-z0-9._/-])[Ss][Pp][Ee][Cc][Nn][Aa][Uu][Tt]($|[^A-Za-z0-9._/-])'
+  while [[ $rest =~ $key ]]; do
+    rest=${BASH_REMATCH[1]}
+    v=${rest//\\\\/$'\001'}
+    v=${v//\\\"/$'\002'}
+    v=${v%%\"*}
+    v=${v//$'\001'\\n/}
+    v=${v//\\[nrt]/ }
+    v=${v//[$'\001\002'\']/}
+    [[ $v =~ $word ]] && return 0
+  done
+  return 1
+}
 tree_top "$dir"
 top=${top:-$dir}
 clean_path
@@ -78,6 +107,7 @@ flat=${input//\\\\\\n/}
 flat=${flat//\\\\/}
 flat=${flat//\\\"/}
 flat=${flat//\'/}
+[ -z "$dropped" ] || ! runs_specnaut || refuse "VERIFIER REFUSED: $dropped$without"
 case "$flat" in *review*) ;; *) exit 0 ;; esac
 # A start, as startsReview (src/domain/review_gate.ts) reads one, its blanks as JSON escapes them
 # too: wider than the binary's, never narrower.

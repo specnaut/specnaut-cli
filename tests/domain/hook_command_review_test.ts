@@ -1,6 +1,9 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { specnautHookFile } from "../../src/domain/hook_settings_merge.ts";
-import { mergeClaudeSettings } from "../../src/domain/claude_settings_merge.ts";
+import {
+  claudeSettingsNotes,
+  mergeClaudeSettings,
+} from "../../src/domain/claude_settings_merge.ts";
 
 /**
  * Every hook Specnaut runs with bash is registered through the launcher of `.claude/hooks/`, which
@@ -104,4 +107,58 @@ Deno.test("an upgrade rewrites each bash hook registered before in place, once",
   const bash = JSON.parse(content).hooks.PreToolUse.find((g: Group) => g.matcher === "Bash");
   assert(bash.hooks[0].command === "mine.sh", "the user's own entry keeps its place");
   assertEquals(bash.hooks[1].command, LAUNCHED(".claude", "review-gate", ""), "replaced in place");
+});
+
+const DEST = ".claude/settings.json";
+/** What an upgrade of `user` says about the hook entries it kept, the plugin notes aside. */
+const keptNotes = (user: string) =>
+  claudeSettingsNotes(user, BUNDLED, DEST).filter((n) => n.includes("kept your hook entry"));
+
+Deno.test("an upgrade keeps a customised bash hook entry beside the launched one, and says so", () => {
+  const mine = `${BEFORE(".claude", "review-gate", "")} || true`;
+  const user = JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: mine }] }] },
+  });
+  const { content } = mergeClaudeSettings(user, BUNDLED, DEST);
+  const bash = JSON.parse(content).hooks.PreToolUse.find((g: Group) => g.matcher === "Bash");
+  assertEquals(
+    bash.hooks.map((h: Hook) => h.command),
+    [mine, LAUNCHED(".claude", "review-gate", "")],
+    "the user's entry is kept, the launched one appended",
+  );
+  assertEquals(keptNotes(user), [
+    `${DEST}: kept your hook entry ${mine} — it runs review-gate.sh, but not through ` +
+    "run-hook.sh: it starts bash from the PATH the session inherits, where an entry inside the " +
+    "repository can supply it. Specnaut's own entry runs beside it; remove yours, or launch it " +
+    "as Specnaut's is",
+  ]);
+});
+
+Deno.test("no word on an entry the upgrade rewrites, runs no bundled script, or runs one launched", () => {
+  const user = JSON.stringify({
+    hooks: {
+      PreToolUse: [{
+        matcher: "Bash",
+        hooks: [
+          { command: "mine.sh" },
+          { command: BEFORE(".claude", "my-review-gate", "") },
+          { command: `${LAUNCHED(".claude", "review-lock", "")} --strict` },
+          // Specnaut's own, as registered before: the upgrade rewrites it, so there is no word to say.
+          { command: BEFORE(".claude", "review-gate", "") },
+        ],
+      }],
+    },
+  });
+  assertEquals(keptNotes(user), []);
+  const fresh = mergeClaudeSettings(null, BUNDLED, DEST).content;
+  assertEquals(keptNotes(fresh), [], "a project already up to date");
+});
+
+Deno.test("a kept entry naming the script by a Windows path is said too", () => {
+  const mine = String.raw`bash .claude\hooks\review-lock.sh`;
+  const user = JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: "*", hooks: [{ command: mine }] }] },
+  });
+  assertEquals(keptNotes(user).length, 1, mine);
+  assertStringIncludes(keptNotes(user)[0], `kept your hook entry ${mine} — it runs review-lock.sh`);
 });

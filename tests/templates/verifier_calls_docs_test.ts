@@ -30,7 +30,7 @@ async function shipped(): Promise<Map<string, string>> {
 
 /**
  * The one bare call left, and why: under the review lock a command runs alone, with no variable,
- * so the untrusted review resolves the verifier before its start and calls the bare name after.
+ * so the untrusted review starts through the resolved verifier and calls the bare name after.
  */
 const LOCKED_CALL = "Run `specnaut verify-scripts` alone, not step 1's block";
 
@@ -41,8 +41,9 @@ Deno.test("no shipped file calls the verifier by its bare name", async () => {
   }
   assertEquals(bare, []);
   const untrusted = flat(read(`${TASK}phases/review-untrusted.md`));
-  const resolve = untrusted.indexOf("§ Resolving the verifier's block alone");
-  assert(resolve >= 0 && resolve < untrusted.indexOf("specnaut review start"));
+  const resolve = untrusted.indexOf("§ Resolving the verifier's block, then this one");
+  assert(resolve >= 0 && resolve < untrusted.indexOf('"$sn" review start'));
+  assert(!untrusted.includes("(specnaut review start"), "the start runs the PATH's specnaut");
   assertStringIncludes(untrusted, "a `VERIFIER REFUSED` line stops the review");
 });
 

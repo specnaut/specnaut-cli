@@ -11,8 +11,10 @@
 # functions, so those named like a builtin this file or the rule may run go first, by `unset`,
 # which no function can stand in for there (`[` through `command`, which keeps a refused name from
 # ending the shell). The script then starts in bash privileged (`-p`): it reads no BASH_ENV,
-# imports no exported function and ignores SHELLOPTS, BASHOPTS and CDPATH, so nothing of the
-# environment runs before its first line. It is given the session's PATH back: the review hooks
+# imports no exported function and ignores SHELLOPTS, so nothing of the environment runs before
+# its first line. A newer bash ignores BASHOPTS, CDPATH and GLOBIGNORE there too; bash 3.2 still
+# honours CDPATH and GLOBIGNORE, which no hook reaches: each `cd` is given an absolute folder or
+# `.`, and none expands a file name. It is given the session's PATH back: the review hooks
 # clean it themselves, so they can name an entry they drop, and the others run their own commands
 # on it as before. With no bash left once the PATH is cleaned, the call is refused (exit 2).
 unset -f cd pwd command test echo printf read true false local 2>/dev/null

@@ -14,24 +14,27 @@ file wins for an untrusted review.
 
 ## Start
 
-First run `phases/script-gate.md` § Resolving the verifier's block alone, as written: a `VERIFIER
-REFUSED` line stops the review, and nothing is fetched. Under the lock below the verifier runs by
-its bare name, the one form the lock lets through, on the PATH this checked, in a checkout the gate
-holds to the base.
-
-Then run this block as written, from the project's root, with the argument the review was given and,
-as `<sha>`, the head the remote reported, written out: for a PR, the commit id step 0's `git
-ls-remote` printed; for a `<remote>/<branch>`, the one `git ls-remote "<remote>"
-"refs/heads/<branch>"` prints. A fetch that lands on any other head is refused:
+Run `phases/script-gate.md` § Resolving the verifier's block, then this one, as written, in that
+same shell and as one command, from the project's root: the start is the resolved verifier, `"$sn"`,
+never `specnaut` as the Bash tool's PATH finds it; a `VERIFIER REFUSED` line stops the review, and
+nothing is fetched. Under the lock below the verifier runs by its bare name, the one form the lock
+lets through, on the PATH this checked, in a checkout the gate holds to the base. Pass the argument
+the review was given and, as `<sha>`, the head the remote reported, written out: for a PR, the
+commit id step 0's `git ls-remote` printed; for a `<remote>/<branch>`, the one `git ls-remote
+"<remote>" "refs/heads/<branch>"` prints. A fetch that lands on any other head is refused:
 
 ```bash
-out=$(specnaut review start "<pr number or remote/branch>" --expect "<sha>"); rc=$?; printf '%s\n' "$out"
+out=$("$sn" review start "<pr number or remote/branch>" --expect "<sha>"); rc=$?; printf '%s\n' "$out"
 ```
 
 The `review-gate` hook judges this session's checkout before the command runs, and the line it lets
 through runs with `SPECNAUT_REVIEW_PASS` exported first: the start takes only the pass that names it,
-so run the line above alone, never from another folder. Claude Code asks the user to confirm that
-rewritten line once. **A refusal, or any exit but 0, stops the
+so run the two blocks as that one command and nothing else, never from another folder. Claude Code
+asks the user to confirm that rewritten line once. While the hook drops an entry of the PATH, it
+refuses any command that runs `specnaut` as a word the PATH is searched for. It stops a mistaken
+start, not a session set on getting past it: a name spelled so the line never holds it (a
+parameter default, `${IFS}`, brace expansion, `$'…'` or `$"…"`, command substitution, `eval`, an
+alias) is out of its reach. **A refusal, or any exit but 0, stops the
 review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 

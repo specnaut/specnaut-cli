@@ -3,6 +3,7 @@ import { join } from "@std/path";
 import { CODEX_REGISTRATIONS, generate, readIfPresent } from "../../scripts/gen-hooks.ts";
 import { codexHookCommand as codexCommand } from "../../src/domain/hook_command.ts";
 import { specnautHookFile } from "../../src/domain/hook_settings_merge.ts";
+import { feed } from "./resolve_verifier_fixture.ts";
 
 /**
  * The Codex registrations pin the hook folder's hash (spec 036, plan § 11
@@ -55,9 +56,7 @@ async function run(command: string, cwd: string): Promise<{ code: number; stderr
     stdout: "null",
   })
     .spawn();
-  const w = p.stdin.getWriter();
-  await w.write(new TextEncoder().encode("{}"));
-  await w.close();
+  await feed(p.stdin, "{}");
   const out = await p.output();
   return { code: out.code, stderr: new TextDecoder().decode(out.stderr) };
 }

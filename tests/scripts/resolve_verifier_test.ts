@@ -18,7 +18,8 @@ import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
  * every tool call of every session, so a refusal would stop work that has nothing to do with a
  * review: they drop the entries instead, and the binary they start is given what is left. The hook
  * that judges a held lock refuses, as the landing does, before handing anything over; so does the
- * one that gates a review's start, which runs on the session's own PATH, dropped entry and all.
+ * one that gates a review's start, for any command that runs `specnaut` from the PATH: it runs on
+ * the session's own PATH, dropped entry and all.
  * The binary drops the same entries from the PATH it starts git with (`git_path.ts`): the last test
  * holds its predicate to the same table.
  */
@@ -61,7 +62,7 @@ function spelledBad(l: Layout): Case[] {
     bad(l, "a `~` entry, a `~` folder in the working folder", "~/bin", RELATIVE),
     // Nothing left to run `cat`, `git` or `rm` with: the lock must still be found, and refused.
     { name: "one empty entry and nothing else", entries: [""], cwd: l.bin, bad: [0, "is empty"],
-      want: { mention: { refused: "is empty", entry: "", exit: 2 }, record: { exit: 0 } } },
+      want: { record: { exit: 0 } } },
   ];
 }
 
@@ -119,10 +120,11 @@ const REFUSES_WITH: Record<string, number> = {
 };
 
 /**
- * What `spelling` must answer. A bad entry: refused by name, except by the hooks that clean the
- * PATH, whose binary runs with that entry gone. Otherwise the answer past the PATH, which the hooks
- * give with the PATH their binary saw; with no `specnaut`, the lock stops the call and the others
- * let it through, and the record is never more than a silent exit.
+ * What `spelling` must answer. A bad entry: refused by name, a command that merely runs `specnaut`
+ * included, as it runs on the session's PATH; the record alone cleans the PATH, its binary run
+ * with that entry gone. Otherwise the answer past the PATH, which the hooks give with the PATH
+ * their binary saw; with no `specnaut`, the lock stops the call and the others let it through, and
+ * the record is never more than a silent exit.
  */
 function expected(c: Case, spelling: string, l: Layout): Answer | undefined {
   if (c.want?.[spelling]) return c.want[spelling];
@@ -130,7 +132,9 @@ function expected(c: Case, spelling: string, l: Layout): Answer | undefined {
   const joined = (entries: string[]) => entries.join(DELIMITER);
   if (c.bad) {
     const [i, why] = c.bad;
-    if (!cleans) return { refused: why, entry: c.entries[i], exit: REFUSES_WITH[spelling] };
+    if (spelling !== "record") {
+      return { refused: why, entry: c.entries[i], exit: REFUSES_WITH[spelling] };
+    }
     return { resolved: l.outside, path: joined(c.entries.filter((_, j) => j !== i)) };
   }
   if (spelling === "landScript") return undefined;

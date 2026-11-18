@@ -1531,24 +1531,27 @@ file wins for an untrusted review.
 
 ## Start
 
-First run \`phases/script-gate.md\` § Resolving the verifier's block alone, as written: a \`VERIFIER
-REFUSED\` line stops the review, and nothing is fetched. Under the lock below the verifier runs by
-its bare name, the one form the lock lets through, on the PATH this checked, in a checkout the gate
-holds to the base.
-
-Then run this block as written, from the project's root, with the argument the review was given and,
-as \`<sha>\`, the head the remote reported, written out: for a PR, the commit id step 0's \`git
-ls-remote\` printed; for a \`<remote>/<branch>\`, the one \`git ls-remote "<remote>"
-"refs/heads/<branch>"\` prints. A fetch that lands on any other head is refused:
+Run \`phases/script-gate.md\` § Resolving the verifier's block, then this one, as written, in that
+same shell and as one command, from the project's root: the start is the resolved verifier, \`"\$sn"\`,
+never \`specnaut\` as the Bash tool's PATH finds it; a \`VERIFIER REFUSED\` line stops the review, and
+nothing is fetched. Under the lock below the verifier runs by its bare name, the one form the lock
+lets through, on the PATH this checked, in a checkout the gate holds to the base. Pass the argument
+the review was given and, as \`<sha>\`, the head the remote reported, written out: for a PR, the
+commit id step 0's \`git ls-remote\` printed; for a \`<remote>/<branch>\`, the one \`git ls-remote
+"<remote>" "refs/heads/<branch>"\` prints. A fetch that lands on any other head is refused:
 
 \`\`\`bash
-out=\$(specnaut review start "<pr number or remote/branch>" --expect "<sha>"); rc=\$?; printf '%s\\n' "\$out"
+out=\$("\$sn" review start "<pr number or remote/branch>" --expect "<sha>"); rc=\$?; printf '%s\\n' "\$out"
 \`\`\`
 
 The \`review-gate\` hook judges this session's checkout before the command runs, and the line it lets
 through runs with \`SPECNAUT_REVIEW_PASS\` exported first: the start takes only the pass that names it,
-so run the line above alone, never from another folder. Claude Code asks the user to confirm that
-rewritten line once. **A refusal, or any exit but 0, stops the
+so run the two blocks as that one command and nothing else, never from another folder. Claude Code
+asks the user to confirm that rewritten line once. While the hook drops an entry of the PATH, it
+refuses any command that runs \`specnaut\` as a word the PATH is searched for. It stops a mistaken
+start, not a session set on getting past it: a name spelled so the line never holds it (a
+parameter default, \`\${IFS}\`, brace expansion, \`\$'…'\` or \`\$"…"\`, command substitution, \`eval\`, an
+alias) is out of its reach. **A refusal, or any exit but 0, stops the
 review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 
@@ -39989,7 +39992,12 @@ exit 0
 # \`specnaut\` on the cleaned PATH (below), nothing is stopped here: \`specnaut
 # review start\` cannot run either - unless the hook dropped an entry, as the
 # start runs on the session's own PATH, where that entry could supply the
-# \`specnaut\` performing it; a line that starts a review is then refused. Before
+# \`specnaut\` performing it; a line that starts a review, or whose command runs
+# \`specnaut\` as a word the PATH is searched for (in any letter case: a
+# case-blind disk finds it so), is then refused, whatever it asks. This stops a
+# mistaken start, not a session set on getting past it: a name spelled so the
+# line never holds it - a parameter default, \`\${IFS}\`, brace expansion, \`\$'...'\`
+# or \`\$"..."\`, command substitution, \`eval\`, an alias - is out of its reach. Before
 # any of that, every time, the pass a gated line left is removed: a pass lives
 # only until the next command, and a check stopped part-way leaves none behind.
 # A \`specnaut\` that resolves into the tree stops a review's command: it would
@@ -40041,6 +40049,30 @@ git_dir_above() {
     dir=\$up
   done
 }
+# Whether a \`command\` value of the input runs \`specnaut\` as a word the PATH is searched for: not
+# after or before a letter, a digit, \`.\`, \`_\`, \`/\` or \`-\`, so \`.specnaut/x\`, \`specnaut-cli/\` and
+# \`/opt/bin/specnaut\` do not. Every key \`command\` the input holds is read, the description never: a
+# key is a quote after \`{\` or \`,\`, and a quote inside a value is always escaped, so no value adds a
+# key or hides one. A value is read with JSON's own pairing of escapes, an escaped backslash first,
+# so it ends at the quote that ends it, whatever backslashes and quotes it holds. Then the shell's
+# quoting goes as the shell removes it: a line continuation, each backslash and quote; and a
+# JSON-escaped blank reads as a blank.
+runs_specnaut() {
+  local rest=\$input v
+  local key='[{,][[:space:]]*"command"[[:space:]]*:[[:space:]]*"(.*)\$'
+  local word='(^|[^A-Za-z0-9._/-])[Ss][Pp][Ee][Cc][Nn][Aa][Uu][Tt](\$|[^A-Za-z0-9._/-])'
+  while [[ \$rest =~ \$key ]]; do
+    rest=\${BASH_REMATCH[1]}
+    v=\${rest//\\\\\\\\/\$'\\001'}
+    v=\${v//\\\\\\"/\$'\\002'}
+    v=\${v%%\\"*}
+    v=\${v//\$'\\001'\\\\n/}
+    v=\${v//\\\\[nrt]/ }
+    v=\${v//[\$'\\001\\002'\\']/}
+    [[ \$v =~ \$word ]] && return 0
+  done
+  return 1
+}
 tree_top "\$dir"
 top=\${top:-\$dir}
 clean_path
@@ -40054,6 +40086,7 @@ flat=\${input//\\\\\\\\\\\\n/}
 flat=\${flat//\\\\\\\\/}
 flat=\${flat//\\\\\\"/}
 flat=\${flat//\\'/}
+[ -z "\$dropped" ] || ! runs_specnaut || refuse "VERIFIER REFUSED: \$dropped\$without"
 case "\$flat" in *review*) ;; *) exit 0 ;; esac
 # A start, as startsReview (src/domain/review_gate.ts) reads one, its blanks as JSON escapes them
 # too: wider than the binary's, never narrower.
@@ -40196,8 +40229,10 @@ exit 2
 # functions, so those named like a builtin this file or the rule may run go first, by \`unset\`,
 # which no function can stand in for there (\`[\` through \`command\`, which keeps a refused name from
 # ending the shell). The script then starts in bash privileged (\`-p\`): it reads no BASH_ENV,
-# imports no exported function and ignores SHELLOPTS, BASHOPTS and CDPATH, so nothing of the
-# environment runs before its first line. It is given the session's PATH back: the review hooks
+# imports no exported function and ignores SHELLOPTS, so nothing of the environment runs before
+# its first line. A newer bash ignores BASHOPTS, CDPATH and GLOBIGNORE there too; bash 3.2 still
+# honours CDPATH and GLOBIGNORE, which no hook reaches: each \`cd\` is given an absolute folder or
+# \`.\`, and none expands a file name. It is given the session's PATH back: the review hooks
 # clean it themselves, so they can name an entry they drop, and the others run their own commands
 # on it as before. With no bash left once the PATH is cleaned, the call is refused (exit 2).
 unset -f cd pwd command test echo printf read true false local 2>/dev/null

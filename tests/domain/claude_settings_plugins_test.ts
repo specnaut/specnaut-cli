@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import {
+  claudeSettingsNotes,
   mergeClaudeSettings,
-  pluginDeclarationNotes,
 } from "../../src/domain/claude_settings_merge.ts";
 import {
   describeSource,
@@ -70,7 +70,7 @@ Deno.test("mergeClaudeSettings: Specnaut's own marketplace is re-pinned to this 
     merged.extraKnownMarketplaces["specnaut-marketplace"].source,
     SHIPPED_SOURCE,
   );
-  assertEquals(pluginDeclarationNotes(existing, SHIPPED, DEST), [
+  assertEquals(claudeSettingsNotes(existing, SHIPPED, DEST), [
     `${DEST}: re-pinned the marketplace specnaut-marketplace from v0.0.1 to ${
       specnautMarketplaceRef(SHIPPED_SOURCE)
     }`,
@@ -78,13 +78,13 @@ Deno.test("mergeClaudeSettings: Specnaut's own marketplace is re-pinned to this 
   ]);
 });
 
-Deno.test("pluginDeclarationNotes: a re-pointed marketplace is kept, and said (#642)", () => {
+Deno.test("claudeSettingsNotes: a re-pointed marketplace is kept, and said (#642)", () => {
   const fork = { source: "github", repo: "my-fork/specnaut-marketplace" };
   const existing = JSON.stringify({
     extraKnownMarketplaces: { "specnaut-marketplace": { source: fork } },
     enabledPlugins: { [COCKPIT]: false },
   });
-  const notes = pluginDeclarationNotes(existing, SHIPPED, DEST);
+  const notes = claudeSettingsNotes(existing, SHIPPED, DEST);
   assertEquals(notes.length, 1);
   assertEquals(
     notes[0].includes(
@@ -95,10 +95,10 @@ Deno.test("pluginDeclarationNotes: a re-pointed marketplace is kept, and said (#
   );
 });
 
-Deno.test("pluginDeclarationNotes: nothing to say on a fresh scaffold or a project already up to date", () => {
-  assertEquals(pluginDeclarationNotes(null, SHIPPED, DEST), []);
+Deno.test("claudeSettingsNotes: nothing to say on a fresh scaffold or a project already up to date", () => {
+  assertEquals(claudeSettingsNotes(null, SHIPPED, DEST), []);
   assertEquals(
-    pluginDeclarationNotes(mergeClaudeSettings(null, SHIPPED, DEST).content, SHIPPED, DEST),
+    claudeSettingsNotes(mergeClaudeSettings(null, SHIPPED, DEST).content, SHIPPED, DEST),
     [],
   );
 });
@@ -125,7 +125,7 @@ Deno.test("mergeClaudeSettings: the legacy github source is replaced, and said (
     source: SHIPPED_SOURCE,
     autoUpdate: true,
   });
-  const notes = pluginDeclarationNotes(existing, SHIPPED, DEST);
+  const notes = claudeSettingsNotes(existing, SHIPPED, DEST);
   assertEquals(notes[0].startsWith(`${DEST}: repaired the marketplace specnaut-marketplace`), true);
   assertEquals(notes[0].includes(describeSource(SHIPPED_SOURCE)), true, notes[0]);
 });
@@ -133,7 +133,7 @@ Deno.test("mergeClaudeSettings: the legacy github source is replaced, and said (
 Deno.test("mergeClaudeSettings: once repaired, a second merge changes and says nothing (cli#783)", () => {
   const once = mergeClaudeSettings(withEntry({ source: LEGACY }), SHIPPED, DEST).content;
   assertEquals(mergeClaudeSettings(once, SHIPPED, DEST).changed, false);
-  const notes = pluginDeclarationNotes(once, SHIPPED, DEST);
+  const notes = claudeSettingsNotes(once, SHIPPED, DEST);
   assertEquals(notes.filter((n) => n.includes("marketplace")), []);
 });
 
@@ -142,7 +142,7 @@ Deno.test("merge and notes agree on a key with no source: kept, and said (cli#78
     const existing = withEntry(entry);
     const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST).content);
     assertEquals(merged.extraKnownMarketplaces["specnaut-marketplace"], entry);
-    const [note] = pluginDeclarationNotes(existing, SHIPPED, DEST);
+    const [note] = claudeSettingsNotes(existing, SHIPPED, DEST);
     assertEquals(note.includes("kept the marketplace specnaut-marketplace"), true, note);
   }
 });

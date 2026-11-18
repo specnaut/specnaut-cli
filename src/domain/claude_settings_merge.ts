@@ -33,7 +33,7 @@
  * Pure — no IO, no Deno globals.
  */
 
-import { type HookMap, spliceHooks } from "./hook_settings_merge.ts";
+import { type HookMap, keptHookNotes, spliceHooks } from "./hook_settings_merge.ts";
 import { type JsonMergeResult, jsonMergeResult, parseUserJson } from "./json_merge.ts";
 import { mergePluginDeclarations, pluginNotes } from "./claude_plugin_declarations.ts";
 
@@ -116,10 +116,12 @@ export function mergeClaudeSettings(
 }
 
 /**
- * What a merge did to the plugin declarations, in sentences for the person
- * running `specnaut upgrade` (`claude_plugin_declarations.ts`).
+ * What a merge owes the person running `specnaut upgrade`, in sentences: a
+ * hook entry of theirs it kept that starts a bundled script outside the
+ * launcher (`hook_settings_merge.ts`), and what it did to the plugin
+ * declarations (`claude_plugin_declarations.ts`).
  */
-export function pluginDeclarationNotes(
+export function claudeSettingsNotes(
   existing: string | null,
   bundled: string,
   dest: string,
@@ -128,5 +130,9 @@ export function pluginDeclarationNotes(
   // never reaches here, and a caller that skipped the merge is told why.
   const user = parseUserJson(existing, dest) as SettingsShape | null;
   if (user === null) return [];
-  return pluginNotes(user, JSON.parse(bundled) as SettingsShape, dest);
+  const ours = JSON.parse(bundled) as SettingsShape;
+  return [
+    ...keptHookNotes(user.hooks ?? {}, ours.hooks ?? {}, dest),
+    ...pluginNotes(user, ours, dest),
+  ];
 }

@@ -114,9 +114,9 @@ export function hook(l: Layout, r: Run, name: string, input: string): Promise<An
 }
 
 /**
- * A hook as settings.json registers it: `/bin/sh` runs the launcher, which finds bash on the PATH
- * the rule keeps and starts the hook of `hooks` (the shipped folder unless given). `env` adds to
- * the run's variables.
+ * A hook as settings.json registers it: `sh` (`/bin/sh` unless given) runs the launcher, which
+ * finds bash on the PATH the rule keeps and starts the shipped hook. `env` adds to the run's
+ * variables.
  */
 export function launched(
   l: Layout,
@@ -124,9 +124,9 @@ export function launched(
   name: string,
   input: string,
   env: Record<string, string> = {},
-  hooks = HOOKS,
+  sh = "/bin/sh",
 ): Promise<Answer> {
-  return fire(l, r, ["/bin/sh", join(hooks, "run-hook.sh"), join(hooks, name)], input, env);
+  return fire(l, r, [sh, join(HOOKS, "run-hook.sh"), join(HOOKS, name)], input, env);
 }
 
 /** `argv` run from `r.cwd` with `input` on stdin, started directly: no shell reads `more` first. */
@@ -167,7 +167,7 @@ export async function spawnWith(
  * `input` written to `stdin`, then closed. A hook that refuses may exit before it reads a byte: the
  * write then breaks its pipe, which is that refusal's own outcome, never the test's failure.
  */
-async function feed(stdin: WritableStream<Uint8Array>, input: string): Promise<void> {
+export async function feed(stdin: WritableStream<Uint8Array>, input: string): Promise<void> {
   const writer = stdin.getWriter();
   try {
     await writer.write(new TextEncoder().encode(input));

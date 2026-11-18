@@ -31,7 +31,17 @@ Deno.test("it starts through the gated command, and every script takes the start
   const doc = flat("review-untrusted.md");
   assertStringIncludes(
     doc,
-    'specnaut review start "<pr number or remote/branch>" --expect "<sha>"',
+    'out=$("$sn" review start "<pr number or remote/branch>" --expect "<sha>")',
+  );
+  assertStringIncludes(doc, "never `specnaut` as the Bash tool's PATH finds it");
+  assertStringIncludes(
+    doc,
+    "refuses any command that runs `specnaut` as a word the PATH is searched for",
+  );
+  assertStringIncludes(
+    doc,
+    "(a parameter default, `${IFS}`, brace expansion, `$'…'` or `$\"…\"`, command substitution, " +
+      "`eval`, an alias)",
   );
   assertStringIncludes(doc, "A fetch that lands on any other head is refused");
   assertStringIncludes(doc, "A refusal, or any exit but 0, stops the review:");

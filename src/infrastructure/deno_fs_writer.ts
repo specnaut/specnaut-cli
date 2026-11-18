@@ -10,7 +10,7 @@ import {
 } from "./fs_containment.ts";
 import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
-import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
+import { claudeSettingsNotes, mergeClaudeSettings } from "../domain/claude_settings_merge.ts";
 import { mergeCodexHooks } from "../domain/hook_settings_merge.ts";
 import type { JsonMergeResult } from "../domain/json_merge.ts";
 import type { BackupReport, ContextLinkWrite, FsWriter } from "../application/ports.ts";
@@ -27,7 +27,7 @@ type JsonFlavor = {
 
 /** One row per `mergeJson` flavor: a new flavor is a row, never a branch in `writeBundle`. */
 const JSON_FLAVORS: Readonly<Record<MergeJsonFlavor, JsonFlavor>> = {
-  "claude-settings": { merge: mergeClaudeSettings, notes: pluginDeclarationNotes },
+  "claude-settings": { merge: mergeClaudeSettings, notes: claudeSettingsNotes },
   "codex-hooks": { merge: mergeCodexHooks },
 };
 

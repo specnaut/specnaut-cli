@@ -18,6 +18,7 @@
 
 import { RETIRED_HOOK_SCRIPTS, SPECNAUT_HOOK_SHAPES } from "./hook_command.ts";
 import { type JsonMergeResult, jsonMergeResult, parseUserJson } from "./json_merge.ts";
+import { terminalText } from "./terminal_text.ts";
 
 type Hook = {
   type?: string;
@@ -116,6 +117,45 @@ function dropSuperseded(merged: HookMap, placed: ReadonlySet<Hook>): HookMap {
     if (kept.length > 0 || groups.length === 0) out[event] = kept;
   }
   return out;
+}
+
+/** The launcher every bash hook of the Claude registration starts through. */
+const LAUNCHER = "run-hook.sh";
+
+/**
+ * What the splice owes the person running the upgrade about the user's entries it kept: one that
+ * runs a script the bundle starts through the launcher, but not through it — a customised copy of
+ * an older registration, say. The splice never touches the user's entry, so the launched one is
+ * placed beside it while the kept one still looks bash up on the PATH the session inherits, where
+ * an entry inside the repository can supply it. Said, never fixed: the entry is the user's.
+ */
+export function keptHookNotes(user: HookMap, bundled: HookMap, dest: string): string[] {
+  const launched = commandsOf(bundled).filter((c) => c.includes(LAUNCHER)).map(specnautHookFile);
+  const scripts = [...new Set(launched)].filter((f): f is string => f !== null);
+  return commandsOf(user).flatMap((command) => {
+    if (specnautHookFile(command) !== null || command.includes(LAUNCHER)) return [];
+    const script = scripts.find((s) => names(command, s));
+    if (script === undefined) return [];
+    return [
+      `${dest}: kept your hook entry ${terminalText(command)} — it runs ${script}.sh, but not ` +
+      `through ${LAUNCHER}: it starts bash from the PATH the session inherits, where an entry ` +
+      `inside the repository can supply it. Specnaut's own entry runs beside it; remove yours, ` +
+      `or launch it as Specnaut's is`,
+    ];
+  });
+}
+
+/**
+ * Whether `command` names `<script>.sh` as a whole file name: at the start, or after a slash, a
+ * backslash (a Windows path), a quote or a blank.
+ */
+const names = (command: string, script: string) =>
+  new RegExp(`(?:^|[\\\\/"'\\s])${script}\\.sh(?![\\w.-])`).test(command);
+
+/** Every string command of every group of `hooks`. */
+function commandsOf(hooks: HookMap): string[] {
+  return Object.values(hooks).flat().flatMap((g) => g.hooks ?? [])
+    .flatMap((h) => typeof h.command === "string" ? [h.command] : []);
 }
 
 /**
