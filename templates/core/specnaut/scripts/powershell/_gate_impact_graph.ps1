@@ -1,7 +1,7 @@
 # Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
 # of the change set and of the affected set with its reverse closure. Reports facts;
 # whether one widens the run is gate-impact's call. Comparison is ordinal throughout, on
-# ASCII-folded text where a path meets a root (Test-GateHolds, Test-GateSpanned, Get-GateAffectedBy).
+# ASCII-folded text where a match only adds an owner (Test-GateHolds, Get-GateAffectedBy).
 #
 # Every path is top-relative: gate-impact refuses a project not at its work tree's top
 # (Test-GateCandidateInRepo), so a declared path already is one; trees are listed whole
@@ -48,22 +48,24 @@ function Get-GateProtectedEntries([string]$Commit, [string]$Path) {
     return @{ Code = 0; Text = ($entries -join "`n") }
 }
 
-# A path meets a root in any ASCII case, both sides folded: a case-insensitive file system hands
-# git `apps/WEB/.gitattributes` for a file in `apps/web/`. The bash twin's holds.
-function Test-GateHolds([string]$Root, [string]$Path) {
-    $r = Get-GateAsciiLower $Root
-    $p = Get-GateAsciiLower $Path
+# Folding only ever widens the run. A path meets a root in any ASCII case where that adds an owner,
+# both sides folded: a case-insensitive file system hands git `apps/WEB/.gitattributes` for a file in
+# `apps/web/`. Where a match narrows it, clearing `unowned`, skipping `inert` or sparing a nested
+# .gitattributes as spanned, it is exact (-Exact). The bash twin's holds and meets.
+function Test-GateHolds([string]$Root, [string]$Path, [switch]$Exact) {
+    $r = if ($Exact) { $Root } else { Get-GateAsciiLower $Root }
+    $p = if ($Exact) { $Path } else { Get-GateAsciiLower $Path }
     if ($r.EndsWith('/', [StringComparison]::Ordinal)) { return $p.StartsWith($r, [StringComparison]::Ordinal) }
     return (Test-GateSame $p $r)
 }
-function Test-GateListed($List, [string]$Path) {
-    foreach ($root in $List) { if (Test-GateHolds $root $Path) { return $true } }
+function Test-GateListed($List, [string]$Path, [switch]$Exact) {
+    foreach ($root in $List) { if (Test-GateHolds $root $Path -Exact:$Exact) { return $true } }
     return $false
 }
-function Get-GateOwnersOf($Owners, [string]$Path) {
+function Get-GateOwnersOf($Owners, [string]$Path, [switch]$Exact) {
     $out = [System.Collections.Generic.List[string]]::new()
     foreach ($id in $Owners.Keys) {
-        if (Test-GateListed $Owners[$id].Roots $Path) { $out.Add($id) }
+        if (Test-GateListed $Owners[$id].Roots $Path -Exact:$Exact) { $out.Add($id) }
     }
     return , $out
 }
@@ -77,18 +79,21 @@ function Test-GateCheckoutConfig([string]$Path) {
     foreach ($name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame $folded $name) { return $true } }
     return $false
 }
-# A name another fold could make one the graph matches is never compared (the bash twin's
-# unreadable): a path holding U+FFFD or a newline; a dotfile name holding a code point above
-# U+007F (`.gitattribute` and U+017F, which folds to s); a name holding `~` and a digit, as an
-# 8.3 short name (`GITATT~1`) does.
+# A path another fold could read as one the graph matches is never compared (the bash twin's
+# unreadable), judged on every component: a path holding U+FFFD or a newline; a folder name holding
+# a code point above U+007F (U+017F folds to s); a file name holding one that is a dotfile once they
+# are dropped (HFS+ ignores U+200C); any name holding `~` and a digit, as an 8.3 short name does.
 function Test-GateUnreadable([string]$Path) {
     if ($Path.Contains([char]0xFFFD) -or $Path.Contains("`n")) { return $true }
-    $name = $Path.Substring($Path.LastIndexOf('/') + 1)
-    if ($name.StartsWith('.', [StringComparison]::Ordinal)) {
-        foreach ($c in $name.ToCharArray()) { if ([int]$c -gt 127) { return $true } }
-    }
-    for ($i = 0; $i + 1 -lt $name.Length; $i++) {
-        if ($name[$i] -eq [char]'~' -and [int]$name[$i + 1] -ge 48 -and [int]$name[$i + 1] -le 57) { return $true }
+    $names = $Path.Split('/')
+    for ($n = 0; $n -lt $names.Count; $n++) {
+        $name = $names[$n]
+        $ascii = -join @($name.ToCharArray() | Where-Object { [int]$_ -le 127 })
+        $dotted = $ascii.StartsWith('.', [StringComparison]::Ordinal)
+        if ($ascii.Length -lt $name.Length -and ($n -lt $names.Count - 1 -or $dotted)) { return $true }
+        for ($i = 0; $i + 1 -lt $name.Length; $i++) {
+            if ($name[$i] -eq [char]'~' -and [int]$name[$i + 1] -ge 48 -and [int]$name[$i + 1] -le 57) { return $true }
+        }
     }
     return $false
 }
@@ -108,11 +113,9 @@ function Test-GateNestedAttributes([string]$Path) {
     return (Get-GateAsciiLower $Path).EndsWith('/.gitattributes', [StringComparison]::Ordinal)
 }
 function Test-GateSpanned($Owners, [string]$Path) {
-    $p = Get-GateAsciiLower $Path
     foreach ($id in $Owners.Keys) {
         foreach ($root in $Owners[$id].Roots) {
-            $r = Get-GateAsciiLower $root
-            if ($r.EndsWith('/', [StringComparison]::Ordinal) -and $p.StartsWith($r, [StringComparison]::Ordinal)) { return $true }
+            if ($root.EndsWith('/', [StringComparison]::Ordinal) -and $Path.StartsWith($root, [StringComparison]::Ordinal)) { return $true }
         }
     }
     return $false
@@ -139,8 +142,8 @@ function Get-GatePathCause($Pairs, $Candidate, $Declared) {
             if (Test-GateUnreadable $path) { return "path-unreadable: $path" }
             if (Test-GateCheckoutConfig $path) { return "checkout-config: $path" }
             if (Test-GateListed $Declared.FullOn $path) { return "full-on: $path" }
-            if (Test-GateListed $Declared.Inert $path) { continue }
-            $held = (Get-GateOwnersOf $Candidate $path).Count + (Get-GateOwnersOf $pair.Snapshot $path).Count
+            if (Test-GateListed $Declared.Inert $path -Exact) { continue }
+            $held = (Get-GateOwnersOf $Candidate $path -Exact).Count + (Get-GateOwnersOf $pair.Snapshot $path -Exact).Count
             if ($held -eq 0) { return "unowned: $path" }
             $spanned = (Test-GateSpanned $Candidate $path) -or (Test-GateSpanned $pair.Snapshot $path)
             if ((Test-GateNestedAttributes $path) -and -not $spanned) { return "checkout-config: $path" }
@@ -159,7 +162,7 @@ function Get-GateAffected($Pairs, $Candidate, $Declared) {
     $set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($pair in $Pairs) {
         foreach ($path in $pair.Changes) {
-            if (Test-GateListed $Declared.Inert $path) { continue }
+            if (Test-GateListed $Declared.Inert $path -Exact) { continue }
             foreach ($snapshot in $snapshots) {
                 foreach ($id in (Get-GateAffectedBy $snapshot $path)) { [void]$set.Add($id) }
             }

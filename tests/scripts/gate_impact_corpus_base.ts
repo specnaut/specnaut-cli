@@ -147,7 +147,8 @@ export const BASES: Case[] = [
     marks: FULL_MARKS,
   },
   {
-    name: "two roots differing only by a zero-width character are two roots",
+    // HFS+ ignores U+200D, so it reads the folder as `apps/web/`: the path is never compared.
+    name: "a folder differing from a root only by a zero-width character widens",
     repo: {
       owners: OWNERS.map((o) =>
         o.id === "web" ? { ...o, roots: ["apps/web/", `apps/web${ZWJ}/`] } : o
@@ -155,8 +156,9 @@ export const BASES: Case[] = [
     },
     build: change(`apps/web${ZWJ}/a.ts`),
     code: 0,
-    scope: "owners web",
-    marks: ["suite-scoped web", "web-scoped web", "always unset"],
+    scope: "full",
+    fallback: "path-unreadable: apps/web???/a.ts",
+    marks: FULL_MARKS,
   },
   {
     name: "a root changed only by a zero-width character is a changed record",

@@ -114,8 +114,8 @@ is the bare run, to the byte. `--refs-stdin` reads a pre-push hook's lines.
 - **`adapter.command`** reports the graph. **`adapter.files`** names what it is built
   from; a change to any of them widens the run.
 - **`scoped_tiers`**: a tier outside the list runs full.
-- **`full_on`**: a changed path here runs full. **`inert`**: a changed path here affects
-  nothing, such as what every branch commits. `full_on` beats `inert`.
+- **`full_on`**: a changed path here runs full. **`inert`**: a changed path here, in its exact
+  case, affects nothing, such as what every branch commits. `full_on` beats `inert`.
 - **`checks`** maps a gate command, by its exact string, to the command that narrows
   it. The scoped command reads the owners from `SPECNAUT_AFFECTED_OWNERS`,
   space-separated; they are never spliced into the string. A check with **`owners`** is
@@ -137,19 +137,19 @@ root, should it need an installed toolchain). It writes:
   "owners": [{ "id": "<id>", "roots": ["<path>"], "depends_on": ["<id>"] }] }
 ```
 
-**What runs.** A changed path under a root in either snapshot, in any ASCII case, affects that
-owner, and an owner whose record differs, or that exists on one side only, is affected. So is
-every owner that depends on an affected one, over the edges of every snapshot.
+**What runs.** A changed path under a root in either snapshot affects that owner in any ASCII case,
+and is owned only in its own. An owner whose record differs, or that exists on one side only, is
+affected. So is every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-`fallback:`: a path name not UTF-8 or holding a newline, a dotfile name holding a code point above
-U+007F, or a name holding `~` and a digit (`path-unreadable:`); the root `.gitattributes`,
-`.lfsconfig` or `.gitmodules` in any ASCII case, even `inert` (`checkout-config:`); an unowned path,
-a `full_on` match, a gitlink, a symlink or a type change; a declaration, an `adapter.files` entry,
-`gates.yml` or `.specnaut/scripts/` that differs from a given base, or from the merge-base with the
-default branch; any of those not a tracked regular file; an adapter that fails or answers anything
-invalid; a malformed declaration; a base that does not resolve or was never fetched; `jq` absent,
-older than 1.6, or failing where its answer decides the run.
+`fallback:`: a path not UTF-8 or holding a newline, a folder or dotfile name holding a code point
+above U+007F, even before the dot, or a name holding `~` and a digit (`path-unreadable:`); the root
+`.gitattributes`, `.lfsconfig` or `.gitmodules` in any ASCII case, even `inert`
+(`checkout-config:`); an unowned path, a `full_on` match, a gitlink, a symlink or a type change; a
+declaration, an `adapter.files` entry, `gates.yml` or `.specnaut/scripts/` that differs from a given
+base, or from the merge-base with the default branch; any of those not a tracked regular file; an
+adapter that fails or answers anything invalid; a malformed declaration; a base unresolved or never
+fetched; `jq` absent, older than 1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 

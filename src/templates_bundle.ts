@@ -651,8 +651,8 @@ is the bare run, to the byte. \`--refs-stdin\` reads a pre-push hook's lines.
 - **\`adapter.command\`** reports the graph. **\`adapter.files\`** names what it is built
   from; a change to any of them widens the run.
 - **\`scoped_tiers\`**: a tier outside the list runs full.
-- **\`full_on\`**: a changed path here runs full. **\`inert\`**: a changed path here affects
-  nothing, such as what every branch commits. \`full_on\` beats \`inert\`.
+- **\`full_on\`**: a changed path here runs full. **\`inert\`**: a changed path here, in its exact
+  case, affects nothing, such as what every branch commits. \`full_on\` beats \`inert\`.
 - **\`checks\`** maps a gate command, by its exact string, to the command that narrows
   it. The scoped command reads the owners from \`SPECNAUT_AFFECTED_OWNERS\`,
   space-separated; they are never spliced into the string. A check with **\`owners\`** is
@@ -674,19 +674,19 @@ root, should it need an installed toolchain). It writes:
   "owners": [{ "id": "<id>", "roots": ["<path>"], "depends_on": ["<id>"] }] }
 \`\`\`
 
-**What runs.** A changed path under a root in either snapshot, in any ASCII case, affects that
-owner, and an owner whose record differs, or that exists on one side only, is affected. So is
-every owner that depends on an affected one, over the edges of every snapshot.
+**What runs.** A changed path under a root in either snapshot affects that owner in any ASCII case,
+and is owned only in its own. An owner whose record differs, or that exists on one side only, is
+affected. So is every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-\`fallback:\`: a path name not UTF-8 or holding a newline, a dotfile name holding a code point above
-U+007F, or a name holding \`~\` and a digit (\`path-unreadable:\`); the root \`.gitattributes\`,
-\`.lfsconfig\` or \`.gitmodules\` in any ASCII case, even \`inert\` (\`checkout-config:\`); an unowned path,
-a \`full_on\` match, a gitlink, a symlink or a type change; a declaration, an \`adapter.files\` entry,
-\`gates.yml\` or \`.specnaut/scripts/\` that differs from a given base, or from the merge-base with the
-default branch; any of those not a tracked regular file; an adapter that fails or answers anything
-invalid; a malformed declaration; a base that does not resolve or was never fetched; \`jq\` absent,
-older than 1.6, or failing where its answer decides the run.
+\`fallback:\`: a path not UTF-8 or holding a newline, a folder or dotfile name holding a code point
+above U+007F, even before the dot, or a name holding \`~\` and a digit (\`path-unreadable:\`); the root
+\`.gitattributes\`, \`.lfsconfig\` or \`.gitmodules\` in any ASCII case, even \`inert\`
+(\`checkout-config:\`); an unowned path, a \`full_on\` match, a gitlink, a symlink or a type change; a
+declaration, an \`adapter.files\` entry, \`gates.yml\` or \`.specnaut/scripts/\` that differs from a given
+base, or from the merge-base with the default branch; any of those not a tracked regular file; an
+adapter that fails or answers anything invalid; a malformed declaration; a base unresolved or never
+fetched; \`jq\` absent, older than 1.6, or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -31591,37 +31591,42 @@ gate_graph_pair() {
 }
 
 # The jq both steps below read a path with: which roots hold it, and who owns it.
-# A path meets a root in any ASCII case (holds, spanned, affected_by), both sides folded: a
-# case-insensitive file system hands git \`apps/WEB/.gitattributes\` for a file in \`apps/web/\`.
+# Folding only ever widens the run. A path meets a root in any ASCII case where that adds an
+# owner (holds, affected_by), both sides folded: a case-insensitive file system hands git
+# \`apps/WEB/.gitattributes\` for a file in \`apps/web/\`. Where a match narrows it, clearing
+# \`unowned\`, skipping \`inert\` or sparing a nested .gitattributes as spanned, it is exact (meets).
 # checkout_config: a root file that changes how every other path is checked out or fetched,
 # whatever the declaration calls it, in any ASCII case. The PowerShell twin's
-# Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a name another
-# fold could make one of these is not compared but widens as \`path-unreadable\` (unreadable):
-# a dotfile name holding a code point above U+007F (\`.gitattribute\` and U+017F, which folds
-# to s) and a name holding \`~\` and a digit, as an 8.3 short name (\`GITATT~1\`) does.
+# Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a path another
+# fold could read as one the graph matches is not compared but widens as \`path-unreadable\`
+# (unreadable), judged on every component: a folder name holding a code point above U+007F
+# (U+017F folds to s), a file name holding one that is a dotfile once they are dropped (HFS+
+# ignores U+200C), and any name holding \`~\` and a digit, as an 8.3 short name (\`GITATT~1\`) does.
 # A nested .gitattributes in folder D changes how every path below D is checked out, so it
 # affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
 # being free to nest. Only a folder root that holds it holds every path below D; held by
 # file roots alone, those paths are no owner's whole, and it widens as checkout config
 # (spanned). The PowerShell twin's Get-GateAffectedBy and Test-GateSpanned read it alike.
 GATE_GRAPH_DEFS='
-    def holds(\$p): ascii_downcase as \$r | (\$p | ascii_downcase) as \$q
-      | if \$r | endswith("/") then \$q | startswith(\$r) else \$q == \$r end;
+    def meets(\$q): . as \$r | if \$r | endswith("/") then \$q | startswith(\$r) else \$q == \$r end;
+    def holds(\$p): ascii_downcase | meets(\$p | ascii_downcase);
     def listed(\$list; \$p): \$list | any(holds(\$p));
     def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);
+    def owned(\$p): [.owners[].roots[] | meets(\$p)] | any;
     def checkout_config(\$p): (\$p | ascii_downcase) as \$l
       | [".gitattributes", ".lfsconfig", ".gitmodules"] | any(. == \$l);
     def nested_attributes(\$p): \$p | ascii_downcase | endswith("/.gitattributes");
-    def spanned(\$p): (\$p | ascii_downcase) as \$q
-      | [.owners[].roots[] | select(endswith("/")) | ascii_downcase] | any(. as \$r | \$q | startswith(\$r));
+    def spanned(\$p): [.owners[].roots[] | select(endswith("/"))] | any(. as \$r | \$p | startswith(\$r));
     def affected_by(\$p): owners_of(\$p) + if nested_attributes(\$p)
       then (\$p[0:(\$p | length) - 14] | ascii_downcase) as \$d
         | .owners | to_entries | map(select(.value.roots | any(ascii_downcase | startswith(\$d))) | .key)
       else [] end;
-    def short_name(\$c): any(range(0; (\$c | length) - 1); \$c[.] == 126 and \$c[. + 1] >= 48 and \$c[. + 1] <= 57);
-    def unreadable(\$p): (\$p | split("/") | last | explode) as \$c
-      | (\$p | contains("\\ufffd") or contains("\\n"))
-        or (\$c[0] == 46 and (\$c | any(. > 127))) or short_name(\$c);'
+    def short_name: . as \$c | any(range(0; length - 1); \$c[.] == 126 and \$c[. + 1] >= 48 and \$c[. + 1] <= 57);
+    def wide: any(. > 127);
+    def dotted: map(select(. < 128)) | .[0] == 46;
+    def unreadable(\$p): (\$p | contains("\\ufffd") or contains("\\n"))
+      or (\$p | split("/") | map(explode) | (.[:-1] | any(wide or short_name))
+        or (last | short_name or (wide and dotted)));'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.
@@ -31635,8 +31640,8 @@ gate_graph_cause() {
         | if unreadable(\$p) then "path-unreadable: \\(\$p)"
           elif checkout_config(\$p) then "checkout-config: \\(\$p)"
           elif listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
-          elif listed(\$d.inert; \$p) then empty
-          elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
+          elif \$d.inert | any(meets(\$p)) then empty
+          elif [\$c, \$b.snapshot | owned(\$p)] | any | not then "unowned: \\(\$p)"
           elif nested_attributes(\$p) and ([\$c, \$b.snapshot | spanned(\$p)] | any | not)
             then "checkout-config: \\(\$p)"
           else empty end] | first // empty' "\$1"
@@ -31657,7 +31662,7 @@ gate_graph_affected() {
       | if \$n == \$s then \$s else \$n | close(\$edges) end;
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
     | ([\$c] + [\$pairs[].snapshot]) as \$snaps
-    | ([\$pairs[].changes[] | select(. as \$p | listed(\$d.inert; \$p) | not)
+    | ([\$pairs[].changes[] | select(. as \$p | \$d.inert | any(meets(\$p)) | not)
         | . as \$p | \$snaps[] | affected_by(\$p)[]]) as \$by_path
     | ([\$pairs[].snapshot as \$b | ((\$b.owners | keys) + (\$c.owners | keys) | unique)[]
         | select(\$b.owners[.] != \$c.owners[.])]) as \$by_record
@@ -38200,7 +38205,7 @@ function Invoke-GateAdapter([string]\$Command, [string]\$Worktree, [string]\$Tre
       `# Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
 # of the change set and of the affected set with its reverse closure. Reports facts;
 # whether one widens the run is gate-impact's call. Comparison is ordinal throughout, on
-# ASCII-folded text where a path meets a root (Test-GateHolds, Test-GateSpanned, Get-GateAffectedBy).
+# ASCII-folded text where a match only adds an owner (Test-GateHolds, Get-GateAffectedBy).
 #
 # Every path is top-relative: gate-impact refuses a project not at its work tree's top
 # (Test-GateCandidateInRepo), so a declared path already is one; trees are listed whole
@@ -38247,22 +38252,24 @@ function Get-GateProtectedEntries([string]\$Commit, [string]\$Path) {
     return @{ Code = 0; Text = (\$entries -join "\`n") }
 }
 
-# A path meets a root in any ASCII case, both sides folded: a case-insensitive file system hands
-# git \`apps/WEB/.gitattributes\` for a file in \`apps/web/\`. The bash twin's holds.
-function Test-GateHolds([string]\$Root, [string]\$Path) {
-    \$r = Get-GateAsciiLower \$Root
-    \$p = Get-GateAsciiLower \$Path
+# Folding only ever widens the run. A path meets a root in any ASCII case where that adds an owner,
+# both sides folded: a case-insensitive file system hands git \`apps/WEB/.gitattributes\` for a file in
+# \`apps/web/\`. Where a match narrows it, clearing \`unowned\`, skipping \`inert\` or sparing a nested
+# .gitattributes as spanned, it is exact (-Exact). The bash twin's holds and meets.
+function Test-GateHolds([string]\$Root, [string]\$Path, [switch]\$Exact) {
+    \$r = if (\$Exact) { \$Root } else { Get-GateAsciiLower \$Root }
+    \$p = if (\$Exact) { \$Path } else { Get-GateAsciiLower \$Path }
     if (\$r.EndsWith('/', [StringComparison]::Ordinal)) { return \$p.StartsWith(\$r, [StringComparison]::Ordinal) }
     return (Test-GateSame \$p \$r)
 }
-function Test-GateListed(\$List, [string]\$Path) {
-    foreach (\$root in \$List) { if (Test-GateHolds \$root \$Path) { return \$true } }
+function Test-GateListed(\$List, [string]\$Path, [switch]\$Exact) {
+    foreach (\$root in \$List) { if (Test-GateHolds \$root \$Path -Exact:\$Exact) { return \$true } }
     return \$false
 }
-function Get-GateOwnersOf(\$Owners, [string]\$Path) {
+function Get-GateOwnersOf(\$Owners, [string]\$Path, [switch]\$Exact) {
     \$out = [System.Collections.Generic.List[string]]::new()
     foreach (\$id in \$Owners.Keys) {
-        if (Test-GateListed \$Owners[\$id].Roots \$Path) { \$out.Add(\$id) }
+        if (Test-GateListed \$Owners[\$id].Roots \$Path -Exact:\$Exact) { \$out.Add(\$id) }
     }
     return , \$out
 }
@@ -38276,18 +38283,21 @@ function Test-GateCheckoutConfig([string]\$Path) {
     foreach (\$name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame \$folded \$name) { return \$true } }
     return \$false
 }
-# A name another fold could make one the graph matches is never compared (the bash twin's
-# unreadable): a path holding U+FFFD or a newline; a dotfile name holding a code point above
-# U+007F (\`.gitattribute\` and U+017F, which folds to s); a name holding \`~\` and a digit, as an
-# 8.3 short name (\`GITATT~1\`) does.
+# A path another fold could read as one the graph matches is never compared (the bash twin's
+# unreadable), judged on every component: a path holding U+FFFD or a newline; a folder name holding
+# a code point above U+007F (U+017F folds to s); a file name holding one that is a dotfile once they
+# are dropped (HFS+ ignores U+200C); any name holding \`~\` and a digit, as an 8.3 short name does.
 function Test-GateUnreadable([string]\$Path) {
     if (\$Path.Contains([char]0xFFFD) -or \$Path.Contains("\`n")) { return \$true }
-    \$name = \$Path.Substring(\$Path.LastIndexOf('/') + 1)
-    if (\$name.StartsWith('.', [StringComparison]::Ordinal)) {
-        foreach (\$c in \$name.ToCharArray()) { if ([int]\$c -gt 127) { return \$true } }
-    }
-    for (\$i = 0; \$i + 1 -lt \$name.Length; \$i++) {
-        if (\$name[\$i] -eq [char]'~' -and [int]\$name[\$i + 1] -ge 48 -and [int]\$name[\$i + 1] -le 57) { return \$true }
+    \$names = \$Path.Split('/')
+    for (\$n = 0; \$n -lt \$names.Count; \$n++) {
+        \$name = \$names[\$n]
+        \$ascii = -join @(\$name.ToCharArray() | Where-Object { [int]\$_ -le 127 })
+        \$dotted = \$ascii.StartsWith('.', [StringComparison]::Ordinal)
+        if (\$ascii.Length -lt \$name.Length -and (\$n -lt \$names.Count - 1 -or \$dotted)) { return \$true }
+        for (\$i = 0; \$i + 1 -lt \$name.Length; \$i++) {
+            if (\$name[\$i] -eq [char]'~' -and [int]\$name[\$i + 1] -ge 48 -and [int]\$name[\$i + 1] -le 57) { return \$true }
+        }
     }
     return \$false
 }
@@ -38307,11 +38317,9 @@ function Test-GateNestedAttributes([string]\$Path) {
     return (Get-GateAsciiLower \$Path).EndsWith('/.gitattributes', [StringComparison]::Ordinal)
 }
 function Test-GateSpanned(\$Owners, [string]\$Path) {
-    \$p = Get-GateAsciiLower \$Path
     foreach (\$id in \$Owners.Keys) {
         foreach (\$root in \$Owners[\$id].Roots) {
-            \$r = Get-GateAsciiLower \$root
-            if (\$r.EndsWith('/', [StringComparison]::Ordinal) -and \$p.StartsWith(\$r, [StringComparison]::Ordinal)) { return \$true }
+            if (\$root.EndsWith('/', [StringComparison]::Ordinal) -and \$Path.StartsWith(\$root, [StringComparison]::Ordinal)) { return \$true }
         }
     }
     return \$false
@@ -38338,8 +38346,8 @@ function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
             if (Test-GateUnreadable \$path) { return "path-unreadable: \$path" }
             if (Test-GateCheckoutConfig \$path) { return "checkout-config: \$path" }
             if (Test-GateListed \$Declared.FullOn \$path) { return "full-on: \$path" }
-            if (Test-GateListed \$Declared.Inert \$path) { continue }
-            \$held = (Get-GateOwnersOf \$Candidate \$path).Count + (Get-GateOwnersOf \$pair.Snapshot \$path).Count
+            if (Test-GateListed \$Declared.Inert \$path -Exact) { continue }
+            \$held = (Get-GateOwnersOf \$Candidate \$path -Exact).Count + (Get-GateOwnersOf \$pair.Snapshot \$path -Exact).Count
             if (\$held -eq 0) { return "unowned: \$path" }
             \$spanned = (Test-GateSpanned \$Candidate \$path) -or (Test-GateSpanned \$pair.Snapshot \$path)
             if ((Test-GateNestedAttributes \$path) -and -not \$spanned) { return "checkout-config: \$path" }
@@ -38358,7 +38366,7 @@ function Get-GateAffected(\$Pairs, \$Candidate, \$Declared) {
     \$set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach (\$pair in \$Pairs) {
         foreach (\$path in \$pair.Changes) {
-            if (Test-GateListed \$Declared.Inert \$path) { continue }
+            if (Test-GateListed \$Declared.Inert \$path -Exact) { continue }
             foreach (\$snapshot in \$snapshots) {
                 foreach (\$id in (Get-GateAffectedBy \$snapshot \$path)) { [void]\$set.Add(\$id) }
             }

@@ -33,7 +33,7 @@ const INERT = declaration().inert as string[];
  * `path` committed as it is spelled. `git add` on a case-insensitive checkout spells a folder as
  * the index already does (`apps/web/` for `apps/WEB/`); `--cacheinfo` keeps the spelling given.
  */
-const spelled = (path: string) => async (r: Repo) => {
+export const spelled = (path: string) => async (r: Repo) => {
   await writeFiles(r.root, { [path]: "# changed\n" });
   const blob = await r.git("hash-object", "-w", "--", path);
   await r.git("update-index", "--add", "--cacheinfo", `100644,${blob},${path}`);
@@ -41,7 +41,7 @@ const spelled = (path: string) => async (r: Repo) => {
 };
 
 /** A name another fold could read as one the graph matches is never compared: it widens. */
-const unreadable = (name: string, path: string, shown: string): Case => ({
+export const unreadable = (name: string, path: string, shown: string): Case => ({
   name,
   repo: { owners: NESTED },
   build: edit(path),
@@ -52,8 +52,8 @@ const unreadable = (name: string, path: string, shown: string): Case => ({
 });
 
 /** Owners whose roots nest: below `apps/web/` a folder and a file, and one that only shares its name. */
-const owner = (id: string, root: string): Owner => ({ id, roots: [root], depends_on: [] });
-const NESTED = [
+export const owner = (id: string, root: string): Owner => ({ id, roots: [root], depends_on: [] });
+export const NESTED = [
   ...OWNERS,
   owner("widgets", "apps/web/widgets/"),
   owner("icons", "apps/web/icons.svg"),
@@ -115,22 +115,24 @@ export const CHECKOUT: Case[] = [
     fallback: "unowned: sub/.gitattributes",
     marks: FULL_MARKS,
   },
-  // A case-insensitive file system hands git `apps/WEB/...` for a file in `apps/web/`: a path meets
-  // a root in any ASCII case.
+  // A case-insensitive file system hands git `apps/WEB/...` for a file in `apps/web/`, a sensitive one
+  // a folder of its own: a root met only in another ASCII case adds its owner, never clears `unowned`.
   {
-    name: "a path in another ASCII case than its owner's root is that owner's",
+    name: "a path only another ASCII case of a root holds stays unowned",
     build: spelled("apps/WEB/b.ts"),
     code: 0,
-    scope: "owners web",
-    marks: scoped("web"),
+    scope: "full",
+    fallback: "unowned: apps/WEB/b.ts",
+    marks: FULL_MARKS,
   },
   {
-    name: "a nested .gitattributes in another case than its folder selects the owners below it",
+    name: "a nested .gitattributes only another case of a folder root holds stays unowned",
     repo: { owners: NESTED },
     build: spelled("Apps/web/.gitattributes"),
     code: 0,
-    scope: "owners icons web widgets",
-    marks: scoped("icons", "web", "widgets"),
+    scope: "full",
+    fallback: "unowned: Apps/web/.gitattributes",
+    marks: FULL_MARKS,
   },
   {
     name: "a nested .gitattributes another owner's root names in another case selects both",
