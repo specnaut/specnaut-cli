@@ -14,7 +14,7 @@ const BACKENDS = ["github", "gitlab", "cloud"];
 
 /** The loop's four lines in `backend`'s `_config.sh`, from its `for _f in` line. */
 async function loop(backend: string): Promise<string[]> {
-  const lines = (await Deno.readTextFile(scriptSource(`${backend}/_config.sh`))).split("\n");
+  const lines = (await Deno.readTextFile(scriptSource(`${backend}/_config.sh`))).split(/\r?\n/);
   const at = lines.findIndex((l) => l.startsWith("for _f in "));
   return at === -1 ? [] : lines.slice(at, at + 4);
 }

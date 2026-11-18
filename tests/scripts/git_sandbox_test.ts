@@ -51,7 +51,8 @@ Deno.test("a child of run() is given only the inherited PATH entries land-featur
   try {
     Deno.env.set("PATH", [...leaks, saved ?? ""].join(DELIMITER));
     const r = await run("bash", ["-c", 'printf %s "$PATH"'], Deno.cwd());
-    const entries = r.stdout.split(DELIMITER);
+    // bash's own view of PATH: `:`-separated on every system, Git Bash converting Windows' `;` list.
+    const entries = r.stdout.split(":");
     for (const leak of leaks) {
       assertEquals(entries.includes(leak), false, `'${leak}' reached the sandbox`);
     }
