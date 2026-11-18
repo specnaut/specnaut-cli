@@ -1,8 +1,8 @@
 import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb, readings } from "./project_path.ts";
-import { manifestsOf } from "./command_runners.ts";
-import { shellSegments } from "./shell_words.ts";
+import { rawWords, type Reading, valueEntries } from "./command_words.ts";
+import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
 
 /**
  * The repository files a judged config makes a harness run: a hook's or a status line's command,
@@ -10,7 +10,9 @@ import { shellSegments } from "./shell_words.ts";
  * the branch changes is already named; what this adds is the file an unchanged command runs,
  * which the branch may have changed. So every string value is swept, never a list of fields, and
  * a word is read too much rather than too little: reading too much only names a file the branch
- * changed. Words are read as text, never expanded, evaluated or run.
+ * changed. Words are read as text, never expanded, evaluated or run. A skill's, an agent's or a
+ * slash command's file holds commands too: its frontmatter's hooks and its `!` spans
+ * (`markdown_commands.ts`).
  */
 
 /** The judged files that name programs a harness runs. */
@@ -22,9 +24,9 @@ export const COMMAND_SOURCES: readonly string[] = [
   ".codex/hooks.json",
 ];
 
-/** Whether `path` is one of {@link COMMAND_SOURCES}, its letter case aside. */
+/** Whether `path` is one of {@link COMMAND_SOURCES}, or a file of commands, its letter case aside. */
 export const isCommandSource = (path: string): boolean =>
-  COMMAND_SOURCES.some((s) => s === path.toLowerCase());
+  COMMAND_SOURCES.some((s) => s === path.toLowerCase()) || isCommandMarkdown(path);
 
 /** The reason a source gets when its commands could not all be read: it is asked about whole. */
 export const COMMAND_REASON = { partial: "commands not fully read" } as const;
@@ -41,9 +43,6 @@ const MAX_JOINS = 50_000;
 /** What a source's commands name, and whether every word of it was read. */
 export type CommandPaths = { readonly paths: readonly string[]; readonly whole: boolean };
 
-/** Whether a reading met no limit: a source that did not parse, or a word or expansion past a cap. */
-type Reading = { whole: boolean };
-
 /**
  * The paths a command source names (`entryPaths`), from its parsed values (each object's strings
  * together: a server's `command`, `args` and `cwd`) and from each line of its bytes. Both always:
@@ -58,7 +57,9 @@ export function commandPaths(
 ): CommandPaths {
   const read: Reading = { whole: true };
   const text = new TextDecoder().decode(bytes);
-  const entries = [...parsedEntries(path, text, read), ...text.split("\n").map(rawWords)];
+  const entries = isCommandMarkdown(path)
+    ? markdownEntries(text, read, PARSE_LIMIT)
+    : [...parsedEntries(path, text, read), ...text.split("\n").map(rawWords)];
   const paths = new Set(entries.flatMap((words) => entryPaths(words, isFolder, read)));
   return { paths: [...paths], whole: read.whole };
 }
@@ -150,10 +151,7 @@ function parsedEntries(path: string, text: string, read: Reading): string[][] {
     return [];
   }
   try {
-    const value = path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text);
-    const entries: string[][] = [];
-    entries.push(commandWords(stringsOf(value, entries)));
-    return entries;
+    return valueEntries(path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text));
   } catch (err) {
     // Not swallowed: a source that does not parse, or nests too deep to walk, is not read whole,
     // and its caller names it. Anything else is not a parse failure and goes up.
@@ -161,25 +159,4 @@ function parsedEntries(path: string, text: string, read: Reading): string[][] {
     read.whole = false;
     return [];
   }
-}
-
-/** The words of `strings`, and the manifest each command among them runs (`manifestsOf`). */
-function commandWords(strings: readonly string[]): string[] {
-  const commands = strings.flatMap(shellSegments);
-  return [...commands.flat(), ...commands.flatMap(manifestsOf)];
-}
-
-/** The strings of `value` that belong to the object holding it; each object's are one entry. */
-function stringsOf(value: unknown, entries: string[][]): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, entries));
-  if (value === null || typeof value !== "object") return [];
-  entries.push(commandWords(Object.values(value).flatMap((v) => stringsOf(v, entries))));
-  return [];
-}
-
-/** The text's words read as bytes: an escaped quote or backslash undone, split on punctuation. */
-function rawWords(text: string): string[] {
-  const plain = text.replace(/\\\\/g, "/").replace(/\\["']/g, " ");
-  return plain.split(/[\s"'`,;&|<>(){}[\]]+/).filter(Boolean);
 }

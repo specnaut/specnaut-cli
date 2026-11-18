@@ -30,3 +30,9 @@ Deno.test("the row names every runner whose manifest is read, and says no other'
   const missing = [...RUNNERS.keys()].filter((name) => !limits.includes(`\`${name}\``));
   assertEquals(missing, [], "a runner the judge reads is not named in the stated limit");
 });
+
+Deno.test("the row names the commands a skill, an agent or a slash command holds", () => {
+  const row = instructionsRow();
+  assert(row.includes("one a skill's, an agent's or a slash command's frontmatter declares"), row);
+  assert(row.includes("a skill's or a slash command's `` !`…` `` span"), row);
+});
