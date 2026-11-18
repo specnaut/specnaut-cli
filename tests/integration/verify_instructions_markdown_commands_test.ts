@@ -39,9 +39,24 @@ Deno.test("a skill's frontmatter hook: its script the branch edits is named", as
   ]);
 });
 
+Deno.test("an agent's frontmatter hook: its script the branch edits is named", async () => {
+  const files = { ".claude/agents/linter.md": SKILL, "scripts/lint.sh": LINT };
+  assertEquals(await landed(files, { "scripts/lint.sh": EDITED }), [
+    "VERDICT instructions untrusted scripts/lint.sh differs from base",
+  ]);
+});
+
 Deno.test("an agent's frontmatter hook: its script the branch leaves alone stays silent", async () => {
   const files = { ".claude/agents/linter.md": SKILL, "scripts/lint.sh": LINT };
   assertEquals(await landed(files, { "notes.md": "x\n" }), ["VERDICT instructions trusted"]);
+});
+
+Deno.test("a skill's ```! block: the script it runs, once edited, is named", async () => {
+  const skill = "---\nname: setup\n---\nEnvironment:\n```!\nbash tools/env.sh\n```\n";
+  const files = { ".claude/skills/setup/SKILL.md": skill, "tools/env.sh": LINT };
+  assertEquals(await landed(files, { "tools/env.sh": EDITED }), [
+    "VERDICT instructions untrusted tools/env.sh differs from base",
+  ]);
 });
 
 Deno.test("a slash command's `!` span: the script it runs, once edited, is named", async () => {

@@ -44,6 +44,8 @@ Deno.test("the row names the commands a skill, an agent or a slash command holds
   const row = instructionsRow();
   assert(row.includes("one a skill's, an agent's or a slash command's frontmatter declares"), row);
   assert(row.includes("a skill's or a slash command's `` !`…` `` span"), row);
+  assert(row.includes("span or ```` ```! ```` block (an agent's file runs neither)"), row);
+  assert(row.includes("or a skill's or a slash command's `allowed-tools` grants"), row);
 });
 
 Deno.test("the row names the programs on a judged PATH, and the PATH a shell builds as a limit", () => {

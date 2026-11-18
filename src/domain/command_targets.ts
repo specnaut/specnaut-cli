@@ -73,7 +73,7 @@ export function commandPaths(
   const read = reading(depth);
   const text = new TextDecoder().decode(bytes);
   const entries = isCommandMarkdown(path)
-    ? markdownEntries(text, read)
+    ? markdownEntries(path, text, read)
     : [...parsedEntries(path, text, read), ...rawEntries(text, read)];
   return found(entries.flatMap((words) => entryPaths(words, isFolder, read)), read);
 }

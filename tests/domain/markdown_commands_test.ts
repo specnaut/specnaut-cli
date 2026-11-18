@@ -59,6 +59,42 @@ Deno.test("a `!` span of a command, or of a skill, names the file it runs", () =
   }
 });
 
+Deno.test("a ```! block of a command, or of a skill, names the files it runs, closed or not", () => {
+  const block = [
+    "````!",
+    "bash tools/env.sh",
+    "node scripts/seed.js",
+    "````",
+    "Then tools/prose.sh.",
+  ];
+  const open = ["```!", "bash tools/last.sh"];
+  for (const path of [".claude/commands/setup.md", ".claude/skills/s/SKILL.md"]) {
+    const paths = read(path, [...block, ...open].join("\n")).paths;
+    has(paths, "tools/env.sh", "scripts/seed.js", "tools/last.sh");
+    assertEquals(paths.includes("tools/prose.sh"), false);
+  }
+  const fenced = ["```bash", "bash tools/shown.sh", "```", ""].join("\n");
+  assertEquals(read(".claude/commands/c.md", fenced).paths.includes("tools/shown.sh"), false);
+});
+
+Deno.test("an agent's `!` spans and blocks run nothing: an agent's file, or a note beside it", () => {
+  const text = "Context: !`bash tools/context.sh`\n\n```!\nbash tools/env.sh\n```\n";
+  for (const path of [".claude/agents/a.md", ".claude/agents/a/memory/note.md"]) {
+    const paths = read(path, text).paths;
+    assertEquals([paths.includes("tools/context.sh"), paths.includes("tools/env.sh")], [
+      false,
+      false,
+    ]);
+  }
+});
+
+Deno.test("a skill's or a command's allowed-tools grants are read as permission rules are", () => {
+  const listed = "---\nallowed-tools:\n  - Read\n  - Bash(./scripts/deploy.sh *)\n---\n";
+  has(read(".claude/skills/d/SKILL.md", listed).paths, "scripts/deploy.sh");
+  const spaced = "---\nallowed-tools: Read Bash(tools/release.sh *)\n---\nRelease.\n";
+  has(read(".claude/commands/release.md", spaced).paths, "tools/release.sh");
+});
+
 Deno.test("a frontmatter that does not parse is read from its lines, and not whole", () => {
   const broken = "---\nhooks: {Stop: [{hooks: [{command: tools/stop.sh}]\n---\nbody\n";
   const found = read(".claude/agents/a.md", broken);
