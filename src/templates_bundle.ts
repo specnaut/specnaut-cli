@@ -31553,17 +31553,29 @@ gate_graph_pair() {
 # git \`.GitAttributes\` for \`.gitattributes\`. A non-ASCII letter some file systems also fold
 # (U+017F to s) is not chased: that name is unowned, so it widens unless declared. The
 # PowerShell twin's Test-GateCheckoutConfig holds the same list.
+# A nested .gitattributes in folder D changes how every path below D is checked out, so it
+# affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
+# being free to nest. Only a folder root that holds it holds every path below D; held by
+# file roots alone, those paths are no owner's whole, and it widens as checkout config
+# (spanned). The PowerShell twin's Get-GateAffectedBy and Test-GateSpanned read it alike.
 GATE_GRAPH_DEFS='
     def holds(\$p): . as \$r | if endswith("/") then (\$p | startswith(\$r)) else \$p == \$r end;
     def listed(\$list; \$p): \$list | any(holds(\$p));
     def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);
     def checkout_config(\$p): (\$p | ascii_downcase) as \$l
-      | [".gitattributes", ".lfsconfig", ".gitmodules"] | any(. == \$l);'
+      | [".gitattributes", ".lfsconfig", ".gitmodules"] | any(. == \$l);
+    def nested_attributes(\$p): \$p | ascii_downcase | endswith("/.gitattributes");
+    def spanned(\$p): [.owners[].roots[] | select(endswith("/"))] | any(. as \$r | \$p | startswith(\$r));
+    def affected_by(\$p): owners_of(\$p) + if nested_attributes(\$p)
+      then \$p[0:(\$p | length) - 14] as \$d
+        | .owners | to_entries | map(select(.value.roots | any(startswith(\$d))) | .key)
+      else [] end;'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
-# path's reason to widen, or nothing. Every base is walked against its own snapshot: a
-# path must be owned on its own pair's sides, or an owner that only another base knows
-# would stop it being unowned. One that cannot be compared as text is never looked up.
+# path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.
+# Every base is walked against its own snapshot: a path must be owned on its own pair's
+# sides, or an owner that only another base knows would stop it being unowned. One that
+# cannot be compared as text is never looked up.
 gate_graph_cause() {
   jq_lf -r --slurp --slurpfile cand "\$2" --slurpfile declared "\$3" "\$GATE_GRAPH_DEFS"'
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
@@ -31573,6 +31585,8 @@ gate_graph_cause() {
           elif listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
           elif listed(\$d.inert; \$p) then empty
           elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
+          elif nested_attributes(\$p) and ([\$c, \$b.snapshot | spanned(\$p)] | any | not)
+            then "checkout-config: \\(\$p)"
           else empty end] | first // empty' "\$1"
 }
 
@@ -31592,7 +31606,7 @@ gate_graph_affected() {
     . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
     | ([\$c] + [\$pairs[].snapshot]) as \$snaps
     | ([\$pairs[].changes[] | select(. as \$p | listed(\$d.inert; \$p) | not)
-        | . as \$p | \$snaps[] | owners_of(\$p)[]]) as \$by_path
+        | . as \$p | \$snaps[] | affected_by(\$p)[]]) as \$by_path
     | ([\$pairs[].snapshot as \$b | ((\$b.owners | keys) + (\$c.owners | keys) | unique)[]
         | select(\$b.owners[.] != \$c.owners[.])]) as \$by_record
     | ([\$snaps[].owners | to_entries[] | .key as \$o | .value.depends_on[] | [\$o, .]]) as \$edges
@@ -38121,18 +38135,49 @@ function Get-GateOwnersOf(\$Owners, [string]\$Path) {
 # name is unowned, so it widens unless declared. The bash twin's checkout_config holds the
 # same list.
 function Test-GateCheckoutConfig([string]\$Path) {
-    \$chars = \$Path.ToCharArray()
-    for (\$i = 0; \$i -lt \$chars.Length; \$i++) {
-        if ([int]\$chars[\$i] -ge 65 -and [int]\$chars[\$i] -le 90) { \$chars[\$i] = [char]([int]\$chars[\$i] + 32) }
-    }
-    \$folded = -join \$chars
+    \$folded = Get-GateAsciiLower \$Path
     foreach (\$name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame \$folded \$name) { return \$true } }
     return \$false
 }
+function Get-GateAsciiLower([string]\$Text) {
+    \$chars = \$Text.ToCharArray()
+    for (\$i = 0; \$i -lt \$chars.Length; \$i++) {
+        if ([int]\$chars[\$i] -ge 65 -and [int]\$chars[\$i] -le 90) { \$chars[\$i] = [char]([int]\$chars[\$i] + 32) }
+    }
+    return -join \$chars
+}
 
-# The first path that cannot be compared, a checkout-config one, a full_on one, or one no
-# snapshot on its own pair's sides owns. A path must be owned on its own pair's sides, or an
-# owner only another base knows would stop it being unowned. Returns the cause, or ''.
+# A nested .gitattributes in folder D changes how every path below D is checked out, so it
+# affects, past the owners holding it, every owner with a root below D/, roots being free to
+# nest. Only a folder root that holds it holds every path below D (Test-GateSpanned); held by
+# file roots alone, it widens as checkout config. The bash twin's affected_by and spanned.
+function Test-GateNestedAttributes([string]\$Path) {
+    return (Get-GateAsciiLower \$Path).EndsWith('/.gitattributes', [StringComparison]::Ordinal)
+}
+function Test-GateSpanned(\$Owners, [string]\$Path) {
+    foreach (\$id in \$Owners.Keys) {
+        foreach (\$root in \$Owners[\$id].Roots) {
+            if (\$root.EndsWith('/', [StringComparison]::Ordinal) -and \$Path.StartsWith(\$root, [StringComparison]::Ordinal)) { return \$true }
+        }
+    }
+    return \$false
+}
+function Get-GateAffectedBy(\$Owners, [string]\$Path) {
+    \$out = Get-GateOwnersOf \$Owners \$Path
+    if (-not (Test-GateNestedAttributes \$Path)) { return , \$out }
+    \$folder = \$Path.Substring(0, \$Path.Length - '.gitattributes'.Length)
+    foreach (\$id in \$Owners.Keys) {
+        foreach (\$root in \$Owners[\$id].Roots) {
+            if (\$root.StartsWith(\$folder, [StringComparison]::Ordinal)) { \$out.Add(\$id); break }
+        }
+    }
+    return , \$out
+}
+
+# The first path that cannot be compared, a checkout-config one, a full_on one, one no
+# snapshot on its own pair's sides owns, or a nested .gitattributes no folder root holds. A
+# path must be owned on its own pair's sides, or an owner only another base knows would stop
+# it being unowned. Returns the cause, or ''.
 function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
     foreach (\$pair in \$Pairs) {
         foreach (\$path in \$pair.Changes) {
@@ -38142,6 +38187,8 @@ function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
             if (Test-GateListed \$Declared.Inert \$path) { continue }
             \$held = (Get-GateOwnersOf \$Candidate \$path).Count + (Get-GateOwnersOf \$pair.Snapshot \$path).Count
             if (\$held -eq 0) { return "unowned: \$path" }
+            \$spanned = (Test-GateSpanned \$Candidate \$path) -or (Test-GateSpanned \$pair.Snapshot \$path)
+            if ((Test-GateNestedAttributes \$path) -and -not \$spanned) { return "checkout-config: \$path" }
         }
     }
     return ''
@@ -38159,7 +38206,7 @@ function Get-GateAffected(\$Pairs, \$Candidate, \$Declared) {
         foreach (\$path in \$pair.Changes) {
             if (Test-GateListed \$Declared.Inert \$path) { continue }
             foreach (\$snapshot in \$snapshots) {
-                foreach (\$id in (Get-GateOwnersOf \$snapshot \$path)) { [void]\$set.Add(\$id) }
+                foreach (\$id in (Get-GateAffectedBy \$snapshot \$path)) { [void]\$set.Add(\$id) }
             }
         }
         foreach (\$id in @(\$pair.Snapshot.Keys) + @(\$Candidate.Keys)) {
