@@ -1,4 +1,4 @@
-import { closing, shellSegments, shellWords } from "./shell_words.ts";
+import { backquoteEnd, closing, shellSegments, shellWords } from "./shell_words.ts";
 
 /**
  * The commands a command runs inside itself, each read as a command of its own: the inside of a
@@ -9,7 +9,7 @@ import { closing, shellSegments, shellWords } from "./shell_words.ts";
  * it only names more paths. Read as text, never expanded or run.
  */
 
-/** At most this many levels of commands inside commands are read: past it a reading is not whole. */
+/** At most this many levels of commands in commands are read: past it a reading is not whole. */
 const MAX_NESTING = 16;
 
 /**
@@ -34,6 +34,12 @@ export function nestedSegments(texts: readonly string[], read: { whole: boolean 
 }
 
 /**
+ * What a backslash escapes inside a backquoted command, as bash reads it: taken off, the command
+ * runs `` `echo \`x\`` `` as `` echo `x` ``, whose own backquote the next level reads.
+ */
+const BACKQUOTED_ESCAPE = /\\([\\`$])/g;
+
+/**
  * The commands `word` holds: itself, when a second split reads it otherwise (a command line, or a
  * level of quoting left), whose own nested commands the next level finds; else what each `$(…)` and
  * backquote in it runs, `${X:-$(…)}` included. Each is shorter than `word`, so the levels end.
@@ -49,9 +55,8 @@ function innerCommands(word: string): string[] {
       i = end;
     } else if (word[i] === "`") {
       const start = i + 1;
-      const close = word.indexOf("`", start);
-      i = close < 0 ? word.length : close;
-      found.push(word.slice(start, i));
+      i = backquoteEnd(word, i);
+      found.push(word.slice(start, i).replace(BACKQUOTED_ESCAPE, "$1"));
     }
   }
   return found.filter((command) => command.trim() !== "");

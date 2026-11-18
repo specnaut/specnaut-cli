@@ -1,5 +1,5 @@
 import { manifestsOf } from "./command_runners.ts";
-import { isPathKey, isSurelyPath, type PathValue, pathWordValue } from "./command_search_path.ts";
+import { isPathKey, type PathValue, pathWordValue, surelySetsPath } from "./command_search_path.ts";
 import { nestedSegments } from "./nested_commands.ts";
 
 /**
@@ -50,10 +50,9 @@ export const reading = (depth = 0): Reading => ({
 
 /** Every group of words `value` holds: one per object, its own strings together. */
 export function valueEntries(value: unknown, read: Reading): string[][] {
-  const entries: string[][] = [];
-  const walked: Walked = { seen: new Set(), visits: 0 };
-  entries.push(commandWords(stringsOf(value, entries, walked, read), read));
-  return entries;
+  const walk: Walk = { seen: new Set(), visits: 0, entries: [], read };
+  walk.entries.push(commandWords(stringsOf(value, walk, []), read));
+  return walk.entries;
 }
 
 /**
@@ -104,36 +103,49 @@ const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
  * The strings of `value` that belong to the object holding it; each object's are one entry. An
  * object or a list met again (a YAML alias is the same value at each use) is read once: walking it
  * at each use would read a chain of aliases in time doubling with its length, and its strings are
- * already read.
+ * already read. `under` is the last two keys above `value` (`""` for a list), which say whether a
+ * key `path` of it sets the environment's PATH (`surelySetsPath`).
  */
-function stringsOf(value: unknown, entries: string[][], walked: Walked, read: Reading): string[] {
+function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string[] {
   if (typeof value === "string") return [value];
-  if (!firstVisit(value, walked, read)) return [];
-  if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, entries, walked, read));
+  if (!firstVisit(value, walk)) return [];
+  if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, walk, below(under, "")));
+  const strings: string[] = [];
   for (const [key, v] of Object.entries(value)) {
     if (isPathKey(key) && typeof v === "string") {
-      read.pathValues.push({ value: v, sure: isSurelyPath(key) });
+      walk.read.pathValues.push({ value: v, sure: surelySetsPath(key, under) });
     }
+    strings.push(...stringsOf(v, walk, below(under, key)));
   }
-  const strings = Object.values(value).flatMap((v) => stringsOf(v, entries, walked, read));
-  entries.push(commandWords(strings, read));
+  walk.entries.push(commandWords(strings, walk.read));
   return [];
 }
 
-/** The objects and lists a walk has met, and how many times it entered one. */
-type Walked = { readonly seen: Set<object>; visits: number };
+/** The last two keys above a value held at `key` of one held under `under`. */
+const below = (under: readonly string[], key: string) => [...under, key].slice(-2);
+
+/**
+ * A walk of one parsed value: the objects and lists it has met, how many times it entered one,
+ * the groups of words it found, and the reading it notes them in.
+ */
+type Walk = {
+  readonly seen: Set<object>;
+  visits: number;
+  readonly entries: string[][];
+  readonly read: Reading;
+};
 
 /**
  * Whether `value` is an object or a list the walk has not met: one past {@link MAX_VISITS} is not
  * entered, and the reading is not whole.
  */
-function firstVisit(value: unknown, walked: Walked, read: Reading): value is object {
-  if (value === null || typeof value !== "object" || walked.seen.has(value)) return false;
-  if (++walked.visits > MAX_VISITS) {
-    read.whole = false;
+function firstVisit(value: unknown, walk: Walk): value is object {
+  if (value === null || typeof value !== "object" || walk.seen.has(value)) return false;
+  if (++walk.visits > MAX_VISITS) {
+    walk.read.whole = false;
     return false;
   }
-  walked.seen.add(value);
+  walk.seen.add(value);
   return true;
 }
 

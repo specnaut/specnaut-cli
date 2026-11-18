@@ -62,6 +62,7 @@ Deno.test("the row names the programs on a judged PATH, and the PATH a shell bui
     row,
   );
   assert(row.includes("(`./tools/$OS/bin`) under a key or a word spelled `PATH`"), row);
+  assert(row.includes("a key `path` in any letter case of an `env` object or of Codex's"), row);
   assert(row.includes("a variable alone other than `$PATH`, such as `$CLAUDE_PROJECT_DIR`"), row);
   assert(row.includes("a path with `..` after a variable (`tools/$OS/../run.sh`)"), row);
   const limits = notRead();

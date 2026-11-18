@@ -8,7 +8,7 @@
 /** What ends a word outside quotes. */
 const SEPARATOR = /[\s;&|<>()]/;
 
-/** What a backslash escapes outside quotes; before anything else it is kept, as in a Windows path. */
+/** What a backslash escapes outside quotes; before anything else it is kept, as a Windows path. */
 const ESCAPED = /[\s"'\\$`;&|<>()]/;
 
 export function shellWords(text: string): string[] {
@@ -47,8 +47,11 @@ export function shellSegments(text: string): string[][] {
 /** The part of a word that starts at `i`, unquoted, and where the next part starts. */
 function wordPart(text: string, i: number): [string, number] {
   const c = text[i];
-  if (c === "'") return quoted(text, i, "'", false);
-  if (c === "`") return quoted(text, i, "`", true);
+  if (c === "'") return quoted(text, i, "'");
+  if (c === "`") {
+    const end = backquoteEnd(text, i);
+    return [text.slice(i, end + 1), end + 1];
+  }
   if (c === '"') return doubleQuoted(text, i);
   if (c === "$" && (text[i + 1] === "(" || text[i + 1] === "{")) {
     const end = closing(text, i + 1);
@@ -58,20 +61,40 @@ function wordPart(text: string, i: number): [string, number] {
   return [c, i + 1];
 }
 
-/** A quoted part up to its closing `quote` (or the text's end): its inside, or kept whole. */
-function quoted(text: string, i: number, quote: string, keep: boolean): [string, number] {
+/** A quoted part up to its closing `quote` (or the text's end): its inside. */
+function quoted(text: string, i: number, quote: string): [string, number] {
   const close = text.indexOf(quote, i + 1);
   const end = close < 0 ? text.length : close;
-  return [keep ? text.slice(i, end + 1) : text.slice(i + 1, end), end + 1];
+  return [text.slice(i + 1, end), end + 1];
 }
 
-/** A double-quoted part: `\"`, `\\`, `` \` `` and `\$` unescaped, a `$(…)` inside kept whole. */
+/**
+ * The index of the backquote closing the one at `open`, or the text's length. A backslash escapes
+ * the character after it, as bash reads a backquoted command: `` \` `` inside is a backquote of a
+ * command nested in this one, never its close.
+ */
+export function backquoteEnd(text: string, open: number): number {
+  for (let i = open + 1; i < text.length; i++) {
+    if (text[i] === "\\") i++;
+    else if (text[i] === "`") return i;
+  }
+  return text.length;
+}
+
+/**
+ * A double-quoted part: `\"`, `\\`, `` \` `` and `\$` unescaped, a `$(…)` or a backquoted command
+ * inside kept whole, its own escapes with it.
+ */
 function doubleQuoted(text: string, i: number): [string, number] {
   let out = "";
   let j = i + 1;
   while (j < text.length && text[j] !== '"') {
     if (text[j] === "$" && text[j + 1] === "(") {
       const end = closing(text, j + 1);
+      out += text.slice(j, end + 1);
+      j = end + 1;
+    } else if (text[j] === "`") {
+      const end = backquoteEnd(text, j);
       out += text.slice(j, end + 1);
       j = end + 1;
     } else if (text[j] === "\\" && /["\\$`]/.test(text[j + 1] ?? "")) {

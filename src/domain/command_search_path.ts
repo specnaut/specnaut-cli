@@ -9,8 +9,9 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
  * a word `PATH=…` (set before a command, or exported). The key is read in any letter case, as
  * Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`) puts its
  * value's folders on PATH too, which only looks for more names in the listing. A folder that
- * cannot be read makes the reading not whole only when its value surely sets PATH, a key or a
- * word spelled `PATH` (`isSurelyPath`): any other is skipped, or every merge would stop for an
+ * cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
+ * word spelled `PATH`, or a key `path` in any letter case of an object that sets a command's
+ * environment (`surelySetsPath`). Any other is skipped, or every merge would stop for an
  * unrelated key. Only what the configs say is read: the PATH a shell builds before the session
  * starts is not.
  */
@@ -21,6 +22,18 @@ const PATH_WORD = /^(path)=(.*)$/is;
 
 /** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
 export const isSurelyPath = (name: string): boolean => name === "PATH";
+
+/**
+ * Whether a key `key` of an object held under the keys `under` (the last two) surely sets PATH:
+ * spelled `PATH`; or, in any letter case, as Windows reads a variable's name, in an object that
+ * sets the environment a command runs with: a settings file's or an MCP server's `env`, Codex's
+ * `shell_environment_policy.set`.
+ */
+export function surelySetsPath(key: string, under: readonly string[]): boolean {
+  if (isSurelyPath(key)) return true;
+  const sets = under.at(-1) === "env" || under.join("/") === "shell_environment_policy/set";
+  return sets && isPathKey(key);
+}
 
 /** A value PATH may be set to, and whether what sets it surely sets PATH (`isSurelyPath`). */
 export type PathValue = { readonly value: string; readonly sure: boolean };

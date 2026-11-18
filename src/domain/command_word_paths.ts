@@ -1,6 +1,6 @@
 import { climb, readings } from "./project_path.ts";
 import { fold, type PathIndex } from "./path_index.ts";
-import { closing } from "./shell_words.ts";
+import { backquoteEnd, closing } from "./shell_words.ts";
 import type { Reading } from "./command_words.ts";
 
 /**
@@ -37,11 +37,10 @@ export function pathsIn(word: string, read: Reading): string[] {
  * starts is not known, each also from each of the `read.depth` folders above the project.
  */
 export function pathOf(piece: string, read: Reading): string[] {
-  const slashed = piece.replaceAll("\\", "/");
-  const bare = withoutVariable(slashed);
-  if (bare === "" || bare === "~") return [];
-  const rooted = bare !== slashed || /^(?:~|(?:[A-Za-z]:)?\/)/.test(bare);
+  const bare = withoutVariable(piece);
   const glob = globbed(bare);
+  if (glob === "" || glob === "~") return [];
+  const rooted = bare !== piece || /^(?:~|(?:[A-Za-z]:)?\/)/.test(glob);
   if (climbsOverVariable(glob)) {
     read.whole = false;
     return [];
@@ -76,9 +75,8 @@ function climbsOverVariable(glob: string): boolean {
  * (`sure`), the reading is not whole and the caller names its source; any other is skipped.
  */
 export function foldersOf(piece: string, read: Reading, sure: boolean): string[] {
-  const slashed = piece.replaceAll("\\", "/");
-  if (/^\$(?:PATH|\{PATH\})$/.test(slashed)) return [];
-  const glob = globbed(withoutVariable(slashed));
+  if (/^\$(?:PATH|\{PATH\})$/.test(piece)) return [];
+  const glob = globbed(withoutVariable(piece));
   if (glob === VAR || glob === "" || /^\.\/?$/.test(glob)) return [""];
   if (!glob.includes(VAR)) return pathOf(piece, read);
   if (sure) read.whole = false;
@@ -136,7 +134,9 @@ function partsInOrder(parts: readonly string[], key: string): boolean {
 
 /**
  * `token` with each variable or command (`$X`, `${X}`, `$(…)`, a backquote) as one {@link VAR},
- * a command's slashes and all; a run of them is one.
+ * a command's slashes and all; a run of them is one. A backslash left outside them is a Windows
+ * folder's separator, read as `/`: only once the commands are found, since one inside a backquoted
+ * command escapes the backquote after it.
  */
 function globbed(token: string): string {
   let out = "";
@@ -145,17 +145,14 @@ function globbed(token: string): string {
     if (end > i) {
       if (!out.endsWith(VAR)) out += VAR;
       i = end;
-    } else out += token[i++];
+    } else out += token[i++].replace("\\", "/");
   }
   return out;
 }
 
 /** Where the variable or command starting at `i` ends, or `i` when none starts there. */
 function variableEnd(token: string, i: number): number {
-  if (token[i] === "`") {
-    const close = token.indexOf("`", i + 1);
-    return close < 0 ? token.length : close + 1;
-  }
+  if (token[i] === "`") return Math.min(backquoteEnd(token, i) + 1, token.length);
   if (token[i] !== "$") return i;
   const next = token[i + 1] ?? "";
   if (next === "(" || next === "{") return closing(token, i + 1) + 1;
@@ -164,8 +161,9 @@ function variableEnd(token: string, i: number): number {
 }
 
 /**
- * `token` without a leading segment, up to its first `/`, that holds a variable or a command: the
- * project's folder, most often. A token with no `/` is a name of its own, and is kept.
+ * `token` without a leading segment, up to its first `/` or `\\`, that holds a variable or a
+ * command: the project's folder, most often. A token with no slash is a name of its own, and is
+ * kept.
  */
 function withoutVariable(token: string): string {
   const slash = firstSlash(token);
@@ -173,16 +171,15 @@ function withoutVariable(token: string): string {
   return token.slice(slash + 1);
 }
 
-/** The first `/` outside a `$(…)`, `${…}` or backquoted command. */
+/** The first `/` or `\\` outside a `$(…)`, `${…}` or backquoted command. */
 function firstSlash(token: string): number {
   let depth = 0;
-  let back = false;
   for (let i = 0; i < token.length; i++) {
     const c = token[i];
-    if (c === "`") back = !back;
+    if (c === "`") i = backquoteEnd(token, i);
     else if (c === "(" || c === "{") depth++;
     else if ((c === ")" || c === "}") && depth > 0) depth--;
-    else if (c === "/" && depth === 0 && !back) return i;
+    else if ((c === "/" || c === "\\") && depth === 0) return i;
   }
   return -1;
 }

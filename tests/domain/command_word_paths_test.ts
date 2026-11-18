@@ -36,6 +36,16 @@ Deno.test("a command inside the path, slashes and all, is one variable", () => {
   assertEquals(matched("tools/$(basename a/b).sh", "tools/b.sh", "a/b.sh"), ["tools/b.sh"]);
 });
 
+Deno.test("a backquoted command in a path ends where bash ends it, past an escaped backquote", () => {
+  const nested = 'bash "tools/`echo \\`uname\\``/run.sh"';
+  assertEquals(matched(nested, "tools/linux/run.sh", "tools/run.sh"), ["tools/linux/run.sh"]);
+  // In a command's block, read through its words alone: a config's raw lines would find these.
+  const block = (command: string) =>
+    commandPaths(".claude/commands/c.md", enc(`\`\`\`!\n${command}\n\`\`\`\n`), none).paths;
+  assert(block('bash "`cd \\`dirname a/b\\``/tools/x.sh"').includes("tools/x.sh"));
+  assert(block('bash "$CLAUDE_PROJECT_DIR\\tools\\x.sh"').includes("tools/x.sh"));
+});
+
 Deno.test("a file name that is a variable alone is no pattern: it would name every file", () => {
   const found = read('prettier --write "$CLAUDE_PROJECT_DIR/$FILE" scripts/$NAME src/$A/$B');
   assertEquals(found.patterns, []);

@@ -90,7 +90,9 @@ Deno.test("`.` on PATH is the project's folder", () => {
 
 Deno.test("a program a `$(…)`, a backquote or a `-c` string runs is read with PATH set", () => {
   const env = { env: { PATH: "./bin:$PATH" } };
-  for (const command of ["$(lint)", "x=`lint --all`", "bash -c 'lint --all'"]) {
+  for (
+    const command of ["$(lint)", "x=`lint --all`", "bash -c 'lint --all'", "`echo \\`lint\\``"]
+  ) {
     const found = read(hook(command, env));
     assertEquals([found.onPath, found.programs.includes("lint")], [["bin"], true], command);
   }
@@ -111,6 +113,20 @@ Deno.test("a variable past the start of another key `path` skips that folder, an
   // A command's span is read through its words alone: no raw line sees the `PATH=` there.
   const span = read(enc("Run !`PATH=./tools/$OS/bin:$PATH lint`\n"), ".claude/commands/c.md");
   assertEquals(span.whole, false);
+});
+
+Deno.test("a key `Path` in an object that sets the environment surely sets PATH, as Windows reads it", () => {
+  const value = "${CLAUDE_PROJECT_DIR}/x/${D:-other}/bin;${PATH}";
+  for (const Path of ["Path", "path"]) {
+    assertEquals(read(json({ env: { [Path]: value } })).whole, false, `env.${Path}`);
+    const mcp = json({ mcpServers: { s: { command: "serve", env: { [Path]: value } } } });
+    assertEquals(read(mcp, ".mcp.json").whole, false, `server env.${Path}`);
+  }
+  const toml = `[shell_environment_policy]\nset = { Path = "x/$D/bin" }\n`;
+  assertEquals(read(enc(toml), ".codex/config.toml").whole, false);
+  // Elsewhere only the shell's spelling is sure: another object's `Path`, or a `Path=` word.
+  assertEquals(read(json({ tools: { x: { Path: "x/$D/bin" } } })).whole, true);
+  assertEquals(read(enc("Run !`Path=x/$D/bin lint`\n"), ".claude/commands/c.md").whole, true);
 });
 
 const listing = (...paths: [string, IndexedPath["kind"]][]) =>

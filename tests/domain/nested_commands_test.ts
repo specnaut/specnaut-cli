@@ -40,3 +40,14 @@ Deno.test("past the nesting cap, what is left is not read, and the reading is no
   const deep = read(`echo ${"$(".repeat(40)}tools/deep.sh${")".repeat(40)}`);
   assertEquals([deep.paths.includes("tools/deep.sh"), deep.whole], [false, false]);
 });
+
+Deno.test("an escaped backquote inside a backquoted command opens a command of its own", () => {
+  // Bash reads `` \` `` inside backquotes as a backquote of the nested command, not as the close.
+  for (const command of ["echo `echo \\`tools/x.sh\\``", 'echo "`echo \\`tools/x.sh\\``"']) {
+    const found = read(command);
+    has(found.paths, "tools/x.sh");
+    assertEquals(found.whole, true, command);
+  }
+  const web = (path: string) => path === "web";
+  has(read("echo `echo \\`cd web && ./run.sh\\``", web).paths, "web/run.sh");
+});
