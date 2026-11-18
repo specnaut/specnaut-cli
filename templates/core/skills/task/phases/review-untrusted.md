@@ -31,11 +31,14 @@ The `review-gate` hook judges this session's checkout before the command runs, a
 through runs with `SPECNAUT_REVIEW_PASS` exported first: the start takes only the pass that names it,
 so run the two blocks as that one command and nothing else, never from another folder. Claude Code
 asks the user to confirm that rewritten line once. While the hook drops an entry of the PATH, it
-refuses any command that runs `specnaut` as a word the PATH is searched for. It stops a mistaken
-start, not a session set on getting past it: a name spelled so the line never holds it (a
-parameter default, `${IFS}`, brace expansion, `$'…'` or `$"…"`, command substitution, `eval`, an
-alias) is out of its reach. **A refusal, or any exit but 0, stops the
-review:** quote its reasons and its advice. Never switch branches, reset or
+refuses any command that runs `specnaut` as a word the PATH is searched for, `specnaut.exe`,
+`.cmd` and `.bat` included, or that holds `$'`. It judges its own PATH, not the Bash tool's: an
+env file or a shell snapshot can change that one, which only the resolve block sees, and a line
+that starts a review and assigns PATH is refused. It stops a mistaken start, not a session set on
+getting past it: a name spelled so the line never holds it (a parameter default, `${IFS}`, brace
+expansion, a `$"…"` a message catalog translates, command substitution, `eval`, an alias, text
+decoded into a shell, a file sourced or written and then run) is out of its reach. **A refusal, or
+any exit but 0, stops the review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 
 On exit 0 the lines are `HEAD <sha>`, `SEATS <dir>` (the reviewers' read-only copy), `SCRATCH <dir>`

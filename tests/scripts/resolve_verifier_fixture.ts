@@ -137,9 +137,21 @@ async function fire(
   input: string,
   more: Record<string, string> = {},
 ): Promise<Answer> {
-  const env = { ...hermetic(), ...path(r), CLAUDE_PROJECT_DIR: l.repo, XDG_STATE_HOME: l.state };
-  const out = await spawnWith(argv, r.cwd, { ...env, ...more }, input);
+  const out = await spawnWith(argv, r.cwd, { ...hookEnv(l, r), ...more }, input);
   return (await seen(l)) ?? refusal(out.stderr, out.code) ?? { exit: out.code };
+}
+
+/** The variables a hook is started with: no more than the run's PATH, the project and the state. */
+const hookEnv = (l: Layout, r: Run) => ({
+  ...hermetic(),
+  ...path(r),
+  CLAUDE_PROJECT_DIR: l.repo,
+  XDG_STATE_HOME: l.state,
+});
+
+/** The hook script at `file`, run by bash as `hook` runs one: its exit and its stderr, as written. */
+export function hookAt(l: Layout, r: Run, file: string, input: string) {
+  return spawnWith([r.bash, file], r.cwd, hookEnv(l, r), input);
 }
 
 /** `argv` started with exactly `env`, `input` on stdin: its exit and what it wrote on stderr. */

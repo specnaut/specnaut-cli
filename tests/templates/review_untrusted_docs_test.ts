@@ -38,10 +38,14 @@ Deno.test("it starts through the gated command, and every script takes the start
     doc,
     "refuses any command that runs `specnaut` as a word the PATH is searched for",
   );
+  assertStringIncludes(doc, "`specnaut.exe`, `.cmd` and `.bat` included, or that holds `$'`");
+  assertStringIncludes(doc, "It judges its own PATH, not the Bash tool's:");
+  assertStringIncludes(doc, "a line that starts a review and assigns PATH is refused");
   assertStringIncludes(
     doc,
-    "(a parameter default, `${IFS}`, brace expansion, `$'…'` or `$\"…\"`, command substitution, " +
-      "`eval`, an alias)",
+    '(a parameter default, `${IFS}`, brace expansion, a `$"…"` a message catalog translates, ' +
+      "command substitution, `eval`, an alias, text decoded into a shell, a file sourced or " +
+      "written and then run)",
   );
   assertStringIncludes(doc, "A fetch that lands on any other head is refused");
   assertStringIncludes(doc, "A refusal, or any exit but 0, stops the review:");

@@ -1546,11 +1546,14 @@ The \`review-gate\` hook judges this session's checkout before the command runs,
 through runs with \`SPECNAUT_REVIEW_PASS\` exported first: the start takes only the pass that names it,
 so run the two blocks as that one command and nothing else, never from another folder. Claude Code
 asks the user to confirm that rewritten line once. While the hook drops an entry of the PATH, it
-refuses any command that runs \`specnaut\` as a word the PATH is searched for. It stops a mistaken
-start, not a session set on getting past it: a name spelled so the line never holds it (a
-parameter default, \`\${IFS}\`, brace expansion, \`\$'…'\` or \`\$"…"\`, command substitution, \`eval\`, an
-alias) is out of its reach. **A refusal, or any exit but 0, stops the
-review:** quote its reasons and its advice. Never switch branches, reset or
+refuses any command that runs \`specnaut\` as a word the PATH is searched for, \`specnaut.exe\`,
+\`.cmd\` and \`.bat\` included, or that holds \`\$'\`. It judges its own PATH, not the Bash tool's: an
+env file or a shell snapshot can change that one, which only the resolve block sees, and a line
+that starts a review and assigns PATH is refused. It stops a mistaken start, not a session set on
+getting past it: a name spelled so the line never holds it (a parameter default, \`\${IFS}\`, brace
+expansion, a \`\$"…"\` a message catalog translates, command substitution, \`eval\`, an alias, text
+decoded into a shell, a file sourced or written and then run) is out of its reach. **A refusal, or
+any exit but 0, stops the review:** quote its reasons and its advice. Never switch branches, reset or
 check anything out in this session, and never fetch or export the branch another way.
 
 On exit 0 the lines are \`HEAD <sha>\`, \`SEATS <dir>\` (the reviewers' read-only copy), \`SCRATCH <dir>\`
@@ -40120,21 +40123,23 @@ exit 0
 # Exit 2 stops the command and shows the session why; 0 lets it run, and what
 # the gate prints is this hook's answer: for a line it passes, the line
 # rewritten to carry the pass's nonce, the one line the start takes it from.
-# Input that
-# never mentions a review is let through without starting the binary. With no
-# \`specnaut\` on the cleaned PATH (below), nothing is stopped here: \`specnaut
-# review start\` cannot run either - unless the hook dropped an entry, as the
-# start runs on the session's own PATH, where that entry could supply the
-# \`specnaut\` performing it; a line that starts a review, or whose command runs
-# \`specnaut\` as a word the PATH is searched for (in any letter case: a
-# case-blind disk finds it so), is then refused, whatever it asks. This stops a
-# mistaken start, not a session set on getting past it: a name spelled so the
-# line never holds it - a parameter default, \`\${IFS}\`, brace expansion, \`\$'...'\`
-# or \`\$"..."\`, command substitution, \`eval\`, an alias - is out of its reach. Before
-# any of that, every time, the pass a gated line left is removed: a pass lives
-# only until the next command, and a check stopped part-way leaves none behind.
-# A \`specnaut\` that resolves into the tree stops a review's command: it would
-# be the tree judging itself. The input is read by a builtin, PATH or none.
+# Input that never mentions a review is let through without starting the binary. With no
+# \`specnaut\` on the cleaned PATH (below), nothing is stopped here: \`specnaut review start\` cannot
+# run either - unless the hook dropped an entry, as the start runs on the session's own PATH, where
+# that entry could supply the \`specnaut\` performing it; a line that starts a review, or whose
+# command runs \`specnaut\` (\`specnaut.exe\`, \`.cmd\` or \`.bat\` too) as a word the PATH is searched for
+# (in any letter case: a case-blind disk finds it so), or holds \`\$'\`, whose escapes spell any name,
+# is then refused, whatever it asks. \`dropped\` is judged on this hook's PATH, the one Claude Code
+# starts it with, not the Bash tool's, which an env file or a shell snapshot can change; a line
+# that starts a review and assigns PATH is refused, an entry dropped or not. This stops a mistaken
+# start, not a session set on getting past it: a name spelled so the line never holds it - a
+# parameter default, \`\${IFS}\`, brace expansion, a \`\$"..."\` a message catalog translates, command
+# substitution, \`eval\`, an alias, text decoded into a shell (\`base64 -d | sh\`), a file sourced or
+# written and then run - is out of its reach, as is a PATH the Bash tool's env file or snapshot
+# sets. Before any of that, every time, the pass a gated line left is removed: a pass lives only
+# until the next command, and a check stopped part-way leaves none behind. A \`specnaut\` that
+# resolves into the tree stops a review's command: it would be the tree judging itself. The input
+# is read by a builtin, PATH or none.
 refuse() {
   echo "review-gate: \$1" >&2
   exit 2
@@ -40182,29 +40187,47 @@ git_dir_above() {
     dir=\$up
   done
 }
+# Whether \$1 matches the pattern \$2, into BASH_REMATCH. One the shell cannot compile (\`[[ =~ ]]\`
+# exits 2) stops the command: read as no match, it would let through the line it is there to stop.
+matches() {
+  local rc=0
+  # shellcheck disable=SC2319 # the test's own status is the point: 2 is a pattern that failed
+  [[ \$1 =~ \$2 ]] || rc=\$?
+  [ "\$rc" -gt 1 ] || return "\$rc"
+  refuse "a pattern this shell cannot compile: \$2"
+}
 # Whether a \`command\` value of the input runs \`specnaut\` as a word the PATH is searched for: not
 # after or before a letter, a digit, \`.\`, \`_\`, \`/\` or \`-\`, so \`.specnaut/x\`, \`specnaut-cli/\` and
 # \`/opt/bin/specnaut\` do not. Every key \`command\` the input holds is read, the description never: a
 # key is a quote after \`{\` or \`,\`, and a quote inside a value is always escaped, so no value adds a
 # key or hides one. A value is read with JSON's own pairing of escapes, an escaped backslash first,
-# so it ends at the quote that ends it, whatever backslashes and quotes it holds. Then the shell's
-# quoting goes as the shell removes it: a line continuation, each backslash and quote; and a
-# JSON-escaped blank reads as a blank.
+# so it ends at the quote that ends it, whatever backslashes and quotes it holds. One holding \`\$'\`
+# does: its escapes can spell the name. Then the shell's quoting goes, wider than the shell removes
+# it, never narrower: each backslash and quote, a \`\$\` before a quote with it. A backslash-newline is
+# read both ways, as this does not parse the line: removed, a line continuation; and kept, as the
+# shell keeps it after an escaped backslash or in a comment, where the newline ends the command.
 runs_specnaut() {
   local rest=\$input v
   local key='[{,][[:space:]]*"command"[[:space:]]*:[[:space:]]*"(.*)\$'
-  local word='(^|[^A-Za-z0-9._/-])[Ss][Pp][Ee][Cc][Nn][Aa][Uu][Tt](\$|[^A-Za-z0-9._/-])'
-  while [[ \$rest =~ \$key ]]; do
+  local name='[Ss][Pp][Ee][Cc][Nn][Aa][Uu][Tt](\\.([Ee][Xx][Ee]|[Cc][Mm][Dd]|[Bb][Aa][Tt]))?'
+  local word="(^|[^A-Za-z0-9._/-])\$name(\\\$|[^A-Za-z0-9._/-])"
+  while matches "\$rest" "\$key"; do
     rest=\${BASH_REMATCH[1]}
     v=\${rest//\\\\\\\\/\$'\\001'}
     v=\${v//\\\\\\"/\$'\\002'}
     v=\${v%%\\"*}
-    v=\${v//\$'\\001'\\\\n/}
-    v=\${v//\\\\[nrt]/ }
-    v=\${v//[\$'\\001\\002'\\']/}
-    [[ \$v =~ \$word ]] && return 0
+    case \$v in *\\\$\\'*) return 0 ;; esac
+    v=\${v//\\\$\$'\\002'/}
+    { holds "\${v//\$'\\001'\\\\n/}" "\$word" || holds "\$v" "\$word"; } && return 0
   done
   return 1
+}
+# Whether value \$1, its escapes paired, holds the word \$2 once its quotes and backslashes are gone,
+# a JSON-escaped blank read as a blank.
+holds() {
+  local v=\${1//\\\\[nrt]/ }
+  v=\${v//[\$'\\001\\002'\\']/}
+  matches "\$v" "\$2"
 }
 tree_top "\$dir"
 top=\${top:-\$dir}
@@ -40212,19 +40235,28 @@ clean_path
 without=" - start the session from a shell without that entry"
 IFS= read -r -d '' input || true
 drop_pass
-# The line with every line continuation, quote and backslash removed, JSON-escaped or not, as the
-# shell removes them before \`specnaut\` reads its words: \`"review" start\`, \`re"vi"ew st'ar't\`,
-# \`review\\ start\` and \`rev\\<newline>iew start\` read as the start they run.
+# The line with every backslash-newline, quote and backslash removed, JSON-escaped or not, and a
+# \`\$\` before a double quote with it: wider than the shell's removal, never narrower, so
+# \`"review" start\`, \`re"vi"ew st'ar't\`, \`re\$"view" start\`, \`review\\ start\` and \`rev\\<newline>iew
+# start\` read as the start they run. A backslash-newline the shell keeps (escaped, or in a comment)
+# ends the command, so removing it joins no start the shell runs; while an entry is dropped, a
+# command holding \`\$'\` is refused before this is read.
 flat=\${input//\\\\\\\\\\\\n/}
 flat=\${flat//\\\\\\\\/}
+flat=\${flat//\\\$\\\\\\"/}
 flat=\${flat//\\\\\\"/}
 flat=\${flat//\\'/}
 [ -z "\$dropped" ] || ! runs_specnaut || refuse "VERIFIER REFUSED: \$dropped\$without"
 case "\$flat" in *review*) ;; *) exit 0 ;; esac
 # A start, as startsReview (src/domain/review_gate.ts) reads one, its blanks as JSON escapes them
-# too: wider than the binary's, never narrower.
+# too: wider than the binary's, never narrower. One whose line assigns PATH runs on a PATH this hook
+# never sees.
 start='review([[:space:]]|\\\\[nrt\\\\])+start'
-[[ -z \$dropped || ! \$flat =~ \$start ]] || refuse "VERIFIER REFUSED: \$dropped\$without"
+if matches "\$flat" "\$start"; then
+  [ -z "\$dropped" ] || refuse "VERIFIER REFUSED: \$dropped\$without"
+  ! matches "\$flat" '(^|[^A-Za-z0-9_])PATH\\+?=' ||
+    refuse "VERIFIER REFUSED: PATH is assigned on the line that starts a review - start it without that assignment"
+fi
 if ! resolve_cmd specnaut; then
   [ -z "\$why" ] || refuse "VERIFIER REFUSED: \$why"
   exit 0
