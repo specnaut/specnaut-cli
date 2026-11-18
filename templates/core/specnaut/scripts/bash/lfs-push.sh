@@ -21,29 +21,25 @@
 #   2  usage, or <commit> is not HEAD on a clean tree
 #   3  the base is unknown
 #   12 an unexpected git failure, named on stderr
-#   13 the PATH holds an entry _verifier.sh refuses (VERIFIER REFUSED)
+#   13 the PATH holds an entry _verifier.sh refuses, or no repository holds the working folder
+#      (VERIFIER REFUSED)
 #   17 the objects could not be pushed, so the commits must not be: LFS UNAVAILABLE, LFS TOO OLD,
 #      LFS CONFIG CHANGED or LFS PUSH FAILED, named on stderr
 #
 # Usage: lfs-push.sh [<commit sha>]
 set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
-# land-feature.sh's alias, for its reason: the branch can commit hooks and a hooksPath naming them.
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
 here=${BASH_SOURCE[0]}
 case $here in */*) here=${here%/*} ;; *) here=. ;; esac
 here=$(CDPATH="" cd "${here:-/}" && pwd)
-unexpected() {
-  [ "$BASH_SUBSHELL" -eq 0 ] || exit "$1"
-  echo "lfs-push: unexpected failure (exit $1) of: $2 - nothing was pushed" >&2
-  exit 12
-}
-trap 'unexpected $? "$BASH_COMMAND"' ERR
+# land-feature.sh's prologue, for its reason: the branch can commit hooks and a hooksPath naming
+# them. An unexpected failure is exit 12.
+# shellcheck source=./_hooks_off.sh
+. "$here/_hooks_off.sh" lfs-push
 # shellcheck source=./_verifier.sh
 . "$here/_verifier.sh"
 # git-lfs and git are looked up on it.
-refuse_unsafe_path
+refuse_unsafe_path pushed
 
 refuse() {
   echo "lfs-push: $1 - $2. Nothing was pushed" >&2
@@ -98,12 +94,22 @@ judge_lfsconfig() {
   [ "$was" != "$now" ] || changed=0
 }
 
+# stdin with every credential a URL carries redacted: its userinfo, and the value of the query
+# parameters X-Amz-Signature, X-Amz-Security-Token, sig, token and access_token, the name kept.
+# In any case, so each letter is spelled in both: macOS's sed has no case-insensitive flag.
+redact_urls() {
+  local token='[Tt][Oo][Kk][Ee][Nn]' sig='[Ss][Ii][Gg]' q
+  q="[Xx]-[Aa][Mm][Zz]-(${sig}[Nn][Aa][Tt][Uu][Rr][Ee]|[Ss][Ee][Cc][Uu][Rr][Ii][Tt][Yy]-$token)"
+  q="$q|$sig|([Aa][Cc][Cc][Ee][Ss][Ss]_)?$token"
+  sed -E -e 's#(://)[^/@[:space:]]+@#\1<redacted>@#g' -e "s#([?&]($q)=)[^&[:space:]]+#\\1<redacted>#g"
+}
+
 # The upload, an incomplete push refused: a `-c` outranks every file git-lfs reads its config from.
-# Its output is printed with any credential in a URL redacted.
+# Its output is printed redacted.
 push_objects() {
   local out
   if ! out=$(GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "$c" 2>&1); then
-    printf '%s\n' "$out" | sed -E 's#(://)[^/@[:space:]]+@#\1<redacted>@#g' >&2
+    printf '%s\n' "$out" | redact_urls >&2
     refuse "LFS PUSH FAILED" "git lfs push origin ${c:0:12} failed"
   fi
 }

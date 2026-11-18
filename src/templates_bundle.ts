@@ -32998,12 +32998,13 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # In order: HEAD is a branch other than the base, and the tree is clean;
 # \`origin/<base>\` is fetched, origin confirms <base> is its default branch,
 # and the branch contains it and holds at least one commit origin lacks; HEAD
-# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked out and fast-forwarded to the branch; the base is pushed
-# with an explicit refspec and never its tags; the merged branch is deleted
-# with \`-d\`; HEAD is verified to be the base. No git hook runs at any step.
-# The base is base-branch.sh's —
-# local-only, so origin is asked here, on the path that already talks to it
-# — never an argument. Reaching it is the instruction to land: it reads no mode.
+# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked
+# out and fast-forwarded to the branch; the base is pushed with an explicit
+# refspec and never its tags; the merged branch is deleted with \`-d\`; HEAD is
+# verified to be the base. No git hook runs at any step. The base is
+# base-branch.sh's — local-only, so origin is asked here, on the path that
+# already talks to it — never an argument. Reaching it is the instruction to
+# land: it reads no mode.
 #
 # Prints \`LANDED <base> <first>..<last> <n> commit(s)\` once the push landed.
 #
@@ -33026,10 +33027,10 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 #   13 HEAD's instructions or helper scripts are neither trusted nor the
 #      digest passed, as the verifier judges them (without --scripts-digest
 #      only a local base ahead of origin passes, to exit 6); or it could not
-#      judge HEAD, or \`specnaut\` resolved to a path it refuses, or the PATH holds an
-#      empty, relative or in-repository entry (VERIFIER REFUSED, naming it);
-#      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
-#      Nothing moved
+#      judge HEAD, or \`specnaut\` resolved to a path it refuses, or the PATH
+#      holds an empty, relative or in-repository entry (VERIFIER REFUSED,
+#      naming it); its VERDICT instructions, UNTRUSTED and APPROVAL lines are
+#      printed. Nothing moved
 #   17 HEAD's git-lfs objects could not be pushed first (lfs-push.sh: its LFS
 #      line names why). Nothing moved; the git push never ran
 # (8 is retired: a branch that will not delete after the push is 11, never
@@ -33044,36 +33045,21 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # approved bytes; the merge phase's own step-0 call is the binding.
 #
 # Usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]
-# -E: the ERR trap below reaches functions and command substitutions too, so a failure there is
-# exit 12, never the raw code of the command that failed.
+# -E: the ERR trap _hooks_off.sh sets reaches functions and command substitutions too, so a failure
+# there is exit 12, never the raw code of the command that failed.
 set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
-# Every git call of the landing runs no hook: the branch being landed could commit hooks and a
-# repository-relative core.hooksPath naming them, and this script fetches, checks out, merges,
-# pushes and deletes for it. A project's own post-merge or pre-push hooks do not run here either.
-# The value is the one the binary's own git wrapper passes on every platform (untrusted_git.ts).
-# An alias, not a function: bash 3.2 runs the ERR trap for a \`command git\` that fails inside an
-# \`if\`, and a function's body escapes the caller's \`if\` under -E.
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
 # This script's folder, read with builtins: the PATH is judged before any command it names runs.
 here=\${BASH_SOURCE[0]}
 case \$here in */*) here=\${here%/*} ;; *) here=. ;; esac
 here=\$(CDPATH="" cd "\${here:-/}" && pwd)
-# \`set -e\` alone would exit with git's own code, which no table lists.
-# In a command substitution the trap only passes the code out: the line that ran it decides, by its
-# own \`||\` or by this trap, as it did before -E.
-unexpected() {
-  [ "\$BASH_SUBSHELL" -eq 0 ] || exit "\$1"
-  echo "land-feature: unexpected failure (exit \$1) of: \$2 - nothing was pushed" >&2
-  exit 12
-}
-trap 'unexpected \$? "\$BASH_COMMAND"' ERR
-
+# Every git call runs no hook, and an unexpected failure is exit 12: _hooks_off.sh says why.
+# shellcheck source=./_hooks_off.sh
+. "\$here/_hooks_off.sh" land-feature
 # shellcheck source=./_verifier.sh
 . "\$here/_verifier.sh"
 # Before the first command looked up on the PATH: \`bash\` below is one.
-refuse_unsafe_path
+refuse_unsafe_path landed
 
 usage="usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]"
 scripts_digest=""
@@ -33213,29 +33199,25 @@ fi
 #   2  usage, or <commit> is not HEAD on a clean tree
 #   3  the base is unknown
 #   12 an unexpected git failure, named on stderr
-#   13 the PATH holds an entry _verifier.sh refuses (VERIFIER REFUSED)
+#   13 the PATH holds an entry _verifier.sh refuses, or no repository holds the working folder
+#      (VERIFIER REFUSED)
 #   17 the objects could not be pushed, so the commits must not be: LFS UNAVAILABLE, LFS TOO OLD,
 #      LFS CONFIG CHANGED or LFS PUSH FAILED, named on stderr
 #
 # Usage: lfs-push.sh [<commit sha>]
 set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
-# land-feature.sh's alias, for its reason: the branch can commit hooks and a hooksPath naming them.
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
 here=\${BASH_SOURCE[0]}
 case \$here in */*) here=\${here%/*} ;; *) here=. ;; esac
 here=\$(CDPATH="" cd "\${here:-/}" && pwd)
-unexpected() {
-  [ "\$BASH_SUBSHELL" -eq 0 ] || exit "\$1"
-  echo "lfs-push: unexpected failure (exit \$1) of: \$2 - nothing was pushed" >&2
-  exit 12
-}
-trap 'unexpected \$? "\$BASH_COMMAND"' ERR
+# land-feature.sh's prologue, for its reason: the branch can commit hooks and a hooksPath naming
+# them. An unexpected failure is exit 12.
+# shellcheck source=./_hooks_off.sh
+. "\$here/_hooks_off.sh" lfs-push
 # shellcheck source=./_verifier.sh
 . "\$here/_verifier.sh"
 # git-lfs and git are looked up on it.
-refuse_unsafe_path
+refuse_unsafe_path pushed
 
 refuse() {
   echo "lfs-push: \$1 - \$2. Nothing was pushed" >&2
@@ -33290,12 +33272,22 @@ judge_lfsconfig() {
   [ "\$was" != "\$now" ] || changed=0
 }
 
+# stdin with every credential a URL carries redacted: its userinfo, and the value of the query
+# parameters X-Amz-Signature, X-Amz-Security-Token, sig, token and access_token, the name kept.
+# In any case, so each letter is spelled in both: macOS's sed has no case-insensitive flag.
+redact_urls() {
+  local token='[Tt][Oo][Kk][Ee][Nn]' sig='[Ss][Ii][Gg]' q
+  q="[Xx]-[Aa][Mm][Zz]-(\${sig}[Nn][Aa][Tt][Uu][Rr][Ee]|[Ss][Ee][Cc][Uu][Rr][Ii][Tt][Yy]-\$token)"
+  q="\$q|\$sig|([Aa][Cc][Cc][Ee][Ss][Ss]_)?\$token"
+  sed -E -e 's#(://)[^/@[:space:]]+@#\\1<redacted>@#g' -e "s#([?&](\$q)=)[^&[:space:]]+#\\\\1<redacted>#g"
+}
+
 # The upload, an incomplete push refused: a \`-c\` outranks every file git-lfs reads its config from.
-# Its output is printed with any credential in a URL redacted.
+# Its output is printed redacted.
 push_objects() {
   local out
   if ! out=\$(GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "\$c" 2>&1); then
-    printf '%s\\n' "\$out" | sed -E 's#(://)[^/@[:space:]]+@#\\1<redacted>@#g' >&2
+    printf '%s\\n' "\$out" | redact_urls >&2
     refuse "LFS PUSH FAILED" "git lfs push origin \${c:0:12} failed"
   fi
 }
@@ -33340,29 +33332,30 @@ echo "LFS pushed \${c:0:12}"
     name: "specify",
     suffix: "scripts/bash/_verifier.sh",
     content:
-      `# shellcheck shell=bash disable=SC2154 # base and the digests: set by the sourcing script
-# HEAD's verdict from the verifier, for land-feature.sh - sourced, never run,
-# after it set its git alias, under its \`set -Eeuo pipefail\` and ERR trap;
-# \`base\`, \`scripts_digest\` and \`instructions_digest\` are set before the calls.
-# Exit 13 is land-feature.sh's: its header says what the code means.
+      `# shellcheck shell=bash disable=SC2154 # me, base and the digests: set by the sourcing script
+# HEAD's verdict from the verifier, for land-feature.sh, and the PATH judgement lfs-push.sh shares
+# with it - sourced, never run, after _hooks_off.sh set the git alias, \`me\` and the ERR trap, under
+# the caller's \`set -Eeuo pipefail\`; land-feature.sh sets \`base\`, \`scripts_digest\` and
+# \`instructions_digest\` before its calls. Exit 13 is the caller's: its header says what it means.
 
 # The PATH, judged before the first command it names runs - \`bash\`, \`git\` and \`specnaut\` are all
 # looked up on it. An empty or a relative entry is searched from the working folder, and an entry
 # in the tree finds what the branch put there, so either can supply any command: the first one is
 # refused by name. Builtins only, git included: it is one of those commands. The rule of
 # phases/script-gate.md § Resolving the verifier and of the Claude Code hooks; one test runs all.
+# \$1 is what the caller did not do when it refuses: \`landed\`, \`pushed\`.
 refuse_unsafe_path() {
   local rest=\${PATH-}: e top why
   tree_top "\$(pwd -P)"
   if [ -z "\$top" ]; then
-    echo "land-feature: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was landed" >&2
+    echo "\$me: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was \$1" >&2
     exit 13
   fi
   while [ -n "\$rest" ]; do
     e=\${rest%%:*}
     rest=\${rest#*:}
     entry_unsafe "\$e" || continue
-    echo "land-feature: VERIFIER REFUSED: PATH entry '\$e' \$why - start the session from a shell without that entry. Nothing was landed" >&2
+    echo "\$me: VERIFIER REFUSED: PATH entry '\$e' \$why - start the session from a shell without that entry. Nothing was \$1" >&2
     exit 13
   done
 }
@@ -33492,6 +33485,40 @@ judge_head() {
   fi
   exit 13
 }
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_hooks_off.sh",
+    content: `# shellcheck shell=bash
+# _hooks_off.sh <name> - the prologue land-feature.sh and lfs-push.sh share (cli#806). Sourced,
+# never run, under the caller's \`set -Eeuo pipefail\`, and before _verifier.sh: an alias applies
+# only to lines bash parses after it is defined, and _verifier.sh's functions call git. <name> is
+# the caller's, into \`me\`: what it, the ERR trap and _verifier.sh print starts with it.
+
+# Every git call of the caller runs no hook: the branch being landed could commit hooks and a
+# repository-relative core.hooksPath naming them, and the caller fetches, checks out, merges and
+# pushes for it. A project's own post-merge or pre-push hooks do not run here either. The value is
+# the one the binary's own git wrapper passes on every platform (untrusted_git.ts). An alias, not
+# a function: bash 3.2 runs the ERR trap for a \`command git\` that fails inside an \`if\`, and a
+# function's body escapes the caller's \`if\` under -E.
+shopt -s expand_aliases
+alias git='git -c core.hooksPath=/dev/null'
+me=\$1
+
+# \`set -e\` alone would exit with git's own code, which no exit table lists: 12 is the unexpected
+# failure in each. In a command substitution the trap only passes the code out: the line that ran
+# it decides, by its own \`||\` or by this trap, as it did before -E.
+unexpected() {
+  [ "\$BASH_SUBSHELL" -eq 0 ] || exit "\$1"
+  echo "\$me: unexpected failure (exit \$1) of: \$2 - nothing was pushed" >&2
+  exit 12
+}
+trap 'unexpected \$? "\$BASH_COMMAND"' ERR
 `,
     executable: false,
     backend: null,

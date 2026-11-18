@@ -62,8 +62,10 @@ Deno.test("a git failure inside the landing's git wrapper is 12, named, nothing 
     const before = await git(sb.remote, "rev-parse", "main");
     const r = await sb.scriptWithGit(shim(`[ "$1" = checkout ] && exit 1`), "land-feature.sh");
     assertEquals(r.code, 12, r.stderr);
-    assertStringIncludes(r.stderr, 'checkout --quiet "$base"');
-    assertStringIncludes(r.stderr, "nothing was pushed");
+    assertStringIncludes(
+      r.stderr,
+      'land-feature: unexpected failure (exit 1) of: git -c core.hooksPath=/dev/null checkout --quiet "$base" - nothing was pushed\n',
+    );
     assertEquals(await git(sb.remote, "rev-parse", "main"), before);
   } finally {
     await sb.cleanup();

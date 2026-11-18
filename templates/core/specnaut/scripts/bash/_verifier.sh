@@ -1,26 +1,27 @@
-# shellcheck shell=bash disable=SC2154 # base and the digests: set by the sourcing script
-# HEAD's verdict from the verifier, for land-feature.sh - sourced, never run,
-# after it set its git alias, under its `set -Eeuo pipefail` and ERR trap;
-# `base`, `scripts_digest` and `instructions_digest` are set before the calls.
-# Exit 13 is land-feature.sh's: its header says what the code means.
+# shellcheck shell=bash disable=SC2154 # me, base and the digests: set by the sourcing script
+# HEAD's verdict from the verifier, for land-feature.sh, and the PATH judgement lfs-push.sh shares
+# with it - sourced, never run, after _hooks_off.sh set the git alias, `me` and the ERR trap, under
+# the caller's `set -Eeuo pipefail`; land-feature.sh sets `base`, `scripts_digest` and
+# `instructions_digest` before its calls. Exit 13 is the caller's: its header says what it means.
 
 # The PATH, judged before the first command it names runs - `bash`, `git` and `specnaut` are all
 # looked up on it. An empty or a relative entry is searched from the working folder, and an entry
 # in the tree finds what the branch put there, so either can supply any command: the first one is
 # refused by name. Builtins only, git included: it is one of those commands. The rule of
 # phases/script-gate.md § Resolving the verifier and of the Claude Code hooks; one test runs all.
+# $1 is what the caller did not do when it refuses: `landed`, `pushed`.
 refuse_unsafe_path() {
   local rest=${PATH-}: e top why
   tree_top "$(pwd -P)"
   if [ -z "$top" ]; then
-    echo "land-feature: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was landed" >&2
+    echo "$me: VERIFIER REFUSED: specnaut has no repository to be judged outside of - could not judge HEAD, nothing was $1" >&2
     exit 13
   fi
   while [ -n "$rest" ]; do
     e=${rest%%:*}
     rest=${rest#*:}
     entry_unsafe "$e" || continue
-    echo "land-feature: VERIFIER REFUSED: PATH entry '$e' $why - start the session from a shell without that entry. Nothing was landed" >&2
+    echo "$me: VERIFIER REFUSED: PATH entry '$e' $why - start the session from a shell without that entry. Nothing was $1" >&2
     exit 13
   done
 }

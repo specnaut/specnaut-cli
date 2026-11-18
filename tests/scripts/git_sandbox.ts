@@ -12,9 +12,9 @@ import { specnautOnPath, withSpecnaut } from "./specnaut_shim.ts";
 const BASH_DIR = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/", import.meta.url),
 );
-export const SCRIPTS =
-  `_base_refs.sh _intake_gate.sh _verifier.sh base-branch.sh epic-status.sh fold-fixups.sh
-  land-feature.sh lfs-push.sh merge-mode.sh remove-spec.sh wip-audit.sh`.split(/\s+/);
+export const SCRIPTS = `_base_refs.sh _hooks_off.sh _intake_gate.sh _verifier.sh base-branch.sh
+  epic-status.sh fold-fixups.sh land-feature.sh lfs-push.sh merge-mode.sh remove-spec.sh
+  wip-audit.sh`.split(/\s+/);
 
 /**
  * Each merge script run on main with no feature stops at a refusal of its own, past the sibling

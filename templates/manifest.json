@@ -2475,6 +2475,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_hooks_off.sh",
+      "source": "core/specnaut/scripts/bash/_hooks_off.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/remove-spec.sh",
       "source": "core/specnaut/scripts/bash/remove-spec.sh",
       "executable": true

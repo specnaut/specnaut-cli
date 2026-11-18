@@ -23,13 +23,11 @@ function docBlock(): string {
   return m[1];
 }
 
-/** `_verifier.sh` as land-feature.sh runs it: its shell options, alias and ERR trap first. */
+/** `_verifier.sh` as land-feature.sh runs it: its shell options and `_hooks_off.sh` first. */
 const LAND = `set -Eeuo pipefail
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
-trap 'echo "ERR trap: $BASH_COMMAND" >&2; exit 12' ERR
+. '${join(BASH_DIR, "_hooks_off.sh")}' land-feature
 . '${join(BASH_DIR, "_verifier.sh")}'
-refuse_unsafe_path
+refuse_unsafe_path landed
 resolve_specnaut`;
 
 /**

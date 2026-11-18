@@ -6,12 +6,13 @@
 # In order: HEAD is a branch other than the base, and the tree is clean;
 # `origin/<base>` is fetched, origin confirms <base> is its default branch,
 # and the branch contains it and holds at least one commit origin lacks; HEAD
-# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked out and fast-forwarded to the branch; the base is pushed
-# with an explicit refspec and never its tags; the merged branch is deleted
-# with `-d`; HEAD is verified to be the base. No git hook runs at any step.
-# The base is base-branch.sh's —
-# local-only, so origin is asked here, on the path that already talks to it
-# — never an argument. Reaching it is the instruction to land: it reads no mode.
+# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked
+# out and fast-forwarded to the branch; the base is pushed with an explicit
+# refspec and never its tags; the merged branch is deleted with `-d`; HEAD is
+# verified to be the base. No git hook runs at any step. The base is
+# base-branch.sh's — local-only, so origin is asked here, on the path that
+# already talks to it — never an argument. Reaching it is the instruction to
+# land: it reads no mode.
 #
 # Prints `LANDED <base> <first>..<last> <n> commit(s)` once the push landed.
 #
@@ -34,10 +35,10 @@
 #   13 HEAD's instructions or helper scripts are neither trusted nor the
 #      digest passed, as the verifier judges them (without --scripts-digest
 #      only a local base ahead of origin passes, to exit 6); or it could not
-#      judge HEAD, or `specnaut` resolved to a path it refuses, or the PATH holds an
-#      empty, relative or in-repository entry (VERIFIER REFUSED, naming it);
-#      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
-#      Nothing moved
+#      judge HEAD, or `specnaut` resolved to a path it refuses, or the PATH
+#      holds an empty, relative or in-repository entry (VERIFIER REFUSED,
+#      naming it); its VERDICT instructions, UNTRUSTED and APPROVAL lines are
+#      printed. Nothing moved
 #   17 HEAD's git-lfs objects could not be pushed first (lfs-push.sh: its LFS
 #      line names why). Nothing moved; the git push never ran
 # (8 is retired: a branch that will not delete after the push is 11, never
@@ -52,36 +53,21 @@
 # approved bytes; the merge phase's own step-0 call is the binding.
 #
 # Usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]
-# -E: the ERR trap below reaches functions and command substitutions too, so a failure there is
-# exit 12, never the raw code of the command that failed.
+# -E: the ERR trap _hooks_off.sh sets reaches functions and command substitutions too, so a failure
+# there is exit 12, never the raw code of the command that failed.
 set -Eeuo pipefail
 export GIT_OPTIONAL_LOCKS=0
-# Every git call of the landing runs no hook: the branch being landed could commit hooks and a
-# repository-relative core.hooksPath naming them, and this script fetches, checks out, merges,
-# pushes and deletes for it. A project's own post-merge or pre-push hooks do not run here either.
-# The value is the one the binary's own git wrapper passes on every platform (untrusted_git.ts).
-# An alias, not a function: bash 3.2 runs the ERR trap for a `command git` that fails inside an
-# `if`, and a function's body escapes the caller's `if` under -E.
-shopt -s expand_aliases
-alias git='git -c core.hooksPath=/dev/null'
 # This script's folder, read with builtins: the PATH is judged before any command it names runs.
 here=${BASH_SOURCE[0]}
 case $here in */*) here=${here%/*} ;; *) here=. ;; esac
 here=$(CDPATH="" cd "${here:-/}" && pwd)
-# `set -e` alone would exit with git's own code, which no table lists.
-# In a command substitution the trap only passes the code out: the line that ran it decides, by its
-# own `||` or by this trap, as it did before -E.
-unexpected() {
-  [ "$BASH_SUBSHELL" -eq 0 ] || exit "$1"
-  echo "land-feature: unexpected failure (exit $1) of: $2 - nothing was pushed" >&2
-  exit 12
-}
-trap 'unexpected $? "$BASH_COMMAND"' ERR
-
+# Every git call runs no hook, and an unexpected failure is exit 12: _hooks_off.sh says why.
+# shellcheck source=./_hooks_off.sh
+. "$here/_hooks_off.sh" land-feature
 # shellcheck source=./_verifier.sh
 . "$here/_verifier.sh"
 # Before the first command looked up on the PATH: `bash` below is one.
-refuse_unsafe_path
+refuse_unsafe_path landed
 
 usage="usage: land-feature.sh [--scripts-digest <sha256>] [--instructions-digest <sha256>]"
 scripts_digest=""
