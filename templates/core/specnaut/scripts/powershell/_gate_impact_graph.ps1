@@ -1,6 +1,7 @@
 # Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
 # of the change set and of the affected set with its reverse closure. Reports facts;
-# whether one widens the run is gate-impact's call. Comparison is ordinal throughout.
+# whether one widens the run is gate-impact's call. Comparison is ordinal throughout, on
+# ASCII-folded text where a path meets a root (Test-GateHolds, Test-GateSpanned, Get-GateAffectedBy).
 #
 # Every path is top-relative: gate-impact refuses a project not at its work tree's top
 # (Test-GateCandidateInRepo), so a declared path already is one; trees are listed whole
@@ -47,9 +48,13 @@ function Get-GateProtectedEntries([string]$Commit, [string]$Path) {
     return @{ Code = 0; Text = ($entries -join "`n") }
 }
 
+# A path meets a root in any ASCII case, both sides folded: a case-insensitive file system hands
+# git `apps/WEB/.gitattributes` for a file in `apps/web/`. The bash twin's holds.
 function Test-GateHolds([string]$Root, [string]$Path) {
-    if ($Root.EndsWith('/', [StringComparison]::Ordinal)) { return $Path.StartsWith($Root, [StringComparison]::Ordinal) }
-    return (Test-GateSame $Path $Root)
+    $r = Get-GateAsciiLower $Root
+    $p = Get-GateAsciiLower $Path
+    if ($r.EndsWith('/', [StringComparison]::Ordinal)) { return $p.StartsWith($r, [StringComparison]::Ordinal) }
+    return (Test-GateSame $p $r)
 }
 function Test-GateListed($List, [string]$Path) {
     foreach ($root in $List) { if (Test-GateHolds $root $Path) { return $true } }
@@ -66,12 +71,25 @@ function Get-GateOwnersOf($Owners, [string]$Path) {
 # A root file that changes how every other path is checked out or fetched, whatever the
 # declaration calls it. ASCII case folds, as a case-insensitive file system hands git
 # `.GitAttributes` for `.gitattributes`, and only ASCII, as the bash twin's jq folds: no .NET
-# casing. A non-ASCII letter some file systems also fold (U+017F to s) is not chased: that
-# name is unowned, so it widens unless declared. The bash twin's checkout_config holds the
-# same list.
+# casing. The bash twin's checkout_config holds the same list.
 function Test-GateCheckoutConfig([string]$Path) {
     $folded = Get-GateAsciiLower $Path
     foreach ($name in @('.gitattributes', '.lfsconfig', '.gitmodules')) { if (Test-GateSame $folded $name) { return $true } }
+    return $false
+}
+# A name another fold could make one the graph matches is never compared (the bash twin's
+# unreadable): a path holding U+FFFD or a newline; a dotfile name holding a code point above
+# U+007F (`.gitattribute` and U+017F, which folds to s); a name holding `~` and a digit, as an
+# 8.3 short name (`GITATT~1`) does.
+function Test-GateUnreadable([string]$Path) {
+    if ($Path.Contains([char]0xFFFD) -or $Path.Contains("`n")) { return $true }
+    $name = $Path.Substring($Path.LastIndexOf('/') + 1)
+    if ($name.StartsWith('.', [StringComparison]::Ordinal)) {
+        foreach ($c in $name.ToCharArray()) { if ([int]$c -gt 127) { return $true } }
+    }
+    for ($i = 0; $i + 1 -lt $name.Length; $i++) {
+        if ($name[$i] -eq [char]'~' -and [int]$name[$i + 1] -ge 48 -and [int]$name[$i + 1] -le 57) { return $true }
+    }
     return $false
 }
 function Get-GateAsciiLower([string]$Text) {
@@ -90,9 +108,11 @@ function Test-GateNestedAttributes([string]$Path) {
     return (Get-GateAsciiLower $Path).EndsWith('/.gitattributes', [StringComparison]::Ordinal)
 }
 function Test-GateSpanned($Owners, [string]$Path) {
+    $p = Get-GateAsciiLower $Path
     foreach ($id in $Owners.Keys) {
         foreach ($root in $Owners[$id].Roots) {
-            if ($root.EndsWith('/', [StringComparison]::Ordinal) -and $Path.StartsWith($root, [StringComparison]::Ordinal)) { return $true }
+            $r = Get-GateAsciiLower $root
+            if ($r.EndsWith('/', [StringComparison]::Ordinal) -and $p.StartsWith($r, [StringComparison]::Ordinal)) { return $true }
         }
     }
     return $false
@@ -100,10 +120,10 @@ function Test-GateSpanned($Owners, [string]$Path) {
 function Get-GateAffectedBy($Owners, [string]$Path) {
     $out = Get-GateOwnersOf $Owners $Path
     if (-not (Test-GateNestedAttributes $Path)) { return , $out }
-    $folder = $Path.Substring(0, $Path.Length - '.gitattributes'.Length)
+    $folder = Get-GateAsciiLower ($Path.Substring(0, $Path.Length - '.gitattributes'.Length))
     foreach ($id in $Owners.Keys) {
         foreach ($root in $Owners[$id].Roots) {
-            if ($root.StartsWith($folder, [StringComparison]::Ordinal)) { $out.Add($id); break }
+            if ((Get-GateAsciiLower $root).StartsWith($folder, [StringComparison]::Ordinal)) { $out.Add($id); break }
         }
     }
     return , $out
@@ -116,7 +136,7 @@ function Get-GateAffectedBy($Owners, [string]$Path) {
 function Get-GatePathCause($Pairs, $Candidate, $Declared) {
     foreach ($pair in $Pairs) {
         foreach ($path in $pair.Changes) {
-            if ($path.Contains([char]0xFFFD) -or $path.Contains("`n")) { return "path-unreadable: $path" }
+            if (Test-GateUnreadable $path) { return "path-unreadable: $path" }
             if (Test-GateCheckoutConfig $path) { return "checkout-config: $path" }
             if (Test-GateListed $Declared.FullOn $path) { return "full-on: $path" }
             if (Test-GateListed $Declared.Inert $path) { continue }
