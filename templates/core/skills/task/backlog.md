@@ -15,7 +15,7 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run `s
 | `estimate <id>` | Estimate complexity |
 | `status` | Dashboard summary |
 | `brief <id>` | Product-owner business brief |
-| `kanban [--no-open]` | Open the board in the browser, read-only: run `.specnaut/scripts/backlog/kanban.sh` alone — no read, no product-owner dispatch, no tracker write. Show its `URL:` line as a link (its header defines every line and exit); a `CLOUD:` or `LOCAL:` line is the board's defined fallback, the local index shown as a repo-relative link. Exit 2 or 13: relay its stderr. |
+| `kanban [--no-open]` | Open the board in the browser, read-only: run `.specnaut/scripts/backlog/kanban.sh`, with `--no-open` when the user gave it, and nothing else — no read, no product-owner dispatch, no tracker write. Show its `URL:` line as a link (its header defines every line and exit); a `CLOUD:` or `LOCAL:` line is the board's defined fallback, the local index shown as a repo-relative link. Exit 2 or 13: relay its stderr. |
 | `<number>` | Show that item; when it is in progress, point to `/task resume <number>` |
 
 ## The session protocol — every product-owner dispatch
@@ -23,7 +23,7 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run `s
 **The product owner proposes; a bundled executor applies.** It holds no shell where the harness
 enforces its grant (the agents README's table). Every dispatch of the `product-owner` — these verbs,
 `groom`, `plan`, the tech-debt intake — runs these steps, and this section is their one home. The
-main session runs no writing script itself; the read-only `list.sh` and `view.sh` inspect state.
+main session runs no writing script itself; it may run read-only `list.sh`, `view.sh`, `kanban.sh`.
 
 1. **Read.** `bash .specnaut/scripts/backlog/read-items.sh <verb> [--id <n>] [<n>... | --status
    <column>]`. `<verb>` is one `scope_for` lists in `_backlog_scope.sh` (`add`, `edit`, `estimate`,
