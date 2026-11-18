@@ -14,16 +14,25 @@ import { shellSegments } from "./shell_words.ts";
 
 /**
  * What a reading of one source found beside its words: whether it met no limit (a source that did
- * not parse, a word or an expansion past a cap), each value it sets PATH to, and each program its
- * commands name without a slash.
+ * not parse, a word or an expansion past a cap), each value it sets PATH to, each program its
+ * commands name without a slash, and each pattern a path built around a variable reads as
+ * (`command_word_paths.ts`). And how many folders the project sits below the repository's top.
  */
 export type Reading = {
   whole: boolean;
   readonly pathValues: string[];
   readonly programs: Set<string>;
+  readonly patterns: Set<string>;
+  readonly depth: number;
 };
 
-export const reading = (): Reading => ({ whole: true, pathValues: [], programs: new Set() });
+export const reading = (depth = 0): Reading => ({
+  whole: true,
+  pathValues: [],
+  programs: new Set(),
+  patterns: new Set(),
+  depth,
+});
 
 /** Every group of words `value` holds: one per object, its own strings together. */
 export function valueEntries(value: unknown, read: Reading): string[][] {

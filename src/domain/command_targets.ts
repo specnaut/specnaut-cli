@@ -1,8 +1,9 @@
 import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
-import { climb, readings } from "./project_path.ts";
+import { climb } from "./project_path.ts";
 import { rawWords, type Reading, reading, valueEntries } from "./command_words.ts";
 import { pathPieces, rawPathValues } from "./command_search_path.ts";
+import { pathOf, pathsIn } from "./command_word_paths.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
 
 /**
@@ -36,20 +37,20 @@ export const COMMAND_REASON = { partial: "commands not fully read" } as const;
 const PARSE_LIMIT = 256 * 1024;
 /** A longer word is not read: no path is that long. */
 const MAX_WORD = 4096;
-/** An absolute path, or one after a dropped variable, is tried from at most this many last parts. */
-const MAX_SUFFIXES = 32;
 /** At most this many paths are put under the folders one group of words names. */
 const MAX_JOINS = 50_000;
 
 /**
  * What a source's commands name, and whether every word of it was read; and, for the programs a
- * bare name runs (`command_search_path.ts`), the folders it puts on PATH and the programs it names.
+ * bare name runs (`command_search_path.ts`), the folders it puts on PATH and the programs it names;
+ * and the patterns its paths built around a variable read as (`command_word_paths.ts`).
  */
 export type CommandPaths = {
   readonly paths: readonly string[];
   readonly whole: boolean;
   readonly onPath: readonly string[];
   readonly programs: readonly string[];
+  readonly patterns: readonly string[];
 };
 
 /**
@@ -63,8 +64,9 @@ export function commandPaths(
   path: string,
   bytes: Uint8Array,
   isFolder: (path: string) => boolean,
+  depth = 0,
 ): CommandPaths {
-  const read = reading();
+  const read = reading(depth);
   const text = new TextDecoder().decode(bytes);
   const entries = isCommandMarkdown(path)
     ? markdownEntries(text, read, PARSE_LIMIT)
@@ -76,6 +78,7 @@ export function commandPaths(
     whole: read.whole,
     onPath: [...onPath],
     programs: [...read.programs],
+    patterns: [...read.patterns],
   };
 }
 
@@ -118,53 +121,6 @@ function underFolders(named: string[], isFolder: (path: string) => boolean, read
     }
   }
   return [...found];
-}
-
-function pathsIn(word: string, read: Reading): string[] {
-  const pieces = new Set([word, ...word.split("="), ...word.split(":")]);
-  return [...pieces].flatMap(readings).flatMap((p) => pathOf(p, read));
-}
-
-/**
- * One piece as a path: relative as written; or, when it is absolute, starts at the home (`~`), or
- * starts with a variable dropped up to its first `/`, each of its folder suffixes, since where it
- * starts is not known. None when a variable is left.
- */
-function pathOf(piece: string, read: Reading): string[] {
-  const slashed = piece.replaceAll("\\", "/");
-  const bare = withoutVariable(slashed);
-  if (bare === null || bare === "" || bare === "~") return [];
-  const rooted = bare !== slashed || /^(?:~|(?:[A-Za-z]:)?\/)/.test(bare);
-  if (!rooted) return [climb([], bare).join("/")].filter(Boolean);
-  const parts = climb([], bare.replace(/^(?:~|[A-Za-z]:)?\/*/, "")).filter((p) => p !== "..");
-  if (parts.length > MAX_SUFFIXES) read.whole = false;
-  const kept = parts.slice(-MAX_SUFFIXES);
-  return kept.map((_, i) => kept.slice(i).join("/"));
-}
-
-/**
- * `token` without a leading segment, up to its first `/`, that holds a variable or a command
- * (`$X`, `${X}`, `$(…)`, a backquote): the project's folder, most often. `null` when one is left.
- */
-function withoutVariable(token: string): string | null {
-  const slash = firstSlash(token);
-  const lead = slash < 0 ? token : token.slice(0, slash);
-  const rest = !/[$`]/.test(lead) ? token : slash < 0 ? "" : token.slice(slash + 1);
-  return /[$`]/.test(rest) ? null : rest;
-}
-
-/** The first `/` outside a `$(…)`, `${…}` or backquoted command. */
-function firstSlash(token: string): number {
-  let depth = 0;
-  let back = false;
-  for (let i = 0; i < token.length; i++) {
-    const c = token[i];
-    if (c === "`") back = !back;
-    else if (c === "(" || c === "{") depth++;
-    else if ((c === ")" || c === "}") && depth > 0) depth--;
-    else if (c === "/" && depth === 0 && !back) return i;
-  }
-  return -1;
 }
 
 function parsedEntries(path: string, text: string, read: Reading): string[][] {

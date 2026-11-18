@@ -1,4 +1,10 @@
-import { COMMAND_REASON, commandPaths, isCommandSource } from "../domain/command_targets.ts";
+import {
+  COMMAND_REASON,
+  type CommandPaths,
+  commandPaths,
+  isCommandSource,
+} from "../domain/command_targets.ts";
+import { matching } from "../domain/command_word_paths.ts";
 import { onPathTargets } from "../domain/command_search_path.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "../domain/path_index.ts";
@@ -31,41 +37,52 @@ export async function readCommands(
     ...await sourcesAt(walk, walk.base.tip, sources.tip),
   ];
   if (read.length === 0) return;
-  const head = await indexAt(walk, walk.base.head);
-  const tip = await indexAt(walk, walk.base.tip);
-  const isFolder = (path: string) => (head.get(fold(path)) ?? []).some((p) => p.kind === "tree");
-  for (const path of commandTargets(walk, read, isFolder)) {
-    for (const target of heldAs(walk.git.projectPrefix, path, head, tip)) await visit(walk, target);
+  const at = { head: await indexAt(walk, walk.base.head), tip: await indexAt(walk, walk.base.tip) };
+  for (const path of commandTargets(walk, read, at)) {
+    for (const target of heldAs(walk.git.projectPrefix, path, at.head, at.tip)) {
+      await visit(walk, target);
+    }
   }
 }
 
 type Read = { readonly entry: BaseEntry; readonly bytes: Uint8Array; readonly atHead: boolean };
+type Found = CommandPaths & { readonly source: Read };
 
 /**
- * Every path the sources `read` name, and each program they name in each folder they put on PATH;
- * a source HEAD holds that is not read whole gets the reason, as does each that puts a folder on
- * PATH, at either commit, when the programs on PATH are too many to try: one at the tip alone
+ * Every path the sources `read` name, each path HEAD or the tip holds that a path built around a
+ * variable matches, and each program they name in each folder they put on PATH. A source HEAD
+ * holds that is not read whole gets the reason. An absolute path is tried from each folder above
+ * a project in a subfolder (its depth).
+ */
+function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
+  const isFolder = (path: string) => (at.head.get(fold(path)) ?? []).some((p) => p.kind === "tree");
+  const depth = walk.git.projectPrefix.split("/").filter(Boolean).length;
+  const found: Found[] = read.map((source) => ({
+    source,
+    ...commandPaths(source.entry.path, source.bytes, isFolder, depth),
+  }));
+  for (const f of found) if (!f.whole && f.source.atHead) partial(walk, f.source.entry.path);
+  const targets = new Set(found.flatMap((f) => f.paths));
+  const patterns = [...new Set(found.flatMap((f) => f.patterns))];
+  for (const index of [at.head, at.tip]) matching(patterns, index).forEach((p) => targets.add(p));
+  onPath(walk, found).forEach((p) => targets.add(p));
+  return targets;
+}
+
+type Indexes = { readonly head: PathIndex; readonly tip: PathIndex };
+
+/**
+ * Each program the sources name in each folder any of them puts on PATH. When they are too many
+ * to try, each source that puts a folder there, at either commit, is named: one at the tip alone
  * still brings its folders to HEAD's programs.
  */
-function commandTargets(walk: Walk, read: readonly Read[], isFolder: (p: string) => boolean) {
-  const targets = new Set<string>();
-  const onPath = {
-    folders: new Set<string>(),
-    programs: new Set<string>(),
-    setters: [] as string[],
-  };
-  for (const source of read) {
-    const found = commandPaths(source.entry.path, source.bytes, isFolder);
-    found.paths.forEach((p) => targets.add(p));
-    found.onPath.forEach((f) => onPath.folders.add(f));
-    found.programs.forEach((p) => onPath.programs.add(p));
-    if (found.onPath.length > 0) onPath.setters.push(source.entry.path);
-    if (!found.whole && source.atHead) partial(walk, source.entry.path);
-  }
+function onPath(walk: Walk, found: readonly Found[]): string[] {
   const tried = { whole: true };
-  onPathTargets(onPath.folders, onPath.programs, tried).forEach((p) => targets.add(p));
-  if (!tried.whole) new Set(onPath.setters).forEach((path) => partial(walk, path));
-  return targets;
+  const folders = found.flatMap((f) => f.onPath);
+  const paths = onPathTargets(folders, found.flatMap((f) => f.programs), tried);
+  const setters = found.filter((f) => f.onPath.length > 0).map((f) => f.source.entry.path);
+  if (!tried.whole) new Set(setters).forEach((path) => partial(walk, path));
+  return paths;
 }
 
 /** Names `path` as a source whose commands were not all read. */

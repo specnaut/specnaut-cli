@@ -44,3 +44,11 @@ Deno.test("the row names the programs on a judged PATH, and the PATH a shell bui
   assert(limits.includes("the folders a shell puts on `PATH` before the session starts"), limits);
   assert(limits.includes("`.envrc`'s `PATH_add`, mise's configuration"), limits);
 });
+
+Deno.test("the row states what a command's targets leave unread", () => {
+  const limits = notRead();
+  assert(limits.includes("a folder a command names (`node server/`)"), limits);
+  assert(limits.includes("what a file a command runs itself sources or runs"), limits);
+  assert(limits.includes("a path whose file name is a variable alone (`scripts/$NAME`)"), limits);
+  assert(limits.includes("or that names no folder before a variable (`$NAME.sh`)"), limits);
+});
