@@ -85,3 +85,14 @@ Deno.test("no git on the PATH left: init names the entry left out, the reads ans
       await Deno.remove(outside, { recursive: true });
     }
   }));
+
+Deno.test("a folder init has not made yet has no tags, and reading them does not throw", async () => {
+  const base = await Deno.makeTempDir({ prefix: "deno-git-" });
+  const dir = join(base, "not-yet");
+  try {
+    // Windows fails the spawn with NotADirectory here, where POSIX says NotFound.
+    assertEquals(listTags(dir), []);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});

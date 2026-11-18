@@ -48,8 +48,8 @@ export class DenoGit implements GitAdapter {
 }
 
 /**
- * The project's tags, for the version scheme `init` suggests: none when there is no git, no
- * repository, or no tag, which the suggestion reads as "no signal", never as a failure.
+ * The project's tags, for the version scheme `init` suggests: none when there is no git, no folder
+ * yet (Windows says NotADirectory there), no repository or no tag: "no signal", never a failure.
  */
 export function listTags(dir: string): string[] {
   const { command } = projectGit(dir, ["tag", "-l"], "piped");
@@ -57,7 +57,7 @@ export function listTags(dir: string): string[] {
   try {
     out = command?.outputSync();
   } catch (err) {
-    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    if (!UNREACHABLE.some((c) => err instanceof c)) throw err;
   }
   if (!out?.success) return [];
   return new TextDecoder().decode(out.stdout).split("\n").map((s) => s.trim()).filter(Boolean);
