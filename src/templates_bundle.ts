@@ -1701,7 +1701,10 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    \`\`\`
 
    The first case of \`phases/script-gate.md\` § Merge's step 0 outcomes that matches decides, on
-   every run.
+   every run. After the scripts' yes, run this step again at once with \`--approved-scripts
+   <SCRIPTS_DIGEST>\`, before any script of the tree runs, on the local path and on \`--pr\` alike:
+   \`epic-status.sh\`, \`run-gate.sh\` and \`lfs-push.sh\` run on what that run decides, never on the
+   run the question was asked from.
 
    A config line whose reason is \`behind base: rebase\` is handled as that reason is for a script:
    \`git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>\`, then this step again at once — the branch only
@@ -1762,7 +1765,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    declares \`.specnaut/impact.json\` may run less than the whole tier, so a pass whose \`scope:\`
    line is not \`full\` is reported as that scope, and a pass with a \`removed:\` line names those
    commands: neither is ever reported as the full gate.
-2. **\`--pr\` only** — push the branch
+2. **\`--pr\` only** — once step 0 ran again after any yes, push the branch
    (\`bash .specnaut/scripts/bash/lfs-push.sh && git -c core.hooksPath=/dev/null push -u origin <branch>\`).
    A non-zero exit of \`lfs-push.sh\` stops before the push: 17 is step 4's row, any other is quoted
    and the phase stops on the branch. Then open the pull request against the base, name any issue its
@@ -4003,13 +4006,16 @@ flag; the phase never compares digests itself. The first case that matches decid
   \`VERDICT scripts untrusted\`** — otherwise it is *anything else*, below.
   - An \`UNTRUSTED\` path outside \`.specnaut/scripts/\` (\`local <base> ahead of origin\`, the lock at
     base): **stop on the branch** and say so. Never asked: no yes makes it hold.
-  - An \`UNTRUSTED\` reason under \`.specnaut/scripts/\` that no yes can hold — any but \`differs from
-    base\`, \`not on base\`, \`first install: no base copy\`, \`on base, missing from the tree\`, \`name
-    differs in case from base\`, \`line endings differ: the same text but for a CR before LF; a diff
-    can be empty\`, \`behind base: rebase\` and \`not a regular file on base\` (a link, a non-file, a
-    hard link, a submodule, a walk that stopped): **stop on the branch** and say why: the digest
-    names no bytes that would run, so the binary answers any yes with \`APPROVAL scripts moved\`, and
-    \`land-feature.sh\` stops on that line too. Never asked.
+  - An \`UNTRUSTED\` reason under \`.specnaut/scripts/\` that no yes can hold: **stop on the branch**
+    and say why: the digest names no bytes that would run, so the binary answers any yes with
+    \`APPROVAL scripts moved\`, and \`land-feature.sh\` stops on that line too. Never asked. A yes
+    holds only these reasons: \`differs from base\`, \`not on base\`, \`first install: no base copy\`,
+    \`on base, missing from the tree\`, \`name differs in case from base\`, \`line endings differ: the
+    same text but for a CR before LF; a diff can be empty\`, \`behind base: rebase\` and \`not a
+    regular file on base\`. No yes holds any other, among them \`a link\`, \`not a regular file\`,
+    \`hard-linked\`, \`a submodule on base\`, an unreadable entry's and a stopped walk's. Compare the
+    whole reason the line prints, never its start: \`not a regular file\` is never held, though \`not
+    a regular file on base\` begins with it.
   - Every reason \`behind base: rebase\` — \`git -c core.hooksPath=/dev/null rebase
     refs/remotes/origin/<BASE_BRANCH>\`, then step 0 again at once. Not a question: the branch only
     lags the base.

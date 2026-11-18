@@ -76,11 +76,43 @@ Deno.test("step 0 stops, never asking, on a scripts reason the binary lets no ye
   assertStringIncludes(bullet, "**stop on the branch** and say why");
   assertStringIncludes(bullet, "`APPROVAL scripts moved`");
   assertStringIncludes(bullet, "Never asked.");
-  // The doc lists the reasons a yes holds exactly as the binary decides them, none more or less.
+  // Each reason the binary prints is quoted whole in the one list its verdict puts it in: the
+  // reasons a yes holds, or those no yes holds. A reason quoted in neither, or in the wrong one,
+  // is a reason the phase would read the other way.
+  const held = between(bullet, "A yes holds only these reasons:", "No yes holds any other");
+  const never = between(bullet, "No yes holds any other", "Compare the whole reason");
   for (const reason of Object.values(REASON)) {
     const holdable = scriptsApprovable([{ path: ".specnaut/scripts/bash/x.sh", reason }]);
-    assertEquals(bullet.includes(`\`${reason}\``), holdable, reason);
+    assertEquals(held.includes(`\`${reason}\``), holdable, `held: ${reason}`);
+    assertEquals(never.includes(`\`${reason}\``), !holdable, `never held: ${reason}`);
   }
+  // `not a regular file` starts `not a regular file on base`: only the whole reason tells them apart.
+  assertStringIncludes(bullet, "Compare the whole reason the line prints, never its start");
+});
+
+/** The text of `doc` from `start` up to `end`, each found once in that order. */
+function between(doc: string, start: string, end: string): string {
+  const from = doc.indexOf(start);
+  const to = doc.indexOf(end, from);
+  assert(from >= 0 && to > from, `no "${start}" before "${end}"`);
+  return doc.slice(from, to);
+}
+
+Deno.test("after the scripts' yes, step 0 runs again with its digest before any script of the tree", () => {
+  const merge = flat(phase("merge").content);
+  const { zero, one } = steps(merge);
+  const rerun = merge.indexOf(
+    "After the scripts' yes, run this step again at once with `--approved-scripts " +
+      "<SCRIPTS_DIGEST>`, before any script of the tree runs, on the local path and on `--pr` alike",
+  );
+  assert(rerun > zero && rerun < one, "step 0 does not run again after the scripts' yes");
+  assertStringIncludes(
+    merge,
+    "`epic-status.sh`, `run-gate.sh` and `lfs-push.sh` run on what that run decides, never on " +
+      "the run the question was asked from.",
+  );
+  const pr = merge.indexOf("2. **`--pr` only** — once step 0 ran again after any yes, push");
+  assert(pr > one && pr < merge.indexOf("lfs-push.sh", pr), "--pr pushes before step 0 ran again");
 });
 
 Deno.test("auto-chain defers an untrusted verdict to merge's step 0 and asks one question", () => {

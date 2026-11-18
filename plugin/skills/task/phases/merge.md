@@ -48,7 +48,10 @@ under `--no-close`, once more after the push: there the item's line must read `O
    ```
 
    The first case of `phases/script-gate.md` § Merge's step 0 outcomes that matches decides, on
-   every run.
+   every run. After the scripts' yes, run this step again at once with `--approved-scripts
+   <SCRIPTS_DIGEST>`, before any script of the tree runs, on the local path and on `--pr` alike:
+   `epic-status.sh`, `run-gate.sh` and `lfs-push.sh` run on what that run decides, never on the
+   run the question was asked from.
 
    A config line whose reason is `behind base: rebase` is handled as that reason is for a script:
    `git -c core.hooksPath=/dev/null rebase refs/remotes/origin/<BASE_BRANCH>`, then this step again at once — the branch only
@@ -109,7 +112,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    declares `.specnaut/impact.json` may run less than the whole tier, so a pass whose `scope:`
    line is not `full` is reported as that scope, and a pass with a `removed:` line names those
    commands: neither is ever reported as the full gate.
-2. **`--pr` only** — push the branch
+2. **`--pr` only** — once step 0 ran again after any yes, push the branch
    (`bash .specnaut/scripts/bash/lfs-push.sh && git -c core.hooksPath=/dev/null push -u origin <branch>`).
    A non-zero exit of `lfs-push.sh` stops before the push: 17 is step 4's row, any other is quoted
    and the phase stops on the branch. Then open the pull request against the base, name any issue its
