@@ -49,6 +49,13 @@ Deno.test("the row names the commands a skill, an agent or a slash command holds
 Deno.test("the row names the programs on a judged PATH, and the PATH a shell builds as a limit", () => {
   const row = instructionsRow();
   assert(row.includes("each program a command names by name alone in each folder a judged"), row);
+  assert(row.includes("so the one a wrapper runs too (`timeout 30 lint`, `bash -c 'lint'`)"), row);
+  assert(row.includes("bare or with a Windows extension (`lint.cmd`)"), row);
+  assert(
+    row.includes("`PATH` folder that holds a variable past its start (`./tools/$OS/bin`)"),
+    row,
+  );
+  assert(row.includes("a path with `..` after a variable (`tools/$OS/../run.sh`)"), row);
   const limits = notRead();
   assert(limits.includes("the folders a shell puts on `PATH` before the session starts"), limits);
   assert(limits.includes("`.envrc`'s `PATH_add`, mise's configuration"), limits);

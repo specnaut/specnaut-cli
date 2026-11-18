@@ -65,21 +65,25 @@ function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
   const targets = new Set(found.flatMap((f) => f.paths));
   const patterns = [...new Set(found.flatMap((f) => f.patterns))];
   for (const index of [at.head, at.tip]) matching(patterns, index).forEach((p) => targets.add(p));
-  onPath(walk, found).forEach((p) => targets.add(p));
+  onPath(walk, found, at).forEach((p) => targets.add(p));
   return targets;
 }
 
 type Indexes = { readonly head: PathIndex; readonly tip: PathIndex };
 
 /**
- * Each program the sources name in each folder any of them puts on PATH. When they are too many
- * to try, each source that puts a folder there, at either commit, is named: one at the tip alone
+ * Each program the sources name in each folder any of them puts on PATH, looked up in both
+ * commits' listings. When folders a link or a submodule is on the way to make them too many to
+ * try, each source that puts a folder there, at either commit, is named: one at the tip alone
  * still brings its folders to HEAD's programs.
  */
-function onPath(walk: Walk, found: readonly Found[]): string[] {
+function onPath(walk: Walk, found: readonly Found[], at: Indexes): string[] {
   const tried = { whole: true };
-  const folders = found.flatMap((f) => f.onPath);
-  const paths = onPathTargets(folders, found.flatMap((f) => f.programs), tried);
+  const on = {
+    folders: found.flatMap((f) => f.onPath),
+    programs: found.flatMap((f) => f.programs),
+  };
+  const paths = onPathTargets(on, [at.head, at.tip], tried);
   const setters = found.filter((f) => f.onPath.length > 0).map((f) => f.source.entry.path);
   if (!tried.whole) new Set(setters).forEach((path) => partial(walk, path));
   return paths;

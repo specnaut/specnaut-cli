@@ -2,6 +2,7 @@ import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb } from "./project_path.ts";
 import {
+  MAX_WORD,
   PARSE_LIMIT,
   parsedGroups,
   rawWords,
@@ -10,7 +11,7 @@ import {
   valueEntries,
 } from "./command_words.ts";
 import { pathPieces, rawPathValues } from "./command_search_path.ts";
-import { pathOf, pathsIn } from "./command_word_paths.ts";
+import { foldersOf, pathsIn } from "./command_word_paths.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
 
 /**
@@ -40,8 +41,6 @@ export const isCommandSource = (path: string): boolean =>
 /** The reason a source gets when its commands could not all be read: it is asked about whole. */
 export const COMMAND_REASON = { partial: "commands not fully read" } as const;
 
-/** A longer word is not read: no path is that long. */
-const MAX_WORD = 4096;
 /** At most this many paths are put under the folders one group of words names. */
 const MAX_JOINS = 50_000;
 
@@ -100,7 +99,7 @@ function pathFolders(read: Reading): string[] {
   const folders = new Set<string>();
   for (const value of read.pathValues) {
     if (value.length > MAX_WORD) read.whole = false;
-    else pathPieces(value).flatMap((p) => pathOf(p, read)).forEach((f) => folders.add(f));
+    else pathPieces(value).flatMap((p) => foldersOf(p, read)).forEach((f) => folders.add(f));
   }
   return [...folders];
 }

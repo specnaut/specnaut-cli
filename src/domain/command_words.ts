@@ -1,6 +1,6 @@
-import { manifestsOf, programOf } from "./command_runners.ts";
+import { manifestsOf } from "./command_runners.ts";
 import { isPathKey, pathWordValue } from "./command_search_path.ts";
-import { shellSegments } from "./shell_words.ts";
+import { shellSegments, shellWords } from "./shell_words.ts";
 
 /**
  * The words a parsed command source holds, grouped as the harness reads them: each object's strings
@@ -9,13 +9,13 @@ import { shellSegments } from "./shell_words.ts";
  * And the words of a raw line, for what a parser rejects. Shared by every kind of command source:
  * a config (`command_targets.ts`) and a skill's, an agent's or a command's file
  * (`markdown_commands.ts`). What decides a bare name's program is noted on the way: the values
- * PATH is set to, and the programs named by name alone (`command_search_path.ts`).
+ * PATH is set to, and the words that may be programs named by name alone (`command_search_path.ts`).
  */
 
 /**
  * What a reading of one source found beside its words: whether it met no limit (a source that did
- * not parse, a word or an expansion past a cap), each value it sets PATH to, each program its
- * commands name without a slash, and each pattern a path built around a variable reads as
+ * not parse, a word or an expansion past a cap), each value it sets PATH to, each word its
+ * commands hold that may be a program named by name alone (`programsIn`), and each pattern a path built around a variable reads as
  * (`command_word_paths.ts`). And how many folders the project sits below the repository's top.
  */
 export type Reading = {
@@ -28,6 +28,8 @@ export type Reading = {
 
 /** A source larger than this is not parsed: read from its bytes, and named as not fully read. */
 export const PARSE_LIMIT = 256 * 1024;
+/** A longer word is not read: no path is that long. */
+export const MAX_WORD = 4096;
 
 /**
  * At most this many objects and lists are walked in one source. Each takes at least a byte of its
@@ -69,17 +71,35 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
 
 /**
  * The words of `strings`, and the manifest each command among them runs (`manifestsOf`); each
- * command's program, when it holds no slash, and each `PATH=…` word's value, are noted in `read`.
+ * word that may be a program (`programsIn`), and each `PATH=…` word's value, are noted in `read`.
  */
 export function commandWords(strings: readonly string[], read: Reading): string[] {
   const commands = strings.flatMap(shellSegments);
-  for (const words of commands) {
-    const program = programOf(words);
-    if (program !== undefined && !/[\\/]/.test(program)) read.programs.add(program);
-    read.pathValues.push(...words.flatMap((w) => pathWordValue(w) ?? []));
+  for (const word of commands.flat()) {
+    programsIn(word).forEach((p) => read.programs.add(p));
+    const value = pathWordValue(word);
+    if (value !== undefined) read.pathValues.push(value);
   }
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];
 }
+
+/**
+ * The programs `word` may run by name alone: itself when it holds no slash, whatever its place in
+ * its command, since a wrapper runs a word after it (`timeout 30 lint`, `nice -n 5 lint`, `xargs
+ * lint`, `sudo lint`, `env -i lint`); and, when the word is itself a command a shell is handed
+ * (`bash -c 'cd x && lint'`), each word of it, read the same way. Most words name no program: the
+ * folders on PATH are searched for the names a commit holds (`command_search_path.ts`), so a word
+ * too many costs nothing. Each pass takes off a level of quoting or a separator, so it ends.
+ */
+function programsIn(word: string): string[] {
+  if (word.length > MAX_WORD) return [];
+  const inner = shellWords(word);
+  if (inner.length !== 1 || inner[0] !== word) return inner.flatMap(programsIn);
+  return /[\\/]/.test(word) || ASSIGNMENT.test(word) ? [] : [word];
+}
+
+/** A word that sets a variable for the command (`CI=1`): no program, whatever follows. */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 /**
  * The strings of `value` that belong to the object holding it; each object's are one entry. An

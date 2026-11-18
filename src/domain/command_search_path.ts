@@ -1,12 +1,15 @@
 import { climb } from "./project_path.ts";
+import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_index.ts";
 
 /**
  * Which program a bare command name runs is decided by the folders on PATH, so a folder a judged
- * config puts there makes each file in it named like a command's program a file that command may
+ * config puts there makes each file in it named like a word of a command a file that command may
  * run: `"env": {"PATH": "./bin:$PATH"}` and a hook `lint` run `bin/lint`. A command source names
- * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy; in
- * any letter case, as Windows reads it) or a word `PATH=…` (set before a command, or exported).
- * Only what the configs say is read: the PATH a shell builds before the session starts is not.
+ * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy) or
+ * a word `PATH=…` (set before a command, or exported). The key is read in any letter case, as
+ * Windows reads it, and in any object: an unrelated key `path` puts its value's folders on PATH
+ * too, which only looks for more names in the listing. Only what the configs say is read: the
+ * PATH a shell builds before the session starts is not.
  */
 
 /** A key or a word that sets PATH, in any letter case. */
@@ -27,24 +30,66 @@ export function rawPathValues(line: string): string[] {
 /** The pieces of a PATH value, each a folder as written: `:` and Windows' `;` both separate. */
 export const pathPieces = (value: string): string[] => value.split(/[:;]/).filter(Boolean);
 
+/** The extensions Windows tries a bare name with: `PATHEXT`'s default, and PowerShell's `.ps1`. */
+const WINDOWS_EXTENSION = /\.(?:com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc|ps1)$/;
+
 /** At most this many program-in-folder paths are tried: past it a reading is not whole. */
 const MAX_ON_PATH = 50_000;
 
+/** What the sources put on PATH: the folders, and every word that may be a program. */
+export type OnPath = { readonly folders: Iterable<string>; readonly programs: Iterable<string> };
+
 /**
- * Each program (a command's first word, holding no slash) in each folder on PATH, as a path
- * relative to the project's folder. Past {@link MAX_ON_PATH}, none is tried and `read` is not
- * whole: the caller names the sources that put a folder there, rather than trust a part.
+ * Each program in each folder on PATH, as a path relative to the project's folder, looked up in
+ * the commits' listings (`at`: HEAD's and the tip's). A program is any word a command holds by
+ * name alone, so most name no file: a folder is tried with the names a commit holds in it that
+ * answer to a program, bare or with a Windows extension (`lint.cmd` for `lint`), and how many words
+ * or folders the sources hold does not grow what is tried. A folder a link or a submodule is on
+ * the way to holds what no listing shows: it is tried with every program and every such name.
+ * Past {@link MAX_ON_PATH} of those, none is tried and `read` is not whole: the caller names the
+ * sources that put a folder there, rather than trust a part.
  */
 export function onPathTargets(
-  folders: Iterable<string>,
-  programs: Iterable<string>,
+  on: OnPath,
+  at: readonly PathIndex[],
   read: { whole: boolean },
 ): string[] {
-  const dirs = [...new Set(folders)];
-  const names = [...new Set(programs)];
-  if (dirs.length * names.length > MAX_ON_PATH) {
+  const programs = [...new Set(on.programs)];
+  const held = heldNames(new Set(programs.map(fold)), at);
+  const dirs = new Set([...on.folders].map((dir) => climb([], dir).join("/")));
+  const tried = [...dirs].map((dir) => ({ dir, names: namesIn(dir, at, programs, held) }));
+  if (tried.reduce((n, t) => n + t.names.length, 0) > MAX_ON_PATH) {
     read.whole = false;
     return [];
   }
-  return dirs.flatMap((dir) => names.map((name) => climb([], `${dir}/${name}`).join("/")));
+  return tried.flatMap(({ dir, names }) => names.map((n) => climb([], `${dir}/${n}`).join("/")));
+}
+
+/**
+ * The names `dir` is tried with: those a commit holds in it, or every program and every such name
+ * when a link or a submodule is on its way.
+ */
+function namesIn(dir: string, at: readonly PathIndex[], programs: readonly string[], held: Held) {
+  const way = at.some((index) => (linkOnTheWay(dir, index) ?? submoduleOnTheWay(dir, index)));
+  return way ? [...new Set([...programs, ...held.all])] : [...held.in.get(fold(dir)) ?? []];
+}
+
+/** The names the commits hold that answer to a program: by the folded folder holding each, and all. */
+type Held = { readonly in: Map<string, Set<string>>; readonly all: Set<string> };
+
+/** Each name `at` holds, as it spells it, that is a program of `programs` (folded) or one with a Windows extension. */
+function heldNames(programs: ReadonlySet<string>, at: readonly PathIndex[]): Held {
+  const held: Held = { in: new Map(), all: new Set() };
+  for (const [key, paths] of at.flatMap((index) => [...index])) {
+    const slash = key.lastIndexOf("/");
+    const name = key.slice(slash + 1);
+    if (!programs.has(name) && !programs.has(name.replace(WINDOWS_EXTENSION, ""))) continue;
+    const dir = slash < 0 ? "" : key.slice(0, slash);
+    for (const { path } of paths) {
+      const spelled = path.slice(path.lastIndexOf("/") + 1);
+      held.in.set(dir, (held.in.get(dir) ?? new Set()).add(spelled));
+      held.all.add(spelled);
+    }
+  }
+  return held;
 }

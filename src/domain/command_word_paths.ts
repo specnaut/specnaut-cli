@@ -39,6 +39,10 @@ export function pathOf(piece: string, read: Reading): string[] {
   if (bare === "" || bare === "~") return [];
   const rooted = bare !== slashed || /^(?:~|(?:[A-Za-z]:)?\/)/.test(bare);
   const glob = globbed(bare);
+  if (climbsOverVariable(glob)) {
+    read.whole = false;
+    return [];
+  }
   if (!rooted) return named(climb([], glob).join("/"), read);
   const parts = climb([], glob.replace(/^(?:~|[A-Za-z]:)?\/*/, "")).filter((p) => p !== "..");
   if (parts.length > MAX_SUFFIXES) read.whole = false;
@@ -47,6 +51,34 @@ export function pathOf(piece: string, read: Reading): string[] {
   const suffixes = kept.map((_, i) => kept.slice(i)).filter((s) => s[0] !== VAR);
   const ups = Array.from({ length: read.depth + 1 }, (_, up) => "../".repeat(up));
   return suffixes.flatMap((s) => ups.flatMap((up) => named(up + s.join("/"), read)));
+}
+
+/**
+ * Whether a `..` follows a part holding a variable (`tools/$OS/../run.sh`): what it climbs to
+ * depends on how many folders the variable holds, so no one path can be read from it.
+ */
+function climbsOverVariable(glob: string): boolean {
+  const parts = glob.split("/");
+  const at = parts.findIndex((p) => p.includes(VAR));
+  return at >= 0 && parts.slice(at + 1).includes("..");
+}
+
+/**
+ * The folders one piece of a PATH value puts there, read as {@link pathOf} reads a path; `.` is
+ * the project's folder, where the harness runs a command. A piece that is a variable alone is the
+ * PATH a shell built before the session (`$PATH`), which is not read. One that still holds a
+ * variable once its leading one is dropped (`./tools/$OS/bin`) names no folder that can be known,
+ * and a pattern would miss a link under it: the reading is not whole, and the caller names its
+ * source.
+ */
+export function foldersOf(piece: string, read: Reading): string[] {
+  const glob = globbed(withoutVariable(piece.replaceAll("\\", "/")));
+  if (glob === VAR) return [];
+  if (glob.includes(VAR)) {
+    read.whole = false;
+    return [];
+  }
+  return /^\.\/?$/.test(glob) ? [""] : pathOf(piece, read);
 }
 
 /**

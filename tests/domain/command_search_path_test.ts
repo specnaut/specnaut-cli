@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { commandPaths } from "../../src/domain/command_targets.ts";
 import { onPathTargets } from "../../src/domain/command_search_path.ts";
+import { type IndexedPath, pathIndex } from "../../src/domain/path_index.ts";
 
 /**
  * A folder a judged config puts on PATH decides which program a bare command name runs: each
@@ -57,21 +58,70 @@ Deno.test("a PATH the parser rejects is read from the bytes", () => {
   assertEquals(read(broken).onPath, ["bin2"]);
 });
 
-Deno.test("a word holding a slash, or before the program, is not a program", () => {
+Deno.test("a word holding a slash, or setting a variable, is not a program; any other may be", () => {
   const programs = read(hook("CI=1 exec ./tools/x.sh && scripts/y.sh; make")).programs;
-  assertEquals(sorted(programs), ["make"]);
+  assertEquals(sorted(programs), ["command", "exec", "make"]);
 });
 
-Deno.test("each folder on PATH holds each program, and past the cap the reading is not whole", () => {
+Deno.test("the program a wrapper runs is read, in each form a wrapper takes", () => {
+  const wrapped = [
+    "timeout 30 fmt-check",
+    "nohup fmt-check &",
+    "nice -n 5 fmt-check",
+    "git ls-files | xargs fmt-check",
+    "sudo -u ci fmt-check",
+    "env -i fmt-check",
+    "bash -c 'cd web && fmt-check --all'",
+  ];
+  const missed = wrapped.filter((c) => !read(hook(c)).programs.includes("fmt-check"));
+  assertEquals(missed, []);
+});
+
+Deno.test("a PATH folder holding a variable past its start is not read, and the reading is not whole", () => {
+  const found = read(json({ env: { PATH: "./bin:./tools/$OS/bin:$PATH" } }));
+  assertEquals([found.onPath, found.whole], [["bin"], false]);
+  const plain = read(json({ env: { PATH: "./bin:$CLAUDE_PROJECT_DIR/tools:$PATH" } }));
+  assertEquals(plain.whole, true);
+});
+
+Deno.test("`.` on PATH is the project's folder", () => {
+  assertEquals(read(json({ env: { PATH: ".:$PATH" } })).onPath, [""]);
+});
+
+const listing = (...paths: [string, IndexedPath["kind"]][]) =>
+  pathIndex(paths.map(([path, kind]) => ({ path, kind })));
+const HELD = listing(
+  ["bin/lint", "blob"],
+  ["tools/Fmt.CMD", "blob"],
+  ["docs/lint", "blob"],
+  ["vendor", "link"],
+);
+
+Deno.test("a folder on PATH is tried with the names it holds, bare or with a Windows extension", () => {
   const read = { whole: true };
-  assertEquals(sorted(onPathTargets(["bin", "a/../tools"], ["lint", "node"], read)), [
-    "bin/lint",
-    "bin/node",
-    "tools/lint",
-    "tools/node",
-  ]);
+  const on = { folders: ["bin", "a/../tools", "nowhere", "."], programs: ["lint", "fmt", "npm"] };
+  assertEquals(sorted(onPathTargets(on, [HELD], read)), ["bin/lint", "tools/Fmt.CMD"]);
   assertEquals(read.whole, true);
-  const many = Array.from({ length: 300 }, (_, i) => `p${i}`);
-  onPathTargets(many, many, read);
+  const root = listing(["lint.ps1", "blob"]);
+  assertEquals(onPathTargets({ folders: [""], programs: ["lint"] }, [root], read), ["lint.ps1"]);
+});
+
+Deno.test("a folder a link is on the way to is tried with every program and every such name", () => {
+  const on = { folders: ["vendor/bin"], programs: ["lint", "fmt"] };
+  assertEquals(sorted(onPathTargets(on, [HELD], { whole: true })), [
+    "vendor/bin/Fmt.CMD",
+    "vendor/bin/fmt",
+    "vendor/bin/lint",
+  ]);
+});
+
+Deno.test("words by the thousand try nothing more; past the cap of a link's folders, not whole", () => {
+  const words = Array.from({ length: 100_000 }, (_, i) => `w${i}`);
+  const folders = Array.from({ length: 300 }, (_, i) => `f${i}`);
+  const read = { whole: true };
+  assertEquals(onPathTargets({ folders, programs: words }, [HELD], read), []);
+  assertEquals(read.whole, true);
+  const linked = folders.map((f) => `vendor/${f}`);
+  onPathTargets({ folders: linked, programs: words.slice(0, 300) }, [HELD], read);
   assertEquals(read.whole, false);
 });

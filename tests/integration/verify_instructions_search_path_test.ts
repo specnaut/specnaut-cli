@@ -35,6 +35,16 @@ Deno.test("a program the branch adds to a folder on PATH, shadowing a bare name,
   ]);
 });
 
+Deno.test("a program a wrapper runs, held with a Windows extension, edited by the branch, is named", async () => {
+  const files = {
+    ".claude/settings.json": settings({ PATH: "./bin:$PATH" }, "timeout 30 lint --fix"),
+    "bin/lint.cmd": LINT,
+  };
+  assertEquals(await landed(files, { "bin/lint.cmd": EDITED }), [
+    "VERDICT instructions untrusted bin/lint.cmd differs from base",
+  ]);
+});
+
 Deno.test("a program on PATH the branch leaves alone stays silent", async () => {
   const files = { ".claude/settings.json": settings({ PATH: "./bin:$PATH" }), "bin/lint": LINT };
   assertEquals(await landed(files, { "notes.md": "x\n" }), ["VERDICT instructions trusted"]);

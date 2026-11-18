@@ -89,3 +89,13 @@ Deno.test("a pattern of many variables against a long name is matched within a s
   const took = performance.now() - started;
   assert(took < 1000, `${took} ms`);
 });
+
+Deno.test("a `..` after a variable reads as no one path, and the reading is not whole", () => {
+  const found = read("bash tools/$OS/../run.sh");
+  assertEquals([found.paths.includes("tools/run.sh"), found.patterns, found.whole], [
+    false,
+    [],
+    false,
+  ]);
+  assertEquals(read("bash $CLAUDE_PROJECT_DIR/../tools/run.sh").whole, true);
+});
