@@ -2,7 +2,7 @@ import { assert } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { writeVersions } from "../../scripts/bump-version.ts";
 import { specnautMarketplaceSource } from "../../src/domain/specnaut_marketplace.ts";
-import { hermetic } from "./git_sandbox.ts";
+import { hermetic } from "./git_hermetic.ts";
 
 /**
  * Repositories in the states the release scripts judge, and a way to run one

@@ -1,6 +1,6 @@
 import { fromFileUrl, join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
-import { type Run, run } from "./git_sandbox.ts";
+import { type Run, run } from "./git_hermetic.ts";
 import { PWSH_AVAILABLE } from "./pwsh_arm.ts";
 
 /**

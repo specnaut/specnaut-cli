@@ -90,9 +90,10 @@ export function seccompFilter(arch: FilterArch): Uint8Array {
 }
 
 /**
- * The rules that read a call's first argument, its low 32 bits (both calls read an `int`), three
- * instructions each. Another call: on to the next rule, its number still loaded. This call: load
- * the argument; a match jumps over the rules left and ALLOW to EPERM, anything else to ALLOW.
+ * The rules that read a call's first argument, its low 32 bits (`socket`'s domain is an `int`,
+ * `personality`'s persona an `unsigned int`: both fit there), three instructions each. Another
+ * call: on to the next rule, its number still loaded. This call: load the argument; a match jumps
+ * over the rules left and ALLOW to EPERM, anything else to ALLOW.
  */
 function argumentRules(arch: FilterArch): Insn[] {
   const rules = [

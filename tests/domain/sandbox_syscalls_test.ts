@@ -14,7 +14,7 @@ for (const arch of ["x86_64", "aarch64"] as const) {
   });
 }
 
-Deno.test("seccompFilter: mounting, namespaces, keyrings, modules and bpf are denied", () => {
+Deno.test("DENIED_SYSCALLS: mounting, namespaces, keyrings, modules and bpf, numbered on both architectures", () => {
   for (
     const name of [
       "mount",

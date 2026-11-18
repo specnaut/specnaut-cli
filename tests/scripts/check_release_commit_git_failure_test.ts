@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { hermetic } from "./git_sandbox.ts";
+import { hermetic } from "./git_hermetic.ts";
 import { git, H, LEAD, repoAt, repoWithHighlights, run } from "./release_commit_fixture.ts";
 
 /**

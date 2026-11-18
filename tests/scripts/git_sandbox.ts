@@ -71,6 +71,28 @@ export async function sandbox(): Promise<Sandbox> {
   const root = await Deno.makeTempDir({ prefix: "specnaut-merge-scripts-" });
   const remote = join(root, "origin.git");
   const work = join(root, "work");
+  await cloneOrigin(root, remote, work);
+  await installScripts(work);
+  return {
+    root,
+    work,
+    remote,
+    script: (name, ...args) => run("bash", [installed(name), ...args], work),
+    scriptWithGit: (shim, name, ...args) => withGit(root, work, {}, shim, name, args),
+    scriptWithGitEnv: (env, shim, name, ...args) => withGit(root, work, env, shim, name, args),
+    commit: (file, content, ...message) => commit(work, file, content, message),
+    refusePushes: () => refusePushes(root, remote),
+    cleanup: () => Deno.remove(root, { recursive: true }),
+  };
+}
+
+/** An installed script, as bash reads its path from the clone. */
+function installed(name: string): string {
+  return bashPath(join(".specnaut/scripts/bash", name));
+}
+
+/** A bare `origin` whose HEAD is `main`, and its clone at `work` holding one commit. */
+async function cloneOrigin(root: string, remote: string, work: string): Promise<void> {
   await git(root, "init", "--quiet", "--bare", "-b", "main", remote);
   await git(root, "clone", "--quiet", remote, work);
   await git(work, "config", "user.name", "t");
@@ -81,6 +103,10 @@ export async function sandbox(): Promise<Sandbox> {
   await git(work, "commit", "--quiet", "-m", "base");
   await git(work, "push", "--quiet", "origin", "main");
   await git(work, "remote", "set-head", "origin", "main");
+}
+
+/** The merge scripts and the lock, committed and pushed. */
+async function installScripts(work: string): Promise<void> {
   const dest = join(work, ".specnaut/scripts/bash");
   await Deno.mkdir(dest, { recursive: true });
   for (const s of SCRIPTS) await Deno.copyFile(join(BASH_DIR, s), join(dest, s));
@@ -89,32 +115,29 @@ export async function sandbox(): Promise<Sandbox> {
   await git(work, "add", ".specnaut");
   await git(work, "commit", "--quiet", "-m", "chore: install the scripts");
   await git(work, "push", "--quiet", "origin", "main");
-  return {
-    root,
-    work,
-    remote,
-    script: (name, ...args) =>
-      run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work),
-    scriptWithGit: (shim, name, ...args) => withGit(root, work, {}, shim, name, args),
-    scriptWithGitEnv: (env, shim, name, ...args) => withGit(root, work, env, shim, name, args),
-    async commit(file, content, ...message) {
-      await Deno.mkdir(join(work, file, ".."), { recursive: true });
-      await Deno.writeTextFile(join(work, file), content);
-      await git(work, "add", file);
-      await git(work, "commit", "--quiet", ...message.flatMap((m) => ["-m", m]));
-      return await git(work, "rev-parse", "HEAD");
-    },
-    async refusePushes() {
-      const hook = join(remote, "hooks/pre-receive");
-      await Deno.writeTextFile(
-        hook,
-        `#!/bin/sh\n[ -f "${bashPath(root)}/allow" ] && exit 0\necho refused >&2\nexit 1\n`,
-      );
-      // Windows has no mode bits: Git for Windows runs a hook by its `#!` line.
-      if (Deno.build.os !== "windows") await Deno.chmod(hook, 0o755);
-    },
-    cleanup: () => Deno.remove(root, { recursive: true }),
-  };
+}
+
+async function commit(
+  work: string,
+  file: string,
+  content: string,
+  message: string[],
+): Promise<string> {
+  await Deno.mkdir(join(work, file, ".."), { recursive: true });
+  await Deno.writeTextFile(join(work, file), content);
+  await git(work, "add", file);
+  await git(work, "commit", "--quiet", ...message.flatMap((m) => ["-m", m]));
+  return await git(work, "rev-parse", "HEAD");
+}
+
+async function refusePushes(root: string, remote: string): Promise<void> {
+  const hook = join(remote, "hooks/pre-receive");
+  await Deno.writeTextFile(
+    hook,
+    `#!/bin/sh\n[ -f "${bashPath(root)}/allow" ] && exit 0\necho refused >&2\nexit 1\n`,
+  );
+  // Windows has no mode bits: Git for Windows runs a hook by its `#!` line.
+  if (Deno.build.os !== "windows") await Deno.chmod(hook, 0o755);
 }
 
 /** `name` run from `work` with `git` on PATH a shim kept under `root`, and `env` added. */
@@ -132,7 +155,7 @@ async function withGit(
   await Deno.mkdir(bin, { recursive: true });
   await Deno.writeTextFile(join(bin, "git"), `#!/usr/bin/env bash\nREAL_GIT='${real}'\n${shim}\n`);
   await Deno.chmod(join(bin, "git"), 0o755);
-  return run("bash", [bashPath(join(".specnaut/scripts/bash", name)), ...args], work, {
+  return run("bash", [installed(name), ...args], work, {
     ...env,
     PATH: `${bin}${DELIMITER}${withSpecnaut(Deno.env.get("PATH"))}`,
   });

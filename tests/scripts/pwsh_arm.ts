@@ -1,5 +1,5 @@
 import { assert } from "@std/assert";
-import { run } from "./git_sandbox.ts";
+import { run } from "./git_hermetic.ts";
 
 /**
  * Whether a file's PowerShell arm can run. It runs through `git_hermetic.ts`'s
