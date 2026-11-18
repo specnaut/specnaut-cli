@@ -28,6 +28,8 @@ Deno.test("a variable inside a path matches any name there, in any letter case",
   assertEquals(matched("tools/lint-${KIND}", "tools/lint-js", "tools/fmt-js"), ["tools/lint-js"]);
   assertEquals(matched("run-$X.sh", "run-a.sh", "tools/run-b.sh"), ["run-a.sh"]);
   assertEquals(matched("bash Tools/$N.SH", "tools/x.sh"), ["tools/x.sh"]);
+  // Each part is found after the one before, and never inside the end the last part takes.
+  assertEquals(matched("bash t/${X}ab${X}b", "t/ab", "t/abb", "t/bab"), ["t/abb"]);
 });
 
 Deno.test("a command inside the path, slashes and all, is one variable", () => {
@@ -41,7 +43,7 @@ Deno.test("a file name that is a variable alone is no pattern: it would name eve
 });
 
 Deno.test("a path that names no folder before a variable is no pattern: it would name every file", () => {
-  assertEquals(read('bash "$CLAUDE_PROJECT_DIR"/scripts/$TASK.sh').patterns, ["^scripts/.*\\.sh$"]);
+  assertEquals(read('bash "$CLAUDE_PROJECT_DIR"/scripts/$TASK.sh').patterns, ["scripts/\0.sh"]);
   for (const command of ["bash $X.sh", 'deno test "${f%.ts}_test.ts"', 'bash "$DIR"/$NAME.sh']) {
     assertEquals(read(command).patterns, [], command);
   }
@@ -52,11 +54,11 @@ Deno.test("an absolute path with a variable is tried from each suffix after it",
   assert(found.paths.includes("scripts/x.sh") && found.paths.includes("proj/scripts/x.sh"));
   assertEquals(found.paths.filter((p) => p.includes("$")), []);
   // A suffix that starts at the variable adds nothing its literal tail does not: no pattern.
-  assertEquals(found.patterns.filter((p) => p.startsWith("^.*")), []);
+  assertEquals(found.patterns.filter((p) => p.startsWith("\0")), []);
 });
 
 Deno.test("an assignment is read for its value, never as a whole name", () => {
-  assertEquals(read("r=$PWD; X=tools/$N.sh").patterns, ["^tools/.*\\.sh$"]);
+  assertEquals(read("r=$PWD; X=tools/$N.sh").patterns, ["tools/\0.sh"]);
 });
 
 Deno.test("past the pattern cap, the reading is not whole", () => {
@@ -74,4 +76,16 @@ Deno.test("an absolute path is tried from each folder above a project in a subfo
   }
   assertEquals(read("/home/me/repo/scripts/x.sh").paths.some((p) => p.startsWith("..")), false);
   assert(read("$CLAUDE_PROJECT_DIR/../shared/x.sh", 1).paths.includes("../shared/x.sh"));
+});
+
+Deno.test("a pattern of many variables against a long name is matched within a second", () => {
+  // `t/${X}a${X}a…${X}c${X}b` against `t/aa…ab`: a backtracking matcher tries each way to place
+  // the `a`s before it finds no `c`, so many that it never ends.
+  const word = `t/${"${X}a".repeat(24)}\${X}c\${X}b`;
+  const started = performance.now();
+  assertEquals(matched(word, `t/${"a".repeat(200)}b`, `t/${"a".repeat(30)}cb`), [
+    `t/${"a".repeat(30)}cb`,
+  ]);
+  const took = performance.now() - started;
+  assert(took < 1000, `${took} ms`);
 });

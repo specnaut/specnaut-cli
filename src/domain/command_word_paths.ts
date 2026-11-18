@@ -64,16 +64,39 @@ function named(path: string, read: Reading): string[] {
   return [];
 }
 
-/** A pattern's source: its folded text as written, and any text where a variable stood. */
-const patternOf = (path: string) =>
-  `^${path.split(VAR).map((t) => fold(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`;
+/** A pattern: its folded text as written, and a {@link VAR} where any text may stand. */
+const patternOf = (path: string) => path.split(VAR).map(fold).join(VAR);
 
-/** Each path of `index` some pattern of `patterns` matches, as the commit spells it. */
+/**
+ * Each path of `index` some pattern of `patterns` matches, as the commit spells it. A pattern is
+ * matched as a glob (`globMatches`), never as a regular expression: one that backtracks takes time
+ * exponential in its wildcards on a crafted value, and the check would hang on it.
+ */
 export function matching(patterns: readonly string[], index: PathIndex): string[] {
-  const compiled = patterns.map((p) => new RegExp(p, "s"));
+  const split = patterns.map((p) => p.split(VAR));
   return [...index].flatMap(([key, held]) =>
-    compiled.some((re) => re.test(key)) ? held.map((p) => p.path) : []
+    split.some((parts) => globMatches(parts, key)) ? held.map((p) => p.path) : []
   );
+}
+
+/**
+ * Whether `key` is `parts` with any text between each two: the first starts it, the last ends it,
+ * and each other is found at its leftmost place after the one before. Leftmost is always right
+ * when only "any text" stands between parts, so nothing is tried twice: the time is that of
+ * reading `key` once for each part.
+ */
+function globMatches(parts: readonly string[], key: string): boolean {
+  const [first, last] = [parts[0], parts[parts.length - 1]];
+  if (parts.length === 1) return key === first;
+  const end = key.length - last.length;
+  if (end < first.length || !key.startsWith(first) || !key.endsWith(last)) return false;
+  let at = first.length;
+  for (const part of parts.slice(1, -1)) {
+    const found = key.indexOf(part, at);
+    if (found < 0 || found + part.length > end) return false;
+    at = found + part.length;
+  }
+  return true;
 }
 
 /**

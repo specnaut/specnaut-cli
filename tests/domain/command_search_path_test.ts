@@ -47,6 +47,11 @@ Deno.test("Codex's shell policy and an MCP server's env put folders on PATH too"
   assertEquals([found.onPath, found.programs.includes("serve")], [["srv/bin"], true]);
 });
 
+Deno.test("a PATH value longer than a word may be is not read, and the reading is not whole", () => {
+  const found = read(json({ env: { PATH: `bin:${"x".repeat(5000)}` } }));
+  assertEquals([found.onPath, found.whole], [[], false]);
+});
+
 Deno.test("a PATH the parser rejects is read from the bytes", () => {
   const broken = enc('{"env": {"PATH": "bin2:$PATH"}, "hooks": ');
   assertEquals(read(broken).onPath, ["bin2"]);

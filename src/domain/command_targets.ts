@@ -81,14 +81,28 @@ export function commandPaths(
 
 /** The paths found, and what `read` noted on the way: the folders its PATH values name. */
 function found(paths: readonly string[], read: Reading): CommandPaths {
-  const onPath = new Set(read.pathValues.flatMap(pathPieces).flatMap((p) => pathOf(p, read)));
+  const onPath = pathFolders(read);
   return {
     paths: [...new Set(paths)],
     whole: read.whole,
-    onPath: [...onPath],
+    onPath,
     programs: [...read.programs],
     patterns: [...read.patterns],
   };
+}
+
+/**
+ * The folders the PATH values `read` noted put there. A value longer than {@link MAX_WORD} is not
+ * read, as a word is not, and the reading is not whole: its pieces are not paths a check should
+ * spend its time on.
+ */
+function pathFolders(read: Reading): string[] {
+  const folders = new Set<string>();
+  for (const value of read.pathValues) {
+    if (value.length > MAX_WORD) read.whole = false;
+    else pathPieces(value).flatMap((p) => pathOf(p, read)).forEach((f) => folders.add(f));
+  }
+  return [...folders];
 }
 
 /** Each line's words as bytes, and what a PATH key or assignment on it sets PATH to. */
