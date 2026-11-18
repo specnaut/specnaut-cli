@@ -19,7 +19,7 @@ export class GhPullRequests {
     args.push("-F", "owner={owner}", "-F", "repo={repo}", "-F", `number=${n}`);
     const res = await this.runner.run("gh", args, { cwd: this.cwd });
     if (res.code !== 0) {
-      throw new Error(`gh exited ${res.code}: ${res.stderr.trim().split("\n")[0].slice(0, 200)}`);
+      throw new Error(`gh exited ${res.code}: ${res.stderr.trim().split("\n")[0].slice(0, 300)}`);
     }
     const said = JSON.parse(res.stdout) as { data?: { repository?: { pullRequest?: unknown } } };
     return said?.data?.repository?.pullRequest ?? null;

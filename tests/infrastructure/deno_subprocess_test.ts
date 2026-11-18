@@ -6,7 +6,7 @@ Deno.test("DenoSubprocessRunner returns code 127 (not throw) when binary is miss
   const result = await runner.run("specnaut-this-binary-does-not-exist-xyz", ["--version"]);
   assertEquals(result.code, 127);
   assertEquals(result.stdout, "");
-  assertEquals(result.stderr.includes("command not found"), true);
+  assertEquals(result.stderr.includes("is not on the PATH"), true);
 });
 
 Deno.test("DenoSubprocessRunner returns real exit code when binary exists", async () => {

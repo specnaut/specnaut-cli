@@ -28,9 +28,10 @@ export function sandboxHostDeps(): SandboxDeps {
   const checkout = () => checkoutRoot(Deno.cwd());
   const { os, arch } = Deno.build;
   const image = async () => baseImage(await checkout());
-  // The engines are asked with the environment a run gives them, and nothing of ours beside it.
+  // The engines are asked with the environment a run gives them, and nothing of ours beside it,
+  // and found on the PATH the run finds them on.
   const prober = new HostBackendProber(
-    new DenoSubprocessRunner({ wholeEnv: true }),
+    new DenoSubprocessRunner({ wholeEnv: true, inheritedPath: true }),
     { os, arch },
     image,
   );
