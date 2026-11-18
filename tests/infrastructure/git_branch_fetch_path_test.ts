@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { DELIMITER, join } from "@std/path";
 import { ExportRefused } from "../../src/application/untrusted_review_ports.ts";
 import { GitBranchFetcher } from "../../src/infrastructure/git_branch_fetch.ts";
 import { GitTreeObjects } from "../../src/infrastructure/git_tree_objects.ts";
@@ -65,8 +65,21 @@ inPlanted(
     await assertRejects(
       () => fetcher.fetch(TOPIC, join(p.base, "out.git")),
       ExportRefused,
-      "no PATH entry outside the repository",
+      `no PATH entry outside the repository; the entry "${p.bin}" was left out because`,
     );
     assertEquals(await ran(p.fired), false, "the planted git ran");
   },
 );
+
+inPlanted("a fetch that finds git on no entry left names the first entry left out", async (p) => {
+  const empty = join(p.base, "empty");
+  await Deno.mkdir(empty);
+  const env = (name: string) => name === "PATH" ? [p.bin, empty].join(DELIMITER) : undefined;
+  const fetcher = new GitBranchFetcher(p.project, { protocols: ["file"], env });
+  await assertRejects(
+    () => fetcher.fetch(TOPIC, join(p.base, "out.git")),
+    ExportRefused,
+    `git is not on the PATH; the entry "${p.bin}" was left out because it is inside the repository`,
+  );
+  assertEquals(await ran(p.fired), false, "the planted git ran");
+});

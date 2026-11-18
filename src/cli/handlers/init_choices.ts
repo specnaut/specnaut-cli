@@ -8,6 +8,7 @@ import type { BacklogBackend, SpecBackend, VersionScheme } from "../../domain/in
 import { SPEC_STRATEGIES } from "../../domain/spec_strategies/registry.ts";
 import { detectVersionScheme } from "../../domain/project_detection.ts";
 import { BACKLOG_STRATEGIES } from "../../domain/backlog_strategies/registry.ts";
+import { listTags } from "../../infrastructure/deno_git.ts";
 
 /**
  * The choices `specnaut init` asks for when no flag gave them: harness, backlog
@@ -98,28 +99,8 @@ export function detectSchemeSuggestion(targetDir: string): VersionScheme {
         return null;
       }
     },
-    listTags() {
-      // `git tag -l` is the cheapest read: a few KB of stdout for the
-      // largest repos, no network. If anything fails (no git binary, no
-      // .git dir, command errors), return an empty list — the detector
-      // treats absence as "no signal", not a failure.
-      try {
-        const out = new Deno.Command("git", {
-          args: ["tag", "-l"],
-          cwd: targetDir,
-          stdout: "piped",
-          stderr: "null",
-        }).outputSync();
-        if (!out.success) return [];
-        return new TextDecoder()
-          .decode(out.stdout)
-          .split("\n")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-      } catch {
-        return [];
-      }
-    },
+    // `git tag -l` is the cheapest read: a few KB of stdout for the largest repos, no network.
+    listTags: () => listTags(targetDir),
   });
   return result.suggestedScheme;
 }

@@ -3,10 +3,16 @@ import { exists } from "./fs_exists.ts";
 
 /**
  * A `git` a checkout could hold, for asserting the binary never starts it: a POSIX script that
- * records it ran and fails. Callers skip Windows, which cannot run it.
+ * records it ran and fails. On Windows, a `git.exe` that is the system's `whoami.exe`: it leaves
+ * no mark, so `ran` says nothing there, and fails on git's arguments, so a caller asserting what
+ * git printed is what proves it never ran.
  */
 export async function plantGit(dir: string, fired: string): Promise<void> {
   await Deno.mkdir(dir, { recursive: true });
+  if (Deno.build.os === "windows") {
+    const system = join(Deno.env.get("SystemRoot") ?? "C:\\Windows", "System32");
+    return await Deno.copyFile(join(system, "whoami.exe"), join(dir, "git.exe"));
+  }
   const fake = `#!/bin/sh\necho planted >'${fired}'\nexit 1\n`;
   await Deno.writeTextFile(join(dir, "git"), fake, { mode: 0o755 });
 }

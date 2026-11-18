@@ -1,56 +1,99 @@
 import type { GitAdapter } from "../application/ports.ts";
+import { type Dropped, filterGitPath, gitMissing } from "./git_path.ts";
+import { UNREACHABLE } from "./fs_containment.ts";
 
+/**
+ * git in the user's own project, for `specnaut init`. The project is the user's, not a checkout
+ * nobody vetted, so its configuration is read as git reads it; but git is looked up as every git
+ * the binary starts is, only on PATH entries outside the project's tree (`git_path.ts`), so a
+ * `git` a cloned project carries in its folders is never the one that runs.
+ */
 export class DenoGit implements GitAdapter {
+  /** `here` is the folder whose tree `isAvailable` keeps git's PATH out of. */
+  constructor(private readonly here: string = Deno.cwd()) {}
+
   async isAvailable(): Promise<boolean> {
-    try {
-      const p = new Deno.Command("git", {
-        args: ["--version"],
-        stdout: "null",
-        stderr: "null",
-      });
-      const status = await p.output();
-      return status.success;
-    } catch {
-      return false;
-    }
+    const { command } = projectGit(this.here, ["--version"], "null");
+    return (await answered(command))?.success ?? false;
   }
 
   async isInitialized(dir: string): Promise<boolean> {
     try {
       const stat = await Deno.lstat(`${dir}/.git`);
       return stat.isDirectory || stat.isFile;
-    } catch {
-      return false;
+    } catch (err) {
+      // No `.git` this process can reach is no repository: `init` makes one or says why not.
+      if (UNREACHABLE.some((c) => err instanceof c)) return false;
+      throw err;
     }
   }
 
   async init(dir: string): Promise<void> {
-    const p = new Deno.Command("git", {
-      args: ["init", "--quiet"],
-      cwd: dir,
-      stdout: "null",
-      stderr: "null",
-    });
-    const status = await p.output();
-    if (!status.success) {
-      throw new Error("git init failed");
+    const { command, dropped } = projectGit(dir, ["init", "--quiet"], "null");
+    if (command === undefined) {
+      throw new Error(gitMissing("no PATH entry outside the repository", dropped));
     }
+    const status = await answered(command);
+    if (status === undefined) throw new Error(gitMissing("git is not on the PATH", dropped));
+    if (!status.success) throw new Error("git init failed");
   }
 
   async getRemoteUrl(dir: string, remote: string): Promise<string | null> {
-    try {
-      const p = new Deno.Command("git", {
-        args: ["remote", "get-url", remote],
-        cwd: dir,
-        stdout: "piped",
-        stderr: "null",
-      });
-      const out = await p.output();
-      if (!out.success) return null;
-      const url = new TextDecoder().decode(out.stdout).trim();
-      return url.length > 0 ? url : null;
-    } catch {
-      return null;
-    }
+    const { command } = projectGit(dir, ["remote", "get-url", remote], "piped");
+    const out = await answered(command);
+    if (!out?.success) return null;
+    const url = new TextDecoder().decode(out.stdout).trim();
+    return url.length > 0 ? url : null;
+  }
+}
+
+/**
+ * The project's tags, for the version scheme `init` suggests: none when there is no git, no
+ * repository, or no tag, which the suggestion reads as "no signal", never as a failure.
+ */
+export function listTags(dir: string): string[] {
+  const { command } = projectGit(dir, ["tag", "-l"], "piped");
+  let out: Deno.CommandOutput | undefined;
+  try {
+    out = command?.outputSync();
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+  }
+  if (!out?.success) return [];
+  return new TextDecoder().decode(out.stdout).split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
+/** A git command for `dir`, or none when no PATH entry is left; the first entry left out. */
+type ProjectGit = { readonly command: Deno.Command | undefined; readonly dropped?: Dropped };
+
+/**
+ * git in `dir` with the caller's environment, its PATH kept outside `dir`'s tree. With no entry
+ * left there is no command: an empty PATH can mean the working folder, which is the project.
+ */
+function projectGit(dir: string, args: string[], stdout: "null" | "piped"): ProjectGit {
+  const { kept, dropped } = filterGitPath(Deno.env.get("PATH") ?? "", dir);
+  if (kept === "") return { command: undefined, dropped };
+  // Every spelling of the caller's PATH goes: Windows would see `Path` and `PATH` as two.
+  const env = Object.entries(Deno.env.toObject()).filter(([k]) => k.toUpperCase() !== "PATH");
+  const command = new Deno.Command("git", {
+    args,
+    cwd: dir,
+    clearEnv: true,
+    env: { ...Object.fromEntries(env), PATH: kept },
+    stdout,
+    stderr: "null",
+  });
+  return { command, dropped };
+}
+
+/** What `command` returned, or undefined when there is none or no git is found to run it. */
+async function answered(
+  command: Deno.Command | undefined,
+): Promise<Deno.CommandOutput | undefined> {
+  try {
+    return await command?.output();
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return undefined;
+    throw err;
   }
 }

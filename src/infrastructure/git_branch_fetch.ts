@@ -2,7 +2,9 @@ import { join } from "@std/path";
 import { type BranchFetcher, ExportRefused } from "../application/untrusted_review_ports.ts";
 import { type BranchSource, FETCHED_REF, refspecOf } from "../domain/branch_source.ts";
 import { decode, firstLine } from "./git_text.ts";
-import { GitRefused, UNTRUSTED_GIT_FLAGS, UntrustedGit, untrustedGitEnv } from "./untrusted_git.ts";
+import { gitMissing } from "./git_path.ts";
+import { type GitEnv, GitRefused, UntrustedGit, untrustedGitEnv } from "./untrusted_git.ts";
+import { UNTRUSTED_GIT_FLAGS } from "./untrusted_git_flags.ts";
 
 /**
  * Fetches one branch as objects into a bare repository made for it, never into the user's own.
@@ -120,7 +122,7 @@ export class GitBranchFetcher implements BranchFetcher {
   }
 
   /** The fetch's environment; a PATH with nothing left outside the project is refused. */
-  #fetchEnv(): Record<string, string> {
+  #fetchEnv(): GitEnv {
     try {
       return fetchEnv(this.#env, this.projectDir);
     } catch (err) {
@@ -136,7 +138,7 @@ const QUIET = { stdin: "null", stdout: "null", stderr: "piped" } as const;
 async function spawn(
   cwd: string,
   args: string[],
-  env: Record<string, string>,
+  { env, dropped }: GitEnv,
   signal: AbortSignal,
 ): Promise<Deno.CommandOutput> {
   const command = new Deno.Command("git", { ...QUIET, args, cwd, clearEnv: true, env, signal });
@@ -144,7 +146,7 @@ async function spawn(
     return await command.output();
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) throw err;
-    throw new ExportRefused("git is not on the PATH", { cause: err });
+    throw new ExportRefused(gitMissing("git is not on the PATH", dropped), { cause: err });
   }
 }
 
@@ -166,14 +168,11 @@ function initArgs(format: string, gitDir: string): string[] {
  * whichever folder git runs in: the repository the fetch fills is made by the binary, the project
  * is the checkout a branch could have put a `git` in.
  */
-function fetchEnv(
-  source: (name: string) => string | undefined,
-  project: string,
-): Record<string, string> {
-  const env = untrustedGitEnv(source, project);
+function fetchEnv(source: (name: string) => string | undefined, project: string): GitEnv {
+  const { env, dropped } = untrustedGitEnv(source, project);
   const agent = source("SSH_AUTH_SOCK");
-  if (agent !== undefined) env.SSH_AUTH_SOCK = agent;
-  return { ...env, LC_ALL: "C", LANG: "C", GIT_PROTOCOL_FROM_USER: "0" };
+  const ssh: Record<string, string> = agent === undefined ? {} : { SSH_AUTH_SOCK: agent };
+  return { env: { ...env, ...ssh, LC_ALL: "C", LANG: "C", GIT_PROTOCOL_FROM_USER: "0" }, dropped };
 }
 
 /** git states the cause before the step that failed (fsck, then index-pack): keep each. */

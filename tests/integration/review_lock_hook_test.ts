@@ -4,7 +4,7 @@ import { bundleForLock } from "../../src/application/lock_bundle.ts";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
 import { SESSION_ID_PATTERN } from "../../src/domain/session_record.ts";
-import { ENV_ALLOWLIST } from "../../src/infrastructure/untrusted_git.ts";
+import { ENV_ALLOWLIST } from "../../src/infrastructure/untrusted_git_flags.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { COPIES, HOOK, inProject, input, runHook } from "./review_lock_hook_fixture.ts";
 import { LOCK } from "./verify_scripts_fixture.ts";

@@ -23,10 +23,21 @@ const UNENTERABLE = "names a folder that cannot be entered";
  */
 const WINDOWS_ABSOLUTE = /^([A-Za-z]:[\\/]|[\\/]{2}[^\\/])/;
 
+/** A PATH entry left out of git's, and why. */
+export type Dropped = { readonly entry: string; readonly why: string };
+
+/** git's PATH, and the first entry left out of it: a git not found names it (`gitMissing`). */
+export type FilteredPath = { readonly kept: string; readonly dropped: Dropped | undefined };
+
 /** `path`'s entries that cannot supply a program from the tree `cwd` is in, in their order. */
 export function gitPath(path: string, cwd: string, os: Os = Deno.build.os): string {
+  return filterGitPath(path, cwd, os).kept;
+}
+
+/** {@link gitPath}, with the first entry it left out. */
+export function filterGitPath(path: string, cwd: string, os: Os = Deno.build.os): FilteredPath {
   const top = treeTop(cwd, os);
-  return keptEntries(path, os, (entry) => entryUnsafe(entry, top, os));
+  return sortEntries(path, os, (entry) => entryUnsafe(entry, top, os));
 }
 
 /** `path` split on the platform's separator, joined back without the entries `unsafe` names. */
@@ -35,8 +46,33 @@ export function keptEntries(
   os: Os,
   unsafe: (entry: string) => string | undefined,
 ): string {
+  return sortEntries(path, os, unsafe).kept;
+}
+
+function sortEntries(
+  path: string,
+  os: Os,
+  unsafe: (entry: string) => string | undefined,
+): FilteredPath {
   const separator = os === "windows" ? ";" : ":";
-  return path.split(separator).filter((entry) => unsafe(entry) === undefined).join(separator);
+  const kept: string[] = [];
+  let dropped: Dropped | undefined;
+  for (const entry of path.split(separator)) {
+    const why = unsafe(entry);
+    if (why === undefined) kept.push(entry);
+    else dropped ??= { entry, why };
+  }
+  return { kept: kept.join(separator), dropped };
+}
+
+/**
+ * What a git that cannot be started is refused with: `missing`, then the first entry left out and
+ * why. The git the user expects may sit on that entry, and "not on the PATH" alone would send them
+ * looking for it where it is.
+ */
+export function gitMissing(missing: string, dropped: Dropped | undefined): string {
+  if (dropped === undefined) return missing;
+  return `${missing}; the entry "${dropped.entry}" was left out because it ${dropped.why}`;
 }
 
 /** Why `entry` can supply a program from the tree whose top is `top`; undefined when it cannot. */
@@ -61,8 +97,10 @@ export function spellingUnsafe(entry: string, os: Os = Deno.build.os): string | 
 
 /**
  * The top of the tree `cwd` is in, `tree_top` in the scripts: the nearest folder at or above it,
- * resolved, that holds a `.git`, found without git, which is the program being looked up. With none
- * (a bare repository, or no repository at all) `cwd` itself, so its own folders still count in.
+ * resolved, that holds a `.git`, found without git, which is the program being looked up. A bare
+ * repository holds none, so one nested in a work tree has that tree's top, the wider of the two.
+ * With none at or above (a bare repository outside any work tree, or no repository) `cwd` itself,
+ * so its own folders still count in.
  */
 export function treeTop(cwd: string, os: Os = Deno.build.os): string {
   const path = pathApi(os);

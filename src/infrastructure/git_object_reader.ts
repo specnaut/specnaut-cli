@@ -6,7 +6,8 @@ import { fromTop, toProject } from "../domain/project_path.ts";
 import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
 import { catFiles, lsTree, withBytes } from "./git_tree_records.ts";
 import { decode, firstLine } from "./git_text.ts";
-import { PLAIN_DIFF_FLAGS, UntrustedGit } from "./untrusted_git.ts";
+import { UntrustedGit } from "./untrusted_git.ts";
+import { PLAIN_DIFF_FLAGS } from "./untrusted_git_flags.ts";
 
 /**
  * Reads a repository's commits for the script and checkout checks, through the hardened git. Every

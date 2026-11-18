@@ -2,6 +2,8 @@ import { assertEquals } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
 import {
   entryUnsafe,
+  filterGitPath,
+  gitMissing,
   gitPath,
   keptEntries,
   spellingUnsafe,
@@ -81,6 +83,14 @@ Deno.test("the tree's top is the nearest folder above holding a .git, else the f
     assertEquals(treeTop(join(tmp, "out")), join(tmp, "out"));
   }));
 
+Deno.test("a bare repository nested in a work tree has that tree's top, not its own folder", () =>
+  inTree((_, repo) => {
+    const bare = join(repo, "sub", "nested.git");
+    Deno.mkdirSync(join(bare, "refs"), { recursive: true });
+    Deno.writeTextFileSync(join(bare, "HEAD"), "ref: refs/heads/main\n");
+    assertEquals(treeTop(bare), repo);
+  }));
+
 Deno.test({
   name: "the tree's top is found from the folder the working folder resolves to",
   // A link needs a privilege Windows runners lack.
@@ -111,6 +121,24 @@ Deno.test("the PATH git gets, from a folder of the tree, keeps only what is outs
     const path = [join(repo, "bin"), "", join(tmp, "out"), "bin", tmp].join(DELIMITER);
     assertEquals(gitPath(path, join(repo, "sub")), [join(tmp, "out"), tmp].join(DELIMITER));
   }));
+
+Deno.test("the PATH git gets names the first entry it left out, and why", () =>
+  inTree((tmp, repo) => {
+    const path = [join(tmp, "out"), join(repo, "bin"), "", tmp].join(DELIMITER);
+    assertEquals(filterGitPath(path, repo), {
+      kept: [join(tmp, "out"), tmp].join(DELIMITER),
+      dropped: { entry: join(repo, "bin"), why: "is inside the repository" },
+    });
+    assertEquals(filterGitPath(tmp, repo), { kept: tmp, dropped: undefined });
+  }));
+
+Deno.test("a git not found names the entry left out, which may be where it is", () => {
+  assertEquals(gitMissing("git is not on the PATH", undefined), "git is not on the PATH");
+  assertEquals(
+    gitMissing("git is not on the PATH", { entry: "/r/bin", why: "is inside the repository" }),
+    'git is not on the PATH; the entry "/r/bin" was left out because it is inside the repository',
+  );
+});
 
 Deno.test("an entry naming the repository in another case is in it where case is ignored", () =>
   inTree((_, repo) => {

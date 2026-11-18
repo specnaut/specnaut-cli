@@ -7,9 +7,9 @@
 # Every git call of the caller runs no hook: the branch being landed could commit hooks and a
 # repository-relative core.hooksPath naming them, and the caller fetches, checks out, merges and
 # pushes for it. A project's own post-merge or pre-push hooks do not run here either. The value is
-# the one the binary's own git wrapper passes on every platform (untrusted_git.ts). An alias, not
-# a function: bash 3.2 runs the ERR trap for a `command git` that fails inside an `if`, and a
-# function's body escapes the caller's `if` under -E.
+# the one the binary's own git wrapper passes on every platform (untrusted_git_flags.ts). An
+# alias, not a function: bash 3.2 runs the ERR trap for a `command git` that fails inside an
+# `if`, and a function's body escapes the caller's `if` under -E.
 shopt -s expand_aliases
 alias git='git -c core.hooksPath=/dev/null'
 me=$1

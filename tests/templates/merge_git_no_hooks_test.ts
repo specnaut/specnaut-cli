@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { walk } from "@std/fs";
 import { fromFileUrl, relative } from "@std/path";
-import { UNTRUSTED_GIT_FLAGS } from "../../src/infrastructure/untrusted_git.ts";
+import { UNTRUSTED_GIT_FLAGS } from "../../src/infrastructure/untrusted_git_flags.ts";
 
 /**
  * The merge phase runs no git hook: `phases/merge.md` § Steps is the rule, and this guards the

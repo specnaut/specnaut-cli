@@ -77,7 +77,7 @@ if [ -n "$id" ] && absolute "$state"; then
   fi
 fi
 # Git is asked as the binary asks it (UNTRUSTED_GIT_ENV, ENV_ALLOWLIST in
-# src/infrastructure/untrusted_git.ts): none of the caller's GIT_* variables.
+# src/infrastructure/untrusted_git_flags.ts): none of the caller's GIT_* variables.
 vars=(GIT_CONFIG_NOSYSTEM=1)
 for name in PATH HOME XDG_CONFIG_HOME TMPDIR LANG LC_ALL LC_CTYPE USERPROFILE HOMEDRIVE HOMEPATH SYSTEMROOT WINDIR COMSPEC PATHEXT TEMP TMP; do
   [ -n "${!name+x}" ] && vars+=("$name=${!name}")

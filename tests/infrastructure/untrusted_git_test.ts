@@ -2,13 +2,15 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import {
   GitRefused,
+  UntrustedGit,
+  untrustedGitEnv,
+} from "../../src/infrastructure/untrusted_git.ts";
+import {
   LAZY_FETCH_FLAG,
   PLAIN_DIFF_FLAGS,
   UNTRUSTED_GIT_ENV,
   UNTRUSTED_GIT_FLAGS,
-  UntrustedGit,
-  untrustedGitEnv,
-} from "../../src/infrastructure/untrusted_git.ts";
+} from "../../src/infrastructure/untrusted_git_flags.ts";
 import { callerPath, plantGit, ran, withPath } from "../helpers/planted_git.ts";
 
 /**
@@ -66,7 +68,7 @@ Deno.test("only the allowlist of the caller's environment reaches git, and no GI
     GIT_CONFIG_PARAMETERS: "'core.fsmonitor'='x'",
     EDITOR: "vi",
   };
-  assertEquals(untrustedGitEnv((name) => caller[name], Deno.cwd()), {
+  assertEquals(untrustedGitEnv((name) => caller[name], Deno.cwd()).env, {
     PATH: bin,
     HOME: "/home/u",
     ...UNTRUSTED_GIT_ENV,
@@ -109,34 +111,62 @@ async function inTemp(fn: (dir: string) => Promise<void>): Promise<void> {
   }
 }
 
-// The planted git is a POSIX shell script.
-const POSIX_ONLY = Deno.build.os === "windows";
+/**
+ * Where the planted git runs: on Windows it cannot leave a mark (`plantGit`), so what proves the
+ * real git ran is what it printed, which the planted one never prints.
+ */
+const decoded = (out: Uint8Array) => new TextDecoder().decode(out).trim();
 
-Deno.test({
-  name: "the git the binary starts is looked up only on PATH entries outside the repository",
-  ignore: POSIX_ONLY,
-  fn: () =>
-    inTemp(async (dir) => {
-      const fired = await plantedRepo(dir);
-      const path = ["", ".", "bin", join(dir, "bin"), ...callerPath()];
-      const out = await withPath(path, () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]));
-      assertEquals(new TextDecoder().decode(out).trim(), ".git");
-      assertEquals(await ran(fired), false, "planted git ran");
-    }),
-});
+Deno.test("the git the binary starts is looked up only on PATH entries outside the tree", () =>
+  inTemp(async (dir) => {
+    const fired = await plantedRepo(dir);
+    const path = ["", ".", "bin", join(dir, "bin"), ...callerPath()];
+    const out = await withPath(path, () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]));
+    assertEquals(decoded(out), ".git");
+    assertEquals(await ran(fired), false, "planted git ran");
+  }));
 
-Deno.test({
-  name: "a PATH with no entry outside the repository is refused, never searched",
-  ignore: POSIX_ONLY,
-  fn: () =>
-    inTemp(async (dir) => {
-      const fired = await plantedRepo(dir);
-      await withPath(["", join(dir, "bin")], () =>
+Deno.test("a PATH with no entry outside the repository is refused, never searched", () =>
+  inTemp(async (dir) => {
+    const fired = await plantedRepo(dir);
+    await withPath(["", join(dir, "bin")], () =>
+      assertRejects(
+        () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]),
+        GitRefused,
+        'no PATH entry outside the repository; the entry "" was left out because it is empty',
+      ));
+    assertEquals(await ran(fired), false, "planted git ran");
+  }));
+
+Deno.test("a git found on no entry left names the first entry left out, and why", () =>
+  inTemp(async (dir) => {
+    const fired = await plantedRepo(dir);
+    const outside = await Deno.makeTempDir({ prefix: "untrusted-git-empty-" });
+    try {
+      await withPath([join(dir, "bin"), outside], () =>
         assertRejects(
           () => new UntrustedGit(dir).run("rev-parse", ["--git-dir"]),
           GitRefused,
-          "no PATH entry outside the repository",
+          `git is not on the PATH; the entry "${
+            join(dir, "bin")
+          }" was left out because it is inside the repository`,
         ));
-      assertEquals(await ran(fired), false, "planted git ran");
-    }),
-});
+    } finally {
+      await Deno.remove(outside, { recursive: true });
+    }
+    assertEquals(await ran(fired), false, "planted git ran");
+  }));
+
+Deno.test("an instance starts every git with the PATH it filtered at its first call", () =>
+  inTemp(async (dir) => {
+    await new Deno.Command("git", { args: ["init", "-q"], cwd: dir }).output();
+    const git = new UntrustedGit(dir);
+    assertEquals(decoded(await git.run("rev-parse", ["--git-dir"])), ".git");
+    const outside = await Deno.makeTempDir({ prefix: "untrusted-git-empty-" });
+    try {
+      const again = await withPath([outside], () => git.run("rev-parse", ["--git-dir"]));
+      assertEquals(decoded(again), ".git");
+    } finally {
+      await Deno.remove(outside, { recursive: true });
+    }
+  }));
