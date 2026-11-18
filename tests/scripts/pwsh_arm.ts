@@ -2,7 +2,7 @@ import { assert } from "@std/assert";
 import { run } from "./git_sandbox.ts";
 
 /**
- * Whether a file's PowerShell arm can run. It runs through `git_sandbox.ts`'s
+ * Whether a file's PowerShell arm can run. It runs through `git_hermetic.ts`'s
  * hermetic `run`, as the arm itself does, which is also what stands for `exec`.
  */
 async function hasPwsh(): Promise<boolean> {

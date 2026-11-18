@@ -18,7 +18,7 @@ export function run(cwd: string, tag: string): Promise<{ code: number; err: stri
 
 /**
  * A release script, by absolute path, run in `cwd` with the permissions CI gives
- * it, in the hermetic environment git_sandbox.ts builds: no `GIT_*` from the
+ * it, in the hermetic environment git_hermetic.ts builds: no `GIT_*` from the
  * host, no global or system config, an isolated HOME, and the C locale, so
  * git's words a test asserts on hold whatever the host's.
  */
