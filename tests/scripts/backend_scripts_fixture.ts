@@ -64,10 +64,11 @@ export async function runScript(
   script: string,
   args: ReadonlyArray<string> = [],
   path = Deno.env.get("PATH") ?? "",
+  env: Record<string, string> = {},
 ): Promise<Run> {
   const { code, stdout, stderr } = await new Deno.Command("bash", {
     args: [script, ...args],
-    env: { PATH: `${tmp}/bin:${path}` },
+    env: { ...env, PATH: `${tmp}/bin:${path}` },
     stdout: "piped",
     stderr: "piped",
   }).output();

@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 import { normalizeApiUrl, renderCloudConfig } from "../../src/domain/cloud/cloud_config.ts";
+import { run, TOKEN, withServer } from "./cloud_stub.ts";
 
 /**
  * The cloud backlog scripts' `_config.sh` hands `api_url` to curl, which is not
@@ -175,4 +176,17 @@ Deno.test("cloud _config.sh refuses a plain-http api_url before a token is asked
     assertEquals(r.code, 0, `${url}\n${r.out}`);
     assertEquals(normalizeApiUrl(url), url);
   }
+});
+
+// cli#808: only kanban.sh's own flag skips the token. One the user exported once made every
+// Cloud script stop before `cloud_curl` and `API_BASE` existed, failing on errors unrelated to it.
+Deno.test("a BACKLOG_CONFIG_ONLY exported from the environment changes nothing for a Cloud script", async () => {
+  await withServer(async (port, requests) => {
+    const env = { BACKLOG_CONFIG_ONLY: "1" };
+    const r = await run("list.sh", [], `http://127.0.0.1:${port}/ok`, { env });
+    assertEquals(r.code, 0, r.out);
+    const sent = await requests();
+    assertEquals(sent.length > 0, true, `no request\n${r.out}`);
+    for (const q of sent) assertEquals(q.authorization, `Bearer ${TOKEN}`);
+  });
 });

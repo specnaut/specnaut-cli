@@ -85,8 +85,8 @@ case $API_URL in http://*)
   } ;;
 esac
 
-# A caller sending no request (kanban.sh) needs no token: logged out works (cli#804).
-[ "${BACKLOG_CONFIG_ONLY:-}" != 1 ] || return 0
+# kanban.sh sends no request, so needs no token (cli#804): its UNEXPORTED flag only (cli#808).
+[[ $(declare -p BACKLOG_CONFIG_ONLY 2>/dev/null) != 'declare -- BACKLOG_CONFIG_ONLY="1"' ]] || return 0
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).

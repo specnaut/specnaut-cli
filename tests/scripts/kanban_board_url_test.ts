@@ -30,12 +30,13 @@ async function kanban(
   config: string | null,
   stubs: Record<string, string>,
   args: ReadonlyArray<string> = ["--no-open"],
+  env: Record<string, string> = {},
 ): Promise<Run & { calls: string; tmp: string }> {
   const extra = [`${backend}/_board.sh`, "_open_url.sh", "kanban.sh"];
   if (backend === "cloud") extra.push("_issue_text.sh");
   const tmp = await backendHarness(backend, config, extra);
   for (const [name, body] of Object.entries(stubs)) await stub(tmp, name, logged(body));
-  const run = await runScript(tmp, `${backendDir(tmp, backend)}/kanban.sh`, args);
+  const run = await runScript(tmp, `${backendDir(tmp, backend)}/kanban.sh`, args, undefined, env);
   return { ...run, calls: await readCalls(`${tmp}/calls`), tmp };
 }
 
@@ -132,12 +133,15 @@ Deno.test("gitlab: a failed lookup, or one naming no plain path, is exit 13", as
   }
 });
 
+// The flag exported as well (cli#808): kanban.sh's own still counts, though an inherited one does not.
 Deno.test("cloud: no board address and no credential needed, so the fallback, logged out too", async () => {
   for (const specnaut of ["echo tok", 'echo "not signed in" >&2; exit 1']) {
-    const r = await kanban("cloud", CLOUD, { specnaut, curl: "exit 1" });
-    assertEquals(r.code, 0, r.err);
-    assertEquals(r.out, "CLOUD: project ACME - open the board from the Specnaut Cloud web app");
-    assertEquals(r.calls, "", "kanban sends no request: no token is asked for");
+    for (const env of [{}, { BACKLOG_CONFIG_ONLY: "1" }] as Record<string, string>[]) {
+      const r = await kanban("cloud", CLOUD, { specnaut, curl: "exit 1" }, ["--no-open"], env);
+      assertEquals(r.code, 0, r.err);
+      assertEquals(r.out, "CLOUD: project ACME - open the board from the Specnaut Cloud web app");
+      assertEquals(r.calls, "", "kanban sends no request: no token is asked for");
+    }
   }
 });
 

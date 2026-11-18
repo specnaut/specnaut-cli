@@ -21,7 +21,9 @@ case "${1:-}" in
 esac
 
 # The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
-# no credential is fetched first (cli#804).
+# no credential is fetched first (cli#804). Unset first, so the flag is this
+# shell's own and unexported: cloud/_config.sh honours no other (cli#808).
+unset BACKLOG_CONFIG_ONLY
 BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
