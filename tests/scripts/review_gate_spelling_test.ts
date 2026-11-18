@@ -106,6 +106,7 @@ Deno.test({
       assertEquals(out.code, 2, out.stderr);
       assertStringIncludes(out.stderr, `PATH entry '${l.bin}' is inside the repository`);
       assertStringIncludes(out.stderr, "the command holds $', whose escapes can spell any name");
+      assertStringIncludes(out.stderr, "or write the $ as [$]");
       assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
     }),
 });

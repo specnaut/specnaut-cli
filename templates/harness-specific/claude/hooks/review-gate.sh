@@ -21,11 +21,12 @@
 # a session set on getting past it: a name spelled so the line never holds it - a parameter
 # default, `${IFS}`, brace expansion, a `$"..."` a message catalog translates, command
 # substitution, `eval`, an alias, text decoded into a shell (`base64 -d | sh`), a file sourced or
-# written and then run - is out of its reach, as is a PATH named in double quotes (`read "PATH"`)
-# or set by the Bash tool's env file or snapshot. Before any of that, every time, the pass a gated line left is removed: a pass lives only
-# until the next command, and a check stopped part-way leaves none behind. A `specnaut` that
-# resolves into the tree stops a review's command: it would be the tree judging itself. The input
-# is read by a builtin, PATH or none.
+# written and then run - is out of its reach, as is a PATH that `read`, `printf -v` or `declare -n`
+# names in double quotes or between quotes that pair the wrong way (`cut -d'"'`), or that the Bash
+# tool's env file or snapshot sets. Before any of that, every time, the pass a gated line left is
+# removed: a pass lives only until the next command, and a check stopped part-way leaves none
+# behind. A `specnaut` that resolves into the tree stops a review's command: it would be the tree
+# judging itself. The input is read by a builtin, PATH or none.
 # Not exported: only this shell's matching reads it. A session that exports LC_ALL passes C on.
 LC_ALL=C
 refuse() {
@@ -119,18 +120,26 @@ runs_specnaut() {
   done
   return 1
 }
-# Whether a command value names PATH bare, in any letter case, outside a double-quoted string: any
-# spelling that can set it (`PATH=`, `PATH+=`, `PATH[0]=`, zsh's tied `path+=(...)`, `read PATH`,
-# `printf -v PATH`), while `$PATH`, `${PATH...}`, `GOPATH=` and a message in double quotes, as the
-# resolve block prints, are not. Read both ways, as runs_specnaut reads a backslash-newline.
+# Whether a command value names PATH so it can set it, in any letter case. An assignment
+# (`PATH=`, `PATH+=`, `PATH[0]=`, zsh's tied `path+=(...)`) is read over the whole value, quotes
+# and all: `export "PATH=..."` assigns it. Then, double-quoted strings left out, a bare word:
+# `read PATH`, `read path`, `printf -v PATH`. Neither is `$PATH`, `${PATH...}`, `GOPATH=`, nor a
+# message in double quotes, as the resolve block prints. The assignment is read both ways at a
+# backslash-newline, as runs_specnaut reads one; the bare word joined only, as a word a kept
+# newline would start is a command, where only an assignment sets PATH.
 names_path() {
-  local v pre post q=$'\002'
+  local v j pre post q=$'\002'
   # shellcheck disable=SC2016 # a `$` before the name is a read: it is in the class, not expanded
+  local assign='(^|[^$A-Za-z0-9_{])[Pp][Aa][Tt][Hh](\[[^]]*\])?\+?='
+  # shellcheck disable=SC2016 # the same class
   local bare='(^|[^$A-Za-z0-9_{])[Pp][Aa][Tt][Hh]([^A-Za-z0-9_]|$)'
   for v in "${vals[@]}"; do
     v=${v//$'\001'$q/}
+    j=${v//$'\001'\\n/}
+    { holds "$j" "$assign" || holds "$v" "$assign"; } && return 0
     while [[ $v == *$q*$q* ]]; do pre=${v%%"$q"*} post=${v#*"$q"} v=$pre${post#*"$q"}; done
-    { holds "${v//$'\001'\\n/}" "$bare" || holds "$v" "$bare"; } && return 0
+    j=${v//$'\001'\\n/}
+    holds "$j" "$bare" && return 0
   done
   return 1
 }
@@ -145,7 +154,7 @@ tree_top "$dir"
 top=${top:-$dir}
 clean_path
 without=" - start the session from a shell without that entry"
-ansi=" - the command holds \$', whose escapes can spell any name: write it without (printf, say)"
+ansi=" - the command holds \$', whose escapes can spell any name: write it without (printf, say), or write the \$ as [\$]"
 IFS= read -r -d '' input || true
 drop_pass
 # The line with every backslash-newline, quote and backslash removed, JSON-escaped or not, and a

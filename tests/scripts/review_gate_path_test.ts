@@ -18,8 +18,18 @@ const NAMES_PATH = [
   "path+=(bin); specnaut review start 1",
   "PATH[0]=bin:$PATH specnaut review start 1",
   "read PATH; specnaut review start 1",
+  "read path; specnaut review start 1",
+  "read PA\\\nTH; specnaut review start 1",
   "PA\\\nTH=bin specnaut review start 1",
   "ls # note\\\nPATH=bin specnaut review start 1",
+  // Quoted, or past quotes that pair the wrong way: an assignment is read with nothing left out.
+  'export "PATH=$PWD/bin:$PATH"; specnaut review start 1',
+  'env "PATH=./bin" specnaut review start 1',
+  `cut -d'"' -f2 f; PATH=./bin:$PATH specnaut review start "1" --expect "abc"`,
+  'declare "PATH[0]=./bin"; specnaut review start 1',
+  'declare "PATH+=:bin"; specnaut review start 1',
+  'export "PA\\\nTH=./bin"; specnaut review start 1',
+  `cut -d'"' -f2 f #x\\\nPATH=./bin specnaut review start "1"`,
 ];
 
 /** Lines that start a review and only read PATH, name another variable, or quote the word. */
@@ -28,6 +38,7 @@ const READS_PATH = [
   'echo "$PATH"; specnaut review start 1',
   'echo "a \\" in PATH"; specnaut review start 1',
   "GOPATH=/go NODE_PATH=lib echo $PATH ${PATH%%:*}; specnaut review start 1",
+  'echo "$PATH=" ${PATH=/usr/bin}; specnaut review start 1',
 ];
 
 Deno.test({
