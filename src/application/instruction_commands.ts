@@ -1,4 +1,5 @@
 import { COMMAND_REASON, commandPaths, isCommandSource } from "../domain/command_targets.ts";
+import { onPathTargets } from "../domain/command_search_path.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
@@ -11,7 +12,9 @@ import { indexAt, sourceAt, visit, type Walk } from "./head_targets.ts";
  * each word that names a file HEAD or the tip holds, in any letter case, or a path through a link
  * HEAD holds. Resolved and judged, never refused: a target the branch leaves alone stays silent,
  * so only a changed one is named, where refusing would name an unchanged hook on every merge.
- * A target is judged by its bytes alone; its text is never read for imports or for commands.
+ * A target is judged by its bytes alone; its text is never read for imports or for commands. A
+ * program a command names by name alone is tried in each folder any source puts on PATH: a
+ * settings file's PATH reaches a skill's hooks too.
  */
 
 /**
@@ -38,18 +41,36 @@ export async function readCommands(
 
 type Read = { readonly entry: BaseEntry; readonly bytes: Uint8Array; readonly atHead: boolean };
 
-/** Every path the sources `read` name; one HEAD holds that is not read whole gets the reason. */
+/**
+ * Every path the sources `read` name, and each program they name in each folder they put on PATH;
+ * a source HEAD holds that is not read whole gets the reason, as does each that puts a folder on
+ * PATH, at either commit, when the programs on PATH are too many to try: one at the tip alone
+ * still brings its folders to HEAD's programs.
+ */
 function commandTargets(walk: Walk, read: readonly Read[], isFolder: (p: string) => boolean) {
   const targets = new Set<string>();
-  for (const { entry, bytes, atHead } of read) {
-    const found = commandPaths(entry.path, bytes, isFolder);
+  const onPath = {
+    folders: new Set<string>(),
+    programs: new Set<string>(),
+    setters: [] as string[],
+  };
+  for (const source of read) {
+    const found = commandPaths(source.entry.path, source.bytes, isFolder);
     found.paths.forEach((p) => targets.add(p));
-    if (!found.whole && atHead) {
-      walk.reasons.push({ path: entry.path, reason: COMMAND_REASON.partial });
-    }
+    found.onPath.forEach((f) => onPath.folders.add(f));
+    found.programs.forEach((p) => onPath.programs.add(p));
+    if (found.onPath.length > 0) onPath.setters.push(source.entry.path);
+    if (!found.whole && source.atHead) partial(walk, source.entry.path);
   }
+  const tried = { whole: true };
+  onPathTargets(onPath.folders, onPath.programs, tried).forEach((p) => targets.add(p));
+  if (!tried.whole) new Set(onPath.setters).forEach((path) => partial(walk, path));
   return targets;
 }
+
+/** Names `path` as a source whose commands were not all read. */
+const partial = (walk: Walk, path: string) =>
+  walk.reasons.push({ path, reason: COMMAND_REASON.partial });
 
 /** Each command source among `entries`, with the bytes `commit` holds for it. */
 async function sourcesAt(walk: Walk, commit: string, entries: readonly BaseEntry[]) {

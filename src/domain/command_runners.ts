@@ -21,9 +21,13 @@ export const RUNNERS: ReadonlyMap<string, readonly string[]> = new Map([
 const isPrelude = (word: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*=/.test(word) || ["exec", "env", "command"].includes(word);
 
+/** The program one command (its `words`) starts: its first word that is not a prelude. */
+export const programOf = (words: readonly string[]): string | undefined =>
+  words.find((w) => !isPrelude(w));
+
 /** The manifests the program one command (its `words`) starts reads, by its name. */
 export function manifestsOf(words: readonly string[]): readonly string[] {
-  const program = words.find((w) => !isPrelude(w));
+  const program = programOf(words);
   if (program === undefined) return [];
   return RUNNERS.get(program.slice(program.lastIndexOf("/") + 1)) ?? [];
 }

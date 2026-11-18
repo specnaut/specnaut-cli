@@ -1,7 +1,8 @@
 import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb, readings } from "./project_path.ts";
-import { rawWords, type Reading, valueEntries } from "./command_words.ts";
+import { rawWords, type Reading, reading, valueEntries } from "./command_words.ts";
+import { pathPieces, rawPathValues } from "./command_search_path.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
 
 /**
@@ -40,8 +41,16 @@ const MAX_SUFFIXES = 32;
 /** At most this many paths are put under the folders one group of words names. */
 const MAX_JOINS = 50_000;
 
-/** What a source's commands name, and whether every word of it was read. */
-export type CommandPaths = { readonly paths: readonly string[]; readonly whole: boolean };
+/**
+ * What a source's commands name, and whether every word of it was read; and, for the programs a
+ * bare name runs (`command_search_path.ts`), the folders it puts on PATH and the programs it names.
+ */
+export type CommandPaths = {
+  readonly paths: readonly string[];
+  readonly whole: boolean;
+  readonly onPath: readonly string[];
+  readonly programs: readonly string[];
+};
 
 /**
  * The paths a command source names (`entryPaths`), from its parsed values (each object's strings
@@ -55,13 +64,26 @@ export function commandPaths(
   bytes: Uint8Array,
   isFolder: (path: string) => boolean,
 ): CommandPaths {
-  const read: Reading = { whole: true };
+  const read = reading();
   const text = new TextDecoder().decode(bytes);
   const entries = isCommandMarkdown(path)
     ? markdownEntries(text, read, PARSE_LIMIT)
-    : [...parsedEntries(path, text, read), ...text.split("\n").map(rawWords)];
+    : [...parsedEntries(path, text, read), ...rawEntries(text, read)];
   const paths = new Set(entries.flatMap((words) => entryPaths(words, isFolder, read)));
-  return { paths: [...paths], whole: read.whole };
+  const onPath = new Set(read.pathValues.flatMap(pathPieces).flatMap((p) => pathOf(p, read)));
+  return {
+    paths: [...paths],
+    whole: read.whole,
+    onPath: [...onPath],
+    programs: [...read.programs],
+  };
+}
+
+/** Each line's words as bytes, and what a PATH key or assignment on it sets PATH to. */
+function rawEntries(text: string, read: Reading): string[][] {
+  const lines = text.split("\n");
+  read.pathValues.push(...lines.flatMap(rawPathValues));
+  return lines.map(rawWords);
 }
 
 /**
@@ -73,7 +95,7 @@ export function commandPaths(
 export function entryPaths(
   words: readonly string[],
   isFolder: (path: string) => boolean,
-  read: Reading = { whole: true },
+  read: Reading = reading(),
 ): string[] {
   const found = new Set<string>();
   for (const word of new Set(words)) {
@@ -151,7 +173,8 @@ function parsedEntries(path: string, text: string, read: Reading): string[][] {
     return [];
   }
   try {
-    return valueEntries(path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text));
+    const value = path.toLowerCase().endsWith(".toml") ? parseToml(text) : parseJsonc(text);
+    return valueEntries(value, read);
   } catch (err) {
     // Not swallowed: a source that does not parse, or nests too deep to walk, is not read whole,
     // and its caller names it. Anything else is not a parse failure and goes up.

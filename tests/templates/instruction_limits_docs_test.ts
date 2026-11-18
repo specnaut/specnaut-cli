@@ -36,3 +36,11 @@ Deno.test("the row names the commands a skill, an agent or a slash command holds
   assert(row.includes("one a skill's, an agent's or a slash command's frontmatter declares"), row);
   assert(row.includes("a skill's or a slash command's `` !`…` `` span"), row);
 });
+
+Deno.test("the row names the programs on a judged PATH, and the PATH a shell builds as a limit", () => {
+  const row = instructionsRow();
+  assert(row.includes("each program a command names by name alone in each folder a judged"), row);
+  const limits = notRead();
+  assert(limits.includes("the folders a shell puts on `PATH` before the session starts"), limits);
+  assert(limits.includes("`.envrc`'s `PATH_add`, mise's configuration"), limits);
+});

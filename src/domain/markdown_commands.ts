@@ -29,7 +29,7 @@ const BANG = /!`([^`]*)`/g;
  * caller names the file, rather than trust what a parser it disagrees with would run.
  */
 export function markdownEntries(text: string, read: Reading, limit: number): string[][] {
-  const bangs = [...text.matchAll(BANG)].map((m) => commandWords([m[1]]));
+  const bangs = [...text.matchAll(BANG)].map((m) => commandWords([m[1]], read));
   const front = frontmatter(text.replace(/^\uFEFF/, "").split(/\r?\n/));
   return front === null ? bangs : [...frontEntries(front, read, limit), ...bangs];
 }
@@ -43,7 +43,7 @@ function frontmatter(lines: readonly string[]): string[] | null {
 
 function frontEntries(front: readonly string[], read: Reading, limit: number): string[][] {
   const text = front.join("\n");
-  const parsed = text.length > limit ? null : hookEntries(text);
+  const parsed = text.length > limit ? null : hookEntries(text, read);
   if (parsed === null) {
     read.whole = false;
     return front.map(rawWords);
@@ -52,11 +52,11 @@ function frontEntries(front: readonly string[], read: Reading, limit: number): s
 }
 
 /** The groups of words the parsed `hooks:` holds, or `null` when it does not parse or nests too deep. */
-function hookEntries(text: string): string[][] | null {
+function hookEntries(text: string, read: Reading): string[][] | null {
   try {
     const value = parseYaml(text);
     const owns = value !== null && typeof value === "object" && Object.hasOwn(value, "hooks");
-    return valueEntries(owns ? (value as Record<string, unknown>).hooks : undefined);
+    return valueEntries(owns ? (value as Record<string, unknown>).hooks : undefined, read);
   } catch (err) {
     // Not swallowed: the caller reads every line and names the file as not fully read.
     if (!(err instanceof SyntaxError || err instanceof RangeError)) throw err;

@@ -50,3 +50,16 @@ Deno.test("a helper script's folder in another spelling is walked: the script ch
   await readCommands(walk, { head: [settings("bash .Specnaut/scripts/bash/y.sh")], tip: [] });
   assertEquals([...walk.files.keys()], [".Specnaut/scripts/bash/y.sh"]);
 });
+
+Deno.test("too many programs on too many PATH folders to try names the sources that set PATH", async () => {
+  const folders = Array.from({ length: 300 }, (_, i) => `d${i}`).join(":");
+  const programs = Array.from({ length: 300 }, (_, i) => `p${i}`).join("; ");
+  const set: BaseEntry = {
+    kind: "blob",
+    path: ".mcp.json",
+    bytes: enc(JSON.stringify({ mcpServers: { x: { command: "serve", env: { PATH: folders } } } })),
+  };
+  const walk = targetWalk(reader([]), BASE);
+  await readCommands(walk, { head: [settings(programs), set], tip: [] });
+  assertEquals(walk.reasons, [{ path: ".mcp.json", reason: "commands not fully read" }]);
+});
