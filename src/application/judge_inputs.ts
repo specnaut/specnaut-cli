@@ -2,6 +2,7 @@ import { type ClassNow, instructionsApprovable } from "../domain/approval_verdic
 import type { ConfigVerdict } from "../domain/config_trust.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { INSTRUCTION_CLASS } from "../domain/instruction_trust.ts";
+import { APPROVALS_FILE } from "../domain/skill_approvals.ts";
 import type { Harness } from "./ports.ts";
 import type { CheckoutTreeWalker, GitObjectReader } from "./script_trust_ports.ts";
 import { type ShippedInput, shippedInput } from "./shipped_copies.ts";
@@ -27,16 +28,20 @@ export type Judged = {
   readonly verdicts: readonly ConfigVerdict[];
   readonly digest: string | null;
   readonly shipped: ShippedInput | null;
+  /** Whether HEAD commits anything at the approvals file's path: what a yes may not cover. */
+  readonly approvalsAtHead: boolean;
 };
 
 /** The config, then the instruction verdicts, measured from `base`; none when it is unknown. */
 export async function judgeInputs(deps: JudgeDeps, base: InstructionBase | null): Promise<Judged> {
-  if (base === null) return { verdicts: [], digest: null, shipped: null };
+  if (base === null) return { verdicts: [], digest: null, shipped: null, approvalsAtHead: true };
   const { git, tree } = deps;
   const config = await verifyConfig({ git, tree }, base);
   const shipped = await shippedInput(deps, base);
   const instructions = await verifyInstructions({ git, tree }, base, shipped);
-  return { verdicts: [...config, ...instructions.verdicts], digest: instructions.digest, shipped };
+  const verdicts = [...config, ...instructions.verdicts];
+  const approvalsAtHead = (await git.readFile(base.head, APPROVALS_FILE)).kind !== "absent";
+  return { verdicts, digest: instructions.digest, shipped, approvalsAtHead };
 }
 
 /** The instruction class as judged: what a yes to its digest is compared with. */
@@ -45,6 +50,9 @@ export function instructionsNow(judged: Judged): ClassNow {
   return {
     trusted: lines.some((v) => v.trusted),
     digest: judged.digest ?? "",
-    approvable: instructionsApprovable(lines.flatMap((v) => v.trusted ? [] : [v])),
+    approvable: instructionsApprovable(
+      lines.flatMap((v) => v.trusted ? [] : [v]),
+      judged.approvalsAtHead,
+    ),
   };
 }

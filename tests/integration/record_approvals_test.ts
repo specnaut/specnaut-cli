@@ -100,3 +100,20 @@ Deno.test("nothing to record and nothing dormant leaves the file as it is", asyn
   const r = await record(root);
   assertEquals([r.code, r.lines, r.file], [0, ["APPROVALS unchanged"], null], r.stderr);
 });
+
+Deno.test("a yes covers the approvals file's deletion, never a copy HEAD commits", async () => {
+  const files = { ...base(), [TASK]: MINE, [APPROVALS_FILE]: await line(MINE, TASK) };
+  const deleted = await fixture({ files });
+  await Deno.remove(join(deleted.root, APPROVALS_FILE));
+  await commitAll(deleted.root, "revoke the approvals");
+  const r = await record(deleted.root);
+  assertEquals([r.code, r.lines, r.file], [0, ["APPROVALS unchanged"], null], r.stderr);
+  // Committed, then deleted from the work tree only: what lands is HEAD's copy.
+  const { root } = await fixture({ files });
+  await write(root, { [APPROVALS_FILE]: await line(`${MINE}.`, TASK) });
+  await commitAll(root, "approve another copy");
+  await Deno.remove(join(root, APPROVALS_FILE));
+  const forged = await record(root);
+  assertEquals([forged.code, forged.file], [1, null], forged.stderr);
+  assertStringIncludes(forged.lines.join("\n"), "APPROVAL instructions moved ");
+});

@@ -82,12 +82,13 @@ export function scriptsApprovable(untrusted: readonly Untrusted[]): boolean {
 /**
  * Whether a yes can cover the instructions' verdict: any but a branch's change to the approvals
  * file (`skill_approvals.ts`). Only the landing writes it, after a yes; a branch that wrote its own
- * would vouch for itself at the next merge. Deleting it revokes every approval, and a file only the
- * base added is a rebase, so those two hold. Its name in another letter case holds nothing.
+ * would vouch for itself at the next merge. HEAD that commits no such file (`atHead`, read from git
+ * objects, never from the walk's reason) lands none: a deletion revokes every approval, and a file
+ * only the base added is a rebase, so a yes holds either. Its name in another letter case holds
+ * nothing.
  */
-export function instructionsApprovable(untrusted: readonly Untrusted[]): boolean {
+export function instructionsApprovable(untrusted: readonly Untrusted[], atHead: boolean): boolean {
   return untrusted.every((u) =>
-    u.path.toLowerCase() !== APPROVALS_FILE ||
-    (u.path === APPROVALS_FILE && (u.reason === REASON.missing || u.reason === REASON.behind))
+    u.path.toLowerCase() !== APPROVALS_FILE || (u.path === APPROVALS_FILE && !atHead)
   );
 }

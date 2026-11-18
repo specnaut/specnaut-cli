@@ -101,15 +101,16 @@ Deno.test("a yes binds only the bytes the digest covers: a link, a non-file or a
   ) assertEquals(scriptsApprovable(at(reason)), false, reason);
 });
 
-Deno.test("a yes covers no branch change to the approvals file but its deletion", () => {
+Deno.test("a yes covers no branch change to the approvals file but its absence at HEAD", () => {
   const skill = { path: ".claude/skills/task/SKILL.md", reason: REASON.differs };
   const at = (reason: string, path = APPROVALS_FILE) => [skill, { path, reason }];
-  assertEquals(instructionsApprovable([skill]), true);
-  assertEquals(instructionsApprovable(at(REASON.missing)), true, "deleted: approvals revoked");
-  assertEquals(instructionsApprovable(at(REASON.behind)), true, "only the base moved");
-  for (const reason of [REASON.differs, REASON.notOnBase, REASON.caseDiffers, REASON.link]) {
-    assertEquals(instructionsApprovable(at(reason)), false, reason);
+  assertEquals(instructionsApprovable([skill], true), true);
+  for (const reason of [REASON.missing, REASON.behind, REASON.differs, REASON.notOnBase]) {
+    // Absent at HEAD: deleted, which revokes every approval, or added by the base alone.
+    assertEquals(instructionsApprovable(at(reason), false), true, `absent at HEAD: ${reason}`);
+    // Committed at HEAD, whatever the walk of the tree says of it.
+    assertEquals(instructionsApprovable(at(reason), true), false, `at HEAD: ${reason}`);
   }
   const upper = APPROVALS_FILE.toUpperCase();
-  assertEquals(instructionsApprovable(at(REASON.missing, upper)), false, "another letter case");
+  assertEquals(instructionsApprovable(at(REASON.missing, upper), false), false, "another case");
 });
