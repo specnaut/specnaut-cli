@@ -37,10 +37,13 @@ async function olderRouterWithLocalRow(dir: string, extra = ""): Promise<string>
 Deno.test("a router whose only edit routes kanban locally is replaced by the bundled verb", async () => {
   await withTempDir(async (dir) => {
     const bundled = await olderRouterWithLocalRow(dir);
+    // A note, not a refusal: `ℹ`, on the dry run and the applied run alike.
+    const dry = await runSpecnaut(["upgrade", "--dry-run"], dir);
+    assertStringIncludes(dry.stdout, `ℹ ${ROUTER}: the local row is dropped`);
     const up = await runSpecnaut(["upgrade"], dir);
     assertEquals(up.code, 0, up.stderr);
     assertEquals(await Deno.readTextFile(join(dir, ROUTER)), bundled);
-    assertStringIncludes(up.stdout, `${ROUTER}: the local row is dropped`);
+    assertStringIncludes(up.stdout, `ℹ ${ROUTER}: the local row is dropped`);
     assertStringIncludes(up.stdout, "the bundled `kanban` takes over");
     assertStringIncludes(up.stdout, LOCAL);
   });

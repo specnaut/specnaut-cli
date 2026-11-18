@@ -19,15 +19,20 @@ import type { ContextLinkSurvey } from "./upgrade_context_links.ts";
  * sees is the same as the silent skip it replaced — and on the up-to-date one
  * too, which is the likely path: a project whose only outstanding difference is
  * the refused file lands there. Anything else every path must say joins them:
- * staging cleanup, orphan prunes, and what `carryRenames` moved or would not —
- * the one list a dry run also prints.
+ * staging cleanup, orphan prunes, and what `carryRenames` moved or would not.
  */
 type WithRefusals = { refusals: ReadonlyArray<string> };
 
+/**
+ * What the person should hear that refuses nothing, printed `ℹ` where a refusal
+ * is `⚠` (`specnaut/phases/upgrade.md`): what the verb-row supersede did or
+ * could not match (cli#804), on every path, a dry run's too; and on a run that
+ * writes, what the merges changed (#642).
+ */
+type WithNotes = { notes: ReadonlyArray<string> };
+
 /** What the JSON re-merge did (`upgrade_json_merges.ts`) on a run that writes. */
-type WithMerges = {
-  /** What the merges changed that the person should hear about (#642). */
-  notes: ReadonlyArray<string>;
+type WithMerges = WithNotes & {
   /** JSON-merged dests this run changed. */
   mergedChanged: ReadonlyArray<string>;
 };
@@ -39,7 +44,7 @@ export type UpToDateResult = WithRefusals & WithMerges & {
   currentVersion: string;
 };
 
-export type PlannedResult = WithRefusals & {
+export type PlannedResult = WithRefusals & WithNotes & {
   status: "planned";
   plan: UpgradePlan;
   fromVersion: string;
@@ -111,5 +116,7 @@ export type UpgradeRun = {
   readonly plan: UpgradePlan;
   /** Everything said before the plan: refusals, the constitution, the renames. */
   readonly refusals: ReadonlyArray<string>;
+  /** What the supersede said before the plan (`WithNotes`): every result carries it. */
+  readonly notes: ReadonlyArray<string>;
   readonly links: ContextLinkSurvey;
 };

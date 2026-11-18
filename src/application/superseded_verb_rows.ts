@@ -2,9 +2,15 @@ import type { FsReader } from "./ports.ts";
 import type { Bundle, TemplateFile } from "../domain/template.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import { routedVerbs, rowVerb, verbRowDrops } from "../domain/router_verb_rows.ts";
+import {
+  candidateRows,
+  MAX_CANDIDATE_ROWS,
+  routedVerbs,
+  rowVerb,
+  verbRowDrops,
+} from "../domain/router_verb_rows.ts";
 
-/** The dests planned as unedited, and one line for each, quoting what goes. */
+/** The dests planned as unedited, and one note for each, quoting what goes. */
 export type SupersededEdits = {
   readonly dests: ReadonlySet<string>;
   readonly notes: ReadonlyArray<string>;
@@ -40,8 +46,9 @@ export async function supersededVerbEdits(
     const disk = await ctx.reader.readText(ctx.projectDir, dest);
     const dropped = await restoringDrop(disk, file.content, lockSha!);
     if (dropped === null) continue;
-    dests.add(dest);
-    notes.push(supersedeNote(dest, dropped));
+    const matched = typeof dropped !== "number";
+    if (matched) dests.add(dest);
+    notes.push(matched ? supersedeNote(dest, dropped) : unmatchedNote(dest, dropped));
   }
   return { dests, notes };
 }
@@ -53,13 +60,19 @@ function editedRouter(file: TemplateFile, lockSha?: string, diskSha?: string): b
   return file.content.includes("## Verbs");
 }
 
-/** The fewest candidate rows whose removal leaves the text hashing to `lockSha`, or null. */
+/**
+ * The fewest candidate rows whose removal leaves the text hashing to `lockSha`,
+ * or null; the candidate count when it is past `MAX_CANDIDATE_ROWS`, as after a
+ * multi-release jump, where no drop is tried and the user is told so.
+ */
 async function restoringDrop(
   disk: string | null,
   bundled: string,
   lockSha: string,
-): Promise<ReadonlyArray<string> | null> {
+): Promise<ReadonlyArray<string> | number | null> {
   if (disk === null) return null;
+  const candidates = candidateRows(disk, bundled).length;
+  if (candidates > MAX_CANDIDATE_ROWS) return candidates;
   for (const drop of verbRowDrops(disk, bundled)) {
     if (await sha256Hex(drop.text) !== lockSha) continue;
     // The restored text is what Specnaut last wrote. A verb it already routed
@@ -76,4 +89,10 @@ function supersedeNote(dest: string, dropped: ReadonlyArray<string>): string {
   const verbs = [...new Set(dropped.map(rowVerb))].map((v) => `\`${v}\``).join(", ");
   const local = dropped.length === 1 ? "row is" : "rows are";
   return `${dest}: the local ${local} dropped (${rows}); the bundled ${verbs} takes over`;
+}
+
+/** Why a router with too many candidate rows is kept, rather than saying nothing. */
+function unmatchedNote(dest: string, candidates: number): string {
+  return `${dest}: the local row could not be matched (${candidates} rows route verbs this ` +
+    `release ships, more than the ${MAX_CANDIDATE_ROWS} compared); the router is kept as customised`;
 }

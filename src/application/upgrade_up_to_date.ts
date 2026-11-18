@@ -41,7 +41,7 @@ export async function finishUpToDate(io: UpgradeIo, run: UpgradeRun): Promise<Up
     fromVersion: run.lock.templatesVersion,
     currentVersion: run.templatesVersion,
     refusals: [...run.refusals, ...pruned],
-    notes: [...merges.notes, ...grants],
+    notes: [...run.notes, ...merges.notes, ...grants],
     mergedChanged: merges.changed,
   };
 }

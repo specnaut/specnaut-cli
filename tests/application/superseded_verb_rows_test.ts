@@ -1,10 +1,18 @@
 import { assertEquals } from "@std/assert";
 import { supersededVerbEdits } from "../../src/application/superseded_verb_rows.ts";
 import { gatherPlanInputs } from "../../src/application/upgrade_plan_inputs.ts";
+import { finishUpToDate } from "../../src/application/upgrade_up_to_date.ts";
+import { MAX_CANDIDATE_ROWS } from "../../src/domain/router_verb_rows.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { Bundle } from "../../src/domain/template.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
-import { fakeReader, fakeWriter } from "./upgrade_fakes.ts";
+import {
+  fakeHarness,
+  fakeLockStore,
+  fakeReader,
+  fakeStagingStore,
+  fakeWriter,
+} from "./upgrade_fakes.ts";
 
 /**
  * Which customised routers a verb the bundle now ships supersedes (cli#803):
@@ -104,11 +112,40 @@ Deno.test("a declared preserve, an untouched file and a merge block are never as
   }
 });
 
-Deno.test("the plan inputs carry the superseded dest, and its note among the refusals", async () => {
+Deno.test("more candidate rows than are compared: said, and the router kept as customised", async () => {
+  // A multi-release jump: every row the bundle reworded is a candidate too.
+  const many = Array.from({ length: MAX_CANDIDATE_ROWS }, (_, i) => row("list", `Old ${i}`));
+  const { out } = await edits(router(...many, LOCAL));
+  assertEquals([...out.dests], []);
+  assertEquals(out.notes, [
+    `${R}: the local row could not be matched (${MAX_CANDIDATE_ROWS + 1} rows route verbs ` +
+    `this release ships, more than the ${MAX_CANDIDATE_ROWS} compared); the router is kept as customised`,
+  ]);
+});
+
+/** `ℹ` is a note, `⚠` a refusal (`specnaut/phases/upgrade.md`): a superseded row is a note. */
+Deno.test("the plan inputs carry the superseded dest, and its note among the notes", async () => {
   const disk = router(row("list", "Overview"), LOCAL);
   const { lock, bundle } = await edits(disk);
   const io = { reader: fakeReader({ [R]: disk }), writer: fakeWriter(), dryRun: true };
   const inputs = await gatherPlanInputs(io, "/p", bundle, lock, () => false);
-  assertEquals([...inputs.superseded], [R]);
-  assertEquals(inputs.refusals.filter((r) => r.includes(LOCAL)).length, 1);
+  assertEquals([...inputs.superseded.dests], [R]);
+  assertEquals(inputs.superseded.notes.filter((r) => r.includes(LOCAL)).length, 1);
+  assertEquals(inputs.refusals.filter((r) => r.includes(LOCAL)), []);
+});
+
+Deno.test("an up-to-date run reports a note from before the plan as a note, never a refusal", async () => {
+  const { lock } = await edits(OLD);
+  const links = { states: new Map(), diskShas: new Map(), refused: [], notes: [] };
+  const run = {
+    projectDir: "/p",
+    ...{ dryRun: true, force: false, resetBaseline: false, isDeclaredPreserved: () => false },
+    ...{ lock, effectiveLock: lock, parentManaged: false, harness: fakeHarness() },
+    ...{ templatesVersion: lock.templatesVersion, now: "2026-01-01T00:00:00Z" },
+    ...{ jsonMerged: {}, bundle: {}, newShas: new Map(), plan: [], links },
+    ...{ refusals: [], notes: ["a note"] },
+  };
+  const io = { reader: fakeReader({}), writer: fakeWriter(), lockStore: fakeLockStore(lock) };
+  const result = await finishUpToDate({ ...io, stagingStore: fakeStagingStore() }, run);
+  assertEquals([result.notes, result.refusals], [["a note"], []]);
 });

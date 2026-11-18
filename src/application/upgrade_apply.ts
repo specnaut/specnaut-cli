@@ -62,6 +62,7 @@ export async function applyUpgrade(io: UpgradeIo, run: UpgradeRun): Promise<Appl
     managedSections: appliedSections,
     written: Object.keys(written.bundle).sort(),
     notes: [
+      ...run.notes,
       ...run.links.notes,
       ...merges.notes,
       ...await productOwnerGrantNotices(io.reader, run.projectDir),

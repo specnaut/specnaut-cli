@@ -9,7 +9,7 @@ import { constitutionAfterRun, constitutionNotices } from "./upgrade_constitutio
 import { retiredConfigNotices } from "./upgrade_retired_notices.ts";
 import { carryLegacySettings } from "./upgrade_legacy_settings.ts";
 import { CONSTITUTION_PATH } from "../domain/constitution_paths.ts";
-import { supersededVerbEdits } from "./superseded_verb_rows.ts";
+import { type SupersededEdits, supersededVerbEdits } from "./superseded_verb_rows.ts";
 
 /** The ports the inputs are read through, and whether this run may write (the move). */
 export type PlanInputsIo = {
@@ -28,10 +28,10 @@ export type PlanInputsIo = {
 export type PlanInputs = {
   /** The planned bundle, minus every refused dest. A copy: the caller's is untouched. */
   readonly bundle: Bundle;
-  /** Every merge or context link this run declined, the constitution move, and each superseded row. */
+  /** Every merge or context link this run declined, and the constitution move. */
   readonly refusals: string[];
-  /** The dests whose only edit is a verb row this bundle ships (`supersededVerbEdits`). */
-  readonly superseded: ReadonlySet<string>;
+  /** The routers whose only edit is a verb row this bundle ships, and the notes (never refusals) on each. */
+  readonly superseded: SupersededEdits;
   readonly links: ContextLinkSurvey;
   /** dest → sha of what is on disk; for a merge block, of the block only. */
   readonly diskShas: Map<string, string>;
@@ -76,8 +76,7 @@ export async function gatherPlanInputs(
   const diskShas = await readDiskShas(io.reader, projectDir, bundle, lock, links, refusedDests);
   const ctx = { reader: io.reader, projectDir, isDeclaredPreserved };
   const superseded = await supersededVerbEdits(ctx, bundle, lockForPlan, diskShas);
-  const refusals = [...refused.refusals, ...superseded.notes];
-  return { bundle, refusals, superseded: superseded.dests, links, diskShas, lockForPlan };
+  return { bundle, refusals: refused.refusals, superseded, links, diskShas, lockForPlan };
 }
 
 /** The one refusal step's outputs, produced together so no caller patches them apart. */

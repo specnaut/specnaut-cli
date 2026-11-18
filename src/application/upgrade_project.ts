@@ -10,7 +10,7 @@ import { isAgenticPath } from "../domain/parent_managed.ts";
 import { bundleOptionsOf } from "./lock_bundle.ts";
 import { type ManagedSectionOutcome, surveyManagedSections } from "./upgrade_managed_sections.ts";
 import { carryRenames } from "./upgrade_renames.ts";
-import { gatherPlanInputs } from "./upgrade_plan_inputs.ts";
+import { gatherPlanInputs, type PlanInputs } from "./upgrade_plan_inputs.ts";
 import { splitJsonMerged } from "./upgrade_json_merges.ts";
 import type { ContextLinkSurvey } from "./upgrade_context_links.ts";
 import { finishUpToDate } from "./upgrade_up_to_date.ts";
@@ -118,6 +118,7 @@ export class UpgradeProjectUseCase {
       newShas,
       plan,
       refusals: [...inputs.refusals, ...carried.notes],
+      notes: inputs.superseded.notes,
       links: inputs.links,
     };
     return await this.finish(run);
@@ -132,9 +133,7 @@ export class UpgradeProjectUseCase {
       );
     }
     const harness = this.deps.findHarness(lock.harness);
-    if (!harness) {
-      throw new Error(`unknown harness in lock: ${lock.harness}`);
-    }
+    if (!harness) throw new Error(`unknown harness in lock: ${lock.harness}`);
     return { lock, harness };
   }
 
@@ -159,7 +158,7 @@ export class UpgradeProjectUseCase {
       managedRoots: step.harness.managedRoots,
       managedFiles: step.harness.managedFiles,
       linkStates: step.links.states,
-      isSupersededEdit: (dest) => step.superseded.has(dest),
+      isSupersededEdit: (dest) => step.superseded.dests.has(dest),
     });
     return { plan, newShas };
   }
@@ -224,6 +223,7 @@ export class UpgradeProjectUseCase {
     return {
       status: "planned",
       refusals: run.refusals,
+      notes: run.notes,
       plan: run.plan,
       fromVersion: run.lock.templatesVersion,
       toVersion: run.templatesVersion,
@@ -242,7 +242,7 @@ type PlanStep = {
   readonly harness: Harness;
   readonly input: UpgradeProjectInput;
   readonly isDeclaredPreserved: (dest: string) => boolean;
-  readonly superseded: ReadonlySet<string>;
+  readonly superseded: PlanInputs["superseded"];
 };
 
 /**

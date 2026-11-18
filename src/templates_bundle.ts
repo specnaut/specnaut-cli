@@ -2039,7 +2039,8 @@ expected them to print.
 5. **The upgrade.** \`specnaut upgrade\` (add \`--force\` only if the user passed it: it overwrites
    customised files, keeping a \`.specnaut.bak\` of each). Keep its whole output. Lines starting
    with \`⚠\` are refusals and lines starting with \`ℹ\` are notes — a plugin the upgrade enabled, a
-   marketplace it re-pinned. Every one of them goes into the report, verbatim.
+   marketplace it re-pinned, a local router row a shipped verb replaced or could not be matched
+   to. Every one of them goes into the report, verbatim.
 
 6. **The result holds.**
    - \`specnaut reconcile --status\` — files kept because they were customised, now waiting for a
