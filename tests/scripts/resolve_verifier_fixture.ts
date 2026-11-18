@@ -158,9 +158,21 @@ export async function spawnWith(
     stdout: "piped",
     stderr: "piped",
   }).spawn();
-  const writer = child.stdin.getWriter();
-  await writer.write(new TextEncoder().encode(input));
-  await writer.close();
+  await feed(child.stdin, input);
   const out = await child.output();
   return { code: out.code, stderr: new TextDecoder().decode(out.stderr) };
+}
+
+/**
+ * `input` written to `stdin`, then closed. A hook that refuses may exit before it reads a byte: the
+ * write then breaks its pipe, which is that refusal's own outcome, never the test's failure.
+ */
+async function feed(stdin: WritableStream<Uint8Array>, input: string): Promise<void> {
+  const writer = stdin.getWriter();
+  try {
+    await writer.write(new TextEncoder().encode(input));
+    await writer.close();
+  } catch (err) {
+    if (!(err instanceof Deno.errors.BrokenPipe)) throw err;
+  }
 }
