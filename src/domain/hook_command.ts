@@ -93,16 +93,33 @@ function codexPattern(walk: string): RegExp {
 }
 
 /**
+ * The review hooks of `.claude/hooks/`, named for the reason below. Every hook Specnaut runs with
+ * bash is registered through `run-hook.sh`, which finds bash on the PATH the hooks' rule keeps;
+ * registered before as `bash "<script>"`, bash was looked up on the session's raw PATH, where an
+ * entry inside the repository could supply it. Both spellings are Specnaut's, so an upgrade
+ * rewrites the old one in place.
+ */
+const REVIEW_HOOK = "(review-gate|review-lock|record-checkout)\\.sh";
+const CLAUDE_HOOKS = '"\\$CLAUDE_PROJECT_DIR/\\.claude/hooks/';
+const SPECNAUT_HOOKS = '"\\$CLAUDE_PROJECT_DIR/\\.specnaut/hooks/';
+const LAUNCH = `/bin/sh ${CLAUDE_HOOKS}run-hook\\.sh" `;
+const ARGS = "(?: [a-z]+)?";
+
+/**
  * Every shape a Specnaut hook command has, each capturing the script's basename:
- * the Claude registration (`templates/harness-specific/claude/settings.json`),
- * the Codex one (`codexHookCommand`) and its 7.3 walk, and the two scripts 7.1 registered under
+ * the Claude registration (`templates/harness-specific/claude/settings.json`) launched and as it
+ * was before, the Codex one (`codexHookCommand`) and its 7.3 walk, the review hooks launched and as
+ * they were before, and the two scripts 7.1 registered under
  * `.claude/hooks/` before they moved — named, not globbed, because that folder
  * also holds the user's own scripts and `check-backlog-prereqs.sh`, which did
  * not move.
  */
 export const SPECNAUT_HOOK_SHAPES: readonly RegExp[] = [
-  new RegExp(`^bash "\\$CLAUDE_PROJECT_DIR/\\.specnaut/hooks/${SCRIPT_NAME}"(?: [a-z]+)?$`),
+  new RegExp(`^${LAUNCH}${SPECNAUT_HOOKS}${SCRIPT_NAME}"${ARGS}$`),
+  new RegExp(`^bash ${SPECNAUT_HOOKS}${SCRIPT_NAME}"${ARGS}$`),
   codexPattern(WALK),
   codexPattern(WALK_7_3),
+  new RegExp(`^${LAUNCH}${CLAUDE_HOOKS}${REVIEW_HOOK}"$`),
+  new RegExp(`^bash ${CLAUDE_HOOKS}${REVIEW_HOOK}"$`),
   /^\.claude\/hooks\/(protect-generated|log-subagent)\.sh(?: (?:start|stop))?$/,
 ];

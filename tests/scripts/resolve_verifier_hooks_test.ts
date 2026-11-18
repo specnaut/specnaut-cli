@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { DELIMITER, join } from "@std/path";
 import { toolsIn } from "../integration/hook_tools.ts";
-import { CALL, hook, START } from "./resolve_verifier_fixture.ts";
+import { CALL, hook, launched, START } from "./resolve_verifier_fixture.ts";
 import { fired, ifMissing, inLayout } from "./resolve_verifier_layout.ts";
 
 /**
@@ -65,5 +65,26 @@ Deno.test({
       const tab = JSON.stringify({ tool_input: { command: "specnaut review\tstart 1" } });
       assertEquals(await hook(l, r, "review-gate.sh", tab), want, "a start spelled with a tab");
       assertEquals(await fired(l), "", "a command the PATH entry supplied ran");
+    }),
+});
+
+Deno.test({
+  name: "launched as settings.json registers it, nothing of the environment runs before the hook",
+  ignore: Deno.build.os === "windows",
+  fn: () =>
+    inLayout(async (l, { bash }) => {
+      const mark = (name: string) => `echo ${name} >>'${join(l.tmp, "fired")}'`;
+      const startup = join(l.tmp, "outside", "startup");
+      await Deno.writeTextFile(startup, `${mark("BASH_ENV")}\n`);
+      // Exported functions named like the builtins the launcher, the rule and the hook run before
+      // the PATH is cleaned: a bash run as /bin/sh imports them too.
+      const env: Record<string, string> = { BASH_ENV: startup };
+      for (const name of ["cd", "pwd", "command", "local"]) {
+        env[`BASH_FUNC_${name}%%`] = `() {  ${mark(name)}; builtin ${name} "$@"\n}`;
+      }
+      const r = { entries: [join(l.tmp, "outside", "real"), l.tools], cwd: l.repo, bash };
+      const want = { resolved: l.outside, path: r.entries.join(DELIMITER) };
+      assertEquals(await launched(l, r, "review-lock.sh", CALL, env), want);
+      assertEquals(await fired(l), "", "BASH_ENV or an exported function ran");
     }),
 });

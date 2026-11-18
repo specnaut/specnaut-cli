@@ -4,11 +4,11 @@ import { git, run } from "./git_sandbox.ts";
 
 /**
  * The folders the PATH check's table runs in (resolve_verifier_test.ts): a repository whose folders
- * hold a marker for every command the five spellings run, `specnaut` stubs outside and beside it,
+ * hold a marker for every command the spellings run, `specnaut` stubs outside and beside it,
  * links across its edge both ways, a folder holding only the real tools, and a held lock's copy.
  */
 
-/** Every name a script of the five runs, planted where a PATH entry it must not trust points. */
+/** Every name a script of the table runs, planted where a PATH entry it must not trust points. */
 const EXTERNALS = "cat env git rm dirname readlink sed grep awk bash specnaut".split(" ");
 
 /** The folders and files the cases name, all under one physical temp folder. */
@@ -53,7 +53,7 @@ async function layout(tmp: string): Promise<Layout> {
     tmp,
     repo,
     bin,
-    tools: await toolsIn(tmp, ["git", "readlink", "cat", "env", "rm", "dirname"]),
+    tools: await toolsIn(tmp, ["git", "readlink", "cat", "env", "rm", "dirname", "bash"]),
     outside: await stub({ tmp }, join(tmp, "outside", "real")),
     sibling: await stub({ tmp }, join(tmp, "repo-x", "bin")),
     state: await lockCopy(tmp),

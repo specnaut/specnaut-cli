@@ -17,12 +17,25 @@ points at, or when the links on it lead there. Then it sets `sn` to the physical
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
 neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository. It runs
-in bash and in zsh alike. `land-feature.sh` holds the same rule as `refuse_unsafe_path` and
-`resolve_specnaut`, in `_verifier.sh` beside it; the Claude Code hooks drop such entries instead.
+in bash and in zsh alike, in the session's own shell: it reaches `cd`, `pwd` and `command` through
+`\builtin`, and clears zsh's `chpwd` hooks inside each `$(…)` that changes folder, so no function,
+alias or hook of that shell stands in for them. `land-feature.sh` holds the same rule as
+`refuse_unsafe_path` and `resolve_specnaut`, in `_verifier.sh` beside it; the Claude Code review
+hooks drop such entries instead (`_clean-path.sh`), and every Claude Code hook Specnaut runs with
+bash starts under `bash -p`, resolved on the PATH they keep as `specnaut` is (`run-hook.sh`): no
+`BASH_ENV` and no exported function runs before its first line.
+
+The rule judges where a command is found, not what ran before it was asked. Out of its reach: what
+the session's shell loaded when it started (its rc files, `BASH_ENV`), and a function of that shell
+named `builtin` or `[`; the dynamic loader's `LD_LIBRARY_PATH`, `LD_PRELOAD` and `DYLD_*`, read
+before any shell runs a line, where an empty entry is the working folder; and a version manager's
+shim, found outside the tree, which picks the program it runs from a file in the working folder. A
+session that carries one of them is not protected from it by this block, the landing or the hooks.
+Codex hook commands still start bash from the PATH as given.
 
 <!-- script-gate: resolve-verifier -->
 ```bash
-sn=""; why=""; n=0; p=""; top=""; d=$(pwd -P); rest=${PATH-}:
+sn=""; why=""; n=0; p=""; top=""; d=$(\builtin pwd -P); rest=${PATH-}:
 while [ -z "$top" ]; do [ -e "$d/.git" ] && top=${d:-/}; [ -n "$d" ] || break; d=${d%/*}; done
 [ -n "$top" ] || why="has no repository to be judged outside of"
 while [ -z "$why" ] && [ -n "$rest" ]; do
@@ -32,18 +45,20 @@ while [ -z "$why" ] && [ -n "$rest" ]; do
   while [ -z "$why" ] && [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
   [ -n "$why" ] || ! [ "$a" -ef "$top" ] || why="is inside the repository"; a=$e
   while [ -z "$why" ] && ! [ -e "$a" ] && ! [ -L "$a" ]; do a=${a%/*}; a=${a:-/}; done
-  [ -n "$why" ] || a=$(cd -P "$a" 2>/dev/null && pwd) || why="names a folder that cannot be entered"
+  [ -n "$why" ] || a=$(\builtin unset -f chpwd 2>/dev/null; \builtin unset chpwd_functions
+    \builtin cd -P -- "$a" 2>/dev/null && \builtin pwd) || why="names a folder that cannot be entered"
   while [ -z "$why" ] && [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
   [ -n "$why" ] || ! [ "$a" -ef "$top" ] || why="is inside the repository"
   [ -z "$why" ] || { p="PATH entry '$e'"; why="$why - start the session from a shell without that entry"; }
 done
 if [ -z "$why" ]; then
-  p=$(command -v specnaut); top=$(git rev-parse --show-toplevel)
+  p=$(\builtin command -v specnaut); top=$(git rev-parse --show-toplevel)
   case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
   [ -n "$why" ] || [ -n "$top" ] || why="has no repository to be judged outside of"
 fi
 while [ -z "$why" ]; do
-  d=$(cd -P "${p%/*}/" && pwd) || { why="names a folder that cannot be entered"; break; }
+  d=$(\builtin unset -f chpwd 2>/dev/null; \builtin unset chpwd_functions
+    \builtin cd -P -- "${p%/*}/" && \builtin pwd) || { why="names a folder that cannot be entered"; break; }
   p="$d/${p##*/}"; a=$d
   while [ "$a" != / ] && ! [ "$a" -ef "$top" ]; do a=${a%/*}; a=${a:-/}; done
   if [ "$a" -ef "$top" ]; then why="is inside the repository"; break; fi

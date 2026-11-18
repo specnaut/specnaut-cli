@@ -153,5 +153,8 @@ Deno.test("only Claude Code is scaffolded the gate hook, registered before every
     bundleForLock(CORE_BUNDLE, lock, findHarness)![".claude/settings.json"].content,
   );
   const bash = settings.hooks.PreToolUse.find((h: { matcher: string }) => h.matcher === "Bash");
-  assertStringIncludes(bash.hooks[0].command, ".claude/hooks/review-gate.sh");
+  assertStringIncludes(
+    bash.hooks[0].command,
+    'run-hook.sh" "$CLAUDE_PROJECT_DIR/.claude/hooks/review-gate.sh"',
+  );
 });

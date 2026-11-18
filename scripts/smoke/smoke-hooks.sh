@@ -60,6 +60,13 @@ check "review-lock.sh registered on PreToolUse for every tool" \
 out=$(echo '{"session_id":"s","tool_name":"Bash","tool_input":{"command":"ls"}}' | bash .claude/hooks/review-lock.sh 2>&1; echo "ec=$?")
 [ "$out" = "ec=0" ] && pass "review-lock.sh lets a call through with no lock held, silent" \
   || fail "review-lock.sh stopped or spoke with no lock held" "$out"
+# Every hook run with bash is launched through run-hook.sh, which finds bash on the PATH the rule keeps.
+check "run-hook.sh executable" '[ -x .claude/hooks/run-hook.sh ]'
+check "_clean-path.sh installed beside the hooks that source it" '[ -f .claude/hooks/_clean-path.sh ]'
+out=$(echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' |
+  /bin/sh .claude/hooks/run-hook.sh .claude/hooks/review-gate.sh 2>&1; echo "ec=$?")
+[ "$out" = "ec=0" ] && pass "run-hook.sh starts review-gate.sh, which lets an unrelated command through" \
+  || fail "run-hook.sh did not start review-gate.sh silently" "$out"
 check "retired protect-generated copy not scaffolded" '[ ! -e .claude/hooks/protect-generated.sh ]'
 check "retired log-subagent copy not scaffolded" '[ ! -e .claude/hooks/log-subagent.sh ]'
 # Every script a registration runs exists: a moved hook left registered at its

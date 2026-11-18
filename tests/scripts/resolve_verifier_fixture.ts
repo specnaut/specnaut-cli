@@ -1,21 +1,22 @@
 import { DELIMITER, fromFileUrl, join } from "@std/path";
-import { run } from "./git_sandbox.ts";
+import { hermetic, run } from "./git_sandbox.ts";
 import { ifMissing, type Layout, type Shells } from "./resolve_verifier_layout.ts";
 
 /**
- * The five spellings of the rule that judges the PATH and resolves `specnaut` before anything runs:
- * the resolve block of `phases/script-gate.md` (run by bash, and by zsh where it is installed),
- * `_verifier.sh` as `land-feature.sh` sources it, and the three Claude Code hooks. They cannot share
- * code, so one table of PATHs runs every one of them, in the layout of resolve_verifier_layout.ts.
+ * The three spellings of the rule that judges the PATH and resolves `specnaut` before anything
+ * runs: the resolve block of `phases/script-gate.md` (run by bash, and by zsh where it is
+ * installed), `_verifier.sh` as `land-feature.sh` sources it, and `_clean-path.sh`, which the three
+ * Claude Code hooks and their launcher source. They cannot share code, so one table of PATHs runs
+ * every one of them, in the layout of resolve_verifier_layout.ts.
  */
 
 const TEMPLATES = new URL("../../templates/", import.meta.url);
 const at = (path: string) => fromFileUrl(new URL(path, TEMPLATES));
 const BASH_DIR = at("core/specnaut/scripts/bash/");
-const HOOKS = at("harness-specific/claude/hooks/");
+export const HOOKS = at("harness-specific/claude/hooks/");
 
 /** The bash block after the resolve anchor in the gate doc, as written. */
-function docBlock(): string {
+export function docBlock(): string {
   const doc = Deno.readTextFileSync(at("core/skills/task/phases/script-gate.md"));
   const after = doc.split("<!-- script-gate: resolve-verifier -->")[1];
   const m = /^\s*```bash\n([\s\S]*?)\n```/.exec(after ?? "");
@@ -62,7 +63,12 @@ async function seen(l: Layout): Promise<Answer | undefined> {
 export type Run = { entries: string[]; cwd: string } & Shells;
 
 /** A doc block or `_verifier.sh` run: what `sn` was set to, else the refusal it printed. */
-async function resolver(shell: string, flags: string[], code: string, r: Run): Promise<Answer> {
+export async function resolver(
+  shell: string,
+  flags: string[],
+  code: string,
+  r: Run,
+): Promise<Answer> {
   const out = await run(shell, [...flags, `${code}\nprintf 'SN %s\\n' "$sn"`], r.cwd, path(r));
   const sn = /^SN (.+)$/m.exec(out.stdout)?.[1];
   if (sn) return { resolved: sn };
@@ -87,6 +93,7 @@ export async function answers(l: Layout, r: Run): Promise<Record<string, Answer>
     land: await resolver(r.bash, ["-c"], LAND, r),
     landScript: await landScript(r),
     lock: await hook(l, r, "review-lock.sh", CALL),
+    launch: await launched(l, r, "review-lock.sh", CALL),
     gate: await hook(l, r, "review-gate.sh", START),
     mention: await hook(l, r, "review-gate.sh", MENTION),
     record: await hook(l, r, "record-checkout.sh", ""),
@@ -101,16 +108,59 @@ async function landScript(r: Run): Promise<Answer> {
   return refusal(out.stderr, out.code) ?? { exit: out.code };
 }
 
-/** A hook as Claude Code runs it, `input` on stdin: what the stub saw, a refusal, or the exit. */
-export async function hook(l: Layout, r: Run, name: string, input: string): Promise<Answer> {
-  const file = join(l.tmp, "input");
-  await Deno.writeTextFile(file, input);
-  const env = { ...path(r), CLAUDE_PROJECT_DIR: l.repo, XDG_STATE_HOME: l.state };
-  const out = await run(
-    r.bash,
-    ["-c", '"$0" "$1" <"$2"', r.bash, join(HOOKS, name), file],
-    r.cwd,
-    env,
-  );
+/** A hook run by bash itself, `input` on stdin: what the stub saw, a refusal, or the exit. */
+export function hook(l: Layout, r: Run, name: string, input: string): Promise<Answer> {
+  return fire(l, r, [r.bash, join(HOOKS, name)], input);
+}
+
+/**
+ * A hook as settings.json registers it: `/bin/sh` runs the launcher, which finds bash on the PATH
+ * the rule keeps and starts the hook of `hooks` (the shipped folder unless given). `env` adds to
+ * the run's variables.
+ */
+export function launched(
+  l: Layout,
+  r: Run,
+  name: string,
+  input: string,
+  env: Record<string, string> = {},
+  hooks = HOOKS,
+): Promise<Answer> {
+  return fire(l, r, ["/bin/sh", join(hooks, "run-hook.sh"), join(hooks, name)], input, env);
+}
+
+/** `argv` run from `r.cwd` with `input` on stdin, started directly: no shell reads `more` first. */
+async function fire(
+  l: Layout,
+  r: Run,
+  argv: string[],
+  input: string,
+  more: Record<string, string> = {},
+): Promise<Answer> {
+  const env = { ...hermetic(), ...path(r), CLAUDE_PROJECT_DIR: l.repo, XDG_STATE_HOME: l.state };
+  const out = await spawnWith(argv, r.cwd, { ...env, ...more }, input);
   return (await seen(l)) ?? refusal(out.stderr, out.code) ?? { exit: out.code };
+}
+
+/** `argv` started with exactly `env`, `input` on stdin: its exit and what it wrote on stderr. */
+export async function spawnWith(
+  [cmd, ...args]: string[],
+  cwd: string,
+  env: Record<string, string>,
+  input: string,
+): Promise<{ code: number; stderr: string }> {
+  const child = new Deno.Command(cmd, {
+    args,
+    cwd,
+    clearEnv: true,
+    env,
+    stdin: "piped",
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
+  const writer = child.stdin.getWriter();
+  await writer.write(new TextEncoder().encode(input));
+  await writer.close();
+  const out = await child.output();
+  return { code: out.code, stderr: new TextDecoder().decode(out.stderr) };
 }

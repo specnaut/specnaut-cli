@@ -101,7 +101,7 @@ Deno.test("specnautHookFile: every Specnaut command the bundled Claude settings.
     .filter((c) => c.includes(".specnaut/hooks/"));
   assertEquals(ours.length > 0, true, "the bundle registers .specnaut/hooks scripts");
   for (const command of ours) {
-    assertEquals(specnautHookFile(command), /hooks\/([\w-]+)\.sh/.exec(command)?.[1], command);
+    assertEquals(specnautHookFile(command), /.*hooks\/([\w-]+)\.sh/.exec(command)?.[1], command);
   }
 });
 

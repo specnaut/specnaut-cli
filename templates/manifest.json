@@ -2801,6 +2801,11 @@
     },
     {
       "harness": "claude",
+      "destination": ".claude/hooks/_clean-path.sh",
+      "source": "harness-specific/claude/hooks/_clean-path.sh"
+    },
+    {
+      "harness": "claude",
       "destination": ".claude/hooks/check-backlog-prereqs.sh",
       "source": "harness-specific/claude/hooks/check-backlog-prereqs.sh",
       "executable": true
@@ -2821,6 +2826,12 @@
       "harness": "claude",
       "destination": ".claude/hooks/review-lock.sh",
       "source": "harness-specific/claude/hooks/review-lock.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".claude/hooks/run-hook.sh",
+      "source": "harness-specific/claude/hooks/run-hook.sh",
       "executable": true
     },
     {

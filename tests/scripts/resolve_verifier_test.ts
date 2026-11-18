@@ -5,11 +5,12 @@ import { type Answer, answers } from "./resolve_verifier_fixture.ts";
 import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
 
 /**
- * The rule that judges the PATH and resolves `specnaut` before anything runs has five spellings
+ * The rule that judges the PATH and resolves `specnaut` before anything runs has three spellings
  * that cannot share code: `phases/script-gate.md` § Resolving the verifier, which runs before any
- * script of the tree is trusted; `_verifier.sh`, which `land-feature.sh` sources; and the three
- * Claude Code hooks, which run before any of them. One table of PATHs runs all five, and each case
- * must get the same answer from each.
+ * script of the tree is trusted; `_verifier.sh`, which `land-feature.sh` sources; and
+ * `_clean-path.sh`, which the three Claude Code hooks, run before any of them, and their launcher
+ * source. One table of PATHs runs every script that holds one, and each case must get the same
+ * answer from each.
  *
  * A PATH entry that is empty, relative, holds a `.` or `..`, or sits in the tree can supply any
  * command the scripts look up, and the branch under review or being landed can put one there.
@@ -104,6 +105,9 @@ function pastThePath(l: Layout): Case[] {
   ];
 }
 
+/** The spellings whose answer is another's: zsh runs the doc block, the launcher the lock hook. */
+const SAME_AS: Record<string, string> = { zsh: "doc", launch: "lock" };
+
 /** The exit a spelling refuses with; the doc block runs in the session's shell and never exits. */
 const REFUSES_WITH: Record<string, number> = {
   doc: 0,
@@ -151,7 +155,7 @@ Deno.test({
         }
         const got = await answers(l, { entries: c.entries, cwd: c.cwd, ...shells });
         for (const [spelling, answer] of Object.entries(got)) {
-          const want = expected(c, spelling === "zsh" ? "doc" : spelling, l);
+          const want = expected(c, SAME_AS[spelling] ?? spelling, l);
           if (want) assertEquals(answer, want, `${spelling}, ${c.name}`);
         }
         assertEquals(await fired(l), "", `a command the PATH entry supplied ran, ${c.name}`);

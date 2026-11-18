@@ -141,7 +141,9 @@ Deno.test("only Claude Code is scaffolded the lock's hook, run before every tool
   const settings = JSON.parse(files[".claude/settings.json"].content);
   type Group = { matcher?: string; hooks: { command: string }[] };
   const groups = (settings.hooks.PreToolUse as Group[]).filter((g) =>
-    g.hooks.some((h) => h.command.includes(".claude/hooks/review-lock.sh"))
+    g.hooks.some((h) =>
+      h.command.includes('run-hook.sh" "$CLAUDE_PROJECT_DIR/.claude/hooks/review-lock.sh"')
+    )
   );
   assertEquals(groups.map((g) => g.matcher), ["*"]);
 });

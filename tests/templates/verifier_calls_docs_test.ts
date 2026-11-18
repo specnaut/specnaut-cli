@@ -67,7 +67,7 @@ Deno.test("the resolve block refuses a relative name and anything inside the rep
   assert(block !== undefined, "script-gate.md lost its resolve anchor");
   for (
     const part of [
-      "p=$(command -v specnaut)",
+      "p=$(\\builtin command -v specnaut)",
       'case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac',
       '[ "$a" -ef "$top" ]',
       't=$(readlink "$p")',
