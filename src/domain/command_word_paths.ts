@@ -11,7 +11,10 @@ import type { Reading } from "./command_words.ts";
  * is matched against (`scripts/$NAME.sh` is every `.sh` under `scripts/`). Nothing is expanded.
  */
 
-/** An absolute path, or one after a dropped variable, is tried from at most this many last parts. */
+/**
+ * An absolute path, or one after a dropped variable, is tried from at most this many last parts:
+ * past it the reading is not whole.
+ */
 const MAX_SUFFIXES = 32;
 /** At most this many patterns are read from one source: past it the reading is not whole. */
 const MAX_PATTERNS = 64;
@@ -64,21 +67,22 @@ function climbsOverVariable(glob: string): boolean {
 }
 
 /**
- * The folders one piece of a PATH value puts there, read as {@link pathOf} reads a path; `.` is
- * the project's folder, where the harness runs a command. A piece that is a variable alone is the
- * PATH a shell built before the session (`$PATH`), which is not read. One that still holds a
- * variable once its leading one is dropped (`./tools/$OS/bin`) names no folder that can be known,
- * and a pattern would miss a link under it: the reading is not whole, and the caller names its
- * source.
+ * The folders one piece of a PATH value puts there, read as {@link pathOf} reads a path. `$PATH`
+ * is the PATH a shell built before the session, which is not read. `.`, any other variable alone
+ * (`$CLAUDE_PROJECT_DIR`, `${ROOT}`), and a piece left empty once its leading variable is dropped
+ * (`$CLAUDE_PROJECT_DIR/`) are the project's folder, where the harness runs a command. One that
+ * still holds a variable once its leading one is dropped (`./tools/$OS/bin`) names no folder that
+ * can be known, and a pattern would miss a link under it: when the value surely sets PATH
+ * (`sure`), the reading is not whole and the caller names its source; any other is skipped.
  */
-export function foldersOf(piece: string, read: Reading): string[] {
-  const glob = globbed(withoutVariable(piece.replaceAll("\\", "/")));
-  if (glob === VAR) return [];
-  if (glob.includes(VAR)) {
-    read.whole = false;
-    return [];
-  }
-  return /^\.\/?$/.test(glob) ? [""] : pathOf(piece, read);
+export function foldersOf(piece: string, read: Reading, sure: boolean): string[] {
+  const slashed = piece.replaceAll("\\", "/");
+  if (/^\$(?:PATH|\{PATH\})$/.test(slashed)) return [];
+  const glob = globbed(withoutVariable(slashed));
+  if (glob === VAR || glob === "" || /^\.\/?$/.test(glob)) return [""];
+  if (!glob.includes(VAR)) return pathOf(piece, read);
+  if (sure) read.whole = false;
+  return [];
 }
 
 /**
@@ -101,25 +105,24 @@ const patternOf = (path: string) => path.split(VAR).map(fold).join(VAR);
 
 /**
  * Each path of `index` some pattern of `patterns` matches, as the commit spells it. A pattern is
- * matched as a glob (`globMatches`), never as a regular expression: one that backtracks takes time
+ * matched as a glob (`partsInOrder`), never as a regular expression: one that backtracks takes time
  * exponential in its wildcards on a crafted value, and the check would hang on it.
  */
 export function matching(patterns: readonly string[], index: PathIndex): string[] {
   const split = patterns.map((p) => p.split(VAR));
   return [...index].flatMap(([key, held]) =>
-    split.some((parts) => globMatches(parts, key)) ? held.map((p) => p.path) : []
+    split.some((parts) => partsInOrder(parts, key)) ? held.map((p) => p.path) : []
   );
 }
 
 /**
- * Whether `key` is `parts` with any text between each two: the first starts it, the last ends it,
- * and each other is found at its leftmost place after the one before. Leftmost is always right
- * when only "any text" stands between parts, so nothing is tried twice: the time is that of
- * reading `key` once for each part.
+ * Whether `key` is `parts`, two at least (a pattern holds a {@link VAR}), with any text between
+ * each two: the first starts it, the last ends it, and each other is found at its leftmost place
+ * after the one before. Leftmost is always right when only "any text" stands between parts, so
+ * nothing is tried twice: the time is that of reading `key` once for each part.
  */
-function globMatches(parts: readonly string[], key: string): boolean {
+function partsInOrder(parts: readonly string[], key: string): boolean {
   const [first, last] = [parts[0], parts[parts.length - 1]];
-  if (parts.length === 1) return key === first;
   const end = key.length - last.length;
   if (end < first.length || !key.startsWith(first) || !key.endsWith(last)) return false;
   let at = first.length;

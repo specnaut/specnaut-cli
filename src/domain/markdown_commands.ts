@@ -30,7 +30,7 @@ export function isCommandMarkdown(path: string): boolean {
 /** A `!` span: what Claude Code runs, whatever it spans up to the closing backquote. */
 const BANG = /!`([^`]*)`/g;
 
-/** Whether Claude Code runs the `!` commands of the file at `path`: a skill's or a slash command's. */
+/** Whether Claude Code runs the `!` commands of the file at `path`: a skill's or a command's. */
 const runsShell = (path: string) => /^\.claude\/(?:skills|commands)\//i.test(path);
 
 /**
@@ -52,16 +52,20 @@ export function markdownEntries(path: string, text: string, read: Reading): stri
 
 /**
  * The text of each fenced block opened with ```` ```! ````, Claude Code's form of a multi-line
- * command, up to the next line of backquotes alone or the file's end. A shorter fence inside a
- * longer one ends it here, where Markdown reads on: the line it ends on would open a backquoted
- * command a shell reads to the block's end, so its words are no path either way.
+ * command, up to the next line of at least as many backquotes alone, as Markdown closes it, or the
+ * file's end. A shorter fence inside is part of the block: to a shell it opens a backquoted
+ * command, which runs, so the words after it are read as a command of their own
+ * (`nested_commands.ts`).
  */
 function bangBlocks(lines: readonly string[]): string[] {
   const blocks: string[] = [];
   let body: string[] | null = null;
+  let fence = 0;
   for (const line of lines) {
-    if (body === null) body = /^\s*`{3,}!/.test(line) ? [] : null;
-    else if (/^`{3,}$/.test(line.trim())) {
+    if (body === null) {
+      fence = /^\s*(`{3,})!/.exec(line)?.[1].length ?? 0;
+      body = fence > 0 ? [] : null;
+    } else if (/^`+$/.test(line.trim()) && line.trim().length >= fence) {
       blocks.push(body.join("\n"));
       body = null;
     } else body.push(line);

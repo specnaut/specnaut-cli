@@ -123,3 +123,36 @@ Deno.test("a frontmatter past the parse limit is read from its lines, and not wh
   has(found.paths, "scripts/lint.sh");
   assertEquals(found.whole, false);
 });
+
+Deno.test("a command nested in a `!` span, a ```! block or a frontmatter hook is read", () => {
+  has(
+    read(".claude/skills/c/SKILL.md", 'Now !`echo "$(tools/ctx.sh)"` here.\n').paths,
+    "tools/ctx.sh",
+  );
+  const block = "```!\necho `tools/tick.sh`\n```\n";
+  has(read(".claude/commands/c.md", block).paths, "tools/tick.sh");
+  const hooked = (command: string) =>
+    HOOKED.replace('"$CLAUDE_PROJECT_DIR/scripts/lint.sh"', command);
+  const web = (path: string) => path === "web";
+  const found = commandPaths(
+    ".claude/agents/a.md",
+    enc(hooked(`"bash -c 'cd web && ./run.sh'"`)),
+    web,
+  );
+  has(found.paths, "web/run.sh");
+  has(read(".claude/agents/a.md", hooked(`"bash -c 'tools/x.sh --fast'"`)).paths, "tools/x.sh");
+});
+
+Deno.test("a ```! block ends at a fence as long as its own: a shorter one opens a backquoted command", () => {
+  const text = [
+    "````!",
+    "echo start",
+    "```",
+    "bash tools/after.sh",
+    "````",
+    "Then tools/prose.sh.",
+  ];
+  const paths = read(".claude/commands/c.md", text.join("\n")).paths;
+  has(paths, "tools/after.sh");
+  assertEquals(paths.includes("tools/prose.sh"), false);
+});

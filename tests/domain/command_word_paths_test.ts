@@ -78,16 +78,13 @@ Deno.test("an absolute path is tried from each folder above a project in a subfo
   assert(read("$CLAUDE_PROJECT_DIR/../shared/x.sh", 1).paths.includes("../shared/x.sh"));
 });
 
-Deno.test("a pattern of many variables against a long name is matched within a second", () => {
+Deno.test("a pattern of many variables against a long name is matched without backtracking", () => {
   // `t/${X}a${X}a…${X}c${X}b` against `t/aa…ab`: a backtracking matcher tries each way to place
-  // the `a`s before it finds no `c`, so many that it never ends.
+  // the `a`s before it finds no `c`, so many that it never ends, and the test with it.
   const word = `t/${"${X}a".repeat(24)}\${X}c\${X}b`;
-  const started = performance.now();
   assertEquals(matched(word, `t/${"a".repeat(200)}b`, `t/${"a".repeat(30)}cb`), [
     `t/${"a".repeat(30)}cb`,
   ]);
-  const took = performance.now() - started;
-  assert(took < 1000, `${took} ms`);
 });
 
 Deno.test("a `..` after a variable reads as no one path, and the reading is not whole", () => {

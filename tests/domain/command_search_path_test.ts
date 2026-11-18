@@ -88,6 +88,31 @@ Deno.test("`.` on PATH is the project's folder", () => {
   assertEquals(read(json({ env: { PATH: ".:$PATH" } })).onPath, [""]);
 });
 
+Deno.test("a program a `$(…)`, a backquote or a `-c` string runs is read with PATH set", () => {
+  const env = { env: { PATH: "./bin:$PATH" } };
+  for (const command of ["$(lint)", "x=`lint --all`", "bash -c 'lint --all'"]) {
+    const found = read(hook(command, env));
+    assertEquals([found.onPath, found.programs.includes("lint")], [["bin"], true], command);
+  }
+});
+
+Deno.test("a lone variable other than PATH on PATH is the project's folder, and stays whole", () => {
+  for (const PATH of ["$CLAUDE_PROJECT_DIR:$PATH", "${CLAUDE_PROJECT_DIR}/:$PATH", "${ROOT}"]) {
+    const found = read(json({ env: { PATH } }));
+    assertEquals([found.onPath, found.whole], [[""], true], PATH);
+  }
+  assertEquals(read(json({ env: { PATH: "$PATH:${PATH}" } })).onPath, []);
+});
+
+Deno.test("a variable past the start of another key `path` skips that folder, and stays whole", () => {
+  const args = ["--out-path=a/$X/b", "--out-PATH=c/$X/d"];
+  const found = read(json({ servers: { x: { path: "docs/$LANG/bin", args } } }));
+  assertEquals(found.whole, true);
+  // A command's span is read through its words alone: no raw line sees the `PATH=` there.
+  const span = read(enc("Run !`PATH=./tools/$OS/bin:$PATH lint`\n"), ".claude/commands/c.md");
+  assertEquals(span.whole, false);
+});
+
 const listing = (...paths: [string, IndexedPath["kind"]][]) =>
   pathIndex(paths.map(([path, kind]) => ({ path, kind })));
 const HELD = listing(

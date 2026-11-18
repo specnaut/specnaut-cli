@@ -34,7 +34,7 @@ export const COMMAND_SOURCES: readonly string[] = [
   ".codex/hooks.json",
 ];
 
-/** Whether `path` is one of {@link COMMAND_SOURCES}, or a file of commands, its letter case aside. */
+/** Whether `path` is one of {@link COMMAND_SOURCES} or a file of commands, letter case aside. */
 export const isCommandSource = (path: string): boolean =>
   COMMAND_SOURCES.some((s) => s === path.toLowerCase()) || isCommandMarkdown(path);
 
@@ -97,9 +97,9 @@ function found(paths: readonly string[], read: Reading): CommandPaths {
  */
 function pathFolders(read: Reading): string[] {
   const folders = new Set<string>();
-  for (const value of read.pathValues) {
+  for (const { value, sure } of read.pathValues) {
     if (value.length > MAX_WORD) read.whole = false;
-    else pathPieces(value).flatMap((p) => foldersOf(p, read)).forEach((f) => folders.add(f));
+    else pathPieces(value).forEach((p) => foldersOf(p, read, sure).forEach((f) => folders.add(f)));
   }
   return [...folders];
 }

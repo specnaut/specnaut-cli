@@ -1,6 +1,6 @@
 import { manifestsOf } from "./command_runners.ts";
-import { isPathKey, pathWordValue } from "./command_search_path.ts";
-import { shellSegments, shellWords } from "./shell_words.ts";
+import { isPathKey, isSurelyPath, type PathValue, pathWordValue } from "./command_search_path.ts";
+import { nestedSegments } from "./nested_commands.ts";
 
 /**
  * The words a parsed command source holds, grouped as the harness reads them: each object's strings
@@ -9,18 +9,20 @@ import { shellSegments, shellWords } from "./shell_words.ts";
  * And the words of a raw line, for what a parser rejects. Shared by every kind of command source:
  * a config (`command_targets.ts`) and a skill's, an agent's or a command's file
  * (`markdown_commands.ts`). What decides a bare name's program is noted on the way: the values
- * PATH is set to, and the words that may be programs named by name alone (`command_search_path.ts`).
+ * PATH is set to, and the words that may be programs named by name alone
+ * (`command_search_path.ts`).
  */
 
 /**
  * What a reading of one source found beside its words: whether it met no limit (a source that did
  * not parse, a word or an expansion past a cap), each value it sets PATH to, each word its
- * commands hold that may be a program named by name alone (`programsIn`), and each pattern a path built around a variable reads as
- * (`command_word_paths.ts`). And how many folders the project sits below the repository's top.
+ * commands hold that may be a program named by name alone (`isProgram`), and each pattern a path
+ * built around a variable reads as (`command_word_paths.ts`). And how many folders the project
+ * sits below the repository's top.
  */
 export type Reading = {
   whole: boolean;
-  readonly pathValues: string[];
+  readonly pathValues: PathValue[];
   readonly programs: Set<string>;
   readonly patterns: Set<string>;
   readonly depth: number;
@@ -70,13 +72,14 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
 }
 
 /**
- * The words of `strings`, and the manifest each command among them runs (`manifestsOf`); each
- * word that may be a program (`programsIn`), and each `PATH=…` word's value, are noted in `read`.
+ * The words of `strings` and of every command nested in them (`nested_commands.ts`), and the
+ * manifest each of those commands runs (`manifestsOf`); each word that may be a program
+ * (`isProgram`), and each `PATH=…` word's value, are noted in `read`.
  */
 export function commandWords(strings: readonly string[], read: Reading): string[] {
-  const commands = strings.flatMap(shellSegments);
+  const commands = nestedSegments(strings, read);
   for (const word of commands.flat()) {
-    programsIn(word).forEach((p) => read.programs.add(p));
+    if (isProgram(word)) read.programs.add(word);
     const value = pathWordValue(word);
     if (value !== undefined) read.pathValues.push(value);
   }
@@ -84,19 +87,15 @@ export function commandWords(strings: readonly string[], read: Reading): string[
 }
 
 /**
- * The programs `word` may run by name alone: itself when it holds no slash, whatever its place in
- * its command, since a wrapper runs a word after it (`timeout 30 lint`, `nice -n 5 lint`, `xargs
- * lint`, `sudo lint`, `env -i lint`); and, when the word is itself a command a shell is handed
- * (`bash -c 'cd x && lint'`), each word of it, read the same way. Most words name no program: the
- * folders on PATH are searched for the names a commit holds (`command_search_path.ts`), so a word
- * too many costs nothing. Each pass takes off a level of quoting or a separator, so it ends.
+ * Whether `word` may be a program run by name alone: it holds no slash, whatever its place in its
+ * command, since a wrapper runs a word after it (`timeout 30 lint`, `nice -n 5 lint`, `xargs
+ * lint`, `sudo lint`, `env -i lint`), and a command a shell is handed (`bash -c 'cd x && lint'`)
+ * or a `$(lint)` is read for its own words. Most words name no program: the folders on PATH are
+ * searched for the names a commit holds (`command_search_path.ts`), so a word too many costs
+ * nothing.
  */
-function programsIn(word: string): string[] {
-  if (word.length > MAX_WORD) return [];
-  const inner = shellWords(word);
-  if (inner.length !== 1 || inner[0] !== word) return inner.flatMap(programsIn);
-  return /[\\/]/.test(word) || ASSIGNMENT.test(word) ? [] : [word];
-}
+const isProgram = (word: string): boolean =>
+  word.length <= MAX_WORD && !/[\\/]/.test(word) && !ASSIGNMENT.test(word);
 
 /** A word that sets a variable for the command (`CI=1`): no program, whatever follows. */
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
@@ -112,7 +111,9 @@ function stringsOf(value: unknown, entries: string[][], walked: Walked, read: Re
   if (!firstVisit(value, walked, read)) return [];
   if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, entries, walked, read));
   for (const [key, v] of Object.entries(value)) {
-    if (isPathKey(key) && typeof v === "string") read.pathValues.push(v);
+    if (isPathKey(key) && typeof v === "string") {
+      read.pathValues.push({ value: v, sure: isSurelyPath(key) });
+    }
   }
   const strings = Object.values(value).flatMap((v) => stringsOf(v, entries, walked, read));
   entries.push(commandWords(strings, read));

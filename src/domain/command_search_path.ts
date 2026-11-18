@@ -7,24 +7,42 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
  * run: `"env": {"PATH": "./bin:$PATH"}` and a hook `lint` run `bin/lint`. A command source names
  * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy) or
  * a word `PATH=…` (set before a command, or exported). The key is read in any letter case, as
- * Windows reads it, and in any object: an unrelated key `path` puts its value's folders on PATH
- * too, which only looks for more names in the listing. Only what the configs say is read: the
- * PATH a shell builds before the session starts is not.
+ * Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`) puts its
+ * value's folders on PATH too, which only looks for more names in the listing. A folder that
+ * cannot be read makes the reading not whole only when its value surely sets PATH, a key or a
+ * word spelled `PATH` (`isSurelyPath`): any other is skipped, or every merge would stop for an
+ * unrelated key. Only what the configs say is read: the PATH a shell builds before the session
+ * starts is not.
  */
 
 /** A key or a word that sets PATH, in any letter case. */
 export const isPathKey = (key: string): boolean => /^path$/i.test(key);
-const PATH_WORD = /^path=(.*)$/is;
+const PATH_WORD = /^(path)=(.*)$/is;
+
+/** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
+export const isSurelyPath = (name: string): boolean => name === "PATH";
+
+/** A value PATH may be set to, and whether what sets it surely sets PATH (`isSurelyPath`). */
+export type PathValue = { readonly value: string; readonly sure: boolean };
 
 /** What a word sets PATH to, when it sets it: `PATH=./bin:$PATH` sets it to `./bin:$PATH`. */
-export const pathWordValue = (word: string): string | undefined => PATH_WORD.exec(word)?.[1];
+export function pathWordValue(word: string): PathValue | undefined {
+  const set = PATH_WORD.exec(word);
+  return set ? { value: set[2], sure: isSurelyPath(set[1]) } : undefined;
+}
 
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
-const RAW_PATH = /(?<![\w${])path["']?\s*[:=]\s*["']?([^"'\s,&|]*)/gi;
+const RAW_PATH = /(?<![\w${])(path)["']?\s*[:=]\s*["']?([^"'\s,&|]*)/gi;
 
-/** What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. */
-export function rawPathValues(line: string): string[] {
-  return [...line.matchAll(RAW_PATH)].map((m) => m[1]).filter(Boolean);
+/**
+ * What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. One
+ * after a `-` is an option's name (`--out-path=`), never surely PATH.
+ */
+export function rawPathValues(line: string): PathValue[] {
+  return [...line.matchAll(RAW_PATH)].filter((m) => m[2] !== "").map((m) => ({
+    value: m[2],
+    sure: isSurelyPath(m[1]) && line[m.index - 1] !== "-",
+  }));
 }
 
 /** The pieces of a PATH value, each a folder as written: `:` and Windows' `;` both separate. */
@@ -74,10 +92,16 @@ function namesIn(dir: string, at: readonly PathIndex[], programs: readonly strin
   return way ? [...new Set([...programs, ...held.all])] : [...held.in.get(fold(dir)) ?? []];
 }
 
-/** The names the commits hold that answer to a program: by the folded folder holding each, and all. */
+/**
+ * The names the commits hold that answer to a program:
+ * by the folded folder holding each, and all.
+ */
 type Held = { readonly in: Map<string, Set<string>>; readonly all: Set<string> };
 
-/** Each name `at` holds, as it spells it, that is a program of `programs` (folded) or one with a Windows extension. */
+/**
+ * Each name `at` holds, as it spells it, that is a program of `programs` (folded) or one with a
+ * Windows extension.
+ */
 function heldNames(programs: ReadonlySet<string>, at: readonly PathIndex[]): Held {
   const held: Held = { in: new Map(), all: new Set() };
   for (const [key, paths] of at.flatMap((index) => [...index])) {
