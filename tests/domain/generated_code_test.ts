@@ -83,8 +83,12 @@ Deno.test("generatedByPath: a name that only resembles one is authored", () => {
   ) assert(!generatedByPath(path), path);
 });
 
-Deno.test("generatedByPath: a name holding a newline is never generated", () => {
-  assertEquals([generatedByPath("a\nb.gen.ts"), generatedByPath("a.gen.ts")], [false, true]);
+Deno.test("generatedByPath: a name holding a control character is never generated", () => {
+  for (const c of ["\n", "\r", "\t", "\x01", "\x1b", "\x1f", "\x7f", "\x80", "\x9b", "\x9f"]) {
+    assert(!generatedByPath(`a${c}b.gen.ts`), JSON.stringify(c));
+  }
+  // The first printable past C1, and a letter whose UTF-8 holds a byte in C1's range: generated.
+  assertEquals([generatedByPath("a\xa0b.gen.ts"), generatedByPath("aĀb.gen.ts")], [true, true]);
 });
 
 const bytes = (text: string) => new TextEncoder().encode(text);

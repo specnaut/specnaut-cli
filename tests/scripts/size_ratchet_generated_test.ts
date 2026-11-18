@@ -126,14 +126,27 @@ Deno.test("a positive `exempt:` glob still exempts a file a `!` entry names", as
   assertStringIncludes(r.stdout, "size-ratchet: 0 staged file(s) within the file limits");
 });
 
+// cli#802: a `generated:` line prints the name raw; a control character could rewrite the verdict.
 Deno.test({
-  name: "a name holding a newline is never generated, by name or by header",
+  name: "a name holding a control character is never generated, by name or by header",
   ignore: Deno.build.os === "windows",
   fn: async () => {
     const dir = await repo(10, CONFIG);
-    await put(dir, "a\nb.gen.ts", lines(600));
-    await put(dir, "c\nd.ts", MARKER + lines(600));
-    await refused(dir, over("a\nb.gen.ts", 0, 600), over("c\nd.ts", 0, 601));
+    const names = [
+      "a\nb.gen.ts",
+      "e\x1b[2J.gen.ts",
+      "r\rb.gen.ts",
+      "d\x7f.gen.ts",
+      "c\u009b2J.gen.ts",
+    ];
+    const headed = ["c\nd.ts", "t\tb.ts"];
+    for (const name of names) await put(dir, name, lines(600));
+    for (const name of headed) await put(dir, name, MARKER + lines(600));
+    await put(dir, "aĀb.gen.ts", lines(600)); // UTF-8 c4 80: no C1 character
+    const refusals = [...names.map((n) => over(n, 0, 600)), ...headed.map((n) => over(n, 0, 601))];
+    const stdout = await refused(dir, ...refusals);
+    assertStringIncludes(stdout, "  generated: aĀb.gen.ts (path convention)\n");
+    assertEquals(stdout.split("\n").filter((l) => l.startsWith("  generated: ")).length, 1, stdout);
   },
 });
 

@@ -33,9 +33,21 @@ export const MARKER_LINES = 5;
 
 const COMPILED = compileGlobs(GENERATED_GLOBS);
 
-/** Whether `path` is a generator's output by its name. A name holding a newline never is. */
+/** Unicode's control characters: C0 (a newline among them), DEL and C1. */
+const CONTROL = /\p{Cc}/u;
+
+/**
+ * Whether the generated defaults may reach `path` at all, by name or by header. Not when it holds
+ * a control character (cli#802): the ratchet prints a generated file's name raw, and an escape
+ * sequence or a carriage return in it could rewrite the verdict a user reads.
+ */
+export function generatedMayApply(path: string): boolean {
+  return !CONTROL.test(path);
+}
+
+/** Whether `path` is a generator's output by its name. */
 export function generatedByPath(path: string): boolean {
-  return !path.includes("\n") && anyGlobTakes(COMPILED, path);
+  return generatedMayApply(path) && anyGlobTakes(COMPILED, path);
 }
 
 /**

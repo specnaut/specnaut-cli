@@ -23,7 +23,8 @@
 # name was generated as well. A branch cannot exempt an existing file by
 # renaming it or giving it a header. A `!` entry names files never generated, by
 # name or by marker; it never undoes a positive glob, and stays out of
-# config_exempt. A name holding a newline is never exempt and never generated.
+# config_exempt. A name holding a newline is never exempt; one holding any
+# control character is never generated.
 # `specnaut scan` asks the same rules, from its own copy of both lists.
 
 SIZE_EXEMPT_GLOBS=() SIZE_EXEMPT_KEPT=() SIZE_EXEMPT_MANAGED=""
@@ -57,9 +58,15 @@ size_exempt() {
   config_exempt "$1" ${SIZE_EXEMPT_GLOBS[@]+"${SIZE_EXEMPT_GLOBS[@]}"}
 }
 
-# 0 when generated defaults may apply to <path>: no newline, and no `!` entry.
+# 0 when generated defaults may apply to <path>: no `!` entry, and no control
+# character, which the `generated:` line would print raw (cli#802). Matched
+# byte by byte: C0 and DEL as the C locale's cntrl class, C1 as its UTF-8
+# bytes \302\200-\302\237, as generated_code.ts's \p{Cc} reads the name.
 _size_generated_open() {
-  case "$1" in *$'\n'*) return 1 ;; esac
+  (
+    LC_ALL=C
+    case "$1" in *[[:cntrl:]]* | *$'\302'[$'\200'-$'\237']*) exit 1 ;; esac
+  ) || return 1
   ! config_exempt "$1" ${SIZE_EXEMPT_KEPT[@]+"${SIZE_EXEMPT_KEPT[@]}"}
 }
 

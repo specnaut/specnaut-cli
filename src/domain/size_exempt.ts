@@ -1,6 +1,6 @@
 import { anyGlobTakes, type CompiledGlob, compileGlobs } from "./case_glob.ts";
 import { CONSTITUTION_PATH } from "./constitution_paths.ts";
-import { generatedByPath } from "./generated_code.ts";
+import { generatedByPath, generatedMayApply } from "./generated_code.ts";
 
 /**
  * Which rule holds a tracked path: the one home of that decision (plan § 5). `_size_exempt.sh`,
@@ -48,8 +48,9 @@ export function exemptRules(managed: ReadonlySet<string>, globs: readonly string
  * The constitution first, before any exemption: it is loaded into every session, and neither an
  * `exempt:` glob nor a generated header reaches it. A name holding a newline is never exempt, as
  * the ratchet holds it. Then Specnaut's own tree, the lock's entries, the positive globs and a
- * generated name, in the ratchet's order: a `!` entry keeps a file from the generated defaults
- * only, never from a glob. Binary files are decided apart, in `binary_sniff.ts`.
+ * generated name, in the ratchet's order: a `!` entry, or a control character in the name, keeps
+ * a file from the generated defaults only, never from a glob. Binary files are decided apart, in
+ * `binary_sniff.ts`.
  */
 export function heldBy(path: string, rules: ExemptRules): HeldBy {
   if (path === CONSTITUTION_PATH) return { kind: "unit", unit: "constitution", marker: false };
@@ -57,9 +58,9 @@ export function heldBy(path: string, rules: ExemptRules): HeldBy {
   if (path.startsWith(".specnaut/")) return { kind: "exempt", reason: "specnaut" };
   if (rules.managed.has(path)) return { kind: "exempt", reason: "installed_lock" };
   if (anyGlobTakes(rules.globs, path)) return { kind: "exempt", reason: "exempt_glob" };
-  const kept = anyGlobTakes(rules.kept, path);
-  if (!kept && generatedByPath(path)) return { kind: "exempt", reason: "generated" };
-  return { kind: "unit", unit: "file", marker: !kept };
+  const open = generatedMayApply(path) && !anyGlobTakes(rules.kept, path);
+  if (open && generatedByPath(path)) return { kind: "exempt", reason: "generated" };
+  return { kind: "unit", unit: "file", marker: open };
 }
 
 /** Bounds on the config's globs: a path costs at most twice their total length times its own. */

@@ -62,6 +62,13 @@ Deno.test("heldBy: a name holding a newline is never exempt, as the ratchet hold
   }
 });
 
+Deno.test("heldBy: a name holding a control character is never generated, nor its header", () => {
+  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  for (const path of ["a\x1bb.gen.ts", "a\rb.ts", "a\x9bb.ts"]) {
+    assertEquals(heldBy(path, rules()), measured, JSON.stringify(path));
+  }
+});
+
 Deno.test("exemptGlobsProblem: a config over a bound is refused, never trimmed", () => {
   assertEquals(exemptGlobsProblem(["*.lock"]), null);
   assert(exemptGlobsProblem(Array(MAX_EXEMPT_GLOBS + 1).fill("a")) !== null);
