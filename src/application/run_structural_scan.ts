@@ -61,7 +61,7 @@ function unreadable(what: string, reason: string): ScanOutcome {
 type Candidate = {
   readonly path: string;
   readonly unit: "file" | "constitution";
-  readonly marker: boolean;
+  readonly headerMayExempt: boolean;
 };
 
 /** Each entry's rule; the exempt and the index's links and submodules folded, never opened. */
@@ -71,7 +71,7 @@ function held(entries: readonly TrackedEntry[], rules: ExemptRules, fold: ScanFo
     const rule = heldBy(path, rules);
     if (rule.kind === "exempt") fold.exempt(rule.reason);
     else if (mode !== "file") fold.skipped(mode);
-    else candidates.push({ path, unit: rule.unit, marker: rule.marker });
+    else candidates.push({ path, unit: rule.unit, headerMayExempt: rule.headerMayExempt });
   }
   return candidates;
 }
@@ -87,7 +87,7 @@ async function measureAll(repo: ScanRepository, candidates: Candidate[], fold: S
   }
   await eachPooled(reads, READ_POOL, async ({ candidate, sniff }) => {
     const decode = classifyPath(candidate.path).kind === "read";
-    const { marker } = candidate;
+    const marker = candidate.headerMayExempt;
     foldRead(fold, candidate, await repo.read(candidate.path, { sniff, decode, marker }));
   });
 }

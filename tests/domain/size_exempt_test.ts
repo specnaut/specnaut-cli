@@ -17,7 +17,7 @@ Deno.test("heldBy: the constitution is held first, even under a glob that takes 
   assertEquals(heldBy("docs/constitution.md", rules(["*"])), {
     kind: "unit",
     unit: "constitution",
-    marker: false,
+    headerMayExempt: false,
   });
 });
 
@@ -27,8 +27,8 @@ Deno.test("heldBy: Specnaut's tree, then the lock's entries, then the globs", ()
   assertEquals(heldBy(".claude/agents/a.md", r), { kind: "exempt", reason: "installed_lock" });
   assertEquals(heldBy("deep/dir/deno.lock", r), { kind: "exempt", reason: "exempt_glob" });
   assertEquals(heldBy("gen/a/b.ts", r), { kind: "exempt", reason: "exempt_glob" });
-  assertEquals(heldBy("src/gen/b.ts", r), { kind: "unit", unit: "file", marker: true });
-  assertEquals(heldBy("specnaut/x.sh", r), { kind: "unit", unit: "file", marker: true });
+  assertEquals(heldBy("src/gen/b.ts", r), { kind: "unit", unit: "file", headerMayExempt: true });
+  assertEquals(heldBy("specnaut/x.sh", r), { kind: "unit", unit: "file", headerMayExempt: true });
 });
 
 Deno.test("heldBy: a generated name is exempt with no entry, after every config glob", () => {
@@ -41,7 +41,7 @@ Deno.test("heldBy: a generated name is exempt with no entry, after every config 
 
 Deno.test("heldBy: a `!` entry keeps a file measured by name and by header, never a glob", () => {
   const r = rules(["!src/api.gen.ts", "!*.lock", "!src/schema.ts"]);
-  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  const measured: HeldBy = { kind: "unit", unit: "file", headerMayExempt: false };
   assertEquals(heldBy("src/api.gen.ts", r), measured);
   assertEquals(heldBy("deep/Cargo.lock", r), measured);
   assertEquals(heldBy("src/schema.ts", r), measured);
@@ -56,14 +56,14 @@ Deno.test("heldBy: a `!` entry keeps a file measured by name and by header, neve
 
 Deno.test("heldBy: a name holding a newline is never exempt, as the ratchet holds it", () => {
   const r = rules(["*"], ["a\nb"]);
-  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  const measured: HeldBy = { kind: "unit", unit: "file", headerMayExempt: false };
   for (const path of ["a\nb", ".specnaut/a\nb", "x\ny.ts", "a\nb.gen.ts"]) {
     assertEquals(heldBy(path, r), measured, JSON.stringify(path));
   }
 });
 
 Deno.test("heldBy: a name holding a control character is never generated, nor its header", () => {
-  const measured: HeldBy = { kind: "unit", unit: "file", marker: false };
+  const measured: HeldBy = { kind: "unit", unit: "file", headerMayExempt: false };
   for (const path of ["a\x1bb.gen.ts", "a\rb.ts", "a\x9bb.ts"]) {
     assertEquals(heldBy(path, rules()), measured, JSON.stringify(path));
   }

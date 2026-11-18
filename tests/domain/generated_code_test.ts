@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { BINARY_SNIFF_BYTES } from "../../src/domain/binary_sniff.ts";
 import {
@@ -10,20 +10,24 @@ import {
 } from "../../src/domain/generated_code.ts";
 
 /**
- * What counts as generated code has two copies: `_size_exempt.sh`, which the ratchet sources in a
- * project, and `generated_code.ts`, which `specnaut scan` asks. These tests hold the TypeScript copy
- * to the script, and pin each signal at its edges.
+ * What counts as generated code has three copies: `_size_exempt.sh`, which the ratchet sources in a
+ * project, `generated_code.ts`, which `specnaut scan` asks, and the prose of `size-limits.md`,
+ * which a project reads. These tests hold the TypeScript copy to the other two, and pin each signal
+ * at its edges.
  */
 
-const SCRIPT = fromFileUrl(
-  new URL("../../templates/core/specnaut/scripts/bash/_size_exempt.sh", import.meta.url),
-);
-const source = await Deno.readTextFile(SCRIPT);
+const template = (path: string) =>
+  Deno.readTextFile(fromFileUrl(new URL(`../../templates/core/specnaut/${path}`, import.meta.url)));
+const source = await template("scripts/bash/_size_exempt.sh");
+const prose = await template("memory/size-limits.md");
 
-/** The quoted words of the script's `<name>=(...)` assignment. */
+/**
+ * The words of the script's `<name>=(...)` assignment, in either quote or none: an entry one side
+ * adds in a quoting this parse skipped would never be compared.
+ */
 function scriptArray(name: string): string[] {
   const body = source.match(new RegExp(`^${name}=\\(([^)]*)\\)`, "m"))?.[1] ?? "";
-  return [...body.matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+  return [...body.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
 }
 
 /** The script's `<name>=<number>` setting. */
@@ -43,6 +47,26 @@ Deno.test("the generated globs and phrases are the script's, in its order", () =
 Deno.test("the header window is the script's: git's sniff bytes, then the first lines", () => {
   assertEquals(scriptNumber("SIZE_GENERATED_WINDOW_BYTES"), BINARY_SNIFF_BYTES);
   assertEquals(scriptNumber("SIZE_GENERATED_WINDOW_LINES"), MARKER_LINES);
+});
+
+/** The prose bullet opening on `**<label>**`, up to the next bullet or a blank line. */
+const bullet = (label: string): string =>
+  prose.match(new RegExp(`^- \\*\\*${label}\\*\\*[^]*?(?=\\n- |\\n\\n)`, "m"))?.[0] ?? "";
+const ticked = (text: string) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+
+// The prose writes a lockfile glob of the form star-slash-name bare: "lockfiles at any depth".
+const asProse = (glob: string) => /^\*\/[^*/]+$/.test(glob) ? glob.slice(2) : glob;
+
+Deno.test("size-limits.md states the generated globs, phrases and window of the code", () => {
+  const names = ticked(bullet("Its name"));
+  const header = bullet("Its header");
+  assert(names.length >= 10, `parsed too few globs from the prose: ${names}`);
+  assertEquals(names, GENERATED_GLOBS.map(asProse));
+  assertEquals(ticked(header), [...GENERATED_PHRASES]);
+  assertStringIncludes(
+    header.replace(/\s+/g, " "),
+    `first ${MARKER_LINES} lines and first ${BINARY_SNIFF_BYTES} bytes`,
+  );
 });
 
 Deno.test("generatedByPath: the names code generators give their output, at any depth", () => {

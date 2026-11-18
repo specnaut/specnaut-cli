@@ -17,11 +17,15 @@ export const EXEMPT_REASONS = [
 export type ExemptReason = typeof EXEMPT_REASONS[number];
 
 /**
- * The unit a path is held to, or why it is held to none. `marker`: whether a generated header may
- * still exempt it once its bytes are read (`generated_code.ts`'s `hasGeneratedMarker`).
+ * The unit a path is held to, or why it is held to none. `headerMayExempt`: whether a generated
+ * header may still exempt it once its bytes are read (`generated_code.ts`'s `hasGeneratedMarker`).
  */
 export type HeldBy =
-  | { readonly kind: "unit"; readonly unit: "file" | "constitution"; readonly marker: boolean }
+  | {
+    readonly kind: "unit";
+    readonly unit: "file" | "constitution";
+    readonly headerMayExempt: boolean;
+  }
   | { readonly kind: "exempt"; readonly reason: ExemptReason };
 
 export type ExemptRules = {
@@ -53,14 +57,16 @@ export function exemptRules(managed: ReadonlySet<string>, globs: readonly string
  * `binary_sniff.ts`.
  */
 export function heldBy(path: string, rules: ExemptRules): HeldBy {
-  if (path === CONSTITUTION_PATH) return { kind: "unit", unit: "constitution", marker: false };
-  if (path.includes("\n")) return { kind: "unit", unit: "file", marker: false };
+  if (path === CONSTITUTION_PATH) {
+    return { kind: "unit", unit: "constitution", headerMayExempt: false };
+  }
+  if (path.includes("\n")) return { kind: "unit", unit: "file", headerMayExempt: false };
   if (path.startsWith(".specnaut/")) return { kind: "exempt", reason: "specnaut" };
   if (rules.managed.has(path)) return { kind: "exempt", reason: "installed_lock" };
   if (anyGlobTakes(rules.globs, path)) return { kind: "exempt", reason: "exempt_glob" };
   const open = generatedMayApply(path) && !anyGlobTakes(rules.kept, path);
   if (open && generatedByPath(path)) return { kind: "exempt", reason: "generated" };
-  return { kind: "unit", unit: "file", marker: open };
+  return { kind: "unit", unit: "file", headerMayExempt: open };
 }
 
 /** Bounds on the config's globs: a path costs at most twice their total length times its own. */
