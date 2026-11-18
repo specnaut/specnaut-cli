@@ -9,6 +9,10 @@ import { isSkillPath } from "./shipped_skills.ts";
  * being judged must never vouch for itself. Only the landing writes it, as its own commit after the
  * yes (`land-feature.sh`). The form is strict, `sha256sum`'s: `<64 lowercase hex>  <path>\n` per
  * approval, sorted by path, each path once, LF only. Anything else approves nothing, never a part.
+ *
+ * The residual: the check runs only where the merge runs it. A forge merge or a direct push lands
+ * a branch's change to this file unjudged, and from then on the file is trusted as the base
+ * commits it: whoever can write the base can approve a skill.
  */
 
 export const APPROVALS_FILE = ".specnaut/approved-skills.txt";

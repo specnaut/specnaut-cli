@@ -4071,12 +4071,12 @@ characters\` reason names each code point and its line: say so with the diff, wh
 them. A \`differs from the copy Specnaut ships\` reason names a skill Specnaut ships whose bytes are
 not the shipped copy, even where the base holds the same edit: show \`specnaut diff <path>\`, which
 compares it with that copy. A yes to such a line is remembered while the skill keeps those bytes:
-the landing records it in \`.specnaut/approved-skills.txt\` (path, SHA-256) in its own commit on top
-of the judged one, and later merges name that skill again only when a byte of it changes. Only the
-landing writes that file: a branch's own change to it, other than deleting it, is named and no yes
-holds it (\`APPROVAL instructions moved\`), so stop on the branch. A \`records a skill digest that is
-not the copy Specnaut ships\` reason names \`.specnaut/installed.lock\`: the branch re-stamped a
-skill's digest, which would vouch for that copy at every later merge; show its diff. Then ask once,
+the landing records it (path, SHA-256) in \`.specnaut/approved-skills.txt\`, in its own commit on the
+judged one. Only the landing writes that file: a branch's own change to it, but a deletion, is named
+and no yes holds it (\`APPROVAL instructions moved\`), so stop on the branch. A forge merge or a
+direct push lands it unjudged: the file is trusted as the base commits it. A \`records a skill digest
+that is not the copy Specnaut ships\` reason names \`.specnaut/installed.lock\`: the branch re-stamped
+a skill's digest, which would vouch for that copy from then on; show its diff. Then ask once,
 as the one question before step 3: *"This branch changes the instructions, skills, hooks or settings
 this session's harness loads. Yes lands them."* When a \`differs from the copy Specnaut ships\` line
 is among them, add: *"Yes is remembered for those skills while they keep these bytes; deleting

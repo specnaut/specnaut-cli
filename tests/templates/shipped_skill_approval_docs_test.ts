@@ -24,6 +24,10 @@ Deno.test("the instructions verdict says a yes to a shipped-copy line is remembe
   assertStringIncludes(text, "no yes holds it (`APPROVAL instructions moved`)");
   assertStringIncludes(
     text,
+    "A forge merge or a direct push lands it unjudged: the file is trusted as the base commits it.",
+  );
+  assertStringIncludes(
+    text,
     `A \`${LOCK_SKILL_REASON}\` reason names \`.specnaut/installed.lock\``,
   );
 });
