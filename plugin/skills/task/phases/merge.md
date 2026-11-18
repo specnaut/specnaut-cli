@@ -30,7 +30,9 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
 **No git hook runs in this phase.** Every git command it runs that writes — written here, described
 in words, or named by a script's message — is `git -c core.hooksPath=/dev/null <subcommand> …`, as the landing
-runs its own: the branch can commit a hook a hook manager runs, and nothing judges hooks.
+runs its own: the branch can commit a hook a hook manager runs, and nothing judges hooks. git-lfs
+uploads from a pre-push hook, so the LFS objects are pushed explicitly first: inside the landing,
+and in step 2 before the `--pr` push (the closeout's commit only deletes).
 
 **The intake gate** (`phases/auto-chain.md`) runs before step 2, before every run of step 3, and,
 under `--no-close`, once more after the push: there the item's line must read `OWN partial`.
@@ -107,7 +109,10 @@ under `--no-close`, once more after the push: there the item's line must read `O
    declares `.specnaut/impact.json` may run less than the whole tier, so a pass whose `scope:`
    line is not `full` is reported as that scope, and a pass with a `removed:` line names those
    commands: neither is ever reported as the full gate.
-2. **`--pr` only** — push the branch (`git -c core.hooksPath=/dev/null push -u origin <branch>`), open the pull request against the base, name any issue its
+2. **`--pr` only** — push the branch
+   (`bash .specnaut/scripts/bash/lfs-push.sh && git -c core.hooksPath=/dev/null push -u origin <branch>`).
+   A non-zero exit of `lfs-push.sh` stops before the push: 17 is step 4's row, any other is quoted
+   and the phase stops on the branch. Then open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. After the PR
    lands, `/task resume <n>` settles it. Never use the forge's "Squash and merge": it collapses
@@ -122,7 +127,8 @@ under `--no-close`, once more after the push: there the item's line must read `O
    with the verifier, and lands only when the scripts and the instructions are each trusted or
    still that digest; a local base ahead of origin is left to its exit 6.
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
-   contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
+   contains `origin/<base>` and adds to it; it pushes HEAD's git-lfs objects (`lfs-push.sh`),
+   fast-forwards the base, pushes it, deletes the
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
    commit(s)`. **It pushes without asking, in either merge mode**: reaching
    this step is the instruction — `phases/auto-chain.md` reads the mode, and this phase stops only
@@ -145,6 +151,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
    | 13 | HEAD's scripts or instructions are neither trusted nor the digest passed, or hold a reason no yes covers, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
+   | 17 | the git-lfs objects could not be pushed first; its `LFS` line names why | quote that line and stop on the branch: nothing moved, nothing was pushed. `LFS CONFIG CHANGED`: show the `.lfsconfig` diff it names — a legitimate change is pushed or landed by hand, never by this phase. `LFS UNAVAILABLE`, `LFS TOO OLD`: install or upgrade git-lfs, then run the step again. `LFS PUSH FAILED`: say what its output names |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First
    the board fence: when step 0's `NAMES_FILE` lists `.specnaut/backlog-config.yml`, or its

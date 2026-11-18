@@ -177,11 +177,11 @@ check "a surviving fixup! is a finding named by its sha, not something to fold b
 check "the fold verifies by tree id, and --verify takes only the PRE it recorded (#559)" \
   '(m_epic && bash .specnaut/scripts/bash/fold-fixups.sh --verify "$(git rev-parse HEAD)" >/dev/null 2>&1; [ $? = 2 ])'
 
-# Spec 042 — the merge mechanics live in five scripts. Each doc calls its
-# script; the absence halves keep a second, inline spelling of it out.
-for s in land-feature fold-fixups epic-status remove-spec; do
-  check "$s.sh scaffolded + executable (spec 042)" \
-    "[ -x .specnaut/scripts/bash/$s.sh ]"
+# Spec 042 — the merge mechanics live in these scripts (lfs-push.sh: cli#799, run by
+# lfs_push_test). Each doc calls its script; the absence halves keep an inline spelling out.
+for s in land-feature.sh lfs-push.sh fold-fixups.sh epic-status.sh remove-spec.sh; do
+  check "$s scaffolded + executable (spec 042)" \
+    "[ -x .specnaut/scripts/bash/$s ]"
 done
 check "close-shipped.sh scaffolded + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'

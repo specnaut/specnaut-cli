@@ -21,7 +21,8 @@
 # basename the branch that landed (a stale feature.json names another).
 # Nothing else may be staged, nor edited under it. Then `git rm -r` of it and
 # of feature.json, a check that every staged path is one of those deletions,
-# a commit, and a push with an explicit refspec and never its tags. Files
+# a commit, and a push with an explicit refspec and never its tags - with no
+# git-lfs upload: a commit of deletions adds no pointer (lfs-push.sh). Files
 # under it that git does not track (ignored ones included) are in no commit:
 # they are listed, quoted, and kept — never deleted.
 #

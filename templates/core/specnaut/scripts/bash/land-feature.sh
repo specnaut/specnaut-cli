@@ -5,8 +5,8 @@
 #
 # In order: HEAD is a branch other than the base, and the tree is clean;
 # `origin/<base>` is fetched, origin confirms <base> is its default branch,
-# and the branch contains it and holds at least one commit origin lacks; the
-# base is checked out and fast-forwarded to the branch; the base is pushed
+# and the branch contains it and holds at least one commit origin lacks; HEAD
+# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked out and fast-forwarded to the branch; the base is pushed
 # with an explicit refspec and never its tags; the merged branch is deleted
 # with `-d`; HEAD is verified to be the base. No git hook runs at any step.
 # The base is base-branch.sh's —
@@ -38,6 +38,8 @@
 #      empty, relative or in-repository entry (VERIFIER REFUSED, naming it);
 #      its VERDICT instructions, UNTRUSTED and APPROVAL lines are printed.
 #      Nothing moved
+#   17 HEAD's git-lfs objects could not be pushed first (lfs-push.sh: its LFS
+#      line names why). Nothing moved; the git push never ran
 # (8 is retired: a branch that will not delete after the push is 11, never
 # read as a failed landing.)
 #
@@ -108,7 +110,9 @@ if [ "$branch" = "$base" ]; then
   echo "land-feature: already on $base — check out the feature branch" >&2
   exit 2
 fi
-if [ -n "$(git status --porcelain)" ]; then
+# Captured first: a status that fails is the ERR trap's 12, never a clean tree.
+dirty=$(git status --porcelain)
+if [ -n "$dirty" ]; then
   git status --short >&2
   echo "land-feature: the tree is dirty — commit, or stop whoever holds it" >&2
   exit 4
@@ -143,6 +147,18 @@ first=$(git rev-list --reverse "refs/remotes/origin/$base..HEAD" | sed -n 1p)
 last=$(git rev-parse HEAD)
 resolve_specnaut
 judge_head
+# The judged commit's git-lfs objects first, while nothing has moved: the push below runs no hook,
+# so git-lfs's pre-push upload never does. Its 17 is its own refusal; anything else is 12.
+rc=0
+bash "$here/lfs-push.sh" "$last" >&2 || rc=$?
+case $rc in
+  0) ;;
+  17) exit 17 ;;
+  *)
+    echo "land-feature: lfs-push.sh failed (exit $rc) - nothing was pushed" >&2
+    exit 12
+    ;;
+esac
 
 git checkout --quiet "$base"
 # The commit judged above, never the branch's name: a ref that moved since would land unjudged. A

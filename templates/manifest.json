@@ -2462,6 +2462,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/lfs-push.sh",
+      "source": "core/specnaut/scripts/bash/lfs-push.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/_verifier.sh",
       "source": "core/specnaut/scripts/bash/_verifier.sh"
     },

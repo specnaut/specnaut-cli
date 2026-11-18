@@ -27,5 +27,7 @@ windows, context, cost and the quota hold are unchanged.
 
 **`/task merge` runs no git hook.** Its squash, fixup fold, rebase and closeout commands now run
 with hooks off, as the landing itself already did. Your project's own commit, checkout and push
-hooks do not fire during a merge, git-lfs's pre-push upload included; the full gate tier still runs
-before anything lands.
+hooks do not fire during a merge; the full gate tier still runs before anything lands. Git LFS
+objects are now pushed explicitly before the landing's push and the `--pr` push, since git-lfs's own
+pre-push upload no longer runs. If you track files with Git LFS and landed with 9.4.0, run
+`git lfs push --all origin <base>` once: those landings pushed without the objects.

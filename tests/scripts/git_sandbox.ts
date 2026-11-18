@@ -14,7 +14,7 @@ const BASH_DIR = fromFileUrl(
 );
 export const SCRIPTS =
   `_base_refs.sh _intake_gate.sh _verifier.sh base-branch.sh epic-status.sh fold-fixups.sh
-  land-feature.sh merge-mode.sh remove-spec.sh wip-audit.sh`.split(/\s+/);
+  land-feature.sh lfs-push.sh merge-mode.sh remove-spec.sh wip-audit.sh`.split(/\s+/);
 
 /**
  * Each merge script run on main with no feature stops at a refusal of its own, past the sibling
