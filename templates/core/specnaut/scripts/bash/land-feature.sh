@@ -6,10 +6,13 @@
 # In order: HEAD is a branch other than the base, and the tree is clean;
 # `origin/<base>` is fetched, origin confirms <base> is its default branch,
 # and the branch contains it and holds at least one commit origin lacks; HEAD
-# is judged and its git-lfs objects pushed (lfs-push.sh); the base is checked
-# out and fast-forwarded to the branch; the base is pushed with an explicit
-# refspec and never its tags; the merged branch is deleted with `-d`; HEAD is
-# verified to be the base. No git hook runs at any step. The base is
+# is judged; after a yes that held, the approvals of the customised shipped
+# skills it covered are committed on top of HEAD (record_approvals in
+# _verifier.sh: `APPROVALS NOT RECORDED` when the binary cannot); HEAD's
+# git-lfs objects are pushed (lfs-push.sh); the base is checked out and
+# fast-forwarded to the branch, or to that commit; the base is pushed with an
+# explicit refspec and never its tags; the merged branch is deleted with `-d`;
+# HEAD is verified to be the base. No git hook runs at any step. The base is
 # base-branch.sh's — local-only, so origin is asked here, on the path that
 # already talks to it — never an argument. Reaching it is the instruction to
 # land: it reads no mode.
@@ -37,7 +40,8 @@
 #      only a local base ahead of origin passes, to exit 6); or it could not
 #      judge HEAD, or `specnaut` resolved to a path it refuses, or the PATH
 #      holds an empty, relative or in-repository entry (VERIFIER REFUSED,
-#      naming it); its VERDICT instructions, UNTRUSTED and APPROVAL lines are
+#      naming it), or the yes no longer held when its approvals were
+#      recorded; its VERDICT instructions, UNTRUSTED and APPROVAL lines are
 #      printed. Nothing moved
 #   17 HEAD's git-lfs objects could not be pushed first (lfs-push.sh: its LFS
 #      line names why). Nothing moved; the git push never ran
@@ -134,6 +138,7 @@ first=$(git rev-list --reverse "refs/remotes/origin/$base..HEAD" | sed -n 1p)
 last=$(git rev-parse HEAD)
 resolve_specnaut
 judge_head
+record_approvals
 # The judged commit's git-lfs objects first, while nothing has moved: the push below runs no hook,
 # so git-lfs's pre-push upload never does. Its 17 is its own refusal; anything else is 12.
 rc=0
@@ -148,9 +153,10 @@ case $rc in
 esac
 
 git checkout --quiet "$base"
-# The commit judged above, never the branch's name: a ref that moved since would land unjudged. A
-# base that already contained it and more stays where it is: it holds commits origin lacks.
-if ! git merge --quiet --ff-only "$last" || [ "$(git rev-parse HEAD)" != "$last" ]; then
+# The commit judged above, or the approvals commit on it, never the branch's name: a ref that moved
+# since would land unjudged. A base that already contained it and more stays where it is: it holds
+# commits origin lacks.
+if ! git merge --quiet --ff-only "$land" || [ "$(git rev-parse HEAD)" != "$land" ]; then
   git checkout --quiet "$branch"
   echo "land-feature: the local $base has commits origin/$base lacks (origin/$base..$base):" >&2
   git --no-pager log --format='  %h %s' "refs/remotes/origin/$base..refs/heads/$base" >&2
@@ -171,7 +177,8 @@ if [ "$now" != "$base" ]; then
   echo "land-feature: HEAD is on '$now', not $base" >&2
   exit 9
 fi
-printf 'LANDED %s %s..%s %s commit(s)\n' "$base" "${first:0:12}" "${last:0:12}" "$count"
+[ "$land" = "$last" ] || count=$((count + 1))
+printf 'LANDED %s %s..%s %s commit(s)\n' "$base" "${first:0:12}" "${land:0:12}" "$count"
 if [ "$deleted" = 0 ]; then
   echo "land-feature: landed and pushed, but $branch would not delete with -d — the landing stands; the branch stays" >&2
   exit 11

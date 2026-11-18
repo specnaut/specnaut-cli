@@ -1,8 +1,6 @@
-import { red } from "@std/fmt/colors";
+import { red, yellow } from "@std/fmt/colors";
 import { type VerifyOutcome, verifyScripts } from "../../application/verify_scripts.ts";
-import { verifyConfig } from "../../application/verify_config.ts";
-import { type InstructionBase, verifyInstructions } from "../../application/verify_instructions.ts";
-import { shippedSkills } from "../../application/shipped_copies.ts";
+import { instructionsNow, type Judged, judgeInputs } from "../../application/judge_inputs.ts";
 import type {
   CheckoutTreeWalker,
   GitObjectReader,
@@ -16,7 +14,7 @@ import {
   scriptsApprovable,
 } from "../../domain/approval_verdict.ts";
 import type { ConfigVerdict } from "../../domain/config_trust.ts";
-import { INSTRUCTION_CLASS } from "../../domain/instruction_trust.ts";
+import { APPROVALS_FILE } from "../../domain/skill_approvals.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
@@ -107,27 +105,24 @@ export async function runVerifyScripts(
     const base = outcome.kind === "judged"
       ? { tip: outcome.baseTip, mergeBase: outcome.base, head: outcome.head }
       : null;
-    return await answer(outcome, await judgeInputs(git, config, base), deps, approved);
+    const judged = await judgeInputs({ git, tree: config, core: CORE_BUNDLE, findHarness }, base);
+    warnRefused(deps, judged);
+    return await answer(outcome, judged, deps, approved);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
   }
 }
 
-/** The config and instruction lines, and the digest a yes to the instruction lines covers. */
-type Judged = { readonly verdicts: readonly ConfigVerdict[]; readonly digest: string | null };
-
-/** The config, then the instruction verdicts, measured from `base`; none when it is unknown. */
-async function judgeInputs(
-  git: GitObjectReader,
-  tree: CheckoutTreeWalker,
-  base: InstructionBase | null,
-): Promise<Judged> {
-  if (base === null) return { verdicts: [], digest: null };
-  const config = await verifyConfig({ git, tree }, base);
-  const shipped = await shippedSkills({ git, core: CORE_BUNDLE, findHarness }, base.tip);
-  const instructions = await verifyInstructions({ git, tree }, base, shipped);
-  return { verdicts: [...config, ...instructions.verdicts], digest: instructions.digest };
+/**
+ * The approvals at the base's tip, when they could not be read: said on stderr, never a verdict
+ * line. They approve nothing then, so each customised skill is named and asked about.
+ */
+function warnRefused(deps: VerifyScriptsDeps, judged: Judged): void {
+  const why = judged.shipped?.approvalsRefused;
+  if (why === null || why === undefined) return;
+  const text = `${APPROVALS_FILE} at the base's tip is not read, so it approves nothing: ${why}`;
+  deps.err(yellow(`warning: specnaut verify-scripts: ${terminalText(text)}`));
 }
 
 type Outcome = Extract<VerifyOutcome, { kind: "judged" }>;
@@ -156,11 +151,7 @@ function approvalOf(outcome: Outcome, config: Judged, approved: ApprovedDigests)
   const { trusted, untrusted } = outcome.verdict;
   return approvalVerdict(approved, {
     scripts: { trusted, digest: outcome.digest, approvable: scriptsApprovable(untrusted) },
-    instructions: {
-      trusted: config.verdicts.some((v) => v.class === INSTRUCTION_CLASS && v.trusted),
-      digest: config.digest ?? "",
-      approvable: true,
-    },
+    instructions: instructionsNow(config),
   });
 }
 

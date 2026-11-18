@@ -1,4 +1,5 @@
 import type { BacklogBackend, SpecBackend } from "../domain/installed_lock.ts";
+import type { RecordApprovalsIntent, VerifyScriptsIntent } from "./verify_scripts_parser.ts";
 
 /**
  * What the command line asks for: `parseArgs` returns one, `main.ts` dispatches on its `kind`.
@@ -192,8 +193,8 @@ export type Intent =
   }
   | ScanIntent
   | SandboxIntent
-  /** `specnaut verify-scripts`, and the digests a yes covers (verify_scripts_handler.ts). */
-  | { kind: "verify-scripts"; approved: { scripts?: string; instructions?: string } }
+  | VerifyScriptsIntent
+  | RecordApprovalsIntent
   /** `specnaut record-checkout`: a `SessionStart` hook records the checkout (record_checkout_handler.ts). */
   | { kind: "record-checkout" }
   | ReviewIntent;

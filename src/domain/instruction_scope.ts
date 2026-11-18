@@ -1,6 +1,7 @@
 import { inScopeRoot, isNestedSurface, NESTED_NAMES, type ScopeRoot } from "./checkout_scope.ts";
 import type { ConfigFile } from "./config_trust.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
+import { APPROVALS_FILE } from "./skill_approvals.ts";
 
 /**
  * Which paths the instruction class (`instruction_trust.ts`) judges, and how HEAD's listing is
@@ -13,9 +14,11 @@ import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./scri
 /**
  * The instruction files, and every other surface a harness loads from the checkout and acts on:
  * skills, agents and their memory, hooks and the settings that name them, slash commands, rules,
- * output styles, MCP servers, Codex's config, Specnaut's own hooks. `.gitattributes` and
- * `.lfsconfig` too: they decide how git shows and checks out every other file. Each is a root of the checked files
- * (`checkout_scope.ts` holds them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files there.
+ * output styles, MCP servers, Codex's config, Specnaut's own hooks, and the skill approvals (a
+ * branch that writes one is named). `.gitattributes` and `.lfsconfig` too: they decide how git
+ * shows and checks out every other file. Each is a root of the checked files (`checkout_scope.ts`
+ * holds them all). `.claude/` is not walked whole: a project may keep worktrees or scratch files
+ * there.
  */
 // deno-fmt-ignore
 export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
@@ -31,6 +34,7 @@ export const INSTRUCTION_SCOPE: readonly ScopeRoot[] = [
   { dir: ".agents", deep: true },
   { dir: ".specnaut/hooks", deep: true },
   { dir: ".specnaut/addenda", deep: true },
+  { dir: ".specnaut", deep: false, names: [APPROVALS_FILE.slice(".specnaut/".length)] },
   { dir: "docs", deep: false, names: ["constitution.md"] },
 ];
 

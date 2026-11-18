@@ -4,8 +4,10 @@ import {
   approvalVerdict,
   type ApprovedDigests,
   type ClassNow,
+  instructionsApprovable,
   scriptsApprovable,
 } from "../../src/domain/approval_verdict.ts";
+import { APPROVALS_FILE } from "../../src/domain/skill_approvals.ts";
 import { REASON } from "../../src/domain/trust_reason.ts";
 
 /**
@@ -97,4 +99,17 @@ Deno.test("a yes binds only the bytes the digest covers: a link, a non-file or a
       "a link in the path: .specnaut/scripts/bash",
     ]
   ) assertEquals(scriptsApprovable(at(reason)), false, reason);
+});
+
+Deno.test("a yes covers no branch change to the approvals file but its deletion", () => {
+  const skill = { path: ".claude/skills/task/SKILL.md", reason: REASON.differs };
+  const at = (reason: string, path = APPROVALS_FILE) => [skill, { path, reason }];
+  assertEquals(instructionsApprovable([skill]), true);
+  assertEquals(instructionsApprovable(at(REASON.missing)), true, "deleted: approvals revoked");
+  assertEquals(instructionsApprovable(at(REASON.behind)), true, "only the base moved");
+  for (const reason of [REASON.differs, REASON.notOnBase, REASON.caseDiffers, REASON.link]) {
+    assertEquals(instructionsApprovable(at(reason)), false, reason);
+  }
+  const upper = APPROVALS_FILE.toUpperCase();
+  assertEquals(instructionsApprovable(at(REASON.missing, upper)), false, "another letter case");
 });

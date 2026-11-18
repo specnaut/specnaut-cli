@@ -3,6 +3,8 @@ import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { BaseEntry } from "../../src/domain/script_trust.ts";
 import {
   isSkillPath,
+  LOCK_SKILL_REASON,
+  lockSkillReasons,
   SHIPPED_REASON,
   type ShippedCopy,
   shippedReasons,
@@ -56,4 +58,37 @@ Deno.test("the skill folders are the ones Specnaut writes for Claude Code and Co
     ),
     [true, true, false],
   );
+});
+
+Deno.test("an approved digest holds where the bundle differs, and only for those exact bytes", async () => {
+  const approvedSha256 = await sha256Hex("mine");
+  const copy: ShippedCopy = { bytes: enc("ship"), approvedSha256 };
+  assertEquals(await judge([blob(SKILL, "mine")], [[SKILL, copy]]), []);
+  assertEquals(await judge([blob(SKILL, "mine.")], [[SKILL, copy]]), [
+    `${SKILL} ${SHIPPED_REASON}`,
+  ]);
+});
+
+Deno.test("an approval never holds a link where Specnaut ships a file", async () => {
+  const link: BaseEntry = { kind: "link", path: SKILL, target: "mine" };
+  const copy: ShippedCopy = { bytes: enc("ship"), approvedSha256: await sha256Hex("mine") };
+  assertEquals(await judge([link], [[SKILL, copy]]), [`${SKILL} ${SHIPPED_REASON}`]);
+});
+
+const entry = (sha256: string) => ({ sha256, installedAt: "", templatesVersion: "" });
+const LOCK = ".specnaut/installed.lock";
+
+Deno.test("a branch's lock that records a skill digest Specnaut does not ship is named", () => {
+  const head = new Map([[SKILL, entry("b".repeat(64))]]);
+  const old = new Map([[SKILL, entry("a".repeat(64))]]);
+  const bundled = new Map([[SKILL, "c".repeat(64)]]);
+  assertEquals(lockSkillReasons(head, old, bundled), [{ path: LOCK, reason: LOCK_SKILL_REASON }]);
+  assertEquals(lockSkillReasons(head, undefined, bundled).length, 1, "a first lock too");
+});
+
+Deno.test("a lock left as the merge base had it, or set to the bundle's digest, is silent", () => {
+  const sha = "b".repeat(64);
+  const head = new Map([[SKILL, entry(sha)], [".claude/agents/x.md", entry("d".repeat(64))]]);
+  assertEquals(lockSkillReasons(head, new Map([[SKILL, entry(sha)]]), new Map()), []);
+  assertEquals(lockSkillReasons(head, undefined, new Map([[SKILL, sha]])), []);
 });

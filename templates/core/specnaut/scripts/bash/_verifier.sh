@@ -1,8 +1,9 @@
-# shellcheck shell=bash disable=SC2154 # me, base and the digests: set by the sourcing script
-# HEAD's verdict from the verifier, for land-feature.sh, and the PATH judgement lfs-push.sh shares
-# with it - sourced, never run, after _hooks_off.sh set the git alias, `me` and the ERR trap, under
-# the caller's `set -Eeuo pipefail`; land-feature.sh sets `base`, `scripts_digest` and
-# `instructions_digest` before its calls. Exit 13 is the caller's: its header says what it means.
+# shellcheck shell=bash disable=SC2154 # me, base, last and the digests: set by the sourcing script
+# HEAD's verdict from the verifier, and the approvals a yes leaves, for land-feature.sh, and the
+# PATH judgement lfs-push.sh shares with it - sourced, never run, after _hooks_off.sh set the git
+# alias, `me` and the ERR trap, under the caller's `set -Eeuo pipefail`; land-feature.sh sets
+# `base`, `last`, `scripts_digest` and `instructions_digest` before its calls. Exits 12 and 13 are
+# the caller's: its header says what they mean.
 
 # The PATH, judged before the first command it names runs - `bash`, `git` and `specnaut` are all
 # looked up on it. An empty or a relative entry is searched from the working folder, and an entry
@@ -150,4 +151,44 @@ judge_head() {
     echo "land-feature: HEAD's instructions or helper scripts are neither trusted nor the digest passed - ask, then land again with it. Nothing was landed" >&2
   fi
   exit 13
+}
+
+# After a yes that held, the approvals of the customised shipped skills it covered: the binary
+# writes the whole file to a temp file, and this commits it on top of the judged commit with git's
+# plumbing - no work-tree write, no filter, no hook. `land` is what lands: that commit, checked to
+# have the judged commit as its one parent and to change that one file, a regular file; or the
+# judged commit itself. A binary too old for the command (exit 2) records nothing; the next merge
+# asks again. A yes that moved since judge_head is exit 13.
+record_approvals() {
+  local rc=0 rec file path blob tree idx raw m s p
+  land=$last
+  { [ -n "$instructions_digest" ] && grep -q '^APPROVAL instructions holds ' <<<"$out"; } || return 0
+  rec=$("$sn" record-approvals --instructions-digest "$instructions_digest" --head "$last" \
+    --base-tip "$(sed -n 's/^BASE_TIP //p' <<<"$out")") || rc=$?
+  case $rc in
+    0) ;;
+    2) echo "$me: APPROVALS NOT RECORDED - this specnaut cannot record them; the next merge asks again" >&2; return 0 ;;
+    1) echo "$me: the yes no longer holds for HEAD - nothing was landed" >&2; exit 13 ;;
+    *) echo "$me: the approvals could not be recorded (exit $rc) - nothing was pushed" >&2; exit 12 ;;
+  esac
+  file=$(sed -n 's/^APPROVALS_FILE //p' <<<"$rec")
+  [ -n "$file" ] || return 0
+  path="$(git rev-parse --show-prefix).specnaut/approved-skills.txt"
+  blob=$(git hash-object -w --no-filters -- "$file")
+  rm -f "$file"
+  idx=$(mktemp -d)
+  GIT_INDEX_FILE=$idx/index git read-tree "$last^{tree}"
+  GIT_INDEX_FILE=$idx/index git update-index --add --cacheinfo 100644 "$blob" "$path"
+  tree=$(GIT_INDEX_FILE=$idx/index git write-tree)
+  rm -rf "$idx"
+  land=$(git commit-tree "$tree" -p "$last" -m "chore(specnaut): approve customised skill content")
+  raw=$(git -c core.quotePath=false diff-tree -r --no-renames --raw --no-abbrev "$last" "$land")
+  read -r _ m _ s _ <<<"${raw%%$'\t'*}"
+  p=${raw#*$'\t'}
+  if [ "$(git rev-list --parents -n 1 "$land")" != "$land $last" ] || [ "$m $s" != "100644 $blob" ] ||
+    [ "$p" != "$path" ]; then
+    echo "$me: the approvals commit is not the one file on the judged commit - nothing was pushed" >&2
+    exit 12
+  fi
+  grep '^APPROVED ' <<<"$rec" >&2 || true
 }

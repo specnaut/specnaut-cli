@@ -51,6 +51,7 @@ Deno.test("the class covers every surface a harness loads from the checkout, and
     ".codex/config.toml",
     ".agents/skills/specnaut-task/SKILL.md",
     ".specnaut/hooks/protect-generated.sh",
+    ".specnaut/approved-skills.txt",
     ".gitattributes",
   ];
   const outside = (path: string) =>

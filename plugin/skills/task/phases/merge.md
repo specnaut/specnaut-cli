@@ -130,12 +130,15 @@ under `--no-close`, once more after the push: there the item's line must read `O
    with the verifier, and lands only when the scripts and the instructions are each trusted or
    still that digest; a local base ahead of origin is left to its exit 6.
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
-   contains `origin/<base>` and adds to it; it pushes HEAD's git-lfs objects (`lfs-push.sh`),
-   fast-forwards the base, pushes it, deletes the
-   branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
-   commit(s)`. **It pushes without asking, in either merge mode**: reaching
-   this step is the instruction — `phases/auto-chain.md` reads the mode, and this phase stops only
-   where step 0 says.
+   contains `origin/<base>` and adds to it; after a yes to the instructions that held, it commits
+   the approvals of the customised shipped skills that yes covered (`.specnaut/approved-skills.txt`,
+   `phases/script-gate.md` § The instructions verdict) on top of the judged commit, which then lands
+   too, or prints `APPROVALS NOT RECORDED` when the binary cannot record them (the next merge asks
+   again); it pushes HEAD's git-lfs objects (`lfs-push.sh`), fast-forwards the base, pushes it,
+   deletes the branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base>
+   <first>..<last> <n> commit(s)`. **It pushes without asking, in either merge mode**: reaching this
+   step is the instruction — `phases/auto-chain.md` reads the mode, and this phase stops only where
+   step 0 says.
 4. **Read its exit** — this table maps every exit `land-feature.sh`'s header lists; an exit it does
    not list is a finding: quote it and stop on the branch. A row that rebases runs step 0 right
    after its `git rebase`, before anything else.
@@ -153,7 +156,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
-   | 13 | HEAD's scripts or instructions are neither trusted nor the digest passed, or hold a reason no yes covers, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
+   | 13 | HEAD's scripts or instructions are neither trusted nor the digest passed, or hold a reason no yes covers, or the yes no longer held when its approvals were recorded, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
    | 17 | the git-lfs objects could not be pushed first; its `LFS` line names why | quote that line and stop on the branch: nothing moved, nothing was pushed. `LFS CONFIG CHANGED`: show the `.lfsconfig` diff it names — a legitimate change is pushed or landed by hand, never by this phase. `LFS UNAVAILABLE`, `LFS TOO OLD`: install or upgrade git-lfs, then run the step again. `LFS PUSH FAILED`: say what its output names |
 
 5. **Settle the card** — the one place this phase decides where the linked item's card goes. First

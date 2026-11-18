@@ -13,11 +13,12 @@ import { importedAtHead, type ImportSources, readImports } from "./instruction_i
 import { isNested, keptAtHead, nestedRoots } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
-import { type ShippedCopy, shippedReasons } from "../domain/shipped_skills.ts";
+import { shippedReasons } from "../domain/shipped_skills.ts";
 import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
 import type { ConfigVerdict } from "../domain/config_trust.ts";
 import type { GitObjectReader } from "./script_trust_ports.ts";
 import { commitFile, type ConfigBase, type VerifyConfigDeps } from "./verify_config.ts";
+import type { ShippedInput } from "./shipped_copies.ts";
 
 /**
  * The instruction half of `specnaut verify-scripts` (`instruction_trust.ts`): what a session and
@@ -37,7 +38,7 @@ export type InstructionOutcome = {
 /**
  * The instruction class (`instruction_trust.ts`): each of its roots walked in the tree and listed at
  * the tip, the merge base and HEAD, one at a time for the reason above, then judged as one class,
- * HEAD's skills against `shipped` too (`shippedSkills` in `shipped_copies.ts`), the files above a
+ * HEAD's skills against `shipped` too, with its lock reasons (`shipped_copies.ts`), the files above a
  * project in a subfolder (`instruction_parents.ts`), what the judged CLAUDE.md files import
  * (`instruction_imports.ts`), and the files the judged configs' commands run
  * (`instruction_commands.ts`).
@@ -45,7 +46,7 @@ export type InstructionOutcome = {
 export async function verifyInstructions(
   deps: VerifyConfigDeps,
   base: InstructionBase,
-  shipped: ReadonlyMap<string, ShippedCopy> = new Map(),
+  shipped: ShippedInput,
 ): Promise<InstructionOutcome> {
   const head = await deps.git.listCommit(base.head, keptAtHead);
   const { tree, tip, mergeBase } = await listRoots(deps, base, head);
@@ -57,10 +58,10 @@ export async function verifyInstructions(
     head: [...files, ...parents.head],
     tip: [...tip, ...parents.tip, ...tipOverrides(committed)],
   });
-  const extra = [...await shippedReasons(files, shipped), ...parentReasons(parents)];
-  extra.push(...importReasons(targets.files), ...targets.reasons);
+  const extra = [...await shippedReasons(files, shipped.copies), ...shipped.reasons];
+  extra.push(...parentReasons(parents), ...importReasons(targets.files), ...targets.reasons);
   const verdicts = judgeInstructions({ tree, tip, mergeBase, head, committed, symlinks, extra });
-  const landing = [...files, ...parents.head, ...importedAtHead(targets.files)];
+  const landing = [...files, ...parents.head, ...importedAtHead(targets.files), ...shipped.covers];
   return { verdicts, digest: await digestOf(deps.git, base.head, landing, verdicts) };
 }
 

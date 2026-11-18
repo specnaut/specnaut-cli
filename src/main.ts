@@ -68,6 +68,10 @@ async function dispatch(argv: string[]): Promise<number> {
     case "verify-scripts":
       return (await import("./cli/handlers/verify_scripts_handler.ts"))
         .runVerifyScripts(undefined, intent.approved);
+    case "record-approvals":
+      return (await import("./cli/handlers/record_approvals_handler.ts")).runRecordApprovals(
+        intent,
+      );
     case "review":
       return (await import("./cli/handlers/review_handler.ts")).runReview(intent);
     case "record-checkout":

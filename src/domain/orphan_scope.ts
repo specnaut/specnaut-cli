@@ -25,10 +25,10 @@ export type OrphanScope = "in-scope" | "git-dir" | "outside-managed-roots";
 export type RefusedScope = Exclude<OrphanScope, "in-scope">;
 
 /**
- * The `.specnaut/` folders every harness writes. Not `.specnaut/` itself: its
- * other folders and files are the project's own — specs, local backlog,
- * addenda, `installed.lock`, `preserve.yml`, `backlog-config.yml` — and no
- * lock entry may ever reach them.
+ * The `.specnaut/` folders every harness writes. Not `.specnaut/` itself: its other folders
+ * and files are the project's own — specs, local backlog, addenda, `installed.lock`,
+ * `preserve.yml`, `backlog-config.yml`, `approved-skills.txt` — and no lock entry may ever
+ * reach them.
  */
 export const SHARED_ROOTS: ReadonlyArray<string> = [
   ".specnaut/logs/",

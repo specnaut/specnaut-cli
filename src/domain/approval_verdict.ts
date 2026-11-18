@@ -1,4 +1,5 @@
 import { SCRIPTS_DIR, type Untrusted } from "./script_trust.ts";
+import { APPROVALS_FILE } from "./skill_approvals.ts";
 import { REASON } from "./trust_reason.ts";
 
 /**
@@ -42,11 +43,15 @@ export function approvalVerdict(
   const lines = APPROVAL_CLASSES.flatMap((c): ApprovalLine[] => {
     const yes = approved[c];
     if (yes === undefined) return [];
-    return [{ class: c, holds: now[c].approvable && yes === now[c].digest, digest: now[c].digest }];
+    return [{ class: c, holds: yesHolds(yes, now[c]), digest: now[c].digest }];
   });
   const held = (c: ApprovalClass) => lines.some((l) => l.class === c && l.holds);
   return { lines, holds: APPROVAL_CLASSES.every((c) => now[c].trusted || held(c)) };
 }
+
+/** Whether the yes given to digest `yes` binds the class as judged now. */
+export const yesHolds = (yes: string, now: ClassNow): boolean =>
+  now.approvable && yes === now.digest;
 
 /**
  * The reasons a yes can bind: each names bytes `SCRIPTS_DIGEST` covers, or a file's absence, which
@@ -72,4 +77,17 @@ const APPROVABLE: ReadonlySet<string> = new Set([
  */
 export function scriptsApprovable(untrusted: readonly Untrusted[]): boolean {
   return untrusted.every((u) => u.path.startsWith(`${SCRIPTS_DIR}/`) && APPROVABLE.has(u.reason));
+}
+
+/**
+ * Whether a yes can cover the instructions' verdict: any but a branch's change to the approvals
+ * file (`skill_approvals.ts`). Only the landing writes it, after a yes; a branch that wrote its own
+ * would vouch for itself at the next merge. Deleting it revokes every approval, and a file only the
+ * base added is a rebase, so those two hold. Its name in another letter case holds nothing.
+ */
+export function instructionsApprovable(untrusted: readonly Untrusted[]): boolean {
+  return untrusted.every((u) =>
+    u.path.toLowerCase() !== APPROVALS_FILE ||
+    (u.path === APPROVALS_FILE && (u.reason === REASON.missing || u.reason === REASON.behind))
+  );
 }

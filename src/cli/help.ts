@@ -24,6 +24,10 @@ ${bold("Usage:")}
                                       (read-only). Exit 0 trusted, 1 untrusted, 3 no base. With the
                                       digests a yes covers: an APPROVAL line per flag, exit 0 when the
                                       scripts and the instructions are each trusted or still that digest
+  specnaut record-approvals --instructions-digest <sha256> --head <sha> --base-tip <sha>
+                                      After a yes to that digest, write the approvals of the customised
+                                      shipped skills it covered to a temporary file (land-feature.sh
+                                      commits it). Exit 0 written or unchanged, 1 the yes does not hold
   specnaut record-checkout            Record the checkout a session started on (HEAD and the instruction and
                                       config files it loaded), from a SessionStart hook's input on stdin
   specnaut review gate                Check, from a Claude Code PreToolUse hook's input on stdin, that the
