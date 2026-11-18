@@ -142,11 +142,13 @@ Deno.test("gitlab: a failed lookup, or one naming no plain path, is exit 13", as
   }
 });
 
-Deno.test("cloud: no board address in the contract yet, so the defined fallback, exit 0", async () => {
-  const r = await kanban("cloud", CLOUD, { specnaut: "echo tok", curl: "exit 1" });
-  assertEquals(r.code, 0, r.err);
-  assertEquals(r.out, "CLOUD: project ACME - open the board from the Specnaut Cloud web app");
-  assertEquals(r.calls, "specnaut cloud token --api-url https://api.example.com\n");
+Deno.test("cloud: no board address and no credential needed, so the fallback, logged out too", async () => {
+  for (const specnaut of ["echo tok", 'echo "not signed in" >&2; exit 1']) {
+    const r = await kanban("cloud", CLOUD, { specnaut, curl: "exit 1" });
+    assertEquals(r.code, 0, r.err);
+    assertEquals(r.out, "CLOUD: project ACME - open the board from the Specnaut Cloud web app");
+    assertEquals(r.calls, "", "kanban sends no request: no token is asked for");
+  }
 });
 
 Deno.test("cloud: the board helper never reads the API address", async () => {

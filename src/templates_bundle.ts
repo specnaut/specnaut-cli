@@ -8913,6 +8913,9 @@ case "\${1:-}" in
   *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
 esac
 
+# The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
+# no credential is fetched first (cli#804).
+BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=./_board.sh
@@ -12353,6 +12356,9 @@ case "\${1:-}" in
   *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
 esac
 
+# The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
+# no credential is fetched first (cli#804).
+BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=./_board.sh
@@ -15100,6 +15106,9 @@ case "\${1:-}" in
   *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
 esac
 
+# The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
+# no credential is fetched first (cli#804).
+BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=./_board.sh
@@ -15778,6 +15787,9 @@ case \$API_URL in http://*)
     exit 2
   } ;;
 esac
+
+# A caller sending no request (kanban.sh) needs no token: logged out works (cli#804).
+[ "\${BACKLOG_CONFIG_ONLY:-}" != 1 ] || return 0
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
@@ -17099,6 +17111,9 @@ case "\${1:-}" in
   *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
 esac
 
+# The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
+# no credential is fetched first (cli#804).
+BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 # shellcheck source=./_board.sh

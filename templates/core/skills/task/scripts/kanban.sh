@@ -20,6 +20,9 @@ case "${1:-}" in
   *) echo "usage: kanban.sh [--no-open]" >&2; exit 2 ;;
 esac
 
+# The fields alone: a request is the tracker CLI's (_board.sh), never ours, so
+# no credential is fetched first (cli#804).
+BACKLOG_CONFIG_ONLY=1
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 # shellcheck source=./_board.sh

@@ -85,6 +85,9 @@ case $API_URL in http://*)
   } ;;
 esac
 
+# A caller sending no request (kanban.sh) needs no token: logged out works (cli#804).
+[ "${BACKLOG_CONFIG_ONLY:-}" != 1 ] || return 0
+
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
 # A failure has said why on stderr: logged out, Cloud unavailable, or a redirect.
