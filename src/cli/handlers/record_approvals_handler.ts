@@ -22,8 +22,9 @@ import type { RecordApprovalsIntent } from "../record_approvals_parser.ts";
  *      removes) or `APPROVALS unchanged`
  *   1  D does not hold for HEAD judged at those commits: `APPROVAL instructions moved <digest now>`,
  *      nothing written
- *   2  usage: no `.specnaut/` here; an argument is the parser's exit 2, as is an older binary's
- *      answer to a command it does not know
+ *   2  usage: no `.specnaut/` here; an argument is the parser's exit 2. An older binary answers a
+ *      command it does not know with exit 2 too: `_approvals.sh` tells the two apart by whether
+ *      `specnaut --help` names this command, so the help line in `help.ts` is part of the contract
  *   3  the commits are not ones this repository holds, or the check could not run
  */
 const EXIT = { written: 0, moved: 1, ...VERIFIER_EXIT } as const;

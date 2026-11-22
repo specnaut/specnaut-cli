@@ -20,6 +20,12 @@ import {
 
 const NAMED = `VERDICT instructions untrusted ${SKILL} ${SHIPPED_REASON}`;
 
+/** A binary from before `record-approvals`: an unknown command, exit 2, and a help without it. */
+const OLDER = `case $1 in
+  record-approvals) echo 'Unknown command: "record-approvals"' >&2; exit 2 ;;
+  --help) "$REAL" --help | grep -v 'specnaut record-approvals'; exit 0 ;;
+esac`;
+
 Deno.test("a customised skill the base holds is asked about before it lands", async () => {
   const sb = await customisedBase();
   try {
@@ -87,7 +93,7 @@ Deno.test("a verifier that cannot record approvals lands, and says nothing was r
   const sb = await customisedBase();
   try {
     const judged = await git(sb.work, "rev-parse", "HEAD");
-    const r = await landWithVerifier(sb, '[ "$1" = record-approvals ] && exit 2');
+    const r = await landWithVerifier(sb, OLDER);
     assertEquals(r.code, 0, r.stderr);
     assertStringIncludes(r.stderr, "APPROVALS NOT RECORDED");
     assertEquals(await git(sb.remote, "rev-parse", "main"), judged);

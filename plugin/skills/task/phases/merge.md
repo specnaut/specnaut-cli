@@ -155,7 +155,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    | 9 | `HEAD` is not the base | the landing stands — it was pushed. Say so, `git -c core.hooksPath=/dev/null checkout <base>`, then step 5 runs: the person who asked must be back where they work |
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
-   | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
+   | 12 | an unexpected git failure before the push, or approvals the binary could not record | quote it and stop: nothing was pushed |
    | 13 | HEAD's scripts or instructions are neither trusted nor the digest passed, or hold a reason no yes covers, or the yes no longer held when its approvals were recorded, or the check could not run or refused the verifier | step 0 at once: its questions decide, then land again with those digests. "Could not judge": stop and say so |
    | 17 | the git-lfs objects could not be pushed first; its `LFS` line names why | quote that line and stop on the branch: nothing moved, nothing was pushed. `LFS CONFIG CHANGED`: show the `.lfsconfig` diff it names — a legitimate change is pushed or landed by hand, never by this phase. `LFS UNAVAILABLE`, `LFS TOO OLD`: install or upgrade git-lfs, then run the step again. `LFS PUSH FAILED`: say what its output names |
 

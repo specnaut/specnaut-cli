@@ -34,7 +34,8 @@
 #   9  HEAD is not the base afterwards
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
-#   12 an unexpected git failure before the push, named on stderr
+#   12 an unexpected git failure before the push, or approvals the binary
+#      could not record (it refused the call, or failed), named on stderr
 #   13 HEAD's instructions or helper scripts are neither trusted nor the
 #      digest passed, as the verifier judges them (without --scripts-digest
 #      only a local base ahead of origin passes, to exit 6); or it could not

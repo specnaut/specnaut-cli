@@ -2,59 +2,15 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import { APPROVALS_FILE } from "../../src/domain/skill_approvals.ts";
-import { runSpecnaut } from "../helpers/run_specnaut.ts";
-import { bundled, commitAll, fixture, git, verify, write } from "./verify_scripts_fixture.ts";
+import { line, MINE, record, SHIP, TASK, untouched } from "./record_approvals_fixture.ts";
+import { bundled, commitAll, fixture, git, write } from "./verify_scripts_fixture.ts";
 import { base } from "./verify_instructions_fixture.ts";
-import { DENO_DIR } from "./spawn_env.ts";
 
 /**
  * `specnaut record-approvals` judges HEAD again at the commits it is given and, only when the yes's
  * digest still holds, writes the approvals of the customised shipped skills that yes covered to a
  * temporary file: never the work tree, never a commit. `land-feature.sh` commits that file.
  */
-
-const TASK = ".claude/skills/task/SKILL.md";
-const SHIP = ".claude/skills/ship/SKILL.md";
-const MINE = `${bundled(TASK)}\nAsk before every merge.\n`;
-const line = async (text: string, path: string) => `${await sha256Hex(text)}  ${path}\n`;
-
-let home: string | undefined;
-
-/** An empty HOME for the CLI, made once, as `verify` has: the developer's git config stays out. */
-function cliHome(): Record<string, string> {
-  home ??= Deno.makeTempDirSync({ prefix: "record-approvals-home-" });
-  return { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, ".config"), DENO_DIR };
-}
-
-type Recorded = { code: number; lines: string[]; file: string | null; stderr: string };
-
-/** Judges `root`'s HEAD, then records under the digest `yes` (that run's own when absent). */
-async function record(root: string, yes?: string): Promise<Recorded> {
-  const v = await verify(root);
-  await Deno.remove(v.field("NAMES_FILE")!);
-  const head = (await git(root, "rev-parse", "HEAD")).trim();
-  const digest = yes ?? v.field("INSTRUCTIONS_DIGEST")!;
-  const args = [
-    "--instructions-digest",
-    digest,
-    "--head",
-    head,
-    "--base-tip",
-    v.field("BASE_TIP")!,
-  ];
-  const r = await runSpecnaut(["record-approvals", ...args], { cwd: root, env: cliHome() });
-  const lines = r.stdout.trimEnd().split("\n");
-  const path = lines.find((l) => l.startsWith("APPROVALS_FILE "))?.slice(15);
-  const file = path === undefined ? null : await Deno.readTextFile(path);
-  if (path !== undefined) await Deno.remove(path);
-  return { code: r.code, lines, file, stderr: r.stderr };
-}
-
-/** The work tree and HEAD are as the branch left them: the command writes neither. */
-async function untouched(root: string) {
-  assertEquals((await git(root, "status", "--porcelain")).trim(), "");
-  assertEquals(await Deno.stat(join(root, APPROVALS_FILE)).catch(() => null), null);
-}
 
 Deno.test("a yes that holds writes the approval of the customised skill it covered", async () => {
   const { root } = await fixture({ files: { ...base(), [TASK]: MINE } });

@@ -38,15 +38,16 @@ export async function landWithYes(sb: Sandbox): Promise<Run> {
 
 /**
  * `land-feature.sh` with a yes, a `specnaut` first on the PATH, outside the repository, that runs
- * the bash `body` before it hands the call to the real one: what an older or a broken binary
- * answers. A bash script found on the PATH: not on Windows, which resolves its tools otherwise.
+ * the bash `body` before it hands the call to the real one, `$REAL`: what an older or a broken
+ * binary answers. A bash script found on the PATH: not on Windows, which resolves its tools
+ * otherwise.
  */
 export async function landWithVerifier(sb: Sandbox, body: string): Promise<Run> {
   const yes = await digest(sb);
   const dir = join(sb.root, "verifier");
   await Deno.mkdir(dir);
   const real = (await run("bash", ["-c", "command -v specnaut"], sb.work)).stdout.trim();
-  const shim = `#!/usr/bin/env bash\n${body}\nexec '${real}' "$@"\n`;
+  const shim = `#!/usr/bin/env bash\nREAL='${real}'\n${body}\nexec "$REAL" "$@"\n`;
   await Deno.writeTextFile(join(dir, "specnaut"), shim);
   await Deno.chmod(join(dir, "specnaut"), 0o755);
   const path = `${dir}:${withSpecnaut(Deno.env.get("PATH"))}`;

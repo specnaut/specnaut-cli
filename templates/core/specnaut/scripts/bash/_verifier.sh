@@ -105,15 +105,17 @@ resolve_specnaut() {
   exit 13
 }
 
-# The verifier's answer on HEAD, into `out`, given the flags; exit 13 when it is no answer for this
-# base: an exit past 1, no instructions digest, or another base's name.
+# The verifier's answer on HEAD, into `out`, and its base tip, into `base_tip`, given the flags;
+# exit 13 when it is no answer for this base: an exit past 1, no instructions digest, another base's
+# name, or a tip that is not one full commit sha - it is passed on to git and to the binary.
 ask_verifier() {
   local rc=0 names
   out=$("$sn" verify-scripts "$@") || rc=$?
   names=$(sed -n 's/^NAMES_FILE //p' <<<"$out")
   [ -z "$names" ] || rm -f "$names"
+  base_tip=$(sed -n 's/^BASE_TIP //p' <<<"$out")
   if [ "$rc" -gt 1 ] || ! grep -qE '^INSTRUCTIONS_DIGEST [0-9a-f]{64}$' <<<"$out" ||
-    ! grep -qxF "BASE_BRANCH $base" <<<"$out"; then
+    ! grep -qxF "BASE_BRANCH $base" <<<"$out" || ! [[ $base_tip =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
     echo "land-feature: the verifier could not judge HEAD (exit $rc) - nothing was landed" >&2
     exit 13
   fi
