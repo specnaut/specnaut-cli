@@ -30,9 +30,17 @@ async function inProject(fn: (p: Project) => Promise<void>): Promise<void> {
 const leftOut = (bin: string) =>
   `the entry "${bin}" was left out because it is inside the repository`;
 
-const git = (cwd: string, ...args: string[]) =>
-  new Deno.Command("git", { args: ["-c", "user.name=t", "-c", "user.email=t@t", ...args], cwd })
+/**
+ * The fixture's own git, checked: a step that fails throws with git's cause. It reads no global or
+ * system configuration, so a developer's signing or hook settings cannot fail a commit here.
+ */
+async function git(cwd: string, ...args: string[]): Promise<void> {
+  const env = { GIT_CONFIG_GLOBAL: join(cwd, "..", "no-global-config"), GIT_CONFIG_NOSYSTEM: "1" };
+  const id = ["-c", "user.name=t", "-c", "user.email=t@t"];
+  const out = await new Deno.Command("git", { args: [...id, ...args], cwd, env, stderr: "piped" })
     .output();
+  if (!out.success) throw new Error(`git ${args[0]}: ${new TextDecoder().decode(out.stderr)}`);
+}
 
 Deno.test("init, the version probe, the remote and the tags skip a git the project holds", () =>
   inProject(async ({ dir, bin }) => {

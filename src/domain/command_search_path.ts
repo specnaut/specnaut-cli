@@ -7,10 +7,10 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
  * run: `"env": {"PATH": "./bin:$PATH"}` and a hook `lint` run `bin/lint`. A command source names
  * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy) or
  * a word `PATH=…` or `PATH+=…` (set before a command, or exported), or PowerShell's `$env:Path`
- * set or appended to (`$env:Path += ';bin'`). The key is read in any letter case, as
- * Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`) puts its
- * value's folders on PATH too, which only looks for more names in the listing. A folder that
- * cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
+ * or `${env:Path}` and every word after it (`$env:Path += ';bin'`). The key is read in any letter
+ * case, as Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`)
+ * puts its value's folders on PATH too, which only looks for more names in the listing. A folder
+ * that cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
  * word spelled `PATH`, or a key `path` in any letter case of an object that sets a command's
  * environment (`surelySetsPath`). Any other is skipped, or every merge would stop for an
  * unrelated key. Only what the configs say is read: the PATH a shell builds before the session
@@ -22,12 +22,19 @@ export const isPathKey = (key: string): boolean => /^path$/i.test(key);
 const PATH_WORD = /^(path)\+?=(.*)$/is;
 
 /**
- * PowerShell's PATH, `$env:Path`: in any letter case, as PowerShell reads a variable's name, so
- * always surely PATH. Alone it is the PATH in effect, as `$PATH` is a shell's.
+ * PowerShell's PATH, `$env:Path` or `${env:Path}`: in any letter case, as PowerShell reads a
+ * variable's name, so always surely PATH. Inside a value it is the PATH in effect, as `$PATH` is a
+ * shell's.
  */
-const PS_PATH = /\$env:path\b/gi;
-const PS_PATH_ALONE = /^\$env:path$/i;
-const PS_PATH_WORD = /^\$env:path\+?=(.*)$/is;
+const PS_PATH = /\$(?:env:path\b|\{env:path\})/gi;
+const PS_PATH_WORD = /^\$(?:env:path|\{env:path\})(?:\+?=(.*))?$/is;
+
+/**
+ * A word that sets PATH in a way no value is read from: the `env:` drive's `Path` item, which
+ * `Set-Item`, `New-Item`, `Set-Content` and their aliases write, or .NET's
+ * `SetEnvironmentVariable`. Its source is not read whole.
+ */
+const PS_PATH_UNREAD = /(?<![${])env:[\\/]?path\b|SetEnvironmentVariable/i;
 
 /** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
 export const isSurelyPath = (name: string): boolean => name === "PATH";
@@ -54,22 +61,25 @@ function pathWordValue(word: string): PathValue | undefined {
 }
 
 /**
- * What the PATH assignments among one command's words set PATH to: a `PATH=…` word, and
- * PowerShell's `$env:Path=…`, which may also be three words (`$env:Path`, `+=`, the value).
+ * What the PATH assignments among one command's words set PATH to: each `PATH=…` word, and, from
+ * the first word naming PowerShell's PATH, every word after it, its `=` or `+=` taken off. A value
+ * PowerShell builds from parts (`$env:Path + ';' + 'tools'`) is read part by part, a part too many
+ * only looking for more names.
  */
 export function pathAssignments(words: readonly string[]): PathValue[] {
-  return words.flatMap((word, i) => {
-    const ps = PS_PATH_WORD.exec(word);
-    if (ps && ps[1] !== "") return [{ value: ps[1], sure: true }];
-    const spaced = PS_PATH_ALONE.test(word) && /^\+?=$/.test(words[i + 1] ?? "");
-    if (spaced && words[i + 2] !== undefined) return [{ value: words[i + 2], sure: true }];
-    const value = pathWordValue(word);
-    return value === undefined ? [] : [value];
-  });
+  const values = words.flatMap((word) => pathWordValue(word) ?? []);
+  const at = words.findIndex((word) => PS_PATH_WORD.test(word));
+  if (at < 0) return values;
+  const rest = [PS_PATH_WORD.exec(words[at])![1] ?? "", ...words.slice(at + 1)]
+    .map((word) => word.replace(/^\+?=/, "")).filter(Boolean);
+  return [...values, ...rest.map((value) => ({ value, sure: true }))];
 }
 
+/** Whether `word` sets PATH in a way {@link pathAssignments} reads no value from. */
+export const setsPathUnread = (word: string): boolean => PS_PATH_UNREAD.test(word);
+
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
-const RAW_PATH = /(?<![\w${])(path)["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;
+const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;
 
 /**
  * What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. One
