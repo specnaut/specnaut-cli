@@ -33975,7 +33975,7 @@ _config_unit() {
 # Every M record's setting name and value checked in file order: the first bad one's reason and 2.
 # A bad value is echoed only when printable ASCII: a control or high byte acts on the terminal.
 _config_check_values() {
-  local kind n key child value LC_ALL=C re='^(none|[0-9]{1,9})\$'
+  local kind n key child value said LC_ALL=C re='^(none|[0-9]{1,9})\$'
   while IFS=\$'\\t' read -r kind n key child value; do
     [ "\$kind" = M ] || continue
     case "\$child" in target | ceiling) ;; *)
@@ -33984,8 +33984,8 @@ _config_check_values() {
       ;;
     esac
     [[ \$value =~ \$re ]] && continue
-    case "\$value" in *[![:print:]]*) value="holds a control or non-ASCII character" ;; *) value="is '\$value'" ;; esac
-    echo "line \$n: '\$key.\$child' \$value — expected a whole number of lines or none"
+    case "\$value" in *[![:print:]]*) said="holds a control or non-ASCII character" ;; *) said="is '\$value'" ;; esac
+    echo "line \$n: '\$key.\$child' \$said — expected a whole number of lines or none"
     return 2
   done <<<"\$1"
 }

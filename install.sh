@@ -65,12 +65,28 @@ make_dir_as_user() {
   [[ -e "$1" ]] && return 0
   while [[ ! -e "$parent" ]]; do parent="$(dirname "$parent")"; done
   [[ -d "$parent" && -w "$parent" ]] || return 0
-  mkdir -p "$1" || warn "could not create $1 as you - trying with admin access."
+  mkdir -p "$1" || warn "could not create $1 as you."
+}
+
+# Moves $1 to $2 with sudo, its password read from the tty even when stdin is the curl pipe.
+# Returns 1 when there is no tty or no sudo, and when sudo fails, having said so.
+# shellcheck disable=SC2024 # the redirects are meant as the user: sudo reads its password from the tty
+install_with_sudo() {
+  local src="$1" dest="$2" dest_dir
+  dest_dir="$(dirname "$dest")"
+  [[ -e /dev/tty ]] && command -v sudo >/dev/null 2>&1 || return 1
+  info "${dest_dir} requires admin access - you'll be prompted for your password."
+  if sudo -p "  [sudo] password for %u: " mkdir -p "$dest_dir" </dev/tty \
+     && sudo mv -f "$src" "$dest" </dev/tty \
+     && sudo chmod 755 "$dest" </dev/tty; then
+    return 0
+  fi
+  warn "sudo failed - falling back to a user-writable location."
+  return 1
 }
 
 # Move $1 to $2, handling permission elevation transparently.
 # Sets FINAL_DEST to the actual install path (may differ from $2 on fallback).
-# shellcheck disable=SC2024 # the redirects are meant as the user: sudo reads its password from the tty
 install_binary() {
   local src="$1" dest="$2" dest_dir
   dest_dir="$(dirname "$dest")"
@@ -85,24 +101,17 @@ install_binary() {
     return 0
   fi
 
-  # Try elevating with sudo (reads password from controlling tty even when
-  # this script's stdin is the curl pipe).
-  if [[ -e /dev/tty ]] && command -v sudo >/dev/null 2>&1; then
-    info "${dest_dir} requires admin access — you'll be prompted for your password."
-    if sudo -p "  [sudo] password for %u: " mkdir -p "$dest_dir" </dev/tty \
-       && sudo mv -f "$src" "$dest" </dev/tty \
-       && sudo chmod 755 "$dest" </dev/tty; then
-      FINAL_DEST="$dest"
-      return 0
-    fi
-    warn "sudo failed — falling back to a user-writable location."
+  if install_with_sudo "$src" "$dest"; then
+    FINAL_DEST="$dest"
+    return 0
   fi
 
   # Fallback: install into $HOME/.local/bin (no admin needed).
   if [[ -n "${PREFIX_EXPLICIT:-}" && "$PREFIX" != "/usr/local/bin" ]]; then
     abort "cannot write to ${dest_dir} and you set PREFIX explicitly — aborting."
   fi
-  local fallback_dir="$HOME/.local/bin" fallback_dest="$HOME/.local/bin/specnaut"
+  local fallback_dir="$HOME/.local/bin"
+  local fallback_dest="$fallback_dir/specnaut"
   mkdir -p "$fallback_dir"
   mv -f "$src" "$fallback_dest"
   chmod 755 "$fallback_dest"
@@ -110,10 +119,8 @@ install_binary() {
   FINAL_DEST="$fallback_dest"
 }
 
-main() {
-  require curl
-
-  local SHA_CMD
+# Sets SHA_CMD to the SHA-256 tool this system has.
+pick_sha_command() {
   if command -v shasum >/dev/null 2>&1; then
     SHA_CMD="shasum -a 256"
   elif command -v sha256sum >/dev/null 2>&1; then
@@ -121,15 +128,43 @@ main() {
   else
     abort "shasum or sha256sum is required"
   fi
+}
 
-  local target version bin_url sha_url expected_sha actual_sha dest
-  target="$(detect_target)"
-  if [[ -z "$VERSION" ]]; then
-    version="$(latest_version)"
-    [[ -z "$version" ]] && abort "could not resolve latest version from GitHub"
-  else
-    version="$VERSION"
+# Downloads $1 to $3/specnaut and its checksum $2 beside it; aborts unless they match.
+download_verified() {
+  local bin_url="$1" sha_url="$2" dir="$3" expected_sha actual_sha
+  info "downloading binary..."
+  curl -fsSL "$bin_url" -o "$dir/specnaut"
+  info "downloading checksum..."
+  curl -fsSL "$sha_url" -o "$dir/specnaut.sha256"
+  expected_sha="$(awk '{print $1}' < "$dir/specnaut.sha256")"
+  actual_sha="$(cd "$dir" && $SHA_CMD specnaut | awk '{print $1}')"
+  if [[ "$expected_sha" != "$actual_sha" ]]; then
+    abort "checksum mismatch: expected $expected_sha, got $actual_sha"
   fi
+  ok "checksum verified"
+}
+
+# Tells how to put the folder of $1 on PATH, when it is not there yet.
+print_path_hint() {
+  local dest_dir
+  dest_dir="$(dirname "$1")"
+  case ":$PATH:" in *":$dest_dir:"*) return 0 ;; esac
+  echo
+  warn "${dest_dir} is not in your PATH."
+  info "Add this to your shell profile (~/.zshrc, ~/.bashrc, ...):"
+  info "  ${BOLD}export PATH=\"${dest_dir}:\$PATH\"${RESET}"
+  info "Then restart your shell, or run: ${BOLD}source ~/.zshrc${RESET}"
+}
+
+main() {
+  require curl
+  pick_sha_command
+
+  local target version bin_url sha_url dest
+  target="$(detect_target)"
+  version="${VERSION:-$(latest_version || true)}" # a failed lookup is named below, not a silent exit
+  [[ -n "$version" ]] || abort "could not resolve latest version from GitHub"
   bin_url="https://github.com/${REPO}/releases/download/${version}/${target}"
   sha_url="${bin_url}.sha256"
 
@@ -146,40 +181,16 @@ main() {
 
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT # tmp is global: the trap runs after main returns
-
-  info "downloading binary..."
-  curl -fsSL "$bin_url" -o "$tmp/specnaut"
-  info "downloading checksum..."
-  curl -fsSL "$sha_url" -o "$tmp/specnaut.sha256"
-
-  expected_sha="$(awk '{print $1}' < "$tmp/specnaut.sha256")"
-  actual_sha="$(cd "$tmp" && $SHA_CMD specnaut | awk '{print $1}')"
-  if [[ "$expected_sha" != "$actual_sha" ]]; then
-    abort "checksum mismatch: expected $expected_sha, got $actual_sha"
-  fi
-  ok "checksum verified"
+  download_verified "$bin_url" "$sha_url" "$tmp"
 
   chmod 755 "$tmp/specnaut"
   dest="${PREFIX}/specnaut"
-
   install_binary "$tmp/specnaut" "$dest"
   dest="$FINAL_DEST"
 
   echo
   ok "installed ${BOLD}${dest}${RESET}"
-
-  local dest_dir
-  dest_dir="$(dirname "$dest")"
-  case ":$PATH:" in
-    *":$dest_dir:"*) ;;
-    *)
-      echo
-      warn "${dest_dir} is not in your PATH."
-      info "Add this to your shell profile (~/.zshrc, ~/.bashrc, …):"
-      info "  ${BOLD}export PATH=\"${dest_dir}:\$PATH\"${RESET}"
-      info "Then restart your shell, or run: ${BOLD}source ~/.zshrc${RESET}"
-      ;;
-  esac
+  print_path_hint "$dest"
 
   echo
   "$dest" --version || true
