@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
-import { run } from "./git_sandbox.ts";
+import { hermetic, run } from "./git_sandbox.ts";
 
 /**
  * cli#711 — the merge-script sandbox is hermetic: what the developer's own git
@@ -50,14 +50,22 @@ Deno.test("a child of run() is given only the inherited PATH entries land-featur
   const leaks = ["", "node_modules/.bin", "./bin", "/opt/../usr/bin"];
   try {
     Deno.env.set("PATH", [...leaks, saved ?? ""].join(DELIMITER));
+    // The PATH handed over, in the platform's own list: on Windows, MSYS rewrites what bash reports.
+    const env = hermetic();
+    const handed = env[Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH"];
+    assertKept(handed.split(DELIMITER), leaks, "the PATH handed over");
     const r = await run("bash", ["-c", 'printf %s "$PATH"'], Deno.cwd());
     // bash's own view of PATH: `:`-separated on every system, Git Bash converting Windows' `;` list.
-    const entries = r.stdout.split(":");
-    for (const leak of leaks) {
-      assertEquals(entries.includes(leak), false, `'${leak}' reached the sandbox`);
-    }
-    assertEquals(entries.length > 1, true, "the sandbox lost the inherited PATH");
+    assertKept(r.stdout.split(":"), leaks, "the sandbox");
   } finally {
     saved === undefined ? Deno.env.delete("PATH") : Deno.env.set("PATH", saved);
   }
 });
+
+/** `entries` hold none of `leaks`, and more than the shim's folder: the inherited PATH is kept. */
+function assertKept(entries: string[], leaks: string[], where: string): void {
+  for (const leak of leaks) {
+    assertEquals(entries.includes(leak), false, `'${leak}' reached ${where}`);
+  }
+  assertEquals(entries.length > 1, true, `${where} lost the inherited PATH`);
+}

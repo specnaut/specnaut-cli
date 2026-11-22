@@ -28,11 +28,14 @@ async function planted(base: string): Promise<Planted> {
   return { base, project, bin, head, fired };
 }
 
-/** `fn` given a planted world, removed after; Windows cannot run the planted script. */
-function inPlanted(name: string, fn: (p: Planted) => Promise<void>) {
+/**
+ * `fn` given a planted world, removed after. On Windows the planted git leaves no mark (`plantGit`):
+ * a fetch that succeeds, or a refusal naming the entry left out, is what proves it never ran.
+ */
+function inPlanted(name: string, fn: (p: Planted) => Promise<void>, ignore = false) {
   Deno.test({
     name,
-    ignore: Deno.build.os === "windows",
+    ignore,
     fn: async () => {
       const base = await tempDir("fetch-path-");
       try {
@@ -108,6 +111,8 @@ inPlanted(
       assertEquals(calls.some((c) => c.includes(said)), true, `no logged git call says ${said}`);
     }
   },
+  // The logging git is a shell script, which Windows does not start as a program named `git`.
+  Deno.build.os === "windows",
 );
 
 /** The git the caller's PATH finds, by its absolute path. */

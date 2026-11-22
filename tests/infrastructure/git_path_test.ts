@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { DELIMITER, join } from "@std/path";
+import { basename, DELIMITER, join } from "@std/path";
 import {
   entryUnsafe,
   filterGitPath,
@@ -138,17 +138,27 @@ Deno.test("a git not found names the entry left out, which may be where it is", 
   );
 });
 
-Deno.test("an entry naming the repository in another case is in it where case is ignored", () =>
-  inTree((_, repo) => {
-    const upper = repo.slice(0, -"repo".length) + "REPO";
-    const caseBlind = (() => {
-      try {
-        return Deno.statSync(upper).isDirectory;
-      } catch (err) {
-        if (err instanceof Deno.errors.NotFound) return false;
-        throw err;
-      }
-    })();
-    if (!caseBlind) return console.warn("skipped: this file system tells case apart");
-    assertEquals(entryUnsafe(join(upper, "bin"), repo), "is inside the repository");
-  }));
+/** Whether the file system the tests' folders are made on ignores case, probed on one made for it. */
+function caseBlind(): boolean {
+  const dir = Deno.makeTempDirSync({ prefix: "git-path-case-" });
+  const upper = join(dir, "..", basename(dir).toUpperCase());
+  try {
+    return Deno.statSync(upper).isDirectory;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  } finally {
+    Deno.removeSync(dir);
+  }
+}
+
+Deno.test({
+  name: "an entry naming the repository in another case is in it where case is ignored",
+  // Where the file system tells case apart, the other case names another folder: nothing to check.
+  ignore: !caseBlind(),
+  fn: () =>
+    inTree((_, repo) => {
+      const upper = repo.slice(0, -"repo".length) + "REPO";
+      assertEquals(entryUnsafe(join(upper, "bin"), repo), "is inside the repository");
+    }),
+});

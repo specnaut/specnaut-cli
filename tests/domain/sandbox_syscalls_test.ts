@@ -55,18 +55,18 @@ Deno.test("SYSCALL_NUMBERS: a call missing on an architecture is one it does not
   assertEquals(DENIED_SYSCALLS.filter((n) => SYSCALL_NUMBERS.x86_64[n] === undefined), []);
 });
 
-Deno.test("the shared list's newest calls have a number on both architectures", () => {
+Deno.test("kcmp, fanotify_init, the memory-policy calls and open_tree_attr are denied, numbered on both architectures", () => {
   const expected = {
     x86_64: { kcmp: 312, fanotify_init: 300, mbind: 237, set_mempolicy: 238, get_mempolicy: 239 },
     aarch64: { kcmp: 272, fanotify_init: 262, mbind: 235, set_mempolicy: 237, get_mempolicy: 236 },
   } as const;
+  // The unified table's numbers, checked against x86's syscall_64.tbl and arm64's.
+  const unified = { set_mempolicy_home_node: 450, open_tree_attr: 467 } as const;
   for (const arch of ["x86_64", "aarch64"] as const) {
-    for (const [name, nr] of Object.entries(expected[arch])) {
+    for (const [name, nr] of Object.entries({ ...expected[arch], ...unified })) {
+      assert((DENIED_SYSCALLS as readonly string[]).includes(name), `${name} is not denied`);
       assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>)[name], nr, `${arch} ${name}`);
     }
-    assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>).set_mempolicy_home_node, 450);
-    // The unified table's number, checked against x86's syscall_64.tbl and arm64's.
-    assertEquals((SYSCALL_NUMBERS[arch] as Record<string, number>).open_tree_attr, 467);
   }
 });
 
