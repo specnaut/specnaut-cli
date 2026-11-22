@@ -68,8 +68,7 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "auto-chain", parents: [tk("plan"), tk("implement"), tk("review")] },
   // Loaded by auto-chain in remote mode, at the plan stop and at the review verdict.
   { skill: "task", doc: "remote-gates", parents: [tk("plan"), tk("review")] },
-  // Loaded by groom's orphan-spec step (spec 041).
-  { skill: "task", doc: "orphan-specs", parents: [tk("groom")] },
+  { skill: "task", doc: "orphan-specs", parents: [tk("groom")] }, // groom's orphan-spec step
   // The review aggregation, loaded by review before its first seat brief (#678).
   { skill: "task", doc: "review-seats", parents: [tk("review")] },
   // Review Phase 2's gate table, and the mode review follows for a PR or a remote branch.
@@ -78,8 +77,7 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "plan-reentry", parents: [tk("plan")] },
   // The helper-script gate: of the verbs that load it, groom and audit read an addendum.
   { skill: "task", doc: "script-gate", parents: [tk("groom"), tk("audit")] },
-  // The shipped-skill lines of the instructions verdict, which merge's step 0 acts on.
-  { skill: "task", doc: "skill-approvals", parents: [tk("merge")] },
+  { skill: "task", doc: "skill-approvals", parents: [tk("merge")] }, // merge step 0's skill lines
 ];
 
 /**
