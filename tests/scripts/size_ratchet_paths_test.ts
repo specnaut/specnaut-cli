@@ -6,21 +6,25 @@
 // Every case grows a committed file past its limits and requires the refusal
 // line naming the file with its real sizes — a line only the path that read
 // both blobs can print. A pass, or a `0 → 0`, fails the case.
+//
+// cli#812: every case runs under the bash PATH finds and under macOS's stock
+// /bin/bash 3.2, pinned as twin_runner.ts pins it. On a Mac PATH usually finds
+// a newer bash, and `size_quoted`'s byte ranges are read by both.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import {
-  BASH,
-  FILE,
-  lines,
-  quoted,
-  ratchet,
-  repo,
-  run,
-  SCRIPT,
-  stage,
-} from "./size_ratchet_fixture.ts";
+import { BASH, FILE, lines, quoted, repo, run, SCRIPT, stage } from "./size_ratchet_fixture.ts";
 import { run as child } from "../templates/child_fixture.ts";
+import { BASH as STOCK_BASH } from "./twin_runner.ts";
+
+const SHELLS = [...new Set([BASH, STOCK_BASH])];
+
+/** The ratchet run in `dir` by each shell in turn, each result naming its shell. */
+async function ratchets(dir: string, ...args: string[]) {
+  const out = [];
+  for (const bash of SHELLS) out.push({ bash, ...await run(bash, [SCRIPT, ...args], dir) });
+  return out;
+}
 
 /** Commits `name` at `start` lines in a fresh repo held to target 300, ceiling 400. */
 async function committed(name: string, start: number): Promise<string> {
@@ -33,12 +37,13 @@ async function committed(name: string, start: number): Promise<string> {
 async function assertGrowthRefused(name: string): Promise<void> {
   const dir = await committed(name, 380);
   await stage(dir, name, 390);
-  const r = await ratchet(dir);
-  assertEquals(r.code, 1, r.stdout + r.stderr);
-  assertStringIncludes(
-    r.stderr,
-    `${quoted(name)}: 380 → 390 (target 300, ceiling 400) — over the target and grew`,
-  );
+  for (const r of await ratchets(dir)) {
+    assertEquals(r.code, 1, `${r.bash}: ${r.stdout}${r.stderr}`);
+    assertStringIncludes(
+      r.stderr,
+      `${quoted(name)}: 380 → 390 (target 300, ceiling 400) — over the target and grew`,
+    );
+  }
 }
 
 Deno.test("a file with a non-ASCII name is measured, and refused when it grows", async () => {
@@ -64,12 +69,13 @@ Deno.test("a renamed file with a non-ASCII name is measured against its old size
   await run("git", ["mv", "naïve.ts", "café.ts"], dir);
   await Deno.writeTextFile(join(dir, "café.ts"), lines(390));
   await run("git", ["add", "café.ts"], dir);
-  const r = await ratchet(dir);
-  assertEquals(r.code, 1, r.stdout + r.stderr);
-  assertStringIncludes(
-    r.stderr,
-    '"caf\\303\\251.ts": 380 → 390 (target 300, ceiling 400) — over the target and grew',
-  );
+  for (const r of await ratchets(dir)) {
+    assertEquals(r.code, 1, `${r.bash}: ${r.stdout}${r.stderr}`);
+    assertStringIncludes(
+      r.stderr,
+      '"caf\\303\\251.ts": 380 → 390 (target 300, ceiling 400) — over the target and grew',
+    );
+  }
 });
 
 // A name is a pathspec to `git diff`: `*.ts` also matches the binary `!bin.ts`,
@@ -82,9 +88,10 @@ Deno.test({
     await Deno.writeTextFile(join(dir, "!bin.ts"), "\0binary\0");
     await stage(dir, "*.ts", 390);
     await run("git", ["add", "!bin.ts"], dir);
-    const r = await ratchet(dir);
-    assertEquals(r.code, 1, r.stdout + r.stderr);
-    assertStringIncludes(r.stderr, "*.ts: 380 → 390");
+    for (const r of await ratchets(dir)) {
+      assertEquals(r.code, 1, `${r.bash}: ${r.stdout}${r.stderr}`);
+      assertStringIncludes(r.stderr, "*.ts: 380 → 390");
+    }
   },
 });
 
@@ -122,9 +129,10 @@ Deno.test({
       `100644 ${blob.stdout.trim()}\t${name}\0`,
     );
     assertEquals(staged.code, 0, staged.stderr);
-    const r = await ratchet(dir);
-    assertEquals(r.code, 1, r.stdout + r.stderr);
-    assertStringIncludes(r.stderr, '"grown.ts\\nmanaged.ts": 0 → 900 (target 300, ceiling 400)');
+    for (const r of await ratchets(dir)) {
+      assertEquals(r.code, 1, `${r.bash}: ${r.stdout}${r.stderr}`);
+      assertStringIncludes(r.stderr, '"grown.ts\\nmanaged.ts": 0 → 900 (target 300, ceiling 400)');
+    }
   },
 });
 
@@ -137,19 +145,26 @@ Deno.test({
   fn: async () => {
     const dir = await repo(10, FILE(200, 500));
     await stage(dir, "e\x1b[2J.ts", 600);
-    const over = await run(BASH, [SCRIPT, "--report"], dir);
-    assertEquals(over.code, 1, over.stdout + over.stderr);
-    assertStringIncludes(over.stderr, '  "e\\033[2J.ts": 0 → 600 (target 200, ceiling 500) — over');
-    assertStringIncludes(over.stdout, '  "e\\033[2J.ts": 0 → 600\n');
+    const overs = await ratchets(dir, "--report");
+    for (const over of overs) {
+      assertEquals(over.code, 1, `${over.bash}: ${over.stdout}${over.stderr}`);
+      assertStringIncludes(
+        over.stderr,
+        '  "e\\033[2J.ts": 0 → 600 (target 200, ceiling 500) — over',
+      );
+      assertStringIncludes(over.stdout, '  "e\\033[2J.ts": 0 → 600\n');
+    }
     await run("git", ["rm", "-q", "--cached", "e\x1b[2J.ts"], dir);
     await stage(dir, "n\x9b1m.ts", 300);
-    const note = await ratchet(dir);
-    assertEquals(note.code, 0, note.stdout + note.stderr);
-    assertStringIncludes(
-      note.stdout,
-      '  note: "n\\302\\2331m.ts": 0 → 300 (target 200, ceiling 500)',
-    );
-    const all = [over, note].map((out) => out.stdout + out.stderr).join("");
+    const notes = await ratchets(dir);
+    for (const note of notes) {
+      assertEquals(note.code, 0, `${note.bash}: ${note.stdout}${note.stderr}`);
+      assertStringIncludes(
+        note.stdout,
+        '  note: "n\\302\\2331m.ts": 0 → 300 (target 200, ceiling 500)',
+      );
+    }
+    const all = [...overs, ...notes].map((out) => out.stdout + out.stderr).join("");
     assert(!all.includes("\x1b") && !all.includes("\x9b"), all);
   },
 });

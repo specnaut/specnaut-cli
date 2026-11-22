@@ -89,3 +89,29 @@ Deno.test(
     }
   },
 );
+
+// cli#812: git-lfs's HTTP/2 transport (golang.org/x/net/http2) logs every header it sends, the
+// Authorization one included, when GODEBUG holds `http2debug=1` or `=2` anywhere: Go tests for the
+// substring. Every entry naming it goes, every other setting stays, and an unset GODEBUG stays so.
+Deno.test(
+  "lfs-push.sh: the push runs with no http2debug entry in GODEBUG, every other one kept",
+  shimmed,
+  async () => {
+    const sb = await lfsBranch();
+    try {
+      const fail = 'printf "seen: %s\\n" "${GODEBUG-unset}" >&2; exit 2';
+      const shim = lfsShim(join(sb.root, "git.log"), "git-lfs/3.0.0", fail);
+      const seen = async (env: Record<string, string>) => {
+        const r = await sb.scriptWithGitEnv(env, shim, "lfs-push.sh");
+        assertEquals(r.code, 17, r.stderr);
+        return r.stderr.split("\n").filter((l) => l.startsWith("seen: "));
+      };
+      const GODEBUG = "madvdontneed=1,http2debug=2,x509sha1=1,,xhttp2debug=1,http2client=0";
+      assertEquals(await seen({ GODEBUG }), ["seen: madvdontneed=1,x509sha1=1,http2client=0"]);
+      assertEquals(await seen({ GODEBUG: "http2debug=1" }), ["seen: "]);
+      assertEquals(await seen({}), ["seen: unset"]);
+    } finally {
+      await sb.cleanup();
+    }
+  },
+);

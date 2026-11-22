@@ -33369,18 +33369,32 @@ redact_urls() {
   local s='([A-Za-z][A-Za-z0-9+.-]*://)' u='([^/?#[:space:]]*@)?' h='(\\[[^]/[:space:]]*\\]|[^]/?#@:[:space:][]*)'
   # The userinfo goes first, on its own: a \`:\` in it (a token sent as the user name, with no path
   # after the host) would otherwise read as the host's port and print the token as the host.
-  sed -E -e "s#\$s[^/?#[:space:]]*@#\\1#g" -e "s#\$s\$u\$h[/?#:][^[:space:]]*#\\1\\3/<redacted>#g" \\
+  sed -E -e "s#\${s}[^/?#[:space:]]*@#\\1#g" -e "s#\$s\$u\${h}[/?#:][^[:space:]]*#\\1\\3/<redacted>#g" \\
     -e "s#\$s\$u\$h#\\1\\3#g"
+}
+
+# \$1, a GODEBUG, less every comma-separated entry holding \`http2debug=\`, and every empty one.
+without_http2debug() {
+  local rest="\$1," entry kept=""
+  while [ -n "\$rest" ]; do
+    entry=\${rest%%,*} rest=\${rest#*,}
+    case \$entry in "" | *http2debug=*) ;; *) kept+=\${kept:+,}\$entry ;; esac
+  done
+  printf '%s' "\$kept"
 }
 
 # The upload, an incomplete push refused: a \`-c\` outranks every file git-lfs reads its config from.
 # Its output is printed redacted, and git's and git-lfs's trace variables are cleared for it
 # (cli#809): GIT_CURL_VERBOSE and GIT_TRACE_CURL print the Authorization header, which no URL
 # redaction sees. Every GIT_TRACE* goes by prefix, so a trace git adds later goes with them.
+# GODEBUG loses its http2debug entries (cli#812): git-lfs's HTTP/2 transport (golang.org/x/net)
+# logs every header it sends, Authorization included, when GODEBUG holds \`http2debug=1\` or \`=2\`
+# anywhere - a substring test, so an entry merely containing it counts. Seen with git-lfs 3.8.0.
 push_objects() {
   local out
   if ! out=\$(
-    unset \${!GIT_TRACE@} GIT_CURL_VERBOSE GIT_TRANSFER_TRACE
+    unset "\${!GIT_TRACE@}" GIT_CURL_VERBOSE GIT_TRANSFER_TRACE
+    [ -z "\${GODEBUG+set}" ] || GODEBUG=\$(without_http2debug "\$GODEBUG")
     GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "\$c" 2>&1
   ); then
     printf '%s\\n' "\$out" | redact_urls >&2
@@ -33959,8 +33973,9 @@ _config_unit() {
 }
 
 # Every M record's setting name and value checked in file order: the first bad one's reason and 2.
+# A bad value is echoed only when printable ASCII: a control or high byte acts on the terminal.
 _config_check_values() {
-  local kind n key child value re='^(none|[0-9]{1,9})\$'
+  local kind n key child value LC_ALL=C re='^(none|[0-9]{1,9})\$'
   while IFS=\$'\\t' read -r kind n key child value; do
     [ "\$kind" = M ] || continue
     case "\$child" in target | ceiling) ;; *)
@@ -33968,19 +33983,16 @@ _config_check_values() {
       return 2
       ;;
     esac
-    [[ \$value =~ \$re ]] || {
-      echo "line \$n: '\$key.\$child' is '\$value' — expected a whole number of lines or none"
-      return 2
-    }
+    [[ \$value =~ \$re ]] && continue
+    case "\$value" in *[![:print:]]*) value="holds a control or non-ASCII character" ;; *) value="is '\$value'" ;; esac
+    echo "line \$n: '\$key.\$child' \$value — expected a whole number of lines or none"
+    return 2
   done <<<"\$1"
 }
 
 config_size_limits() {
   local records kind n key child lim file="" function="" class="" constitution=""
-  records="\$(config_parse "\$1" "file function class constitution" "exempt")" || {
-    echo "\$records"
-    return 2
-  }
+  records="\$(config_parse "\$1" "file function class constitution" "exempt")" || { echo "\$records"; return 2; }
   # Settings in file order, then each unit in key order — the order the
   # TypeScript reader checks them in, so both name the same first fault.
   _config_check_values "\$records" || return 2

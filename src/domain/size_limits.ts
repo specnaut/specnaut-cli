@@ -57,6 +57,7 @@ export type SizeConfig =
 
 /** A limit value: a whole number of lines or `none` (S4). Nine digits: `[ -gt ]` never overflows. */
 export const LIMIT_VALUE = /^(none|[0-9]{1,9})$/;
+const NOT_SHOWN = "holds a control or non-ASCII character"; // cli#812: echoed, it acts on a terminal
 
 /** `"300"` → 300, `"none"` → null. Only for a value that matched `LIMIT_VALUE`. */
 export const toLimit = (v: string): number | null => v === "none" ? null : Number.parseInt(v, 10);
@@ -220,7 +221,8 @@ function givenSettings(parsed: readonly ParsedRecord[]) {
       return `${at} is not a setting — expected target and ceiling`;
     }
     if (!LIMIT_VALUE.test(r.value)) {
-      return `${at} is '${r.value}' — expected a whole number of lines or none`;
+      const said = /^[ -~]*$/.test(r.value) ? `is '${r.value}'` : NOT_SHOWN;
+      return `${at} ${said} — expected a whole number of lines or none`;
     }
     values.get(r.key)!.set(r.child, toLimit(r.value));
   }
@@ -273,9 +275,7 @@ export function sizeLimitsYaml(
 export const isWritableGlob = (glob: string): boolean => /^[^"\\\p{Cc}]+$/u.test(glob);
 
 /** Lines as `wc -l` counts them — newlines — so a warning and the ratchet agree. */
-export function countLines(text: string): number {
-  return text.split("\n").length - 1;
-}
+export const countLines = (text: string): number => text.split("\n").length - 1;
 
 /**
  * `countLines` over raw bytes: a caller sums it across a stream's chunks and

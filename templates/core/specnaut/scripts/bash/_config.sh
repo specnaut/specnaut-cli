@@ -131,8 +131,9 @@ _config_unit() {
 }
 
 # Every M record's setting name and value checked in file order: the first bad one's reason and 2.
+# A bad value is echoed only when printable ASCII: a control or high byte acts on the terminal.
 _config_check_values() {
-  local kind n key child value re='^(none|[0-9]{1,9})$'
+  local kind n key child value LC_ALL=C re='^(none|[0-9]{1,9})$'
   while IFS=$'\t' read -r kind n key child value; do
     [ "$kind" = M ] || continue
     case "$child" in target | ceiling) ;; *)
@@ -140,19 +141,16 @@ _config_check_values() {
       return 2
       ;;
     esac
-    [[ $value =~ $re ]] || {
-      echo "line $n: '$key.$child' is '$value' — expected a whole number of lines or none"
-      return 2
-    }
+    [[ $value =~ $re ]] && continue
+    case "$value" in *[![:print:]]*) value="holds a control or non-ASCII character" ;; *) value="is '$value'" ;; esac
+    echo "line $n: '$key.$child' $value — expected a whole number of lines or none"
+    return 2
   done <<<"$1"
 }
 
 config_size_limits() {
   local records kind n key child lim file="" function="" class="" constitution=""
-  records="$(config_parse "$1" "file function class constitution" "exempt")" || {
-    echo "$records"
-    return 2
-  }
+  records="$(config_parse "$1" "file function class constitution" "exempt")" || { echo "$records"; return 2; }
   # Settings in file order, then each unit in key order — the order the
   # TypeScript reader checks them in, so both name the same first fault.
   _config_check_values "$records" || return 2

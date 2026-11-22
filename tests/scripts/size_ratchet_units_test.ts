@@ -2,7 +2,7 @@
 // and `function` are read, because the one reader takes them, and judge nothing:
 // a line count cannot say where a function or a class starts.
 
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CLEAN, FILE, ratchet, repo, stage, UNIT } from "./size_ratchet_fixture.ts";
 
 Deno.test("a class or function limit set in the config judges no file", async () => {
@@ -28,4 +28,16 @@ Deno.test("a bad class value stops the ratchet, as any bad value does", async ()
   const r = await ratchet(dir);
   assertEquals(r.code, 2, r.stdout + r.stderr);
   assertStringIncludes(r.stderr, "'class.target' is '3OO'");
+});
+
+// cli#812: the refusal names a bad value only when it is printable ASCII; an escape sequence or a
+// C1 byte in it would act on the terminal, as an unescaped path would (cli#807).
+Deno.test("a value holding a control or non-ASCII character is refused without being echoed", async () => {
+  const dir = await repo(10, UNIT("file", "3\x1b[2J\x9b00", 500));
+  await stage(dir, "big.ts", 20);
+  const r = await ratchet(dir);
+  assertEquals(r.code, 2, r.stdout + r.stderr);
+  assertStringIncludes(r.stderr, "'file.target' holds a control or non-ASCII character — expected");
+  const out = r.stdout + r.stderr;
+  assert(!out.includes("\x1b") && !/[\u0080-\u009f]/.test(out), out);
 });
