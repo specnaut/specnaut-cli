@@ -78,6 +78,8 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "plan-reentry", parents: [tk("plan")] },
   // The helper-script gate: of the verbs that load it, groom and audit read an addendum.
   { skill: "task", doc: "script-gate", parents: [tk("groom"), tk("audit")] },
+  // The shipped-skill lines of the instructions verdict, which merge's step 0 acts on.
+  { skill: "task", doc: "skill-approvals", parents: [tk("merge")] },
 ];
 
 /**

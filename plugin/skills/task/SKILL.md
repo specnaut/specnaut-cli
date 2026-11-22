@@ -71,6 +71,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | `phases/review-gates.md` | `review`, at its quality gates |
 | `phases/review-untrusted.md` | `review`, of a remote branch or a PR not trusted |
 | `phases/script-gate.md` | `resume`, `groom`, `audit` and the backlog verbs, before their first script; its config verdicts by every verb that runs a gate |
+| `phases/skill-approvals.md` | `script-gate`'s instructions verdict, on a shipped-skill or lock-digest line |
 
 Unknown verb → look it up first in the `specnaut` skill's **Retired addresses** table: a verb
 retired from this router, or one from before it existed, is answered with where it went. Any other

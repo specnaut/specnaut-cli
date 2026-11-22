@@ -14,7 +14,7 @@ import {
   type ShippedCopy,
 } from "../domain/shipped_skills.ts";
 import { lockShaInput } from "../domain/template.ts";
-import { baseApprovals } from "./base_approvals.ts";
+import { committedApprovals } from "./committed_approvals.ts";
 import { baseLock } from "./base_lock.ts";
 import { bundleForLock } from "./lock_bundle.ts";
 import type { Harness } from "./ports.ts";
@@ -24,10 +24,10 @@ import type { GitObjectReader } from "./script_trust_ports.ts";
  * The skill files Specnaut ships to this project, as `shipped_skills.ts` judges them: each path the
  * lock at the base's tip records, with the digest it records, each regular file this binary
  * bundles for that lock, with its bytes, and the digest the approvals at that tip record for it
- * (`base_approvals.ts`), honoured only on a path Specnaut ships. No lock there, or one this binary
- * cannot map, ships nothing here: the script check already names a lock it cannot use. Each path
- * the lock at the merge base ships and HEAD's does not is judged too (`leavingCopies`), so a HEAD
- * lock this binary cannot read leaves every path the merge base's ships.
+ * (`committed_approvals.ts`), honoured only on a path Specnaut ships. No lock there, or one this
+ * binary cannot map, ships nothing here: the script check already names a lock it cannot use. Each
+ * path the lock at the merge base ships and HEAD's does not is judged too (`leavingCopies`), so a
+ * HEAD lock this binary cannot read leaves every path the merge base's ships.
  */
 
 export type ShippedDeps = {
@@ -55,8 +55,12 @@ export type ShippedInput = {
   readonly approvalsRefused: string | null;
 };
 
+/**
+ * The approvals are read at the base's tip, never at HEAD: a branch's own approval would vouch for
+ * the very skill it customises.
+ */
 export async function shippedInput(deps: ShippedDeps, base: ShippedBase): Promise<ShippedInput> {
-  const { approvals, refused } = await baseApprovals(deps.git, base.tip);
+  const { approvals, refused } = await committedApprovals(deps.git, base.tip);
   const copies = shippedSkills(deps, await baseLock(deps.git, base.tip));
   for (const [path, approvedSha256] of approvals) {
     const copy = copies.get(path);

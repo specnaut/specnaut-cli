@@ -15,7 +15,8 @@ export { git, hermetic, type Run, run } from "./git_hermetic.ts";
 const BASH_DIR = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/", import.meta.url),
 );
-export const SCRIPTS = `_base_refs.sh _hooks_off.sh _intake_gate.sh _verifier.sh base-branch.sh
+export const SCRIPTS =
+  `_approvals.sh _base_refs.sh _hooks_off.sh _intake_gate.sh _verifier.sh base-branch.sh
   epic-status.sh fold-fixups.sh land-feature.sh lfs-push.sh merge-mode.sh remove-spec.sh
   wip-audit.sh`.split(/\s+/);
 

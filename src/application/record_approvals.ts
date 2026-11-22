@@ -9,7 +9,7 @@ import {
   nextApprovals,
   renderApprovals,
 } from "../domain/skill_approvals.ts";
-import { baseApprovals } from "./base_approvals.ts";
+import { type CommittedApprovals, committedApprovals } from "./committed_approvals.ts";
 import { instructionsNow, type Judged, type JudgeDeps, judgeInputs } from "./judge_inputs.ts";
 import type { GitObjectReader } from "./script_trust_ports.ts";
 import type { InstructionBase } from "./verify_instructions.ts";
@@ -47,23 +47,29 @@ export async function recordApprovals(
   const now = instructionsNow(judged);
   if (!yesHolds(yes, now)) return { kind: "moved", digest: now.digest };
   const { approved, refused } = await fresh(deps.git, base.head, namedShipped(judged));
-  const previous = await baseApprovals(deps.git, base.head);
+  // HEAD's own copy, not the tip's: the file this write replaces is the one that lands.
+  const previous = await committedApprovals(deps.git, base.head);
   const copies = judged.shipped?.copies ?? new Map();
-  const head = await headCopies(deps.git, base.head, previous.approvals, copies);
-  const next = nextApprovals(
-    previous.approvals,
-    head,
-    new Map(approved.map((a) => [a.path, a.sha256])),
-  );
-  const text = renderApprovals(next);
+  const text = await written(deps.git, base.head, previous, copies, approved);
+  return { kind: "recorded", approved, refused, text, unread: previous.refused };
+}
+
+/**
+ * The whole file the write leaves (`nextApprovals`): HEAD's approvals still in force, then those
+ * `approved` adds. `null` when HEAD's copy, read whole, already says it.
+ */
+async function written(
+  git: GitObjectReader,
+  head: string,
+  previous: CommittedApprovals,
+  copies: ReadonlyMap<string, ShippedCopy>,
+  approved: readonly Recorded[],
+): Promise<string | null> {
+  const held = await headCopies(git, head, previous.approvals, copies);
+  const added = new Map(approved.map((a) => [a.path, a.sha256]));
+  const text = renderApprovals(nextApprovals(previous.approvals, held, added));
   const same = previous.refused === null && text === renderApprovals(previous.approvals);
-  return {
-    kind: "recorded",
-    approved,
-    refused,
-    text: same ? null : text,
-    unread: previous.refused,
-  };
+  return same ? null : text;
 }
 
 /** The paths the instruction verdict names for holding neither shipped copy, and only those. */

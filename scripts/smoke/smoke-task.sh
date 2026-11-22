@@ -16,7 +16,7 @@ echo "═══ spec 037  the pipeline phases live under /task ═══"
 # Spec 037 moved the pipeline phases under /task; /specnaut keeps only the
 # framework's own verbs. Both halves are asserted, and so is the absence at
 # the old address — a copy left behind is a second router reading stale rules.
-for phase in plan implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution audit remote-gates script-gate orphan-specs; do
+for phase in plan implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution audit remote-gates script-gate skill-approvals orphan-specs; do
   check ".claude/skills/task/phases/$phase.md present" \
     "[ -f .claude/skills/task/phases/$phase.md ]"
   check ".claude/skills/specnaut/phases/$phase.md is gone (spec 037)" \
@@ -34,6 +34,9 @@ check "script-gate.md scaffolded with its resolve and gate blocks, and resume lo
   'f=.claude/skills/task/phases/script-gate.md; grep -qF "<!-- script-gate: verify-scripts -->" $f &&
    grep -qF "<!-- script-gate: resolve-verifier -->" $f &&
    grep -qF "out=\$(\"\$sn\" verify-scripts)" $f && grep -qF "phases/script-gate.md" .claude/skills/task/resume.md'
+check "skill-approvals.md scaffolded, and script-gate.md's instructions verdict loads it (cli#818)" \
+  '[ -f .claude/skills/task/phases/skill-approvals.md ] &&
+   grep -qF "phases/skill-approvals.md" .claude/skills/task/phases/script-gate.md'
 
 echo
 echo "═══ spec 037  /task audit replaced the audit skills ═══"

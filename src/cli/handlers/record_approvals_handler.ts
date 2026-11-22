@@ -4,12 +4,12 @@ import type { CheckoutTreeWalker, GitObjectReader } from "../../application/scri
 import type { InstructionBase } from "../../application/verify_instructions.ts";
 import { APPROVALS_FILE } from "../../domain/skill_approvals.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
-import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { findHarness } from "../harnesses.ts";
-import type { RecordApprovalsIntent } from "../verify_scripts_parser.ts";
+import { inProject, tempFileWriter, VERIFIER_EXIT } from "./verifier_command.ts";
+import type { RecordApprovalsIntent } from "../record_approvals_parser.ts";
 
 /**
  * `specnaut record-approvals --instructions-digest <D> --head <sha> --base-tip <sha>`: what
@@ -26,7 +26,7 @@ import type { RecordApprovalsIntent } from "../verify_scripts_parser.ts";
  *      answer to a command it does not know
  *   3  the commits are not ones this repository holds, or the check could not run
  */
-const EXIT = { written: 0, moved: 1, usage: 2, couldNotRun: 3 } as const;
+const EXIT = { written: 0, moved: 1, ...VERIFIER_EXIT } as const;
 
 type Opened = { git: GitObjectReader; tree: CheckoutTreeWalker };
 
@@ -47,11 +47,7 @@ function defaultDeps(): RecordApprovalsDeps {
       git: await GitObjects.open(cwd),
       tree: new FsTreeWalker(cwd, "block"),
     }),
-    writeFile: async (text) => {
-      const path = await Deno.makeTempFile({ prefix: "specnaut-approvals-" });
-      await Deno.writeTextFile(path, text);
-      return path;
-    },
+    writeFile: tempFileWriter("specnaut-approvals-"),
   };
 }
 
@@ -59,19 +55,13 @@ export async function runRecordApprovals(
   intent: RecordApprovalsIntent,
   deps: RecordApprovalsDeps = defaultDeps(),
 ): Promise<number> {
-  try {
-    if (!await fileExists(`${deps.cwd}/.specnaut`)) {
-      return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
-    }
+  return await inProject(deps.cwd, (code, why) => refuse(deps, code, why), async () => {
     const { git, tree } = await deps.open(deps.cwd);
     const base = await baseOf(git, intent);
     if (typeof base === "string") return refuse(deps, EXIT.couldNotRun, base);
     const judge = { git, tree, core: CORE_BUNDLE, findHarness };
     return await report(deps, await recordApprovals(judge, base, intent.digest));
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
-  }
+  });
 }
 
 /** The commits named, each as this repository holds it, and their merge base; or why not. */
@@ -97,15 +87,21 @@ async function report(deps: RecordApprovalsDeps, outcome: RecordOutcome): Promis
     const why = `HEAD's ${APPROVALS_FILE} is not read, so it is written whole: ${outcome.unread}`;
     deps.err(yellow(`warning: specnaut record-approvals: ${terminalText(why)}`));
   }
-  const lines = [
+  deps.out((await recordedLines(deps, outcome)).join("\n"));
+  return EXIT.written;
+}
+
+/** Exit 0's lines, in the order the header gives; the new file is written on the way. */
+async function recordedLines(
+  deps: RecordApprovalsDeps,
+  outcome: Extract<RecordOutcome, { kind: "recorded" }>,
+): Promise<string[]> {
+  const file = outcome.text === null ? null : await deps.writeFile(outcome.text);
+  return [
     ...outcome.approved.map((a) => `APPROVED ${a.sha256} ${terminalText(a.path)}`),
     ...outcome.refused.map((r) => `NOT APPROVED ${terminalText(r.path)} ${r.why}`),
-    outcome.text === null
-      ? "APPROVALS unchanged"
-      : `APPROVALS_FILE ${terminalText(await deps.writeFile(outcome.text))}`,
+    file === null ? "APPROVALS unchanged" : `APPROVALS_FILE ${terminalText(file)}`,
   ];
-  deps.out(lines.join("\n"));
-  return EXIT.written;
 }
 
 function refuse(deps: RecordApprovalsDeps, code: number, why: string): number {

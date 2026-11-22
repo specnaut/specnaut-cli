@@ -17,6 +17,7 @@ export const TASK_PHASES: readonly string[] = [
   "auto-chain",
   "remote-gates",
   "script-gate",
+  "skill-approvals",
   "orphan-specs",
   "epic-commits",
   "epic-fixups",

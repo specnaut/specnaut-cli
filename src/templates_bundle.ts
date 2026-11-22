@@ -1789,7 +1789,7 @@ under \`--no-close\`, once more after the push: there the item's line must read 
    It checks the tree is clean, that origin names \`<base>\` as its default, and that the branch
    contains \`origin/<base>\` and adds to it; after a yes to the instructions that held, it commits
    the approvals of the customised shipped skills that yes covered (\`.specnaut/approved-skills.txt\`,
-   \`phases/script-gate.md\` § The instructions verdict) on top of the judged commit, which then lands
+   \`phases/skill-approvals.md\`) on top of the judged commit, which then lands
    too, or prints \`APPROVALS NOT RECORDED\` when the binary cannot record them (the next merge asks
    again); it pushes HEAD's git-lfs objects (\`lfs-push.sh\`), fast-forwards the base, pushes it,
    deletes the branch with \`-d\`, and verifies \`HEAD\` is the base; it prints \`LANDED <base>
@@ -4071,26 +4071,47 @@ bytes than those that land, whatever \`git status\` shows; for such a path HEAD 
 tree's file and say it does not land. A \`line endings differ\` reason, whose diff can be empty, is
 shown as its reason says: the same text, a CR before LF on one side only. A \`holds invisible
 characters\` reason names each code point and its line: say so with the diff, which does not show
-them. A \`differs from the copy Specnaut ships\` reason names a skill Specnaut ships whose bytes are
-not the shipped copy, even where the base holds the same edit: show \`specnaut diff <path>\`, which
-compares it with that copy. A yes to such a line is remembered while the skill keeps those bytes:
-the landing records it (path, SHA-256) in \`.specnaut/approved-skills.txt\`, in its own commit on the
+them. A \`differs from the copy Specnaut ships\` or a \`records a skill digest that is not the copy
+Specnaut ships\` reason: follow \`phases/skill-approvals.md\`, which says what to show and what the
+question adds. Then ask once, as the one question before step 3: *"This branch changes the
+instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops
+on the branch. The yes covers that run's \`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them and
+the reasons shown) and nothing else: a later run with another digest asks again, even naming the
+same paths, or with a new reason, and a run with no such line asks. Every later run of step 0
+passes it as \`--approved-instructions\`, and its \`APPROVAL instructions holds\` line answers this
+question: it is not asked again. Step 3 passes that digest to \`land-feature.sh\` as
+\`--instructions-digest\`, which judges HEAD again and refuses (13) any other. The session read
+\`AGENTS.md\` before step 0 ran: this stop is the control, not undoing that read.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "task",
+    suffix: "skill-approvals.md",
+    content: `# Shipped-skill approvals
+
+\`phases/script-gate.md\` § The instructions verdict loads this doc when the last run named a skill
+Specnaut ships or the lock's record of one: what to show for each line, and what the question adds.
+\`phases/merge.md\` step 0 acts on that verdict.
+
+A \`differs from the copy Specnaut ships\` reason names a skill Specnaut ships whose bytes are not the
+shipped copy, even where the base holds the same edit: show \`specnaut diff <path>\`, which compares
+it with that copy. A yes to such a line is remembered while the skill keeps those bytes: the
+landing records it (path, SHA-256) in \`.specnaut/approved-skills.txt\`, in its own commit on the
 judged one. Only the landing writes that file: a branch's own change to it, but a deletion, is named
 and no yes holds it (\`APPROVAL instructions moved\`), so stop on the branch. A forge merge or a
-direct push lands it unjudged: the file is trusted as the base commits it. A \`records a skill digest
-that is not the copy Specnaut ships\` reason names \`.specnaut/installed.lock\`: the branch re-stamped
-a skill's digest, which would vouch for that copy from then on; show its diff. Then ask once,
-as the one question before step 3: *"This branch changes the instructions, skills, hooks or settings
-this session's harness loads. Yes lands them."* When a \`differs from the copy Specnaut ships\` line
+direct push lands it unjudged: the file is trusted as the base commits it.
+
+A \`records a skill digest that is not the copy Specnaut ships\` reason names
+\`.specnaut/installed.lock\`: the branch re-stamped a skill's digest, which would vouch for that copy
+from then on; show its diff.
+
+The question is the instructions verdict's own. When a \`differs from the copy Specnaut ships\` line
 is among them, add: *"Yes is remembered for those skills while they keep these bytes; deleting
-\`.specnaut/approved-skills.txt\` revokes it."* A no stops on the branch. The yes covers that run's
-\`INSTRUCTIONS_DIGEST\` (the files as HEAD commits them and the reasons shown) and nothing else: a
-later run with another digest asks again, even naming the same paths, or with a new reason, and a
-run with no such line asks. Every later run of step 0 passes it as \`--approved-instructions\`, and
-its \`APPROVAL instructions holds\` line answers this question: it is not asked again. Step 3 passes
-that digest to \`land-feature.sh\` as \`--instructions-digest\`, which judges HEAD again and refuses
-(13) any other. The session read \`AGENTS.md\` before step 0 ran: this stop is the control, not
-undoing that read.
+\`.specnaut/approved-skills.txt\` revokes it."*
 `,
     executable: false,
     backend: null,
@@ -6982,6 +7003,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | \`phases/review-gates.md\` | \`review\`, at its quality gates |
 | \`phases/review-untrusted.md\` | \`review\`, of a remote branch or a PR not trusted |
 | \`phases/script-gate.md\` | \`resume\`, \`groom\`, \`audit\` and the backlog verbs, before their first script; its config verdicts by every verb that runs a gate |
+| \`phases/skill-approvals.md\` | \`script-gate\`'s instructions verdict, on a shipped-skill or lock-digest line |
 
 Unknown verb → look it up first in the \`specnaut\` skill's **Retired addresses** table: a verb
 retired from this router, or one from before it existed, is answered with where it went. Any other
@@ -33080,7 +33102,7 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # and the branch contains it and holds at least one commit origin lacks; HEAD
 # is judged; after a yes that held, the approvals of the customised shipped
 # skills it covered are committed on top of HEAD (record_approvals in
-# _verifier.sh: \`APPROVALS NOT RECORDED\` when the binary cannot); HEAD's
+# _approvals.sh: \`APPROVALS NOT RECORDED\` when the binary cannot); HEAD's
 # git-lfs objects are pushed (lfs-push.sh); the base is checked out and
 # fast-forwarded to the branch, or to that commit; the base is pushed with an
 # explicit refspec and never its tags; the merged branch is deleted with \`-d\`;
@@ -33143,6 +33165,8 @@ here=\$(CDPATH="" cd "\${here:-/}" && pwd)
 . "\$here/_hooks_off.sh" land-feature
 # shellcheck source=./_verifier.sh
 . "\$here/_verifier.sh"
+# shellcheck source=./_approvals.sh
+. "\$here/_approvals.sh"
 # Before the first command looked up on the PATH: \`bash\` below is one.
 refuse_unsafe_path landed
 
@@ -33443,11 +33467,11 @@ echo "LFS pushed \${c:0:12}"
     suffix: "scripts/bash/_verifier.sh",
     content:
       `# shellcheck shell=bash disable=SC2154 # me, base, last and the digests: set by the sourcing script
-# HEAD's verdict from the verifier, and the approvals a yes leaves, for land-feature.sh, and the
-# PATH judgement lfs-push.sh shares with it - sourced, never run, after _hooks_off.sh set the git
-# alias, \`me\` and the ERR trap, under the caller's \`set -Eeuo pipefail\`; land-feature.sh sets
-# \`base\`, \`last\`, \`scripts_digest\` and \`instructions_digest\` before its calls. Exits 12 and 13 are
-# the caller's: its header says what they mean.
+# HEAD's verdict from the verifier, for land-feature.sh, and the PATH judgement lfs-push.sh shares
+# with it - sourced, never run, after _hooks_off.sh set the git alias, \`me\` and the ERR trap, under
+# the caller's \`set -Eeuo pipefail\`; land-feature.sh sets \`base\`, \`last\`, \`scripts_digest\` and
+# \`instructions_digest\` before its calls. The approvals a yes leaves are _approvals.sh's. Exits 12
+# and 13 are the caller's: its header says what they mean.
 
 # The PATH, judged before the first command it names runs - \`bash\`, \`git\` and \`specnaut\` are all
 # looked up on it. An empty or a relative entry is searched from the working folder, and an entry
@@ -33596,15 +33620,28 @@ judge_head() {
   fi
   exit 13
 }
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_approvals.sh",
+    content:
+      `# shellcheck shell=bash disable=SC2154 # me, last, out, sn and the digest: set before its call
+# The approvals a yes leaves, for land-feature.sh - sourced, never run, after _hooks_off.sh and
+# _verifier.sh, under the caller's \`set -Eeuo pipefail\`. record_approvals runs after judge_head,
+# whose \`out\` and \`sn\` it reads with \`last\` and \`instructions_digest\`. Exits 12 and 13 are the
+# caller's: its header says what they mean.
 
 # After a yes that held, the approvals of the customised shipped skills it covered: the binary
-# writes the whole file to a temp file, and this commits it on top of the judged commit with git's
-# plumbing - no work-tree write, no filter, no hook. \`land\` is what lands: that commit, checked to
-# have the judged commit as its one parent and to change that one file, a regular file; or the
-# judged commit itself. A binary too old for the command (exit 2) records nothing; the next merge
-# asks again. A yes that moved since judge_head is exit 13.
+# writes the whole file to a temp file, and commit_approvals commits it on top of the judged commit.
+# \`land\` is what lands: that commit, or the judged commit itself. A binary too old for the command
+# (exit 2) records nothing; the next merge asks again. A yes that moved since judge_head is exit 13.
 record_approvals() {
-  local rc=0 rec file path blob tree idx raw m s p
+  local rc=0 rec file
   land=\$last
   { [ -n "\$instructions_digest" ] && grep -q '^APPROVAL instructions holds ' <<<"\$out"; } || return 0
   rec=\$("\$sn" record-approvals --instructions-digest "\$instructions_digest" --head "\$last" \\
@@ -33617,24 +33654,38 @@ record_approvals() {
   esac
   file=\$(sed -n 's/^APPROVALS_FILE //p' <<<"\$rec")
   [ -n "\$file" ] || return 0
+  commit_approvals "\$file"
+  grep '^APPROVED ' <<<"\$rec" >&2 || true
+}
+
+# The approvals file \$1, committed on the judged commit into \`land\` with git's plumbing - no
+# work-tree write, no filter, no hook - through an index of its own; \$1 is removed once read.
+commit_approvals() {
+  local path blob tree idx
   path="\$(git rev-parse --show-prefix).specnaut/approved-skills.txt"
-  blob=\$(git hash-object -w --no-filters -- "\$file")
-  rm -f "\$file"
+  blob=\$(git hash-object -w --no-filters -- "\$1")
+  rm -f "\$1"
   idx=\$(mktemp -d)
   GIT_INDEX_FILE=\$idx/index git read-tree "\$last^{tree}"
   GIT_INDEX_FILE=\$idx/index git update-index --add --cacheinfo 100644 "\$blob" "\$path"
   tree=\$(GIT_INDEX_FILE=\$idx/index git write-tree)
   rm -rf "\$idx"
   land=\$(git commit-tree "\$tree" -p "\$last" -m "chore(specnaut): approve customised skill content")
+  approvals_commit_is "\$blob" "\$path"
+}
+
+# Exit 12 unless \`land\` has the judged commit as its one parent and changes that one file, path \$2,
+# to blob \$1, a regular file.
+approvals_commit_is() {
+  local raw m s p
   raw=\$(git -c core.quotePath=false diff-tree -r --no-renames --raw --no-abbrev "\$last" "\$land")
   read -r _ m _ s _ <<<"\${raw%%\$'\\t'*}"
   p=\${raw#*\$'\\t'}
-  if [ "\$(git rev-list --parents -n 1 "\$land")" != "\$land \$last" ] || [ "\$m \$s" != "100644 \$blob" ] ||
-    [ "\$p" != "\$path" ]; then
+  if [ "\$(git rev-list --parents -n 1 "\$land")" != "\$land \$last" ] || [ "\$m \$s" != "100644 \$1" ] ||
+    [ "\$p" != "\$2" ]; then
     echo "\$me: the approvals commit is not the one file on the judged commit - nothing was pushed" >&2
     exit 12
   fi
-  grep '^APPROVED ' <<<"\$rec" >&2 || true
 }
 `,
     executable: false,

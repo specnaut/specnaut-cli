@@ -186,9 +186,9 @@ done
 check "close-shipped.sh scaffolded + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
 # Instruction only: which script the doc tells the agent to land with, and no inline copy.
-check "merge.md lands through land-feature.sh, not inline git (spec 042), which sources _hooks_off.sh and _verifier.sh" \
+check "merge.md lands through land-feature.sh, not inline git (spec 042), which sources _hooks_off.sh, _verifier.sh and _approvals.sh" \
   'B=.specnaut/scripts/bash && grep -qF "bash $B/land-feature.sh" .claude/skills/task/phases/merge.md && grep -qF "/_hooks_off.sh" "$B/land-feature.sh" && [ -f "$B/_hooks_off.sh" ] &&
-   grep -qF "/_verifier.sh" "$B/land-feature.sh" && [ -f "$B/_verifier.sh" ] && ! grep -qE "git merge --ff-only|git branch -d" .claude/skills/task/phases/merge.md'
+   grep -qF "/_verifier.sh" "$B/land-feature.sh" && [ -f "$B/_verifier.sh" ] && grep -qF "/_approvals.sh" "$B/land-feature.sh" && [ -f "$B/_approvals.sh" ] && ! grep -qE "git merge --ff-only|git branch -d" .claude/skills/task/phases/merge.md'
 # Instruction only: which script the doc tells the agent to fold with, and no inline copy.
 check "epic-fixups.md folds through fold-fixups.sh, not an inline rebase (spec 042)" \
   'grep -qF "bash .specnaut/scripts/bash/fold-fixups.sh" .claude/skills/task/phases/epic-fixups.md &&

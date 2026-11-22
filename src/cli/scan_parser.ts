@@ -1,11 +1,23 @@
 import { hasControl } from "../domain/terminal_text.ts";
-import type { Intent, ScanIntent } from "./intent.ts";
+import type { Intent } from "./intent.ts";
 
 /**
  * `specnaut scan`'s arguments, validated into its intent: the one home of what `--path` may be
  * (plan S8). A refusal is `unknown`, exit 2 with the help, as every parse-time refusal is; it never
  * echoes the value, which may hold anything a caller passed.
  */
+
+/**
+ * `specnaut scan` (#747): a token-free map of the repository's structure against its size limits.
+ * `path` is a repository-relative subtree, already validated (`parseScan`); `top` is how long
+ * each list may be, `"all"` for no bound.
+ */
+export type ScanIntent = {
+  kind: "scan";
+  path: string | null;
+  format: "text" | "json" | "mermaid";
+  top: number | "all";
+};
 
 const SCAN_FORMATS: readonly ScanIntent["format"][] = ["text", "json", "mermaid"];
 

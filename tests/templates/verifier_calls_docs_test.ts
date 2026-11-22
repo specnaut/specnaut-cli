@@ -6,8 +6,9 @@ import { flat } from "./task_docs.ts";
 /**
  * How the shipped text calls the verifier: every call runs `phases/script-gate.md` § Resolving the
  * verifier first and then `"$sn" verify-scripts`, never the bare name, and only the merge (its step
- * 0, and `land-feature.sh` through `_verifier.sh`) passes the digests a yes covers. Swept over both
- * template trees, so a doc that starts calling it is checked without editing this file.
+ * 0, and `land-feature.sh` through `_verifier.sh` and `_approvals.sh`) passes the digests a yes
+ * covers. Swept over both template trees, so a doc that starts calling it is checked without
+ * editing this file.
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
@@ -98,7 +99,7 @@ Deno.test("the gate block verifies first and words a refusal as the review does"
 /** Where a digest flag may be named: merge's step 0, the merge's sections of the gate doc, the landing. */
 function allowedSpans(path: string, text: string): string {
   const doc = path.replace(/^(templates\/core|plugin)\//, "");
-  if (/^specnaut\/scripts\/bash\/(_verifier|land-feature)\.sh$/.test(doc)) return text;
+  if (/^specnaut\/scripts\/bash\/(_verifier|_approvals|land-feature)\.sh$/.test(doc)) return text;
   if (doc === "skills/task/phases/merge.md") {
     return text.slice(text.indexOf("0. **Check the helper scripts"), text.indexOf("1. **Shape"));
   }

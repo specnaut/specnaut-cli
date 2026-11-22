@@ -8,7 +8,7 @@
 # and the branch contains it and holds at least one commit origin lacks; HEAD
 # is judged; after a yes that held, the approvals of the customised shipped
 # skills it covered are committed on top of HEAD (record_approvals in
-# _verifier.sh: `APPROVALS NOT RECORDED` when the binary cannot); HEAD's
+# _approvals.sh: `APPROVALS NOT RECORDED` when the binary cannot); HEAD's
 # git-lfs objects are pushed (lfs-push.sh); the base is checked out and
 # fast-forwarded to the branch, or to that commit; the base is pushed with an
 # explicit refspec and never its tags; the merged branch is deleted with `-d`;
@@ -71,6 +71,8 @@ here=$(CDPATH="" cd "${here:-/}" && pwd)
 . "$here/_hooks_off.sh" land-feature
 # shellcheck source=./_verifier.sh
 . "$here/_verifier.sh"
+# shellcheck source=./_approvals.sh
+. "$here/_approvals.sh"
 # Before the first command looked up on the PATH: `bash` below is one.
 refuse_unsafe_path landed
 

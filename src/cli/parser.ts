@@ -8,7 +8,8 @@ import { parseReconcile } from "./reconcile_parser.ts";
 import { parseReview } from "./review_parser.ts";
 import { parseSandbox } from "./sandbox_parser.ts";
 import { parseScan } from "./scan_parser.ts";
-import { parseRecordApprovals, parseVerifyScripts } from "./verify_scripts_parser.ts";
+import { parseRecordApprovals } from "./record_approvals_parser.ts";
+import { parseVerifyScripts } from "./verify_scripts_parser.ts";
 
 export type { Intent } from "./intent.ts";
 

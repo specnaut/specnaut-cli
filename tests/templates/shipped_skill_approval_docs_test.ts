@@ -9,11 +9,20 @@ import { flat, phase } from "./task_docs.ts";
  * it, and the lock reason that guards the other key. Read from the bundle, as a project gets them.
  */
 
-const gate = () => flat(phase("script-gate").content);
+const leaf = () => flat(phase("skill-approvals").content);
 const merge = () => flat(phase("merge").content);
 
-Deno.test("the instructions verdict says a yes to a shipped-copy line is remembered per bytes", () => {
-  const text = gate();
+Deno.test("the instructions verdict sends its shipped-skill and lock lines to their own leaf", () => {
+  const gate = flat(phase("script-gate").content);
+  assertStringIncludes(
+    gate,
+    `A \`${SHIPPED_REASON}\` or a \`${LOCK_SKILL_REASON}\` reason: follow \`phases/skill-approvals.md\``,
+  );
+  assertStringIncludes(leaf(), "`phases/script-gate.md` § The instructions verdict loads this doc");
+});
+
+Deno.test("the leaf says a yes to a shipped-copy line is remembered per bytes", () => {
+  const text = leaf();
   assertStringIncludes(
     text,
     `A yes to such a line is remembered while the skill keeps those bytes`,

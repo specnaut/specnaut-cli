@@ -16,12 +16,12 @@ import {
 import type { ConfigVerdict } from "../../domain/config_trust.ts";
 import { APPROVALS_FILE } from "../../domain/skill_approvals.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
-import { fileExists } from "../../infrastructure/fs_backup.ts";
 import { FsScriptTreeWalker } from "../../infrastructure/fs_script_tree_walker.ts";
 import { FsTreeWalker } from "../../infrastructure/fs_tree_walker.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import { findHarness } from "../harnesses.ts";
+import { inProject, tempFileWriter, VERIFIER_EXIT } from "./verifier_command.ts";
 
 /**
  * `specnaut verify-scripts`: the review and the merge run it before any helper script of the
@@ -61,7 +61,7 @@ import { findHarness } from "../harnesses.ts";
  * trusted or held, 1 otherwise. Exit 0 then means binding, not consent: the tree is the one the
  * digest named. The last line still reads `trusted` only for scripts that really are.
  */
-const EXIT = { trusted: 0, untrusted: 1, usage: 2, couldNotRun: 3 } as const;
+const EXIT = { trusted: 0, untrusted: 1, ...VERIFIER_EXIT } as const;
 const UNTRUSTED = "VERDICT scripts untrusted";
 
 type Opened = { git: GitObjectReader; walker: ScriptTreeWalker; config: CheckoutTreeWalker };
@@ -84,11 +84,7 @@ function defaultDeps(): VerifyScriptsDeps {
       walker: new FsScriptTreeWalker(cwd),
       config: new FsTreeWalker(cwd, "block"),
     }),
-    writeNames: async (names) => {
-      const path = await Deno.makeTempFile({ prefix: "specnaut-names-" });
-      await Deno.writeTextFile(path, names);
-      return path;
-    },
+    writeNames: tempFileWriter("specnaut-names-"),
   };
 }
 
@@ -96,10 +92,7 @@ export async function runVerifyScripts(
   deps: VerifyScriptsDeps = defaultDeps(),
   approved: ApprovedDigests = {},
 ): Promise<number> {
-  try {
-    if (!await fileExists(`${deps.cwd}/.specnaut`)) {
-      return refuse(deps, EXIT.usage, "no .specnaut/ here: run it from the project's root");
-    }
+  return await inProject(deps.cwd, (code, why) => refuse(deps, code, why), async () => {
     const { git, walker, config } = await deps.open(deps.cwd);
     const outcome = await verifyScripts({ git, walker, core: CORE_BUNDLE, findHarness });
     const base = outcome.kind === "judged"
@@ -108,10 +101,7 @@ export async function runVerifyScripts(
     const judged = await judgeInputs({ git, tree: config, core: CORE_BUNDLE, findHarness }, base);
     warnRefused(deps, judged);
     return await answer(outcome, judged, deps, approved);
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return refuse(deps, EXIT.couldNotRun, `the check could not run: ${why}`);
-  }
+  });
 }
 
 /**

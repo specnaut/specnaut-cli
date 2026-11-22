@@ -4,7 +4,7 @@ import type { ScanRepository } from "../../application/structural_scan_ports.ts"
 import type { ScanReport } from "../../domain/structural_scan_types.ts";
 import { terminalText } from "../../domain/terminal_text.ts";
 import { openGitRepository } from "../../infrastructure/git_tracked_files.ts";
-import type { ScanIntent } from "../intent.ts";
+import type { ScanIntent } from "../scan_parser.ts";
 import { renderScan } from "../scan_render.ts";
 
 /**

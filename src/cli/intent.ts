@@ -1,22 +1,12 @@
 import type { BacklogBackend, SpecBackend } from "../domain/installed_lock.ts";
-import type { RecordApprovalsIntent, VerifyScriptsIntent } from "./verify_scripts_parser.ts";
+import type { RecordApprovalsIntent } from "./record_approvals_parser.ts";
+import type { ScanIntent } from "./scan_parser.ts";
+import type { VerifyScriptsIntent } from "./verify_scripts_parser.ts";
 
 /**
  * What the command line asks for: `parseArgs` returns one, `main.ts` dispatches on its `kind`.
  * Its own module so the parser holds the reading of argv and nothing else (plan A17).
  */
-
-/**
- * `specnaut scan` (#747): a token-free map of the repository's structure against its size limits.
- * `path` is a repository-relative subtree, already validated (`scan_parser.ts`); `top` is how long
- * each list may be, `"all"` for no bound.
- */
-export type ScanIntent = {
-  kind: "scan";
-  path: string | null;
-  format: "text" | "json" | "mermaid";
-  top: number | "all";
-};
 
 /**
  * `specnaut sandbox`: `probe` reports which backend would run a branch's gates; `exec` runs

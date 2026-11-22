@@ -132,7 +132,7 @@ under `--no-close`, once more after the push: there the item's line must read `O
    It checks the tree is clean, that origin names `<base>` as its default, and that the branch
    contains `origin/<base>` and adds to it; after a yes to the instructions that held, it commits
    the approvals of the customised shipped skills that yes covered (`.specnaut/approved-skills.txt`,
-   `phases/script-gate.md` § The instructions verdict) on top of the judged commit, which then lands
+   `phases/skill-approvals.md`) on top of the judged commit, which then lands
    too, or prints `APPROVALS NOT RECORDED` when the binary cannot record them (the next merge asks
    again); it pushes HEAD's git-lfs objects (`lfs-push.sh`), fast-forwards the base, pushes it,
    deletes the branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base>

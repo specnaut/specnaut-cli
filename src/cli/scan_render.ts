@@ -11,7 +11,7 @@ import type {
   UnitFinding,
 } from "../domain/structural_scan_types.ts";
 import { mermaidLabel, terminalJson } from "../domain/terminal_text.ts";
-import type { ScanIntent } from "./intent.ts";
+import type { ScanIntent } from "./scan_parser.ts";
 import { renderScanText } from "./scan_render_text.ts";
 
 /**

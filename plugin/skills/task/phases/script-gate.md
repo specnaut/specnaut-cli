@@ -179,23 +179,14 @@ bytes than those that land, whatever `git status` shows; for such a path HEAD la
 tree's file and say it does not land. A `line endings differ` reason, whose diff can be empty, is
 shown as its reason says: the same text, a CR before LF on one side only. A `holds invisible
 characters` reason names each code point and its line: say so with the diff, which does not show
-them. A `differs from the copy Specnaut ships` reason names a skill Specnaut ships whose bytes are
-not the shipped copy, even where the base holds the same edit: show `specnaut diff <path>`, which
-compares it with that copy. A yes to such a line is remembered while the skill keeps those bytes:
-the landing records it (path, SHA-256) in `.specnaut/approved-skills.txt`, in its own commit on the
-judged one. Only the landing writes that file: a branch's own change to it, but a deletion, is named
-and no yes holds it (`APPROVAL instructions moved`), so stop on the branch. A forge merge or a
-direct push lands it unjudged: the file is trusted as the base commits it. A `records a skill digest
-that is not the copy Specnaut ships` reason names `.specnaut/installed.lock`: the branch re-stamped
-a skill's digest, which would vouch for that copy from then on; show its diff. Then ask once,
-as the one question before step 3: *"This branch changes the instructions, skills, hooks or settings
-this session's harness loads. Yes lands them."* When a `differs from the copy Specnaut ships` line
-is among them, add: *"Yes is remembered for those skills while they keep these bytes; deleting
-`.specnaut/approved-skills.txt` revokes it."* A no stops on the branch. The yes covers that run's
-`INSTRUCTIONS_DIGEST` (the files as HEAD commits them and the reasons shown) and nothing else: a
-later run with another digest asks again, even naming the same paths, or with a new reason, and a
-run with no such line asks. Every later run of step 0 passes it as `--approved-instructions`, and
-its `APPROVAL instructions holds` line answers this question: it is not asked again. Step 3 passes
-that digest to `land-feature.sh` as `--instructions-digest`, which judges HEAD again and refuses
-(13) any other. The session read `AGENTS.md` before step 0 ran: this stop is the control, not
-undoing that read.
+them. A `differs from the copy Specnaut ships` or a `records a skill digest that is not the copy
+Specnaut ships` reason: follow `phases/skill-approvals.md`, which says what to show and what the
+question adds. Then ask once, as the one question before step 3: *"This branch changes the
+instructions, skills, hooks or settings this session's harness loads. Yes lands them."* A no stops
+on the branch. The yes covers that run's `INSTRUCTIONS_DIGEST` (the files as HEAD commits them and
+the reasons shown) and nothing else: a later run with another digest asks again, even naming the
+same paths, or with a new reason, and a run with no such line asks. Every later run of step 0
+passes it as `--approved-instructions`, and its `APPROVAL instructions holds` line answers this
+question: it is not asked again. Step 3 passes that digest to `land-feature.sh` as
+`--instructions-digest`, which judges HEAD again and refuses (13) any other. The session read
+`AGENTS.md` before step 0 ran: this stop is the control, not undoing that read.
