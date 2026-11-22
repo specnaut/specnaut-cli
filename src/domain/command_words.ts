@@ -1,5 +1,10 @@
 import { manifestsOf } from "./command_runners.ts";
-import { isPathKey, type PathValue, pathWordValue, surelySetsPath } from "./command_search_path.ts";
+import {
+  isPathKey,
+  pathAssignments,
+  type PathValue,
+  surelySetsPath,
+} from "./command_search_path.ts";
 import { nestedSegments } from "./nested_commands.ts";
 
 /**
@@ -73,15 +78,12 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
 /**
  * The words of `strings` and of every command nested in them (`nested_commands.ts`), and the
  * manifest each of those commands runs (`manifestsOf`); each word that may be a program
- * (`isProgram`), and each `PATH=…` word's value, are noted in `read`.
+ * (`isProgram`), and the value each PATH assignment sets (`pathAssignments`), are noted in `read`.
  */
 export function commandWords(strings: readonly string[], read: Reading): string[] {
   const commands = nestedSegments(strings, read);
-  for (const word of commands.flat()) {
-    if (isProgram(word)) read.programs.add(word);
-    const value = pathWordValue(word);
-    if (value !== undefined) read.pathValues.push(value);
-  }
+  for (const words of commands) read.pathValues.push(...pathAssignments(words));
+  for (const word of commands.flat()) if (isProgram(word)) read.programs.add(word);
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];
 }
 

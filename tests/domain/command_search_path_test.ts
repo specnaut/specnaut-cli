@@ -35,6 +35,26 @@ Deno.test("a PATH set before a command, or exported, is read from the command's 
   assertEquals(exported.onPath, ["node_modules/.bin"]);
 });
 
+Deno.test("a PATH appended to, before a command or exported, adds its folders to the PATH in effect", () => {
+  const md = (span: string) => read(enc(`Run !\`${span}\`\n`), ".claude/commands/c.md");
+  assertEquals(md("PATH+=:./bin lint").onPath, ["bin"]);
+  assertEquals(md("export PATH+=:tools; lint").onPath, ["tools"]);
+  assertEquals(md("PATH+=:./tools/$OS/bin lint").whole, false);
+  const both = read(hook("PATH+=:tools lint", { env: { PATH: "./bin:$PATH" } }));
+  assertEquals(sorted(both.onPath), ["bin", "tools"]);
+  assertEquals(read(enc('{"hooks": "PATH+=:bin2 lint", ')).onPath, ["bin2"]);
+});
+
+Deno.test("PowerShell's `$env:Path`, set or appended to, in any letter case, puts its folders on PATH", () => {
+  const md = (span: string) => read(enc(`Run !\`${span}\`\n`), ".claude/commands/c.md");
+  assertEquals(md('$env:Path = "ps;$env:Path"; lint').onPath, ["ps"]);
+  assertEquals(md("$env:Path += ';ps2'; lint").onPath, ["ps2"]);
+  assertEquals(md('$env:PATH="ps3;$env:Path"; lint').onPath, ["ps3"]);
+  assertEquals(md("$env:path += ';x/$D/bin'; lint").whole, false);
+  assertEquals(read(hook("$env:Path += ';ps4'; lint")).onPath, ["ps4"]);
+  assertEquals(read(enc(`{"hooks": "$env:Path += ';ps5'; lint", `)).onPath, ["ps5"]);
+});
+
 Deno.test("a PATH key spelled with an escape is read through the parse", () => {
   const escaped = enc('{"env": {"P\\u0041TH": "bin3:$PATH"}}');
   assertEquals(read(escaped).onPath, ["bin3"]);

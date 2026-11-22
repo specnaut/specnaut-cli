@@ -6,7 +6,8 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
  * config puts there makes each file in it named like a word of a command a file that command may
  * run: `"env": {"PATH": "./bin:$PATH"}` and a hook `lint` run `bin/lint`. A command source names
  * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy) or
- * a word `PATH=…` (set before a command, or exported). The key is read in any letter case, as
+ * a word `PATH=…` or `PATH+=…` (set before a command, or exported), or PowerShell's `$env:Path`
+ * set or appended to (`$env:Path += ';bin'`). The key is read in any letter case, as
  * Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`) puts its
  * value's folders on PATH too, which only looks for more names in the listing. A folder that
  * cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
@@ -18,7 +19,15 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
 
 /** A key or a word that sets PATH, in any letter case. */
 export const isPathKey = (key: string): boolean => /^path$/i.test(key);
-const PATH_WORD = /^(path)=(.*)$/is;
+const PATH_WORD = /^(path)\+?=(.*)$/is;
+
+/**
+ * PowerShell's PATH, `$env:Path`: in any letter case, as PowerShell reads a variable's name, so
+ * always surely PATH. Alone it is the PATH in effect, as `$PATH` is a shell's.
+ */
+const PS_PATH = /\$env:path\b/gi;
+const PS_PATH_ALONE = /^\$env:path$/i;
+const PS_PATH_WORD = /^\$env:path\+?=(.*)$/is;
 
 /** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
 export const isSurelyPath = (name: string): boolean => name === "PATH";
@@ -39,13 +48,28 @@ export function surelySetsPath(key: string, under: readonly string[]): boolean {
 export type PathValue = { readonly value: string; readonly sure: boolean };
 
 /** What a word sets PATH to, when it sets it: `PATH=./bin:$PATH` sets it to `./bin:$PATH`. */
-export function pathWordValue(word: string): PathValue | undefined {
+function pathWordValue(word: string): PathValue | undefined {
   const set = PATH_WORD.exec(word);
   return set ? { value: set[2], sure: isSurelyPath(set[1]) } : undefined;
 }
 
+/**
+ * What the PATH assignments among one command's words set PATH to: a `PATH=…` word, and
+ * PowerShell's `$env:Path=…`, which may also be three words (`$env:Path`, `+=`, the value).
+ */
+export function pathAssignments(words: readonly string[]): PathValue[] {
+  return words.flatMap((word, i) => {
+    const ps = PS_PATH_WORD.exec(word);
+    if (ps && ps[1] !== "") return [{ value: ps[1], sure: true }];
+    const spaced = PS_PATH_ALONE.test(word) && /^\+?=$/.test(words[i + 1] ?? "");
+    if (spaced && words[i + 2] !== undefined) return [{ value: words[i + 2], sure: true }];
+    const value = pathWordValue(word);
+    return value === undefined ? [] : [value];
+  });
+}
+
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
-const RAW_PATH = /(?<![\w${])(path)["']?\s*[:=]\s*["']?([^"'\s,&|]*)/gi;
+const RAW_PATH = /(?<![\w${])(path)["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;
 
 /**
  * What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. One
@@ -58,8 +82,12 @@ export function rawPathValues(line: string): PathValue[] {
   }));
 }
 
-/** The pieces of a PATH value, each a folder as written: `:` and Windows' `;` both separate. */
-export const pathPieces = (value: string): string[] => value.split(/[:;]/).filter(Boolean);
+/**
+ * The pieces of a PATH value, each a folder as written: `:` and Windows' `;` both separate, and
+ * PowerShell's `$env:Path` is read as `$PATH`, the PATH in effect, before its `:` splits it.
+ */
+export const pathPieces = (value: string): string[] =>
+  value.replace(PS_PATH, "$$PATH").split(/[:;]/).filter(Boolean);
 
 /** The extensions Windows tries a bare name with: `PATHEXT`'s default, and PowerShell's `.ps1`. */
 const WINDOWS_EXTENSION = /\.(?:com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc|ps1)$/;
