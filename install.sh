@@ -57,12 +57,25 @@ latest_version() {
     | sed -E 's/.*"([^"]+)"$/\1/'
 }
 
+# Creates the folder $1 as the user when it is missing and its nearest existing parent is a folder
+# the user can write, as under $HOME (cli#816): `sudo mkdir -p` there leaves a root-owned folder in
+# the home, and a refused sudo aborted an explicit PREFIX. Anywhere else, sudo is asked as before.
+make_dir_as_user() {
+  local parent="$1"
+  [[ -e "$1" ]] && return 0
+  while [[ ! -e "$parent" ]]; do parent="$(dirname "$parent")"; done
+  [[ -d "$parent" && -w "$parent" ]] || return 0
+  mkdir -p "$1" || warn "could not create $1 as you - trying with admin access."
+}
+
 # Move $1 to $2, handling permission elevation transparently.
 # Sets FINAL_DEST to the actual install path (may differ from $2 on fallback).
+# shellcheck disable=SC2024 # the redirects are meant as the user: sudo reads its password from the tty
 install_binary() {
   local src="$1" dest="$2" dest_dir
   dest_dir="$(dirname "$dest")"
   FINAL_DEST=""
+  make_dir_as_user "$dest_dir"
 
   # Best case: directory exists and is writable.
   if [[ -d "$dest_dir" && -w "$dest_dir" ]]; then
@@ -89,9 +102,8 @@ install_binary() {
   if [[ -n "${PREFIX_EXPLICIT:-}" && "$PREFIX" != "/usr/local/bin" ]]; then
     abort "cannot write to ${dest_dir} and you set PREFIX explicitly — aborting."
   fi
-  local fallback_dir="$HOME/.local/bin"
+  local fallback_dir="$HOME/.local/bin" fallback_dest="$HOME/.local/bin/specnaut"
   mkdir -p "$fallback_dir"
-  local fallback_dest="$fallback_dir/specnaut"
   mv -f "$src" "$fallback_dest"
   chmod 755 "$fallback_dest"
   warn "installed to ${fallback_dir} instead of ${dest_dir}."
@@ -110,7 +122,7 @@ main() {
     abort "shasum or sha256sum is required"
   fi
 
-  local target version bin_url sha_url tmp expected_sha actual_sha dest
+  local target version bin_url sha_url expected_sha actual_sha dest
   target="$(detect_target)"
   if [[ -z "$VERSION" ]]; then
     version="$(latest_version)"
@@ -133,7 +145,7 @@ main() {
   fi
 
   tmp="$(mktemp -d)"
-  trap "rm -rf '$tmp'" EXIT
+  trap 'rm -rf "$tmp"' EXIT # tmp is global: the trap runs after main returns
 
   info "downloading binary..."
   curl -fsSL "$bin_url" -o "$tmp/specnaut"
