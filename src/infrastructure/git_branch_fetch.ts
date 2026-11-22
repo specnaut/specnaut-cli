@@ -3,7 +3,13 @@ import { type BranchFetcher, ExportRefused } from "../application/untrusted_revi
 import { type BranchSource, FETCHED_REF, refspecOf } from "../domain/branch_source.ts";
 import { decode, firstLine } from "./git_text.ts";
 import { gitMissing } from "./git_path.ts";
-import { type GitEnv, GitRefused, UntrustedGit, untrustedGitEnv } from "./untrusted_git.ts";
+import {
+  type EnvSource,
+  type GitEnv,
+  GitRefused,
+  UntrustedGit,
+  untrustedGitEnv,
+} from "./untrusted_git.ts";
 import { UNTRUSTED_GIT_FLAGS } from "./untrusted_git_flags.ts";
 
 /**
@@ -48,8 +54,11 @@ export const FETCH_TIMEOUT_MS = 120_000;
 export type FetchOptions = {
   readonly protocols?: readonly string[];
   readonly timeoutMs?: number;
-  /** Where the fetch reads the caller's variables from; the process's own by default. */
-  readonly env?: (name: string) => string | undefined;
+  /**
+   * Where every git the fetch starts reads the caller's variables from, the project's reads as
+   * the fetch's own; the process's own by default.
+   */
+  readonly env?: EnvSource;
 };
 
 /** The fetch's whole command line, its options before `--` and the URL and refspec after. */
@@ -74,13 +83,13 @@ export class GitBranchFetcher implements BranchFetcher {
   readonly #project: UntrustedGit;
   readonly #protocols: readonly string[];
   readonly #timeoutMs: number;
-  readonly #env: (name: string) => string | undefined;
+  readonly #env: EnvSource;
 
   constructor(readonly projectDir: string, options: FetchOptions = {}) {
-    this.#project = new UntrustedGit(projectDir);
+    this.#env = options.env ?? ((name) => Deno.env.get(name));
+    this.#project = new UntrustedGit(projectDir, projectDir, this.#env);
     this.#protocols = options.protocols ?? DEFAULT_PROTOCOLS;
     this.#timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
-    this.#env = options.env ?? ((name) => Deno.env.get(name));
   }
 
   async remotes(): Promise<string[]> {
@@ -101,7 +110,7 @@ export class GitBranchFetcher implements BranchFetcher {
     const alternates = join(gitDir, "objects", "info", "alternates");
     await Deno.writeTextFile(alternates, `${join(common, "objects")}\n`);
     await this.#git("fetch", gitDir, fetchArgs(url, refspecOf(source), this.#protocols));
-    const head = await new UntrustedGit(gitDir, this.projectDir)
+    const head = await new UntrustedGit(gitDir, this.projectDir, this.#env)
       .run("rev-parse", ["--verify", "--quiet", "--end-of-options", `${FETCHED_REF}^{commit}`])
       .catch(asRefusal);
     return firstLine(head);
@@ -168,7 +177,7 @@ function initArgs(format: string, gitDir: string): string[] {
  * whichever folder git runs in: the repository the fetch fills is made by the binary, the project
  * is the checkout a branch could have put a `git` in.
  */
-function fetchEnv(source: (name: string) => string | undefined, project: string): GitEnv {
+function fetchEnv(source: EnvSource, project: string): GitEnv {
   const { env, dropped } = untrustedGitEnv(source, project);
   const agent = source("SSH_AUTH_SOCK");
   const ssh: Record<string, string> = agent === undefined ? {} : { SSH_AUTH_SOCK: agent };

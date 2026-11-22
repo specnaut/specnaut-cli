@@ -9,8 +9,11 @@ import { UNREACHABLE } from "./fs_containment.ts";
  * `git` a cloned project carries in its folders is never the one that runs.
  */
 export class DenoGit implements GitAdapter {
-  /** `here` is the folder whose tree `isAvailable` keeps git's PATH out of. */
-  constructor(private readonly here: string = Deno.cwd()) {}
+  /**
+   * `here` is the folder whose tree `isAvailable` keeps git's PATH out of: the project `init`
+   * works on, never the working folder by default, which `specnaut init <dir>` need not be in.
+   */
+  constructor(private readonly here: string) {}
 
   async isAvailable(): Promise<boolean> {
     const { command } = projectGit(this.here, ["--version"], "null");

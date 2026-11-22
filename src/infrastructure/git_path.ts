@@ -29,24 +29,13 @@ export type Dropped = { readonly entry: string; readonly why: string };
 /** git's PATH, and the first entry left out of it: a git not found names it (`gitMissing`). */
 export type FilteredPath = { readonly kept: string; readonly dropped: Dropped | undefined };
 
-/** `path`'s entries that cannot supply a program from the tree `cwd` is in, in their order. */
-export function gitPath(path: string, cwd: string, os: Os = Deno.build.os): string {
-  return filterGitPath(path, cwd, os).kept;
-}
-
-/** {@link gitPath}, with the first entry it left out. */
+/**
+ * `path`'s entries that cannot supply a program from the tree `cwd` is in, in their order, split
+ * and joined on `os`'s separator, and the first entry left out.
+ */
 export function filterGitPath(path: string, cwd: string, os: Os = Deno.build.os): FilteredPath {
   const top = treeTop(cwd, os);
   return sortEntries(path, os, (entry) => entryUnsafe(entry, top, os));
-}
-
-/** `path` split on the platform's separator, joined back without the entries `unsafe` names. */
-export function keptEntries(
-  path: string,
-  os: Os,
-  unsafe: (entry: string) => string | undefined,
-): string {
-  return sortEntries(path, os, unsafe).kept;
 }
 
 function sortEntries(

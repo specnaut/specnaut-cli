@@ -227,7 +227,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     if (intent.backlogRepo !== null) {
       githubRepo = intent.backlogRepo;
     } else {
-      const git = new DenoGit();
+      const git = new DenoGit(targetDir);
       const remote = await git.getRemoteUrl(targetDir, "origin");
       githubRepo = remote !== null ? parseGithubRepoFromRemote(remote) : null;
     }
@@ -284,7 +284,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     // append a second `[agents]` table to a `.codex/config.toml` that already
     // has one (cli#599).
     reader: new DenoFsReader(),
-    git: new DenoGit(),
+    git: new DenoGit(targetDir),
     lockStore: new FsLockStore(),
     harness,
     backlogBackend,

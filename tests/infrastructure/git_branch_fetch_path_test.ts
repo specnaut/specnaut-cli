@@ -83,3 +83,35 @@ inPlanted("a fetch that finds git on no entry left names the first entry left ou
   );
   assertEquals(await ran(p.fired), false, "the planted git ran");
 });
+
+inPlanted("the project's own git reads its PATH from the fetch's env option", async (p) => {
+  const empty = join(p.base, "empty");
+  await Deno.mkdir(empty);
+  const env = (name: string) => name === "PATH" ? empty : Deno.env.get(name);
+  const fetcher = new GitBranchFetcher(p.project, { env });
+  await assertRejects(() => fetcher.remotes(), ExportRefused, "git is not on the PATH");
+});
+
+inPlanted(
+  "every git a fetch starts, the cache's read included, is found on the env option's PATH",
+  async (p) => {
+    const [logged, log] = [join(p.base, "logged"), join(p.base, "log")];
+    const real = await whichGit();
+    await Deno.mkdir(logged);
+    const wrapper = `#!/bin/sh\necho "$*" >>'${log}'\nexec '${real}' "$@"\n`;
+    await Deno.writeTextFile(join(logged, "git"), wrapper, { mode: 0o755 });
+    const env = (name: string) => name === "PATH" ? logged : Deno.env.get(name);
+    const fetcher = new GitBranchFetcher(p.project, { protocols: ["file"], env });
+    assertEquals(await fetcher.fetch(TOPIC, join(p.base, "out.git")), p.head);
+    const calls = (await Deno.readTextFile(log)).split("\n");
+    for (const said of ["remote.origin.url", "--show-object-format", "fetch --quiet", "--verify"]) {
+      assertEquals(calls.some((c) => c.includes(said)), true, `no logged git call says ${said}`);
+    }
+  },
+);
+
+/** The git the caller's PATH finds, by its absolute path. */
+async function whichGit(): Promise<string> {
+  const out = await new Deno.Command("sh", { args: ["-c", "command -v git"] }).output();
+  return new TextDecoder().decode(out.stdout).trim();
+}

@@ -38,7 +38,7 @@ Deno.test("init, the version probe, the remote and the tags skip a git the proje
   inProject(async ({ dir, bin }) => {
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(await new DenoGit(dir).isAvailable(), true);
-      await new DenoGit().init(dir);
+      await new DenoGit(dir).init(dir);
     });
     assertEquals(await exists(join(dir, ".git")), true);
     await git(dir, "remote", "add", "origin", "https://example.com/acme/my-app.git");
@@ -46,7 +46,7 @@ Deno.test("init, the version probe, the remote and the tags skip a git the proje
     await git(dir, "tag", "v1.2.3");
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(
-        await new DenoGit().getRemoteUrl(dir, "origin"),
+        await new DenoGit(dir).getRemoteUrl(dir, "origin"),
         "https://example.com/acme/my-app.git",
       );
       assertEquals(listTags(dir), ["v1.2.3"]);
@@ -57,12 +57,12 @@ Deno.test("init with no PATH entry outside the project is refused, naming the en
   inProject(async ({ dir, bin }) => {
     await withPath([bin], async () => {
       await assertRejects(
-        () => new DenoGit().init(dir),
+        () => new DenoGit(dir).init(dir),
         Error,
         `no PATH entry outside the repository; ${leftOut(bin)}`,
       );
       assertEquals(await new DenoGit(dir).isAvailable(), false);
-      assertEquals(await new DenoGit().getRemoteUrl(dir, "origin"), null);
+      assertEquals(await new DenoGit(dir).getRemoteUrl(dir, "origin"), null);
       assertEquals(listTags(dir), []);
     });
   }));
@@ -73,12 +73,12 @@ Deno.test("no git on the PATH left: init names the entry left out, the reads ans
     try {
       await withPath([bin, outside], async () => {
         await assertRejects(
-          () => new DenoGit().init(dir),
+          () => new DenoGit(dir).init(dir),
           Error,
           `git is not on the PATH; ${leftOut(bin)}`,
         );
         assertEquals(await new DenoGit(dir).isAvailable(), false);
-        assertEquals(await new DenoGit().getRemoteUrl(dir, "origin"), null);
+        assertEquals(await new DenoGit(dir).getRemoteUrl(dir, "origin"), null);
         assertEquals(listTags(dir), []);
       });
     } finally {

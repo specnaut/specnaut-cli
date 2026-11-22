@@ -60,16 +60,26 @@ export type GitEnv = {
 /** Where git runs, and the environment it starts with. */
 type Place = { readonly cwd: string; gitEnv(): GitEnv };
 
-/** git, run in one repository under the hardened defaults; `tree` is `cwd` unless it is a cache. */
+/** Where git's allowlisted variables are read from. */
+export type EnvSource = (name: string) => string | undefined;
+
+/**
+ * git, run in one repository under the hardened defaults; `tree` is `cwd` unless it is a cache,
+ * and `source` is the process's own environment unless a caller reads it from elsewhere.
+ */
 export class UntrustedGit {
   #ready: Promise<readonly string[]> | undefined;
   #env: GitEnv | undefined;
 
-  constructor(readonly cwd: string, readonly tree: string = cwd) {}
+  constructor(
+    readonly cwd: string,
+    readonly tree: string = cwd,
+    private readonly source: EnvSource = (name) => Deno.env.get(name),
+  ) {}
 
   /** Filtered at the first call and kept: the PATH's every entry is a realpath and a stat. */
   gitEnv(): GitEnv {
-    return this.#env ??= untrustedGitEnv((name) => Deno.env.get(name), this.tree);
+    return this.#env ??= untrustedGitEnv(this.source, this.tree);
   }
 
   /** stdout, or a throw naming why git refused. */
@@ -137,10 +147,7 @@ async function knowsLazyFetch(at: Place): Promise<boolean> {
 }
 
 /** git's environment: the allowlist, its PATH kept outside `tree`, the hardened variables. */
-export function untrustedGitEnv(
-  source: (name: string) => string | undefined,
-  tree: string,
-): GitEnv {
+export function untrustedGitEnv(source: EnvSource, tree: string): GitEnv {
   const env: Record<string, string> = {};
   for (const name of ENV_ALLOWLIST) {
     const value = source(name);

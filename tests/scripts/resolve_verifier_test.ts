@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { DELIMITER, join } from "@std/path";
-import { entryUnsafe, gitPath, treeTop } from "../../src/infrastructure/git_path.ts";
+import { entryUnsafe, filterGitPath, treeTop } from "../../src/infrastructure/git_path.ts";
 import { type Answer, answers } from "./resolve_verifier_fixture.ts";
 import { fired, inLayout, type Layout } from "./resolve_verifier_layout.ts";
 
@@ -178,7 +178,7 @@ Deno.test({
         const why = c.entries.map((_, i) => i === c.bad?.[0] ? c.bad[1] : undefined);
         assertEquals(c.entries.map((e) => entryUnsafe(e, top)), why, c.name);
         const kept = c.entries.filter((_, i) => why[i] === undefined).join(DELIMITER);
-        assertEquals(gitPath(c.entries.join(DELIMITER), c.cwd), kept, c.name);
+        assertEquals(filterGitPath(c.entries.join(DELIMITER), c.cwd).kept, kept, c.name);
       }
       return Promise.resolve();
     }),

@@ -4,8 +4,6 @@ import {
   entryUnsafe,
   filterGitPath,
   gitMissing,
-  gitPath,
-  keptEntries,
   spellingUnsafe,
   treeTop,
 } from "../../src/infrastructure/git_path.ts";
@@ -54,11 +52,10 @@ Deno.test("on Windows an entry is absolute only with its drive's root or a share
   for (const [entry, why] of cases) assertEquals(spellingUnsafe(entry, "windows"), why, entry);
 });
 
-Deno.test("the entries are split and joined on the platform's own separator", () => {
-  const unsafe = (entry: string) => spellingUnsafe(entry, "windows");
-  assertEquals(keptEntries("C:\\a;;rel;C:\\b\\..;D:\\c", "windows", unsafe), "C:\\a;D:\\c");
-  const posix = (entry: string) => spellingUnsafe(entry, "darwin");
-  assertEquals(keptEntries("/a::rel:/b/..:/c", "darwin", posix), "/a:/c");
+Deno.test("the entries are split on the platform passed in, whichever runs the test", () => {
+  const empty = { kept: "", dropped: { entry: "", why: "is empty" } };
+  assertEquals(filterGitPath(";rel;C:\\x\\..", Deno.cwd(), "windows"), empty);
+  assertEquals(filterGitPath(":rel:/x/..", Deno.cwd(), "darwin"), empty);
 });
 
 /** A repository with a `bin` folder and a file at its top, a folder outside it, then removed. */
@@ -119,7 +116,8 @@ Deno.test("an entry in the tree, made or not, is unsafe; one beside it or outsid
 Deno.test("the PATH git gets, from a folder of the tree, keeps only what is outside it", () =>
   inTree((tmp, repo) => {
     const path = [join(repo, "bin"), "", join(tmp, "out"), "bin", tmp].join(DELIMITER);
-    assertEquals(gitPath(path, join(repo, "sub")), [join(tmp, "out"), tmp].join(DELIMITER));
+    const kept = [join(tmp, "out"), tmp].join(DELIMITER);
+    assertEquals(filterGitPath(path, join(repo, "sub")).kept, kept);
   }));
 
 Deno.test("the PATH git gets names the first entry it left out, and why", () =>
