@@ -21,7 +21,8 @@ expected them to print.
 ## Steps
 
 1. **The binary is there.** `command -v specnaut`. If it is missing, stop and give the install
-   line: `curl -fsSL https://specnaut.com/install.sh | bash`. Do not install it yourself.
+   line: `curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash`.
+   Do not install it yourself.
 
 2. **The tree is clean.** `git status --porcelain`. If it is not empty, the upgrade still runs,
    but step 7 does not commit — an upgrade folded into unrelated uncommitted work cannot be
