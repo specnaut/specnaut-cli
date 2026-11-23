@@ -73,9 +73,10 @@ Deno.test(
         GIT_CURL_VERBOSE: "1",
         GIT_TRANSFER_TRACE: "1",
         GIT_TRACE2: "1",
+        LFS_DEBUG_HTTP: "1", // cli#828: git-lfs logs its HTTP traffic under it
       };
-      const said =
-        'env | grep -E "^GIT_(TRACE|CURL_VERBOSE|TRANSFER_TRACE)" | sed "s/^/seen: /" >&2';
+      const said = 'env | grep -E "^(GIT_(TRACE|CURL_VERBOSE|TRANSFER_TRACE)|LFS_DEBUG_HTTP)" | ' +
+        'sed "s/^/seen: /" >&2';
       const header = 'echo "> Authorization: Basic v-trace" >&2';
       const fail = `${said}; [ -z "\${GIT_CURL_VERBOSE:-}" ] || ${header}; exit 2`;
       const shim = lfsShim(join(sb.root, "git.log"), "git-lfs/3.0.0", fail);

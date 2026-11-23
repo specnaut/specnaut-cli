@@ -121,13 +121,15 @@ without_http2debug() {
 # Its output is printed redacted, and git's and git-lfs's trace variables are cleared for it
 # (cli#809): GIT_CURL_VERBOSE and GIT_TRACE_CURL print the Authorization header, which no URL
 # redaction sees. Every GIT_TRACE* goes by prefix, so a trace git adds later goes with them.
+# LFS_DEBUG_HTTP makes git-lfs log its HTTP traffic (cli#828); a debug-only switch costs the
+# script's own push nothing, so it goes too.
 # GODEBUG loses its http2debug entries (cli#812): git-lfs's HTTP/2 transport (golang.org/x/net)
 # logs every header it sends, Authorization included, when GODEBUG holds `http2debug=1` or `=2`
 # anywhere - a substring test, so an entry merely containing it counts. Seen with git-lfs 3.8.0.
 push_objects() {
   local out
   if ! out=$(
-    unset "${!GIT_TRACE@}" GIT_CURL_VERBOSE GIT_TRANSFER_TRACE
+    unset "${!GIT_TRACE@}" GIT_CURL_VERBOSE GIT_TRANSFER_TRACE LFS_DEBUG_HTTP
     [ -z "${GODEBUG+set}" ] || GODEBUG=$(without_http2debug "$GODEBUG")
     GIT_TERMINAL_PROMPT=0 git -c lfs.allowincompletepush=false lfs push origin "$c" 2>&1
   ); then
