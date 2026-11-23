@@ -7,6 +7,7 @@ import { type CoreEntry, skillDocName } from "../../../src/domain/core_bundle.ts
 import { isSkillDoc } from "../../../src/infrastructure/harness/skill_folder.ts";
 import type { Harness } from "../../../src/application/ports.ts";
 import { routers } from "../../templates/verb_table.ts";
+import { TASK_PHASES } from "../../../src/domain/task_phases.ts";
 
 /**
  * `init`'s "Next steps" told every user to type the Claude commands.
@@ -78,11 +79,21 @@ Deno.test("every skill document's command locates the file the harness emits", (
       checked++;
     }
   }
-  // Non-vacuity: 5 invocable harnesses × 32 sub-documents — `specnaut`'s 4 phases, 20 `task`
-  // phase and contract docs, 5 `task` backlog docs, 2 `ship` phases, `specnaut-facts`'s
-  // integrations. A derivation that silently returned nothing would otherwise report green
-  // having asserted nothing at all.
-  assertEquals(checked, 160, "the sweep did not cover every harness × sub-document");
+  // Non-vacuity: every invocable harness × every sub-document the bundle ships, each of the
+  // `task` phase and contract docs (`TASK_PHASES`, a list kept apart from the bundle) among them.
+  // A derivation that silently returned nothing would otherwise report green having asserted
+  // nothing at all; derived, a document added to the bundle needs no edit here.
+  const docs = CORE_BUNDLE.filter((e) => isSkillDoc(e.category));
+  const invocable = HARNESSES.filter((h) => harnessCommands(h.key as KnownHarness).invocable);
+  for (const name of TASK_PHASES) {
+    assert(docs.some((e) => e.name === "task" && skillDocName(e) === name), `no task doc ${name}`);
+  }
+  assert(invocable.length > 0, "no invocable harness: the sweep checked nothing");
+  assertEquals(
+    checked,
+    invocable.length * docs.length,
+    "the sweep did not cover every harness × sub-document",
+  );
 });
 
 Deno.test("every top-level skill's command locates the folder the harness emits", () => {

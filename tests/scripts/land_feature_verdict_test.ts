@@ -10,6 +10,8 @@ import { specnautOnPath } from "./specnaut_shim.ts";
  */
 
 const DIGEST = `INSTRUCTIONS_DIGEST ${"0".repeat(64)}`;
+/** A base tip in the one form the verifier prints it: a full commit sha. */
+const TIP = `BASE_TIP ${"c".repeat(40)}`;
 
 async function featureBranch(): Promise<Sandbox> {
   const sb = await sandbox();
@@ -63,19 +65,25 @@ async function baseNamed(sb: Sandbox, name: string) {
 const TRUSTED = ["VERDICT instructions trusted", "VERDICT scripts trusted"];
 
 Deno.test("a verdict measured from another base is no verdict: 13", async () => {
-  await refused(["BASE_BRANCH develop", DIGEST, ...TRUSTED], "could not judge");
+  await refused(["BASE_BRANCH develop", TIP, DIGEST, ...TRUSTED], "could not judge");
 });
 
 Deno.test("the base's name is matched as written, never as a pattern", async () => {
-  await refused(["BASE_BRANCH relx1", DIGEST, ...TRUSTED], "could not judge", 0, "rel.1");
+  await refused(["BASE_BRANCH relx1", TIP, DIGEST, ...TRUSTED], "could not judge", 0, "rel.1");
 });
 
 Deno.test("a verifier that could not run is 13, even printing a digest", async () => {
-  await refused(["BASE_BRANCH main", DIGEST, ...TRUSTED], "could not judge", 3);
+  await refused(["BASE_BRANCH main", TIP, DIGEST, ...TRUSTED], "could not judge", 3);
 });
 
 Deno.test("a verdict with no digest line is 13", async () => {
-  await refused(["BASE_BRANCH main", ...TRUSTED], "could not judge");
+  await refused(["BASE_BRANCH main", TIP, ...TRUSTED], "could not judge");
+});
+
+Deno.test("a base tip that is not one full commit sha is 13", async () => {
+  for (const tips of [["BASE_TIP ccccccc"], [TIP, TIP], ["BASE_TIP --help"], []]) {
+    await refused(["BASE_BRANCH main", ...tips, DIGEST, ...TRUSTED], "could not judge");
+  }
 });
 
 Deno.test("a failure inside the verdict's reading is 12, named, never a raw exit", async () => {
@@ -85,7 +93,8 @@ Deno.test("a failure inside the verdict's reading is 12, named, never a raw exit
     // A names file `rm -f` cannot remove: a folder.
     const folder = join(sb.root, "names-folder");
     await Deno.mkdir(folder);
-    const r = await landWith(sb, ["BASE_BRANCH main", `NAMES_FILE ${folder}`, DIGEST, ...TRUSTED]);
+    const lines = ["BASE_BRANCH main", TIP, `NAMES_FILE ${folder}`, DIGEST, ...TRUSTED];
+    const r = await landWith(sb, lines);
     assertEquals(r.code, 12, r.stderr);
     assertStringIncludes(r.stderr, "nothing was pushed");
     assertEquals(await git(sb.remote, "rev-parse", "main"), before);
@@ -100,6 +109,7 @@ const B = "b".repeat(64);
 /** The lines of a run that judged HEAD for main, with `extra` before the last one. */
 const judged = (extra: string[], last = "VERDICT scripts untrusted") => [
   "BASE_BRANCH main",
+  TIP,
   DIGEST,
   ...extra,
   last,
