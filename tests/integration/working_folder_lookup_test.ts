@@ -65,3 +65,40 @@ Deno.test("the git an unvetted read starts is the absolute path the kept entries
     assertEquals(untrustedGitEnv(source, repo).git, join(outside, file));
     await Deno.remove(join(outside, file));
   }));
+
+/** A program that prints the file it was started as, `$0`, and succeeds. */
+async function startedAs(dir: string, name: string): Promise<string> {
+  const file = join(dir, name);
+  await Deno.writeTextFile(file, `#!/bin/sh\nprintf '%s' "$0"\n`, { mode: 0o755 });
+  return file;
+}
+
+/**
+ * The 127 above reads the same whether the lookup found nothing or the spawn did, and outside
+ * Windows the spawn never looks in the working folder: those cases cannot fail there. With a
+ * program on the kept entry that prints the file it ran as, a lookup that finds nothing, or
+ * finds another file, fails on every platform. Windows' planted program is `whoami.exe`, which
+ * prints no such thing; the cases above are its proof.
+ */
+const POSIX = { ignore: Deno.build.os === "windows" };
+
+Deno.test({
+  ...POSIX,
+  name: "the runner starts the gh the kept entry holds, never the working folder's",
+  fn: () =>
+    plantedIn("gh", async ({ repo, outside }) => {
+      const gh = await startedAs(outside, "gh");
+      const out = await new DenoSubprocessRunner().run("gh", ["--version"], { cwd: repo });
+      assertEquals(out, { code: 0, stdout: gh, stderr: "" });
+    }),
+});
+
+Deno.test({
+  ...POSIX,
+  name: "init's reads start the git the kept entry holds, never the project's",
+  fn: () =>
+    plantedIn("git", async ({ repo, outside }) => {
+      const git = await startedAs(outside, "git");
+      assertEquals(await new DenoGit(repo).getRemoteUrl(repo, "origin"), git);
+    }),
+});
