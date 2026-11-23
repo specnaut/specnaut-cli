@@ -82,7 +82,9 @@ export async function shippedReasons(
  * no longer does, its entry dropped or its harness switched so the bundle stops mapping it. Once
  * that lock lands, the base vouches for the skill as an ordinary file and never asks about it as a
  * shipped one again; so it is judged here, against the copy shipped (the tip's, else the merge
- * base's), and no approval holds it: this is the last merge at which it is a shipped skill.
+ * base's), and no approval holds it: this is the last merge at which it is a shipped skill. The
+ * leaving set is compared folded to lower case, so an approval recorded at the path in another
+ * letter case, its twin on a case-blind disk, is dropped with it.
  */
 export function leavingCopies(
   tip: ReadonlyMap<string, ShippedCopy>,
@@ -90,13 +92,19 @@ export function leavingCopies(
   head: ReadonlySet<string>,
 ): Map<string, ShippedCopy> {
   const out = new Map(tip);
+  const leaving = new Set<string>();
   for (const [path, old] of mergeBase) {
     if (head.has(path)) continue;
-    const { approvedSha256: _, ...copy } = tip.get(path) ?? old;
-    out.set(path, copy);
+    out.set(path, unapproved(tip.get(path) ?? old));
+    leaving.add(path.toLowerCase());
+  }
+  for (const [path, copy] of out) {
+    if (leaving.has(path.toLowerCase())) out.set(path, unapproved(copy));
   }
   return out;
 }
+
+const unapproved = ({ approvedSha256: _, ...copy }: ShippedCopy): ShippedCopy => copy;
 
 /** Whether `bytes` are a copy Specnaut ships: the bundled one, or the one the lock records. */
 export async function isShippedCopy(bytes: Uint8Array, copy: ShippedCopy): Promise<boolean> {

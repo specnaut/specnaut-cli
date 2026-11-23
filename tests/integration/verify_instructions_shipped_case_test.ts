@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import { SHIPPED_REASON } from "../../src/domain/shipped_skills.ts";
 import { APPROVALS_FILE } from "../../src/domain/skill_approvals.ts";
-import { bundled, fixture } from "./verify_scripts_fixture.ts";
+import { bundled, commitAll, fixture, write } from "./verify_scripts_fixture.ts";
 import { base, lines } from "./verify_instructions_fixture.ts";
 
 /**
@@ -30,4 +30,13 @@ Deno.test("a renamed copy the base holds is trusted once an approval names its o
   const files = { ...base(), [TWIN]: MINE, [APPROVALS_FILE]: await approving(TWIN) };
   const { root } = await fixture({ files });
   assertEquals(await lines(root), ["VERDICT instructions trusted"]);
+});
+
+Deno.test("an approval at a renamed path holds nothing once its shipped twin leaves the lock", async () => {
+  const files = { ...base(), [TWIN]: MINE, [APPROVALS_FILE]: await approving(TWIN) };
+  const { root } = await fixture({ files });
+  const lock = ".specnaut/installed.lock";
+  await write(root, { [lock]: base()[lock].replace("harness: claude", "harness: codex") });
+  await commitAll(root, "switch the harness");
+  assertEquals(await lines(root), [NAMED]);
 });

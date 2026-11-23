@@ -123,3 +123,11 @@ Deno.test("a skill path the merge base ships and HEAD's lock does not is judged,
   assertEquals(out, new Map([[SKILL, { bytes: enc("ship") }], [kept, mine], [gone, old]]));
   assertEquals(leavingCopies(tip, new Map(), new Set()), tip, "no lock at the merge base");
 });
+
+Deno.test("an approval at a case-renamed path is dropped when its shipped twin leaves the lock", () => {
+  const twin: ShippedCopy = { bytes: enc("ship"), approvedSha256: "a".repeat(64) };
+  const tip = new Map([[SKILL, { bytes: enc("ship") }], [TWIN, twin]]);
+  const out = leavingCopies(tip, new Map([[SKILL, {}]]), new Set());
+  assertEquals(out.get(TWIN), { bytes: enc("ship") });
+  assertEquals(leavingCopies(tip, new Map([[SKILL, {}]]), new Set([SKILL])).get(TWIN), twin);
+});
