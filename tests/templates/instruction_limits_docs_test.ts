@@ -88,7 +88,9 @@ Deno.test("the row names each PowerShell PATH form it reads, and each it does no
   assert(row.includes("a string PowerShell reads otherwise than its words do (`'to''ols'`"), row);
   assert(row.includes("or not ended by its `-join ';'`"), row);
   const limits = notRead();
-  assert(limits.includes("assignment spelled across quotes a shell joins (`'$env:Path'' = …'`)"));
+  assert(row.includes("assignment spelled across quotes a shell joins (`'$env:Path'' = …'`)"), row);
+  assert(row.includes("is read from its words, its value held to the same rules"), row);
+  assert(limits.includes("a path built at run time for `cp`, `mv`, `cd` or `pushd`"), limits);
   assert(limits.includes("reflection through none of those primitives"), limits);
 });
 
@@ -99,7 +101,10 @@ Deno.test("the row names the PowerShell forms that set PATH no value is read fro
     row,
   );
   assert(row.includes("or the `Environment` provider, makes a drive (`New-PSDrive`, `ndr`"), row);
-  assert(row.includes("builds a drive's name from parts (`'en' + 'v:Path'`"), row);
+  assert(row.includes("hands an item cmdlet (`Set-Item`, `New-Item`, `Set-Content`"), row);
+  assert(row.includes('a path that is not a constant (`si "E$()nv$([char]58)Pa$()th"`'), row);
+  assert(row.includes("a `+`, a path from the pipeline)"), row);
+  assert(row.includes("`&` before a `(`, a quote or a `$`, a `.` before a `$`"), row);
   assert(row.includes("assigns `$env:Path` in a list or with `??=`"), row);
   assert(row.includes("builds code or a member at run time (`Invoke-Expression`"), row);
   assert(row.includes("hands `pwsh` or `powershell` an encoded command"), row);
