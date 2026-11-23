@@ -5,6 +5,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { type Case, CORPUS } from "./gate_impact_corpus.ts";
+import { ESCAPED } from "./gate_impact_corpus_escape.ts";
 import { impactRepo, labelled, type Report } from "./gate_impact_fixture.ts";
 import { type Twin, TWINS } from "./run_gate_fixture.ts";
 
@@ -75,6 +76,18 @@ Deno.test({
 
 Deno.test("gate impact: every case of the corpus has a name of its own", () => {
   assertEquals(new Set(CORPUS.map((c) => c.name)).size, CORPUS.length);
+});
+
+// A raw lone surrogate would reach the file as U+FFFD, a string that decodes: the case would test
+// nothing. Each fixture must hold the escape as its six ASCII bytes, and no byte above ASCII.
+Deno.test("gate impact: each lone surrogate fixture holds the escape as ASCII bytes", () => {
+  const escape = ",92,117,100,56,48,48,"; // \ u d 8 0 0
+  assertEquals(ESCAPED.length, 6);
+  for (const text of ESCAPED) {
+    const bytes = new TextEncoder().encode(text);
+    assert(bytes.every((b) => b < 0x80), text);
+    assert(`,${bytes.join(",")},`.includes(escape), text);
+  }
 });
 
 for (const c of CORPUS) {

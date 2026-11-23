@@ -5,7 +5,7 @@ import { declaration, OWNERS, type Repo } from "./gate_impact_fixture.ts";
 // FR-009), runs the full tier and names itself. Each adapter here is invented, and each
 // is `tools/bad.sh`, written per case by the test.
 
-const malformed = (name: string, text: unknown, problem: string): Case => ({
+export const malformed = (name: string, text: unknown, problem: string): Case => ({
   name: `a malformed declaration widens: ${name}`,
   repo: { declaration: typeof text === "string" ? text : JSON.stringify(text) },
   build: change("apps/web/a.ts"),
@@ -97,7 +97,7 @@ const SNAPSHOT = (over: string) =>
   }${over}}`;
 
 /** A repository whose adapter is this script body, unchanged on the branch. */
-const adapterCase = (name: string, body: string, cause: string): Case => ({
+export const adapterCase = (name: string, body: string, cause: string): Case => ({
   name: `an adapter widens: ${name}`,
   repo: {
     declaration: JSON.stringify(declaration({
@@ -112,7 +112,7 @@ const adapterCase = (name: string, body: string, cause: string): Case => ({
   marks: FULL_MARKS,
 });
 
-const out = (json: string) => `cat >"$SPECNAUT_IMPACT_OUT" <<JSON\n${json}\nJSON`;
+export const out = (json: string) => `cat >"$SPECNAUT_IMPACT_OUT" <<JSON\n${json}\nJSON`;
 
 const owners = (list: unknown) =>
   out(

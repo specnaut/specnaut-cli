@@ -6,6 +6,10 @@
 # A function here reports what is wrong; whether that widens the run is gate-impact's
 # call, not this file's. Every catch below turns a parse failure into that named
 # report, which is how it reaches the run's `fallback:` line.
+#
+# A string holding a lone surrogate escape parses here, and throws only when GetString()
+# reads it; jq refuses the whole file at parse. So each reader's one try spans every
+# GetString() it reaches, the predicates' included, and the twins name the same widening.
 
 $script:GateOwnerId = '\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\z'
 # A path holding a code point outside printable ASCII, `~` and a digit, or `:`, or a name ending
@@ -88,12 +92,26 @@ function Get-DeclarationProblem($Root) {
 
 # Reads and validates a declaration. Returns @{ Problem } or the normalized form.
 function Read-GateDeclaration([string]$File) {
-    try { $root = Read-JsonRoot $File } catch { return @{ Problem = 'not-json' } }
-    $problem = Get-DeclarationProblem $root
-    if ($problem.Length -gt 0) { return @{ Problem = $problem } }
-    $adapter = Get-JsonProperty $root 'adapter'
+    try {
+        $root = Read-JsonRoot $File
+        $problem = Get-DeclarationProblem $root
+        if ($problem.Length -gt 0) { return @{ Problem = $problem } }
+        $adapter = Get-JsonProperty $root 'adapter'
+        return @{
+            Problem        = ''
+            AdapterCommand = (Get-JsonProperty $adapter 'command').GetString()
+            AdapterFiles   = Get-JsonStrings (Get-JsonProperty $adapter 'files')
+            ScopedTiers    = Get-JsonStrings (Get-JsonProperty $root 'scoped_tiers')
+            FullOn         = Get-JsonStrings (Get-JsonProperty $root 'full_on')
+            Inert          = Get-JsonStrings (Get-JsonProperty $root 'inert')
+            Checks         = Get-DeclaredChecks $root
+        }
+    } catch { return @{ Problem = 'not-json' } }
+}
+
+function Get-DeclaredChecks($Root) {
     $checks = [System.Collections.Generic.List[object]]::new()
-    foreach ($check in (Get-JsonProperty $root 'checks').EnumerateArray()) {
+    foreach ($check in (Get-JsonProperty $Root 'checks').EnumerateArray()) {
         $owners = Get-JsonProperty $check 'owners'
         $named = $null -ne $owners -and (Test-JsonKind $owners 'Array')
         $checks.Add(@{
@@ -102,15 +120,7 @@ function Read-GateDeclaration([string]$File) {
                 Owners = if ($named) { Get-JsonStrings $owners } else { $null }
             })
     }
-    return @{
-        Problem        = ''
-        AdapterCommand = (Get-JsonProperty $adapter 'command').GetString()
-        AdapterFiles   = Get-JsonStrings (Get-JsonProperty $adapter 'files')
-        ScopedTiers    = Get-JsonStrings (Get-JsonProperty $root 'scoped_tiers')
-        FullOn         = Get-JsonStrings (Get-JsonProperty $root 'full_on')
-        Inert          = Get-JsonStrings (Get-JsonProperty $root 'inert')
-        Checks         = $checks
-    }
+    return , $checks
 }
 
 # An owner a check names that no snapshot holds, or $null. A check that can never match
@@ -156,14 +166,16 @@ function Get-SnapshotProblem($Root, [string]$Commit) {
 # Reads and validates an adapter's output. Returns @{ Problem } or @{ Owners }, a map
 # from id to its sorted roots and dependencies, compared as text by the graph.
 function Read-GateSnapshot([string]$File, [string]$Commit) {
-    try { $root = Read-JsonRoot $File } catch { return @{ Problem = 'invalid-json' } }
-    $problem = Get-SnapshotProblem $root $Commit
-    if ($problem.Length -gt 0) { return @{ Problem = $problem } }
-    $owners = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
-    foreach ($owner in (Get-JsonProperty $root 'owners').EnumerateArray()) {
-        $roots = Get-SortedUnique (Get-JsonProperty $owner 'roots')
-        $deps = Get-SortedUnique (Get-JsonProperty $owner 'depends_on')
-        $owners[(Get-JsonProperty $owner 'id').GetString()] = @{ Roots = $roots; DependsOn = $deps; Record = ($roots -join "`0") + "`u{1}" + ($deps -join "`0") }
-    }
-    return @{ Problem = ''; Owners = $owners }
+    try {
+        $root = Read-JsonRoot $File
+        $problem = Get-SnapshotProblem $root $Commit
+        if ($problem.Length -gt 0) { return @{ Problem = $problem } }
+        $owners = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+        foreach ($owner in (Get-JsonProperty $root 'owners').EnumerateArray()) {
+            $roots = Get-SortedUnique (Get-JsonProperty $owner 'roots')
+            $deps = Get-SortedUnique (Get-JsonProperty $owner 'depends_on')
+            $owners[(Get-JsonProperty $owner 'id').GetString()] = @{ Roots = $roots; DependsOn = $deps; Record = ($roots -join "`0") + "`u{1}" + ($deps -join "`0") }
+        }
+        return @{ Problem = ''; Owners = $owners }
+    } catch { return @{ Problem = 'invalid-json' } }
 }

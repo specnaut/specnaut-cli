@@ -2,6 +2,7 @@ import type { Case } from "./gate_impact_case.ts";
 import { BASES } from "./gate_impact_corpus_base.ts";
 import { CAUSES } from "./gate_impact_corpus_causes.ts";
 import { CHECKOUT } from "./gate_impact_corpus_checkout.ts";
+import { ESCAPES } from "./gate_impact_corpus_escape.ts";
 import { FOLDING } from "./gate_impact_corpus_fold.ts";
 import { SELECTION } from "./gate_impact_corpus_select.ts";
 import { WIDENING } from "./gate_impact_corpus_widen.ts";
@@ -13,6 +14,7 @@ export const CORPUS: Case[] = [
   ...WIDENING,
   ...BASES,
   ...CAUSES,
+  ...ESCAPES,
   ...CHECKOUT,
   ...FOLDING,
   ...WIN32,
