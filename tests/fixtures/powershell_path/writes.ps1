@@ -160,7 +160,12 @@ function Add-ShellWrites($elements, [int] $depth, $writes) {
         $next = $elements[$i + 1]
         if ($next -isnot [StringConstantExpressionAst]) { continue }
         if ($option -eq '') { continue }
-        if ('command'.StartsWith($option, 'OrdinalIgnoreCase')) { Add-CodeWrites $next.Value $depth $writes }
+        if ('command'.StartsWith($option, 'OrdinalIgnoreCase')) {
+            # pwsh runs every argument after -Command, joined with blanks, as one command.
+            $rest = @($elements | Select-Object -Skip ($i + 1))
+            if ($rest | Where-Object { $_ -isnot [StringConstantExpressionAst] }) { $writes.Add($null) }
+            else { Add-CodeWrites (($rest | ForEach-Object Value) -join ' ') $depth $writes }
+        }
         if ($option -eq 'ec' -or 'encodedcommand'.StartsWith($option, 'OrdinalIgnoreCase')) {
             # An option PowerShell cannot decode hands it no code the oracle can read: unknown.
             try { $bytes = [Convert]::FromBase64String($next.Value) }

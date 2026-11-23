@@ -14,7 +14,7 @@ import { commandPaths } from "../../src/domain/command_targets.ts";
 
 const FIXTURES = fromFileUrl(new URL("../fixtures/powershell_path/", import.meta.url));
 /** How many lines of the corpus write PATH, as PowerShell's parser reads them. */
-const WRITING_LINES = 69;
+const WRITING_LINES = 70;
 
 /**
  * A line or a variant of it: its corpus line, how it was varied (`base` for none), its text, its

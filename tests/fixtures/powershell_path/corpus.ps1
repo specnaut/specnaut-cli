@@ -72,3 +72,4 @@ Path
 '@ x
 cd ("en"+"v:"); si .\.\Path x
 pwsh -c '$env:Path = '"(gi evil).FullName + ';' + "'$env:Path; lint'
+pwsh -c '$env:Path = "tools;"' '+(gi evil).FullName'

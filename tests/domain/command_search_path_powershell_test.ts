@@ -28,11 +28,8 @@ function targets(found: ReturnType<typeof span>): string[] {
 Deno.test("each spelling of a PowerShell PATH set or appended to puts `tools` on PATH", () => {
   const spellings = [
     "$env:Path = $env:Path + ';tools'; lint",
-    "$env:Path+=';tools'; lint",
     "$env:Path += ';' + 'tools'; lint",
     "$env:Path +=';tools'; lint",
-    "$env:Path= 'tools;' + $env:Path; lint",
-    "$env:Path+= ';tools'; lint",
     "${env:Path} += ';tools'; lint",
     "$env:path += ';tools'; lint",
   ];

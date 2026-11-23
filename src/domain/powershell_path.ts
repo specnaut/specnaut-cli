@@ -64,20 +64,33 @@ function spelledOnlyAsRead(read: PsText): boolean {
  * split into words takes off the quotes and the brackets that say how the value is built. The value
  * ends at `;`, a comment's `#` or a line's end outside quotes; a `|` or an `&` before it is in the
  * value, which a pipeline or a call builds. `+=` is read as `$env:Path +`. A value with no item is
- * not read whole: PowerShell reads it on the next line (`$env:Path =⏎…`). An assignment inside a
- * quoted string is code a command nested in it runs (`pwsh -c "$env:Path = (…)"`): its value ends
- * with that string, as the shell that runs it joins what follows from other words.
+ * not read whole: PowerShell reads it on the next line (`$env:Path =⏎…`).
  */
-export function buildsPathUnread(text: string): boolean {
+export const buildsPathUnread = (text: string): boolean => readPathValues(text).unread;
+
+/**
+ * What the reading of `buildsPathUnread` read in `text`: whether a value is not read whole, and the
+ * text of each assignment it read, from its `$env:Path` to its value's end. An assignment inside a
+ * quoted string is code a command nested in it runs (`pwsh -c "$env:Path = …"`): its value ends
+ * with that string, and goes on, not read whole, when an argument follows that string, which the
+ * shell running the command joins to it (`pwsh -c '$env:Path = "x;"' '+(gi y)'`).
+ */
+function readPathValues(text: string): { unread: boolean; read: string[] } {
   const spans = text.includes("$") ? quotedSpans(text) : [];
+  const read: string[] = [];
   for (const set of text.matchAll(PS_PATH_SET)) {
     const span = spans.find(([open, close]) => open < set.index && set.index < close);
-    const within = span ? text.slice(0, contentEnd(text, span[1])) : text;
-    const [items] = valueItems(within, set.index + set[0].length);
+    const bound = span ? contentEnd(text, span[1]) : text.length;
+    const [items, end] = valueItems(text.slice(0, bound), set.index + set[0].length);
     const appended = set[0].endsWith("+=") ? ["$env:Path", "+"] : [];
-    if (items.length === 0 || !readableValue([...appended, ...items])) return true;
+    const goesOn = span !== undefined && end === bound &&
+      !/^[^\S\r\n]*(?:$|[;|&\r\n)}#])/.test(text.slice(span[1]));
+    if (goesOn || items.length === 0 || !readableValue([...appended, ...items])) {
+      return { unread: true, read };
+    }
+    read.push(text.slice(set.index, end));
   }
-  return false;
+  return { unread: false, read };
 }
 
 /** Where the content of a quoted string ending at `close` ends: before its closing quote. */
@@ -89,16 +102,19 @@ function contentEnd(text: string, close: number): number {
 
 /**
  * Whether a word a shell splits a command into assigns PowerShell's PATH a value no reading gives
- * whole (`buildsPathUnread`). Every such word is read so, but one the strings as written hold
- * verbatim from its assignment to its value's end, which their own reading reads: the split takes
- * off the quotes such a value is read by (`$env:Path+=';x'` is `$env:Path+=;x`). Past
+ * whole (`buildsPathUnread`). Every such word is read so, but one whose every assignment, from its
+ * `$env:Path` to its value's end, is exactly one the strings' own reading read (`readPathValues`):
+ * the split takes off the quotes such a value is read by (`$env:Path+=';x'` is `$env:Path+=;x`). The
+ * same text elsewhere in the strings, which their reading may end sooner, exempts nothing. Past
  * {@link MAX_SETTING_WORDS} such words the reading is not whole.
  */
 export function joinedPathUnread(strings: readonly string[], words: readonly string[]): boolean {
   const setting = [...new Set(words.filter((w) => w.match(PS_PATH_SET) !== null))];
   if (setting.length > MAX_SETTING_WORDS) return true;
+  if (setting.length === 0) return false;
+  const read = new Set(strings.flatMap((s) => readPathValues(s).read));
   const written = (word: string, at: number, from: number) =>
-    strings.some((s) => s.includes(word.slice(at, valueItems(word, from)[1])));
+    read.has(word.slice(at, valueItems(word, from)[1]));
   return setting.some((word) =>
     [...word.matchAll(PS_PATH_SET)].some((m) => !written(word, m.index, m.index + m[0].length)) &&
     buildsPathUnread(word)

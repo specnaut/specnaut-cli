@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { commandPaths } from "../../src/domain/command_targets.ts";
+import { joinedPathUnread } from "../../src/domain/powershell_path.ts";
 
 /**
  * The PowerShell paths, commands and assignments built where a list of spellings cannot follow: a
@@ -79,9 +80,17 @@ Deno.test("an encoded command the shell's own split hands PowerShell is not read
 });
 
 Deno.test("an assignment spelled across shell quotes is held to the value's rules", () => {
-  // A shell's split hands PowerShell `$env:PATH=tools;…`: quotes glued to the value are taken off.
+  // A shell's split hands PowerShell `$env:PATH=tools;…` or `$env:Path+=;tools`: a value cut short
+  // of what the string's own reading read, which the shell may join to the words after it.
   assertEquals(
-    unread(['$env:PATH="tools;$env:Path"; lint', "${ENV:PATH}='tools;' + ${env:Path}"]),
+    unread([
+      '$env:PATH="tools;$env:Path"; lint',
+      "${ENV:PATH}='tools;' + ${env:Path}",
+      "$env:Path+=';tools'; lint",
+      "$env:Path= 'tools;' + $env:Path; lint",
+      "$env:Path+= ';tools'; lint",
+      "pwsh -c $env:Path= 'tools;' '+(gi evil)'",
+    ]),
     [],
   );
   assertEquals(
@@ -95,4 +104,43 @@ Deno.test("an assignment spelled across shell quotes is held to the value's rule
     ]),
     [],
   );
+});
+
+Deno.test("a word is read from the strings only where their reading read that very assignment", () => {
+  // The decoy holds the word's text, but its own reading ends the value at the `”` that closes it.
+  const decoy = "\u201C$env:Path = 'tools;'\u201D +(gi evil)";
+  const word = "$env:Path = 'tools;'\u201D +(gi evil)";
+  assertEquals(joinedPathUnread([decoy], [word]), true);
+  const command = 'pwsh -c "\\$env:Pa""th = \'tools;\'\u201D +(gi evil)"';
+  const both = {
+    hooks: { Stop: [{ hooks: [{ type: "command", command, statusMessage: decoy }] }] },
+  };
+  const found = commandPaths(
+    ".claude/settings.json",
+    new TextEncoder().encode(JSON.stringify(both)),
+    none,
+  );
+  assertEquals(found.whole, false);
+});
+
+Deno.test("a value a quoted argument ends goes on in the arguments the shell joins to it", () => {
+  assertEquals(unread(["pwsh -c '$env:Path = \"tools;\"' '+(gi evil).FullName'"]), []);
+  assertEquals(
+    ["pwsh -c '$env:Path += \";tools\"'; lint", "pwsh -c '$env:Path += \";tools\"' | x"].filter((
+      c,
+    ) => !whole(c)),
+    [],
+  );
+});
+
+Deno.test("a folder holding a blank reaches PATH as one folder", () => {
+  for (
+    const command of [
+      "pwsh -c \"$env:Path = 'a b;' + $env:Path; lint\"",
+      "$env:Path = 'a b;' + $env:Path",
+    ]
+  ) {
+    const found = commandPaths(".claude/settings.json", hook(command), none);
+    assertEquals(found.onPath.includes("a b"), true, command);
+  }
 });
