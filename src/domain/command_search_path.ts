@@ -58,9 +58,10 @@ function pathWordValue(word: string): PathValue | undefined {
  * through the `env:` drive (`Set-Item env:Path`, `New-Item`, `Set-Content`, an alias) or .NET's
  * `[Environment]::SetEnvironmentVariable('Path', …)`; a value holding a `(` (`(Resolve-Path
  * tools).Path`, `(Join-Path $PWD 'tools')`), a `$(…)`, a bare name, a pipeline (`|`) or a call
- * (`&`), which a cmdlet or a command builds; parts joined other than at a `;` (`'./to' + 'ols'`,
- * `$env:Path + 'tools'`, `-join ''`) or by another operator (`-replace`, `-f`); a list holding
- * anything but a quoted string with no variable but PATH, or PATH itself.
+ * (`&`), which a cmdlet or a command builds; a variable other than PATH (`"$t;$env:Path"`), which
+ * a line before may set to anything; a typographic quote (`’`, `”`), where PowerShell closes a
+ * string; no item before the line's end (`$env:Path =⏎…`); parts joined other than at a `;`
+ * (`'./to' + 'ols'`, `$env:Path + 'tools'`, `-join ''`) or by another operator (`-replace`, `-f`).
  * Not read at all: an assignment spelled across quotes a shell joins (`'$env:Path'' = …'`), whose
  * value is read from its words alone, as the string searched for it does not spell it.
  */

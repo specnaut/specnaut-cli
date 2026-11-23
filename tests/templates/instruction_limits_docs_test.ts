@@ -80,6 +80,8 @@ Deno.test("the row names each PowerShell PATH form it reads, and each it does no
   assert(row.includes("quoted strings and `$env:Path` joined at a `;` (`$env:Path += ';'"), row);
   assert(row.includes("a pipeline (`|`) or a call (`&`), parts joined other than at a `;`"), row);
   assert(row.includes("or by another operator (`-replace`, `-f`)"), row);
+  assert(row.includes('a variable other than `$env:Path` (`"$t;$env:Path"`)'), row);
+  assert(row.includes("a typographic quote (`’`, `”`), no item before the line's end"), row);
   const limits = notRead();
   assert(limits.includes("assignment spelled across quotes a shell joins (`'$env:Path'' = …'`)"));
 });

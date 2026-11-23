@@ -63,12 +63,14 @@ const END = /^[;#\r\n]$/;
  * split into words takes off the quotes and the brackets that say how the value is built, and an
  * assignment in a command nested in quotes (`pwsh -c "$env:Path = (…)"`) is in the string as
  * written. The value ends at `;`, a comment's `#` or a line's end outside quotes; a `|` or an `&`
- * before it is in the value, which a pipeline or a call builds. `+=` is read as `$env:Path +`.
+ * before it is in the value, which a pipeline or a call builds. `+=` is read as `$env:Path +`. A
+ * value with no item is not read whole: PowerShell reads it on the next line (`$env:Path =⏎…`).
  */
 export function buildsPathUnread(text: string): boolean {
   for (const set of text.matchAll(PS_PATH_SET)) {
+    const items = valueItems(text, set.index + set[0].length);
     const appended = set[0].endsWith("+=") ? ["$env:Path", "+"] : [];
-    if (!readableValue([...appended, ...valueItems(text, set.index + set[0].length)])) return true;
+    if (items.length === 0 || !readableValue([...appended, ...items])) return true;
   }
   return false;
 }
@@ -87,12 +89,11 @@ function valueItems(text: string, from: number): string[] {
 /**
  * Whether the words of a PATH value give it whole: each item read as written (`readableItem`), and
  * each operator joining its parts at a `;` (`joinsAtSemicolon`), as the words are read as folders
- * one by one. A list (`@('tools', $env:Path)`, `'tools', $env:Path`) is held to its elements.
+ * one by one; a list (`@('tools', $env:Path)`, `'tools', $env:Path`) is read element by element.
  */
 function readableValue(value: readonly string[]): boolean {
-  const list = value.some((item) => item === "," || item === "@(");
   return value.every((item, at) =>
-    OPERATOR.test(item) ? joinsAtSemicolon(value, at) : readableItem(item, list)
+    OPERATOR.test(item) ? joinsAtSemicolon(value, at) : readableItem(item)
   );
 }
 
@@ -116,17 +117,19 @@ const inside = (item = ""): string =>
   /^['"]/.test(item) ? item.slice(1).replace(new RegExp(`${item[0]}$`), "") : "";
 
 /**
- * Whether one item of a PATH value is read as written. A quoted string, unless a `$(…)` in it runs
- * a command; PowerShell's PATH; a variable; a list's `@(`, `,` or `)`. In a list only a string
- * holding no variable but PATH, and PATH itself, are elements read as written. Any other item
- * builds the value from what only running it gives: a `(`, a `$(…)`, a bare name, which runs a
- * command, a `|` or an `&`.
+ * Whether one item of a PATH value is read as written: PowerShell's PATH, a list's `@(`, `,` or
+ * `)`, a `'…'` string, or a `"…"` string holding no `$` but PATH's. Any other item builds the value
+ * from what only running it gives: a `(`, a `$(…)`, a bare name, which runs a command, a `|` or an
+ * `&`, and a variable other than PATH (`$t`, `"${t};…"`), which a line before may have set to
+ * anything (`$t = (Resolve-Path tools).Path`). A typographic quote is never read as written:
+ * PowerShell closes a `'…'` at `‘’‚‛` and a `"…"` at `“”„`, where the items here see none.
  */
-function readableItem(item: string, list: boolean): boolean {
+function readableItem(item: string): boolean {
+  if (TYPOGRAPHIC_QUOTE.test(item)) return false;
   if (/^(?:[,)]|@\()$/.test(item) || IS_PS_PATH.test(item)) return true;
   if (item.startsWith("'")) return true;
-  if (item.startsWith('"')) {
-    return !item.includes("$(") && !(list && item.replace(EVERY_PS_PATH, "").includes("$"));
-  }
-  return !list && item.startsWith("$") && item !== "$";
+  return item.startsWith('"') && !item.replace(EVERY_PS_PATH, "").includes("$");
 }
+
+/** The quotes PowerShell reads as `'` or `"` beside the ASCII ones, and `‟` with them. */
+const TYPOGRAPHIC_QUOTE = /[\u2018-\u201F]/;

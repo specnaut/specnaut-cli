@@ -147,6 +147,7 @@ Deno.test("a pipeline or a call in a PowerShell PATH value is not read whole", (
   const unread = [
     "$env:Path = 'x' | ForEach-Object { './tools' }; lint",
     "$env:Path = & { './tools' }; lint",
+    "$env:Path = 'tools' && lint",
   ];
   for (const command of unread) assertEquals(span(command).whole, false, command);
 });
@@ -161,4 +162,31 @@ Deno.test("PowerShell PATH parts joined other than at a `;` are not read whole",
     "$env:Path += 'tools'; lint",
   ];
   for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("a variable other than PATH in a PowerShell PATH value is not read whole", () => {
+  const unread = [
+    '$t = (Resolve-Path tools).Path; $env:Path = "$t;$env:Path"; lint',
+    '$tools = Join-Path $PSScriptRoot tools; $env:Path = "$tools;$env:Path"; lint',
+    '$env:Path = "${t};$env:Path"; lint',
+    "$env:Path = $t + ';' + $env:Path; lint",
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("a typographic quote in a PowerShell PATH value is not read whole", () => {
+  const unread = [
+    "$env:Path = '\u2019 + (Resolve-Path tools).Path + \u2019;' + $env:Path; lint",
+    '$env:Path = "\u201D + (Resolve-Path tools).Path + \u201C;" + $env:Path; lint',
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("a PowerShell PATH assigned an empty value, its value on the next line, is not read whole", () => {
+  const settings = commandPaths(
+    ".claude/settings.json",
+    hook("$env:Path =\n(Resolve-Path tools).Path; lint"),
+    none,
+  );
+  assertEquals(settings.whole, false);
 });
