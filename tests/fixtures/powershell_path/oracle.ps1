@@ -43,7 +43,14 @@ function Get-Variants([string] $line) {
     }
 }
 
-$records = foreach ($line in [IO.File]::ReadAllLines($CorpusPath)) {
+# One line is one record, but a line opening a here-string runs to the line that closes it.
+$lines = [System.Collections.Generic.List[string]]::new()
+foreach ($l in [IO.File]::ReadAllLines($CorpusPath)) {
+    if ($lines.Count -gt 0 -and $lines[-1] -match "@['`"](\n[^\n]*)*$" -and $lines[-1] -notmatch "\n['`"]@") {
+        $lines[-1] += "`n" + $l
+    } else { $lines.Add($l) }
+}
+$records = foreach ($line in $lines) {
     if ($line.Trim() -eq '') { continue }
     Get-Record $line 'base' $line
     $seen = @{ $line = $true }

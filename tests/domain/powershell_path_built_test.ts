@@ -45,6 +45,16 @@ Deno.test("an item cmdlet handed a path that is not a constant is not read whole
       "si 'path' tools",
       "si P?th tools",
       "si [P]ath tools",
+      "$a = @(('En'+'v:Path'), 'tools'); si @a",
+      "si('En'+'v:Path') tools",
+      "gi ('En'+'v:Path') | si -Value tools -ea Stop",
+      "gi x | & si -Value tools",
+      "gi x | . si -Value tools",
+      "si \u201CPath\u201D x",
+      'si "Pat`h" x',
+      "si @'\nPath\n'@ x",
+      "si .\\.\\Path x",
+      "si x/../Path tools",
     ]),
     [],
   );
@@ -53,7 +63,7 @@ Deno.test("an item cmdlet handed a path that is not a constant is not read whole
     "New-Item -ItemType Directory tools",
     "si x -Value $v",
     "si -Force x $v",
-    'si "a b" $v',
+    'si x "$v w"',
     "Set-Content out.txt ($a + $b)",
     "Set-Content path.txt x",
     "si ./paths x",
@@ -69,8 +79,16 @@ Deno.test("an encoded command the shell's own split hands PowerShell is not read
 });
 
 Deno.test("an assignment spelled across shell quotes is held to the value's rules", () => {
+  // A shell's split hands PowerShell `$env:PATH=tools;…`: quotes glued to the value are taken off.
+  assertEquals(
+    unread(['$env:PATH="tools;$env:Path"; lint', "${ENV:PATH}='tools;' + ${env:Path}"]),
+    [],
+  );
   assertEquals(
     unread([
+      "pwsh -c '$env:Path = '\"(gi evil).FullName + ';' + \"'$env:Path; lint'",
+      "pwsh -c '$env:Path = ' '(gi evil).FullName'",
+      "pwsh -c '$env:Path = '<#c#>\"(gi evil).FullName + ';' + \"'$env:Path; lint'",
       "pwsh -c '$env:Pa''th = (Resolve-Path tools).Path'",
       "pwsh -c '$env:Pa''th=(Get-Location).Path'",
       "pwsh -c '$env:Pa''th = (Resolve-Path tools).Path'; echo \"$env:Path = 'tools'\"",

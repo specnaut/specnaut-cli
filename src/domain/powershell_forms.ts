@@ -4,8 +4,8 @@ import { quotedEnd } from "./powershell_text.ts";
  * The PowerShell forms that set PATH, or may, in a way no reading of a value gives whole. Each is
  * keyed on the reference or the primitive a command needs: an `env:` path as written, a drive or a
  * provider, code or a member built at run time, and a path an item cmdlet is handed that is not a
- * constant (`computedItemPath`), since no list of the ways to spell a drive's name at run time can
- * be complete. Each is searched in a whole string, as written and as PowerShell reads it
+ * plain constant (`computedItemPath`), since no list of the ways to spell a drive's name at run
+ * time can be complete. Each is searched in a whole string, as written and as PowerShell reads it
  * (`powershell_path.ts`). Reflection through none of these primitives is not read.
  */
 
@@ -37,12 +37,19 @@ export const PS_UNREAD_FORMS: readonly (readonly [form: string, pattern: RegExp]
   ["NewScriptBlock", /\bnewscriptblock\b/i],
   ["Invoke-Command", /\binvoke-command\b|\bicm\b/i],
   ["a call of a computed name", new RegExp(`(?<!&)&(?!&)\\s*(?:\\(|\\$|${QUOTE})`)],
-  ["a script a variable names, dot-sourced", /(?:^|[;|&({}\n])\s*\.\s*\$/],
+  [
+    "a script a `.` runs, named at run time",
+    new RegExp(`(?:^|[;|&({}\\n])\\s*\\.\\s*(?:\\$|\\(|${QUOTE})`),
+  ],
   ["Add-Type", /\badd-type\b/i],
   ["a static member named at run time", new RegExp(`::\\s*(?:\\$|\\(|${QUOTE})`)],
   ["GetMethod", /\.getmethods?\s*\(/i],
   ["InvokeMember", /\binvokemember\b/i],
-  ["session state", /\$executioncontext\.sessionstate\b|sessionstateproxy/i],
+  ["session state", /sessionstate/i],
+  ["the engine's context", /executioncontext/i],
+  ["AddScript", /\baddscript\b/i],
+  ["AddCommand", /\baddcommand\b/i],
+  ["ExpandString", /\bexpandstring\b/i],
   ["InvokeProvider", /\binvokeprovider\b/i],
   ["SetEnvironmentVariable", /setenvironmentvariable/i],
   ["setx", /\bsetx\b/i],
@@ -86,14 +93,12 @@ export function encodedCommand(text: string): boolean {
  * those that set the location a relative path starts from. `cp`, `mv`, `cd` and `pushd` are left
  * out: in a command string they name the shell's own utilities far more often than PowerShell's.
  */
-const ITEM_CMDLETS = new Set([
-  ..."set-item si new-item ni add-content ac set-content sc clear-item cli clear-content clc".split(
-    " ",
-  ),
-  ..."copy-item copy cpi move-item move mi rename-item ren rni set-location sl chdir".split(" "),
-  ..."push-location set-itemproperty sp new-itemproperty clear-itemproperty clp".split(" "),
-  ..."copy-itemproperty cpp move-itemproperty mp rename-itemproperty rnp".split(" "),
-]);
+const ITEM_CMDLETS = new Set(
+  `set-item si new-item ni add-content ac set-content sc clear-item cli clear-content clc copy-item
+  copy cpi move-item move mi rename-item ren rni set-location sl chdir push-location
+  set-itemproperty sp new-itemproperty clear-itemproperty clp copy-itemproperty cpp
+  move-itemproperty mp rename-itemproperty rnp`.split(/\s+/),
+);
 /** The position of the value, not a path, among each such cmdlet's arguments. */
 const VALUE_AT = new Map<string, number>([
   ..."set-item si set-content sc add-content ac".split(" ").map((c) => [c, 1] as [string, number]),
@@ -103,32 +108,54 @@ const VALUE_AT = new Map<string, number>([
 const NOT_PATH = /^(?:va(?:l(?:ue?)?)?|enc\w*|it\w*|ty\w*)$/i;
 const SWITCH = /^(?:force|passthru|recurse|whatif|confirm|verbose|debug|nonewline|asbytestream)$/i;
 /** A word in a command's place, a module's name before it or not (`Microsoft.PowerShell.Core\`). */
-const COMMAND = /(?<=^|[\s;|&({}=])(?:[\w.]+\\)?([a-z][\w-]*)(?=$|[\s;|)}])/gi;
-/** What makes a path built at run time: a variable or a `$(…)`, a bracket, a `+`, a `[char]`. */
-const BUILT = /[$({+]|\[char\]/i;
+const COMMAND = /(?<=^|[\s;|&({}=])(?:[\w.]+\\)?([a-z][\w-]*)(?=$|[\s;|)}(])/gi;
 /**
- * A path the current location decides: `Path` itself, as a name relative to it (`.\Path`), or a
- * wildcard. Wherever the location was set (`cd ("en"+"v:")`), such a path may be PATH's item.
+ * The one path read as a constant: a bare word, or a plain `'…'` or `"…"` string, of letters,
+ * digits and `_ . \ / : ~ -` alone. Anything else is built when the command runs or read otherwise
+ * than written: a variable, a `$(…)`, a bracket, a `+`, a `[char]`, a splat (`@a`), a backtick, a
+ * typographic quote, a here-string, a wildcard.
  */
-const RELATIVE = /^['"]?(?:\.[\\/])?path['"]?$|[*?[]/i;
+const CONSTANT = /^(?:[\w.\\/:~-]+|'[\w.\\/:~-]*'|"[\w.\\/:~-]*")$/;
 
 /**
- * Whether `text` hands an item cmdlet a path that is not a constant: one holding what
- * {@link BUILT} names (`si "E$()nv$([char]58)Pa$()th" tools`, a name from `(gdr -PSProvider
- * Environment).Name`), one the location decides ({@link RELATIVE}), or none at all after a `|`,
- * which the pipeline gives (`gci env: | si -Value tools`). Such a path may name any drive, so no
- * spelling of the environment's can be listed.
+ * Whether a constant path is one the location decides PATH's item for: `Path` itself, once its
+ * quotes, its `.` parts and the parts a `..` climbs out of are taken off (`.\.\Path`, `x/../Path`).
+ * Wherever the location was set (`cd ("en"+"v:")`), such a path may be PATH's item.
+ */
+function relativePath(path: string): boolean {
+  const parts: string[] = [];
+  for (const part of path.replace(/^(['"])(.*)\1$/, "$2").split(/[\\/]/)) {
+    if (part === "..") parts.pop();
+    else if (part !== "" && part !== ".") parts.push(part);
+  }
+  return parts.length === 1 && parts[0].toLowerCase() === "path";
+}
+
+/**
+ * Whether `text` hands an item cmdlet a path it does not read as a constant ({@link CONSTANT}:
+ * `si "E$()nv$([char]58)Pa$()th" tools`, `si @a`, a name from `(gdr -PSProvider
+ * Environment).Name`), one the location decides (`relativePath`), or runs one after a `|`, whose
+ * path the pipeline may give (`gci env: | si -Value tools`, `| & si`). Such a path may name any
+ * drive, so no spelling of the environment's can be listed.
  */
 export function computedItemPath(text: string): boolean {
   for (const m of text.matchAll(COMMAND)) {
     const name = m[1].toLowerCase();
     if (!ITEM_CMDLETS.has(name)) continue;
+    if (piped(text, m.index)) return true;
     const paths = pathArguments(name, argumentsAt(text, m.index + m[0].length));
-    const piped = /(?<!\|)\|\s*$/.test(text.slice(Math.max(0, m.index - 64), m.index));
-    if (paths.some((p) => BUILT.test(p) || RELATIVE.test(p))) return true;
-    if (piped && paths.length === 0) return true;
+    if (paths.some((p) => !CONSTANT.test(p) || relativePath(p))) return true;
   }
   return false;
+}
+
+/** Whether the command at `at` follows a `|`, a call's `&` or `.` between them or not. */
+function piped(text: string, at: number): boolean {
+  let j = at - 1;
+  while (j >= 0 && /\s/.test(text[j])) j--;
+  if ((text[j] === "&" || text[j] === ".") && text[j - 1] !== text[j]) j--;
+  while (j >= 0 && /\s/.test(text[j])) j--;
+  return text[j] === "|" && text[j - 1] !== "|";
 }
 
 /**

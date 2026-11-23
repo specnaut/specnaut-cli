@@ -34,10 +34,14 @@ const QUOTE = /['"\u2018-\u201E]/;
 const BLANK = /^[^\S\r\n]+$/;
 const END = /^[;#\r\n]$/;
 
-/** The items of the value starting at `from`, up to its statement's end, blanks aside. */
-export function valueItems(text: string, from: number): string[] {
+/**
+ * The items of the value starting at `from`, up to its statement's end, blanks aside, and where
+ * the value ends.
+ */
+export function valueItems(text: string, from: number): [string[], number] {
   const items: string[] = [];
-  for (let at = from; at < text.length;) {
+  let at = from;
+  while (at < text.length) {
     const quoted = QUOTE.test(text[at]) || (text[at] === "@" && QUOTE.test(text[at + 1] ?? ""));
     const end = quoted ? quotedEnd(text, at) : itemEnd(text, at);
     const item = text.slice(at, end);
@@ -45,7 +49,7 @@ export function valueItems(text: string, from: number): string[] {
     if (!BLANK.test(item)) items.push(item);
     at = end;
   }
-  return items;
+  return [items, at];
 }
 
 /** Where the item of {@link ITEM} starting at `at` ends. */

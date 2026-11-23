@@ -34,8 +34,6 @@ Deno.test("each spelling of a PowerShell PATH set or appended to puts `tools` on
     "$env:Path= 'tools;' + $env:Path; lint",
     "$env:Path+= ';tools'; lint",
     "${env:Path} += ';tools'; lint",
-    "${ENV:PATH}='tools;' + ${env:Path}; lint",
-    '$env:PATH="tools;$env:Path"; lint',
     "$env:path += ';tools'; lint",
   ];
   for (const command of spellings) {

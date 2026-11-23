@@ -61,3 +61,14 @@ p''wsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA
 &pwsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA
 cd ("en"+"v:"); si Path tools
 cd ("en"+"v:"); si Pat* tools
+$a = @(('En'+'v:Path'), 'tools'); si @a
+si('En'+'v:Path') tools
+gi ('En'+'v:Path') | si -Value tools -ea Stop
+gi x | & si -Value tools
+cd ("en"+"v:"); si “Path” x
+cd ("en"+"v:"); si "Pat`h" x
+cd ("en"+"v:"); si @'
+Path
+'@ x
+cd ("en"+"v:"); si .\.\Path x
+pwsh -c '$env:Path = '"(gi evil).FullName + ';' + "'$env:Path; lint'

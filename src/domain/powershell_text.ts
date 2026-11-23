@@ -1,19 +1,15 @@
 /**
- * PowerShell's text as its tokenizer reads it before running anything, read as text, never run: a
- * backtick escapes the character after it (``Pat`h`` is `Path`) or stands for one of its table
- * (`` `n ``, `` `u{50} ``), a backtick at a line's end joins the line to the next, and a comment
- * (`<#…#>`, `#…`) is taken off. A string (`'…'`, `"…"`, `@'…'@`, `@"…"@`, and the typographic
- * quotes PowerShell reads as theirs) is left as written, a doubled quote inside it, but the code of
- * a `$(…)` inside a `"…"` is read as code. One pass, one character at a time and no pattern that
- * backtracks, so its time is linear in the text, whatever a branch writes there.
+ * PowerShell's text as its tokenizer reads it, never run: a backtick escapes the next character
+ * (``Pat`h`` is `Path`) or stands for one of its table (`` `n ``, `` `u{50} ``) or joins two lines,
+ * and a comment (`<#…#>`, `#…`) is taken off. A string (`'…'`, `"…"`, `@'…'@`, `@"…"@`, the
+ * typographic quotes) is left as written, but a `$(…)` inside a `"…"` is read as code. One pass,
+ * no pattern that backtracks: the time is linear in the text, whatever a branch writes there.
  */
 
 /**
- * How a `#` inside a token is read (`Write-Output a#b`): PowerShell reads it as a comment after a
- * variable or a number in an expression and as a character of a command's word, which only its
- * parser knows. Each reading takes one side, so a check that searches both misses neither. In the
- * `literal` one a string opened after such a `#` ends at its line's end, so that a line PowerShell
- * reads as code is never swallowed by a quote its comment holds.
+ * How a `#` inside a token is read (`Write-Output a#b`): a comment or a character, which only the
+ * parser knows, so a check searches both. In the `literal` one a string opened after such a `#`
+ * ends at its line's end: no line PowerShell reads as code is swallowed by a comment's quote.
  */
 export type HashReading = "comment" | "literal";
 
@@ -35,11 +31,8 @@ const HERE_OPEN = /@(['"\u2018-\u201E])[^\S\n]*\r?\n/y;
 
 /** What the scan is inside: code (a `$(…)` of a string's, `sub`, its brackets counted), or a string. */
 type Frame = { code: true; depth: number; sub: boolean } | { code: false; here: boolean };
-type Scan = { text: string; hash: HashReading; chars: string[]; from: number[] } & {
-  stack: Frame[];
-  i: number;
-  cut: boolean;
-};
+type Out = { text: string; hash: HashReading; chars: string[]; from: number[] };
+type Scan = Out & { stack: Frame[]; i: number; cut: boolean };
 
 /** `text` as PowerShell reads it, a `#` inside a token read as `hash` says. */
 export function normalizedPowerShell(text: string, hash: HashReading = "comment"): PsText {
@@ -65,6 +58,19 @@ export function quotedEnd(text: string, i: number): number {
   step(s);
   while (s.stack.length > 1 && s.i < text.length) step(s);
   return s.i;
+}
+
+/** Each quoted string of `text` outside its comments: where it opens, and where it ends. */
+export function quotedSpans(text: string): [number, number][] {
+  const s = scan(text, "comment", 0);
+  const spans: [number, number][] = [];
+  while (s.i < text.length) {
+    const at = s.i;
+    const end = /['"\u2018-\u201E@]/.test(text[at]) ? quotedEnd(text, at) : at;
+    if (end > at + 1 || (end > at && text[at] !== "@")) spans.push([at, s.i = end]);
+    else step(s);
+  }
+  return spans;
 }
 
 function scan(text: string, hash: HashReading, i: number): Scan {
@@ -108,16 +114,12 @@ function stringStep(s: Scan, here: boolean): void {
 function escape(s: Scan): void {
   const next = s.text[s.i + 1];
   const joins = next === "\n" ? 2 : next === "\r" && s.text[s.i + 2] === "\n" ? 3 : 0;
-  if (next === undefined || joins > 0) {
-    s.i += next === undefined ? 1 : joins;
-    return;
-  }
+  if (next === undefined || joins > 0) return void (s.i += next === undefined ? 1 : joins);
   const point = /^u\{([0-9a-fA-F]{1,6})\}/.exec(s.text.slice(s.i + 1, s.i + 10));
   const code = point ? parseInt(point[1], 16) : -1;
   if (code >= 0 && code <= 0x10FFFF) {
     emit(s, String.fromCodePoint(code), -1);
-    s.i += 1 + point![0].length;
-    return;
+    return void (s.i += 1 + point![0].length);
   }
   emit(s, ESCAPES.get(next) ?? next, ESCAPES.has(next) ? -1 : s.i + 1);
   s.i += 2;
