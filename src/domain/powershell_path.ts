@@ -1,3 +1,12 @@
+import { encodedCommand, PS_PATH, PS_UNREAD_FORMS } from "./powershell_forms.ts";
+import {
+  type HashReading,
+  normalizedPowerShell,
+  type PsText,
+  quotedEnd,
+  writtenAs,
+} from "./powershell_text.ts";
+
 /**
  * How PowerShell sets PATH, read as text, never run: `$env:Path` or `${env:Path}` assigned a value,
  * whose words `pathAssignments` (`command_search_path.ts`) reads, and the ways of setting it that
@@ -6,12 +15,6 @@
  * one the command runs with.
  */
 
-/**
- * PowerShell's PATH, `$env:Path` or `${env:Path}`: in any letter case, as PowerShell reads a
- * variable's name, so always surely PATH. Inside a value it is the PATH in effect, as `$PATH` is a
- * shell's. The one source every regex below naming it is built from.
- */
-const PS_PATH = String.raw`\$(?:env:path\b|\{env:path\})`;
 /** A word naming PowerShell's PATH, and what a glued `=` or `+=` sets it to. */
 export const PS_PATH_WORD = new RegExp(`^${PS_PATH}(?:\\+?=(.*))?$`, "is");
 const IS_PS_PATH = new RegExp(`^${PS_PATH}$`, "i");
@@ -22,38 +25,57 @@ const EVERY_PS_PATH = new RegExp(PS_PATH, "gi");
 export const psPathAsShell = (value: string): string => value.replace(EVERY_PS_PATH, "$$PATH");
 
 /**
- * A word that sets PATH in a way no value is read from: the `env:` drive's `Path` item, which
- * `Set-Item`, `New-Item`, `Set-Content` and their aliases write, or .NET's
- * `SetEnvironmentVariable`. Its source is not read whole.
+ * Whether `text` sets PATH, or may, in a way `pathAssignments` reads no value from: a form of
+ * `powershell_forms.ts` (the `env:` drive, a provider, a new drive, an assignment of another shape,
+ * code or a member built at run time, a write the next session inherits), searched in the text as
+ * written and as PowerShell reads it (`powershell_text.ts`), each `#` inside a token read both
+ * ways; or a PATH, or its assignment, that only the text as read spells (``${env:Pat`h}``,
+ * `$env:Path <#…#>=`). Every assignment the reading finds is so either read from the text as
+ * written, where it is spelled the same at the same place, or leaves its source unread.
  */
-const PS_PATH_UNREAD = /(?<![${])env:[\\/]?path\b|SetEnvironmentVariable/i;
+export function setsPathUnread(text: string): boolean {
+  if (unreadForm(text)) return true;
+  if (!/[`#]/.test(text)) return false;
+  return HASH_READINGS.some((hash) => {
+    const read = normalizedPowerShell(text, hash);
+    return unreadForm(read.text) || spelledOnlyAsRead(read);
+  });
+}
 
-/** Whether `word` sets PATH in a way `pathAssignments` reads no value from. */
-export const setsPathUnread = (word: string): boolean => PS_PATH_UNREAD.test(word);
+const HASH_READINGS: readonly HashReading[] = ["comment", "literal"];
+
+const unreadForm = (text: string): boolean =>
+  PS_UNREAD_FORMS.some(([, pattern]) => pattern.test(text)) || encodedCommand(text);
 
 /** PowerShell's PATH assigned, `=` or `+=`, glued or not. */
 const PS_PATH_SET = new RegExp(`${PS_PATH}\\s*\\+?=`, "gi");
 
+/** Whether a PATH or its assignment in `read` is not as written at the same place. */
+function spelledOnlyAsRead(read: PsText): boolean {
+  return [EVERY_PS_PATH, PS_PATH_SET].some((spelling) =>
+    [...read.text.matchAll(spelling)].some((m) => !writtenAs(read, m.index, m.index + m[0].length))
+  );
+}
+
 /**
  * One item of a PowerShell value, as its parser splits it before running anything: a statement's
- * end, a comment's `#`, a pipe or a call's `&`, blanks, a quoted string up to its close (a
- * backquote escapes inside `"…"`), PowerShell's PATH, a list's `@(`, a bracket or a comma, and any
- * other run of characters (a name, an operator, a variable). Every character starts one, so the
- * items cover the text.
+ * end, a comment's `#`, a pipe or a call's `&`, blanks, PowerShell's PATH, a list's `@(`, a
+ * bracket or a comma, and any other run of characters (a name, an operator, a variable). A quoted
+ * string is one item up to its close, as PowerShell lexes it (`quotedEnd`). Every character starts
+ * one, so the items cover the text.
  */
 const ITEM = new RegExp(
   [
     "[;|&#\\r\\n]",
     "[^\\S\\r\\n]+",
-    "'[^']*'?",
-    '"(?:[^"`]|`.)*"?',
     PS_PATH,
     "@\\(",
     "[(),]",
-    "[^\\s'\"(),;|&]+",
+    "[^\\s'\"\u2018-\u201E(),;|&]+",
   ].join("|"),
   "isy",
 );
+const QUOTE = /['"\u2018-\u201E]/;
 const BLANK = /^[^\S\r\n]+$/;
 const END = /^[;#\r\n]$/;
 
@@ -77,13 +99,22 @@ export function buildsPathUnread(text: string): boolean {
 
 /** The items of the value starting at `from`, up to its statement's end, blanks aside. */
 function valueItems(text: string, from: number): string[] {
-  const item = new RegExp(ITEM);
-  item.lastIndex = from;
   const items: string[] = [];
-  for (let m = item.exec(text); m && !END.test(m[0]); m = item.exec(text)) {
-    if (!BLANK.test(m[0])) items.push(m[0]);
+  for (let at = from; at < text.length;) {
+    const quoted = QUOTE.test(text[at]) || (text[at] === "@" && QUOTE.test(text[at + 1] ?? ""));
+    const end = quoted ? quotedEnd(text, at) : itemEnd(text, at);
+    const item = text.slice(at, end);
+    if (END.test(item)) break;
+    if (!BLANK.test(item)) items.push(item);
+    at = end;
   }
   return items;
+}
+
+/** Where the item of {@link ITEM} starting at `at` ends. */
+function itemEnd(text: string, at: number): number {
+  ITEM.lastIndex = at;
+  return at + (ITEM.exec(text)?.[0].length ?? 1);
 }
 
 /**
@@ -121,14 +152,16 @@ const inside = (item = ""): string =>
  * `)`, a `'…'` string, or a `"…"` string holding no `$` but PATH's. Any other item builds the value
  * from what only running it gives: a `(`, a `$(…)`, a bare name, which runs a command, a `|` or an
  * `&`, and a variable other than PATH (`$t`, `"${t};…"`), which a line before may have set to
- * anything (`$t = (Resolve-Path tools).Path`). A typographic quote is never read as written:
- * PowerShell closes a `'…'` at `‘’‚‛` and a `"…"` at `“”„`, where the items here see none.
+ * anything (`$t = (Resolve-Path tools).Path`). A string PowerShell reads otherwise than its words
+ * do is not read as written either: one holding a doubled quote (`'to''ols'`) or a backtick's
+ * escape (``"tool`s"``), and one closed by a typographic quote, `‘’‚‛` for a `'…'` and `“”„` for
+ * a `"…"`.
  */
 function readableItem(item: string): boolean {
   if (TYPOGRAPHIC_QUOTE.test(item)) return false;
   if (/^(?:[,)]|@\()$/.test(item) || IS_PS_PATH.test(item)) return true;
-  if (item.startsWith("'")) return true;
-  return item.startsWith('"') && !item.replace(EVERY_PS_PATH, "").includes("$");
+  if (item.startsWith("'")) return /^'[^']*'?$/.test(item);
+  return /^"[^"`]*"?$/.test(item) && !item.replace(EVERY_PS_PATH, "").includes("$");
 }
 
 /** The quotes PowerShell reads as `'` or `"` beside the ASCII ones, and `‟` with them. */

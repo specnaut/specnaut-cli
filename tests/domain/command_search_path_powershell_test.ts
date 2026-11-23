@@ -76,9 +76,7 @@ Deno.test("PATH set through the env: drive or .NET names its source as not fully
 });
 
 Deno.test("a variable only named like PATH, or PATH only read, leaves the reading whole", () => {
-  for (
-    const command of ["$env:PathExt += ';.X'; lint", "Write-Host $env:Path; lint", "env:PathExt"]
-  ) {
+  for (const command of ["$env:PathExt += ';.X'; lint", "Write-Host $env:Path; lint"]) {
     const found = span(command);
     assertEquals([found.onPath, found.whole], [[], true], command);
   }

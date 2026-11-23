@@ -80,9 +80,9 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
  * The words of `strings` and of every command nested in them (`nested_commands.ts`), and the
  * manifest each of those commands runs (`manifestsOf`); each word that may be a program
  * (`isProgram`), and the value each PATH assignment sets (`pathAssignments`), are noted in `read`;
- * a word that sets PATH where no value is read (`setsPathUnread`), or a string that sets
- * PowerShell's PATH to a value its words do not give whole (`buildsPathUnread`), leaves the reading
- * not whole.
+ * a word or a string that sets PATH where no value is read (`setsPathUnread`), or a string that
+ * sets PowerShell's PATH to a value its words do not give whole (`buildsPathUnread`), leaves the
+ * reading not whole.
  */
 export function commandWords(strings: readonly string[], read: Reading): string[] {
   const commands = nestedSegments(strings, read);
@@ -91,7 +91,7 @@ export function commandWords(strings: readonly string[], read: Reading): string[
     if (isProgram(word)) read.programs.add(word);
     if (setsPathUnread(word)) read.whole = false;
   }
-  if (strings.some(buildsPathUnread)) read.whole = false;
+  if (strings.some((s) => setsPathUnread(s) || buildsPathUnread(s))) read.whole = false;
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];
 }
 
