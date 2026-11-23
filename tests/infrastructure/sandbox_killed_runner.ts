@@ -40,6 +40,7 @@ if (backend === "seatbelt") {
   const ticks = "i=0; while [ $i -lt 150 ]; do echo tick; sleep 0.2; i=$((i+1)); done";
   const runner = new ContainerRunner(
     engine as Engine,
+    engine,
     image,
     launcher,
     { dropped: [], cpus: null },

@@ -50,6 +50,7 @@ function fileAt(path: string): Handed {
 const runner = (engine: typeof ENGINES[number], launcher: ProcessLauncher) =>
   new ContainerRunner(
     engine,
+    engine,
     IMAGE,
     launcher,
     { dropped: [], cpus: null },
@@ -115,7 +116,7 @@ Deno.test("engine profile: a run refused before its launch leaves nothing behind
   try {
     await withEnv({ TMPDIR: temp }, async () => {
       const { launcher, handed } = reading(0);
-      const unpinned = new ContainerRunner("docker", "acme/dev:latest", launcher, {
+      const unpinned = new ContainerRunner("docker", "docker", "acme/dev:latest", launcher, {
         dropped: [],
         cpus: null,
       });

@@ -21,7 +21,14 @@ containerTest(
   "ContainerRunner: a run that ends on its own still has its container removed by name",
   async () => {
     const { launcher, launches } = fakeLauncher(0);
-    await new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, () => "specnaut-sandbox-x6").run(
+    await new ContainerRunner(
+      "docker",
+      "docker",
+      IMAGE,
+      launcher,
+      NO_DROPS,
+      () => "specnaut-sandbox-x6",
+    ).run(
       policyOf("container"),
       COMMAND,
     );
@@ -43,6 +50,7 @@ containerTest(
       },
     };
     const runner = new ContainerRunner(
+      "docker",
       "docker",
       IMAGE,
       failing,
@@ -70,6 +78,7 @@ containerTest(
       },
     };
     const runner = new ContainerRunner(
+      "docker",
       "docker",
       IMAGE,
       refusing,

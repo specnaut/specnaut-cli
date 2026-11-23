@@ -1,5 +1,10 @@
 import { encodeHex } from "@std/encoding/hex";
-import type { RunnableBackend, RunOutcome, SandboxRunner } from "../application/sandbox_ports.ts";
+import {
+  type RunnableBackend,
+  type RunOutcome,
+  SandboxRefused,
+  type SandboxRunner,
+} from "../application/sandbox_ports.ts";
 import type { Engine, SandboxPolicy } from "../domain/sandbox.ts";
 import { containerArgs, type ContainerRun } from "../domain/sandbox_args.ts";
 import { armExitTrap } from "./exit_trap.ts";
@@ -7,6 +12,7 @@ import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts"
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import { engineRunEnv, type RunEnv } from "./sandbox_engine_env.ts";
 import type { ProcessLauncher, ProcessSpec } from "./sandbox_process.ts";
+import { programOnPath } from "./program_on_path.ts";
 import { SeatbeltRunner } from "./sandbox_seatbelt_runner.ts";
 import { DRAIN_GRACE_SECONDS } from "./sandbox_wall_clock.ts";
 import { watched } from "./sandbox_watched.ts";
@@ -25,11 +31,14 @@ import { watchdogSpec } from "./sandbox_watchdog.ts";
  * The run's container, named so it can be removed when the wall clock runs out or we are stopped.
  * The engine's client, and each removal, start with `engineRunEnv` of ours, read at the run, the
  * client with the options it gives before `run`. What it wrote is released once the run is over,
- * and on an interrupt as `releaseOnExit` says: podman's is left for the watchdog's removal.
+ * and on an interrupt as `releaseOnExit` says: podman's is left for the watchdog's removal. The
+ * client and each removal are started at `program`, the engine's file as the probe found it, so
+ * neither the spawn nor the watchdog's shell looks it up again.
  */
 export class ContainerRunner implements SandboxRunner {
   constructor(
     readonly engine: Engine,
+    readonly program: string,
     readonly image: string,
     readonly launcher: ProcessLauncher,
     /** The caps the engine drops on this host and its CPUs, as the offered backend carries them. */
@@ -62,14 +71,15 @@ export class ContainerRunner implements SandboxRunner {
    */
   async #removed(name: string, runEnv: RunEnv, args: string[], seconds: number) {
     const { env, globals } = runEnv;
-    const remove = removalOf(this.engine, name, env);
+    const remove = removalOf(this.engine, this.program, name, env);
     const disarm = armExitTrap(() => {
       this.launcher.runSync(remove);
       runEnv.releaseOnExit();
     });
     try {
       return await thenRemoved(this.launcher, remove, () => {
-        const started = this.launcher.start({ cmd: this.engine, args: [...globals, ...args], env });
+        const client = { cmd: this.program, args: [...globals, ...args], env };
+        const started = this.launcher.start(client);
         const halt = () => removed(this.launcher, remove);
         return watched(this.launcher, started, seconds, watchdogOf(remove, seconds), halt);
       });
@@ -92,6 +102,8 @@ function containerName(): string {
 /**
  * The host facts a runner needs: the architecture its filter is for, the PATH that finds its
  * engine (the probe's), and the user bus (`userBus`) a systemd user scope is reached through.
+ * Each program a runner starts by name is found on that PATH here, as the probe found it, and
+ * handed to the runner as that file.
  */
 export type RunnerHost = {
   readonly arch: string;
@@ -105,13 +117,33 @@ export function runnerFor(
   host: RunnerHost,
 ): SandboxRunner {
   switch (backend.kind) {
-    case "container": {
-      const env = () => ({ ...Deno.env.toObject(), PATH: host.path });
-      return new ContainerRunner(backend.engine, backend.image, launcher, backend, undefined, env);
+    case "container":
+      return containerRunner(backend, launcher, host.path);
+    case "bwrap": {
+      const systemdRun = backend.scope ? programAt("systemd-run", host.path) : null;
+      const bwrap = programAt("bwrap", host.path);
+      return new BwrapRunner(host.arch, launcher, host.path, bwrap, systemdRun, host.bus);
     }
-    case "bwrap":
-      return new BwrapRunner(host.arch, launcher, host.path, backend.scope, host.bus);
     case "seatbelt":
       return new SeatbeltRunner(launcher);
   }
+}
+
+/** The engine's client and each removal start with ours, PATH the probe's, at the engine's file. */
+function containerRunner(
+  backend: Extract<RunnableBackend, { kind: "container" }>,
+  launcher: ProcessLauncher,
+  path: string,
+): ContainerRunner {
+  const env = () => ({ ...Deno.env.toObject(), PATH: path });
+  const { engine, image } = backend;
+  const program = programAt(engine, path);
+  return new ContainerRunner(engine, program, image, launcher, backend, undefined, env);
+}
+
+/** The file `name` is on `path`, as the probe found it; one gone since is refused, never guessed. */
+function programAt(name: string, path: string): string {
+  const program = programOnPath(name, path);
+  if (program === undefined) throw new SandboxRefused(`${name} is no longer on the PATH`);
+  return program;
 }

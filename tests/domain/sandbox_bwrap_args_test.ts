@@ -81,7 +81,6 @@ Deno.test("bwrapArgs: the environment is exactly the policy's, and the command f
 
 Deno.test("scopeArgs: a systemd user scope carrying the policy's memory, process and CPU caps", () => {
   assertEquals(scopeArgs(policyOf("bwrap")), [
-    "systemd-run",
     "--user",
     "--scope",
     "--quiet",

@@ -13,7 +13,7 @@ import { plantGit, ran, withPath } from "../../helpers/planted_git.ts";
  * The sandbox's engines are found where every program the binary starts by name is: on the PATH
  * entries outside the tree it runs in. The checkout here is a folder under the working folder,
  * whose `bin` holds an engine of each name, first on the PATH: the probe starts none of them, and
- * the run is handed the PATH the probe searched, so it starts the engine the probe found.
+ * the run is handed the PATH the probe searched and the engine's file on it, the one the probe found.
  */
 
 const ENGINES = ["podman", "docker", "bwrap", "systemd-run", "git"];
@@ -41,18 +41,21 @@ Deno.test({
 });
 
 Deno.test({
-  name: "the sandbox run is handed the PATH the probe searched, the checkout's entry left out",
+  name: "the sandbox run is handed the PATH the probe searched and the engine's file outside",
   ignore: POSIX_ONLY,
   fn: () =>
     inCheckout(async (outside) => {
+      for (const name of ["podman", "bwrap"]) await plantGit(outside, join(outside, "x"), name);
       assertEquals(enginePath(), outside);
       const prober = { probe: () => Promise.reject(new Error("not asked")) };
       const deps = execDeps(prober, () => Promise.resolve(outside), null);
-      const bwrap = deps.runnerFor({ kind: "bwrap", scope: false });
-      assertEquals((bwrap as BwrapRunner).path, outside);
+      const bwrap = deps.runnerFor({ kind: "bwrap", scope: false }) as BwrapRunner;
+      assertEquals([bwrap.path, bwrap.bwrap], [outside, join(outside, "bwrap")]);
       const backend = { engine: "podman", image: "x", dropped: [], cpus: null } as const;
       const container = deps.runnerFor({ kind: "container", ...backend }) as ContainerRunner;
-      assertEquals(container.hostEnv().PATH, outside);
-      await Promise.resolve();
+      assertEquals([container.hostEnv().PATH, container.program], [
+        outside,
+        join(outside, "podman"),
+      ]);
     }),
 });

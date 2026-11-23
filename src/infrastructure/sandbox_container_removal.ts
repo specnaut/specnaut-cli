@@ -8,14 +8,20 @@ import type { ProcessLauncher, ProcessSpec, Started } from "./sandbox_process.ts
  */
 
 /**
- * Removes the named container, its name last; what the engine prints (the name) never passes for
- * the run's, and what it says of a failure is read (`removed`), not shown. Podman, unlike docker,
- * fails on a container already gone, as a `--rm` one is once it ended, unless told `--ignore`.
+ * Removes the named container, its name last, through `program`, the engine's file as the run
+ * starts it; what the engine prints (the name) never passes for the run's, and what it says of a
+ * failure is read (`removed`), not shown. Podman, unlike docker, fails on a container already
+ * gone, as a `--rm` one is once it ended, unless told `--ignore`.
  */
-export function removalOf(engine: Engine, name: string, env: Record<string, string>): ProcessSpec {
+export function removalOf(
+  engine: Engine,
+  program: string,
+  name: string,
+  env: Record<string, string>,
+): ProcessSpec {
   const ignore = engine === "podman" ? ["--ignore"] : [];
   const args = ["rm", "--force", ...ignore, name];
-  return { cmd: engine, args, env, stdout: "discarded", stderr: "captured" };
+  return { cmd: program, args, env, stdout: "discarded", stderr: "captured" };
 }
 
 /**

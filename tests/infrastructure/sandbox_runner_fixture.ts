@@ -7,7 +7,9 @@ import type {
   Started,
 } from "../../src/infrastructure/sandbox_process.ts";
 import type { ScratchVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
+import { programOnPath } from "../../src/infrastructure/program_on_path.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
+import { plantGit } from "../helpers/planted_git.ts";
 
 /** What the runner tests share: a launcher that records what it is asked to start. */
 
@@ -15,6 +17,21 @@ import { policyOf } from "../domain/sandbox_fixture.ts";
 export const POSIX = Deno.build.os !== "windows";
 export const COMMAND = ["deno", "task", "test"];
 export const IMAGE = `acme/dev@sha256:${"c".repeat(64)}`;
+
+/** A program's file as the probe found it, for a runner given its path: what it must start. */
+export const BWRAP = "/opt/sandbox/bin/bwrap";
+export const SYSTEMD_RUN = "/opt/sandbox/bin/systemd-run";
+
+/**
+ * A folder holding a stand-in of each program `names` names, for `runnerFor` to find with it as
+ * the PATH; `at` is the file a name is found as there. Nothing is run: the launcher is a fake.
+ */
+export async function plantedPrograms(names: readonly string[]) {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-programs-" });
+  for (const name of names) await plantGit(dir, join(dir, "fired"), name);
+  const at = (name: string) => programOnPath(name, dir) ?? `${name} was not planted`;
+  return { dir, at, [Symbol.asyncDispose]: () => Deno.remove(dir, { recursive: true }) };
+}
 
 export type Launch = { spec: ProcessSpec; pid: number; stopped: number; released: number };
 

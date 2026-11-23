@@ -2,10 +2,10 @@ import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { type SandboxedBackend, sandboxPolicy } from "../../src/domain/sandbox.ts";
 import { FsSandboxHost } from "../../src/infrastructure/fs_sandbox_host.ts";
-import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
+import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
 import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
-import { live, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
+import { live, probed, runIn, RUNNER_HOST, withLayout } from "./sandbox_live_fixture.ts";
 
 /**
  * A pipx venv read by a real sandbox: its `pyvenv.cfg` is read, its receipt, which can name an
@@ -20,7 +20,7 @@ const RUNNERS = {
   },
   bwrap: {
     missing: probed.bwrap === "usable" ? null : "Linux with a usable bubblewrap",
-    make: (l: DenoProcessLauncher) => new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!),
+    make: (l: DenoProcessLauncher) => runnerFor({ kind: "bwrap", scope: false }, l, RUNNER_HOST),
   },
 } as const;
 

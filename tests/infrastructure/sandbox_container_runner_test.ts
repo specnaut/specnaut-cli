@@ -44,6 +44,9 @@ const ENGINE_ENV = {
 /** A podman launch's environment: the engine's, with the override written for the run. */
 const podmanEnv = (l: Launch) => ({ ...ENGINE_ENV, CONTAINERS_CONF_OVERRIDE: overrideOf(l) });
 const overrideOf = (l: Launch) => l.spec.env === "host" ? "" : l.spec.env.CONTAINERS_CONF_OVERRIDE;
+const hostEnv = () => HOST_ENV;
+/** The engine's file, as the probe found it: what every launch of it is started at. */
+const [PODMAN, DOCKER] = ["/opt/engines/podman", "/opt/engines/docker"];
 
 containerTest(
   "ContainerRunner: launches the engine with exactly containerArgs and its options, under a fresh name",
@@ -52,6 +55,7 @@ containerTest(
     const policy = policyOf("container");
     const runner = new ContainerRunner(
       "podman",
+      PODMAN,
       IMAGE,
       launcher,
       NO_DROPS,
@@ -68,7 +72,7 @@ containerTest(
       seccomp: join(dirname(overrideOf(launches[0])), SECCOMP),
     } as const;
     assertEquals(launches[0].spec, {
-      cmd: "podman",
+      cmd: PODMAN,
       args: [
         ...podmanGlobals(dirname(overrideOf(launches[0]))),
         ...containerArgs(policy, run, COMMAND),
@@ -83,7 +87,7 @@ containerTest(
   async () => {
     const { launcher, launches } = fakeLauncher(0);
     const caps = { dropped: [], cpus: 1 };
-    await new ContainerRunner("docker", IMAGE, launcher, caps, () => "specnaut-sandbox-x9").run(
+    await new ContainerRunner("docker", DOCKER, IMAGE, launcher, caps).run(
       policyOf("container"),
       COMMAND,
     );
@@ -98,9 +102,9 @@ containerTest(
     const { launcher, launches } = fakeLauncher(0);
     const policy = withWallClock(policyOf("container"), 60);
     const name = () => "specnaut-sandbox-x4";
-    const runner = new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, name, () => HOST_ENV);
+    const runner = new ContainerRunner("docker", DOCKER, IMAGE, launcher, NO_DROPS, name, hostEnv);
     await runner.run(policy, COMMAND);
-    const removal = ["docker", "rm", "--force", "specnaut-sandbox-x4"];
+    const removal = [DOCKER, "rm", "--force", "specnaut-sandbox-x4"];
     const seconds = 60 + DRAIN_GRACE_SECONDS;
     assertEquals(launches[1].spec, watchdogSpec(launches[0].pid, seconds, removal, ENGINE_ENV));
     assertEquals(launches[1].stopped, 1);
@@ -109,7 +113,7 @@ containerTest(
 
 containerTest("ContainerRunner: each run gets a name of its own", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", IMAGE, launcher, NO_DROPS);
+  const runner = new ContainerRunner("docker", DOCKER, IMAGE, launcher, NO_DROPS);
   await runner.run(policyOf("container"), COMMAND);
   await runner.run(policyOf("container"), COMMAND);
   const runs = launches.filter((l) => l.spec.args[0] === "run");
@@ -120,7 +124,7 @@ containerTest("ContainerRunner: each run gets a name of its own", async () => {
 
 Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async () => {
   const { launcher, launches } = fakeLauncher(0);
-  const runner = new ContainerRunner("docker", "acme/dev:latest", launcher, NO_DROPS);
+  const runner = new ContainerRunner("docker", DOCKER, "acme/dev:latest", launcher, NO_DROPS);
   let refused = false;
   await runner.run(policyOf("container"), COMMAND).catch(() => (refused = true));
   assert(refused);
@@ -130,12 +134,12 @@ Deno.test("ContainerRunner: only a digest-pinned image is ever launched", async 
 containerTest("ContainerRunner: past the wall clock the container is removed by name", async () => {
   const { launcher, launches } = fakeLauncher(null);
   const name = () => "specnaut-sandbox-x2";
-  const runner = new ContainerRunner("podman", IMAGE, launcher, NO_DROPS, name, () => HOST_ENV);
+  const runner = new ContainerRunner("podman", PODMAN, IMAGE, launcher, NO_DROPS, name, hostEnv);
   const outcome = await runner.run(withWallClock(policyOf("container"), 0.01), COMMAND);
   assertEquals(outcome, { kind: "timed_out", seconds: 0.01 });
   // `--ignore`: podman, unlike docker, fails on a container already gone, as a `--rm` one is.
   assertEquals(launches.find((l) => l.spec.args[0] === "rm")?.spec, {
-    cmd: "podman",
+    cmd: PODMAN,
     args: ["rm", "--force", "--ignore", "specnaut-sandbox-x2"],
     env: podmanEnv(launches[0]),
     stdout: "discarded",
@@ -167,7 +171,7 @@ containerTest(
         runSync: (spec) => real.runSync({ ...spec, cmd: engine }),
       };
       const name = () => "specnaut-sandbox-x3";
-      const runner = new ContainerRunner("podman", IMAGE, launcher, NO_DROPS, name);
+      const runner = new ContainerRunner("podman", PODMAN, IMAGE, launcher, NO_DROPS, name);
       const outcome = await runner.run(withWallClock(policyOf("container"), 1), COMMAND);
       assertEquals(outcome, { kind: "timed_out", seconds: 1 });
       assertEquals(out.text(), "from the command\n");

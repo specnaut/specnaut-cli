@@ -54,7 +54,8 @@ Deno.test({
       const [name, value] = LEFT.split("=");
       await withEnv({ [name]: value, CONTAINERS_CONF: conf }, async () => {
         const { out } = await runIn(
-          (l) => new ContainerRunner("podman", LIVE_IMAGE, l, { dropped: [], cpus: null }),
+          (l) =>
+            new ContainerRunner("podman", "podman", LIVE_IMAGE, l, { dropped: [], cpus: null }),
           policy,
           ["/bin/sh", "-c", SCRIPT],
         );
@@ -100,7 +101,8 @@ Deno.test({
         await withEnv(vars, async () => {
           assertEquals(plainRun(), "start\npresent\n", "a plain run did not read mounts.conf");
           const { out } = await runIn(
-            (l) => new ContainerRunner("podman", LIVE_IMAGE, l, { dropped: [], cpus: null }),
+            (l) =>
+              new ContainerRunner("podman", "podman", LIVE_IMAGE, l, { dropped: [], cpus: null }),
             policy,
             ["/bin/sh", "-c", LOOK],
           );

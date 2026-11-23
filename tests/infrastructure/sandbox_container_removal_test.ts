@@ -58,7 +58,7 @@ async function quiet<T>(fn: () => Promise<T>): Promise<{ result: T; errors: unkn
 }
 
 const runOn = (launcher: ProcessLauncher, seconds = 60) =>
-  new ContainerRunner("docker", IMAGE, launcher, NO_DROPS, () => NAME).run(
+  new ContainerRunner("docker", "docker", IMAGE, launcher, NO_DROPS, () => NAME).run(
     withWallClock(policyOf("container"), seconds),
     COMMAND,
   );

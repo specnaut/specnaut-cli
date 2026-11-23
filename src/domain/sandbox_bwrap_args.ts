@@ -44,16 +44,17 @@ export function bwrapArgs(policy: SandboxPolicy, command: readonly string[]): st
 }
 
 /**
- * The prefix that runs bubblewrap in a transient systemd user scope carrying the policy's memory
- * (no swap on top), process and CPU caps: a cgroup holds the whole run, which per-process limits
- * could not. `--scope` runs the command in place, so its input and output pass straight through.
- * A process the memory cap ends is ended alone, as in a container: systemd would otherwise stop
- * the whole scope, and the run would report nothing of what the cap did.
+ * The `systemd-run` options that run bubblewrap in a transient systemd user scope carrying the
+ * policy's memory (no swap on top), process and CPU caps: a cgroup holds the whole run, which
+ * per-process limits could not. `--scope` runs the command in place, so its input and output pass
+ * straight through. A process the memory cap ends is ended alone, as in a container: systemd would
+ * otherwise stop the whole scope, and the run would report nothing of what the cap did. The program
+ * itself is not named: which file runs is the runner's, found where the probe found it.
  */
 export function scopeArgs(policy: SandboxPolicy): string[] {
   const { memoryBytes, processes, cpus } = policy.limits;
   return [
-    ...["systemd-run", "--user", "--scope", "--quiet", "--collect"],
+    ...["--user", "--scope", "--quiet", "--collect"],
     ...["-p", `MemoryMax=${memoryBytes}`, "-p", "MemorySwapMax=0"],
     ...["-p", `TasksMax=${processes}`, "-p", `CPUQuota=${cpus * 100}%`],
     ...["-p", "OOMPolicy=continue"],

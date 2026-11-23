@@ -70,6 +70,7 @@ const read = (path: string) => Deno.readTextFileSync(path);
 const runner = (engine: "podman" | "docker", launcher: ProcessLauncher) =>
   new ContainerRunner(
     engine,
+    engine,
     IMAGE,
     launcher,
     { dropped: [], cpus: null },

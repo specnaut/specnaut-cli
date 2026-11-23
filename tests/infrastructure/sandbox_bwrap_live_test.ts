@@ -1,9 +1,8 @@
 import { assertEquals } from "@std/assert";
-import { userBus } from "../../src/domain/sandbox_bwrap_args.ts";
 import { SYSCALL_NUMBERS } from "../../src/domain/sandbox_syscalls.ts";
 import type { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
-import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
-import { exists, live, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
+import { runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
+import { exists, live, probed, runIn, RUNNER_HOST, withLayout } from "./sandbox_live_fixture.ts";
 
 /** Bubblewrap on a real Linux host that runs it, through the real launcher; skipped elsewhere. */
 
@@ -12,8 +11,9 @@ const MISSING = probed.bwrap === "usable" ? null : "Linux with a usable bubblewr
 const PYTHON = "/usr/bin/python3";
 const NO_PYTHON = MISSING ?? (exists(PYTHON) ? null : `${PYTHON} inside the sandbox`);
 
+/** Bubblewrap as a run gets it: found on our PATH, as the probe found it. */
 const linux = (l: DenoProcessLauncher) =>
-  new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!);
+  runnerFor({ kind: "bwrap", scope: false }, l, RUNNER_HOST);
 
 Deno.test({
   name: live(
@@ -109,9 +109,8 @@ Deno.test({
   fn: () =>
     withLayout("bwrap", async ({ policy }) => {
       const small = { ...policy, limits: { ...policy.limits, memoryBytes: 64 * 1024 ** 2 } };
-      const bus = userBus((name) => Deno.env.get(name));
       const scoped = (l: DenoProcessLauncher) =>
-        new BwrapRunner(Deno.build.arch, l, Deno.env.get("PATH")!, true, bus);
+        runnerFor({ kind: "bwrap", scope: true }, l, RUNNER_HOST);
       // 256 MiB held in one shell variable: four times the cap. The marker says the allocation
       // began; the cap's kill (SIGKILL) leaves 137. A run that failed any other way has neither.
       const script =

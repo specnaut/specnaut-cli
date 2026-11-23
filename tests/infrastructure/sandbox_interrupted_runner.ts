@@ -23,6 +23,7 @@ const policy = policyOf("container");
 const timed = { ...policy, limits: { ...policy.limits, wallClockSeconds: 60 } };
 const runner = new ContainerRunner(
   engine as "podman" | "docker",
+  engine,
   `acme/dev@sha256:${"e".repeat(64)}`,
   launcher,
   { dropped: [], cpus: null },

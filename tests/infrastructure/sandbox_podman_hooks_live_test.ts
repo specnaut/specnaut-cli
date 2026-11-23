@@ -91,7 +91,14 @@ Deno.test({
         await assertPlainRunFiresHook(marker);
         const running = runIn(
           (l) =>
-            new ContainerRunner("podman", LIVE_IMAGE, l, { dropped: [], cpus: null }, () => NAME),
+            new ContainerRunner(
+              "podman",
+              "podman",
+              LIVE_IMAGE,
+              l,
+              { dropped: [], cpus: null },
+              () => NAME,
+            ),
           policy,
           ["/bin/sh", "-c", "echo start; sleep 3"],
         );

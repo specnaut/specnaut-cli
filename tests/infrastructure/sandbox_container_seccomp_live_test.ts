@@ -90,7 +90,7 @@ async function printed(engine: Engine, script: string): Promise<string[]> {
   let lines: string[] = [];
   await withLayout("container", async ({ policy }) => {
     const runner = (l: DenoProcessLauncher) =>
-      new ContainerRunner(engine, LIVE_IMAGE, l, { dropped: [], cpus: null });
+      new ContainerRunner(engine, engine, LIVE_IMAGE, l, { dropped: [], cpus: null });
     const { outcome, out, err } = await runIn(runner, policy, [PERL, "-e", script]);
     assertEquals(outcome, { kind: "exited", code: 0 }, err);
     lines = out.trim().split("\n");

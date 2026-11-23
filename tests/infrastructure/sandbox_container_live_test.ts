@@ -82,7 +82,7 @@ Deno.test({
       };
       const timed = { ...policy, limits: { ...policy.limits, wallClockSeconds: 60 } };
       try {
-        const outcome = await new ContainerRunner(engine, LIVE_IMAGE, killing, {
+        const outcome = await new ContainerRunner(engine, engine, LIVE_IMAGE, killing, {
           dropped: [],
           cpus: null,
         }, () => name)

@@ -11,10 +11,12 @@ import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock
 import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";
 import { policyOf } from "../domain/sandbox_fixture.ts";
 import {
+  BWRAP,
   COMMAND,
   fakeLauncher,
   fakeVolumes,
   IMAGE,
+  plantedPrograms,
   POSIX,
   seatbeltPolicy,
   VOLUME_REMOVAL,
@@ -30,7 +32,7 @@ import {
 Deno.test("BwrapRunner: bubblewrap gets exactly bwrapArgs, the filter on its descriptor", async () => {
   const { launcher, launches } = fakeLauncher(5);
   const policy = policyOf("bwrap");
-  const runner = new BwrapRunner("x86_64", launcher, "/usr/bin:/bin");
+  const runner = new BwrapRunner("x86_64", launcher, "/usr/bin:/bin", BWRAP);
   assertEquals(await runner.run(policy, COMMAND), { kind: "exited", code: 5 });
   const [launch] = launches;
   assertEquals(launch.spec.cmd, "/bin/sh");
@@ -38,7 +40,7 @@ Deno.test("BwrapRunner: bubblewrap gets exactly bwrapArgs, the filter on its des
     "-c",
     `exec ${SECCOMP_FD}<&0 </dev/null; exec "$@"`,
     "sh",
-    "bwrap",
+    BWRAP,
     ...bwrapArgs(policy, COMMAND),
   ]);
   assertEquals(launch.spec.env, { PATH: "/usr/bin:/bin" });
@@ -47,12 +49,12 @@ Deno.test("BwrapRunner: bubblewrap gets exactly bwrapArgs, the filter on its des
 
 Deno.test("BwrapRunner: the filter is the host architecture's, and none other exists", () => {
   const { launcher } = fakeLauncher(0);
-  assertThrows(() => new BwrapRunner("riscv64", launcher, "/usr/bin"), Error, "riscv64");
+  assertThrows(() => new BwrapRunner("riscv64", launcher, "/usr/bin", BWRAP), Error, "riscv64");
 });
 
 Deno.test("BwrapRunner: past the wall clock bubblewrap is stopped", async () => {
   const { launcher, launches } = fakeLauncher(null);
-  const runner = new BwrapRunner("aarch64", launcher, "/usr/bin");
+  const runner = new BwrapRunner("aarch64", launcher, "/usr/bin", BWRAP);
   const outcome = await runner.run(withWallClock(policyOf("bwrap"), 0.01), COMMAND);
   assertEquals(outcome, { kind: "timed_out", seconds: 0.01 });
   assertEquals(launches.length, 1);
@@ -157,9 +159,10 @@ Deno.test({
   },
 });
 
-Deno.test("runnerFor: one runner per backend", () => {
+Deno.test("runnerFor: one runner per backend, each handed its program's file on the PATH", async () => {
   const { launcher } = fakeLauncher(0);
-  const host = { arch: "x86_64", path: "/usr/bin", bus: {} };
+  await using planted = await plantedPrograms(["docker", "bwrap"]);
+  const host = { arch: "x86_64", path: planted.dir, bus: {} };
   const container = runnerFor(
     { kind: "container", engine: "docker", image: IMAGE, dropped: ["cpus"], cpus: null },
     launcher,
@@ -167,6 +170,7 @@ Deno.test("runnerFor: one runner per backend", () => {
   );
   assert(container instanceof ContainerRunner);
   assertEquals([container.engine, container.caps.dropped], ["docker", ["cpus"]]);
+  assertEquals(container.program, planted.at("docker"));
   const oneCpu = {
     kind: "container",
     engine: "docker",
@@ -175,7 +179,9 @@ Deno.test("runnerFor: one runner per backend", () => {
     cpus: 1,
   } as const;
   assertEquals((runnerFor(oneCpu, launcher, host) as ContainerRunner).caps.cpus, 1);
-  assert(runnerFor({ kind: "bwrap", scope: false }, launcher, host) instanceof BwrapRunner);
+  const bwrap = runnerFor({ kind: "bwrap", scope: false }, launcher, host);
+  assert(bwrap instanceof BwrapRunner);
+  assertEquals([bwrap.bwrap, bwrap.systemdRun], [planted.at("bwrap"), null]);
   const seatbelt = runnerFor({ kind: "seatbelt" }, launcher, host);
   assert(seatbelt instanceof SeatbeltRunner);
   // Its scratch is capped by a disk image, made through the run's own launcher.
