@@ -1,5 +1,6 @@
 import type { ScopeRoot } from "../domain/checkout_scope.ts";
 import type { CheckoutWalk } from "../domain/checkout_trust.ts";
+import type { ParentFilter } from "../domain/instruction_parents.ts";
 import type { IndexedPath } from "../domain/path_index.ts";
 import type { BaseEntry, CommitEntry, TreeWalk } from "../domain/script_trust.ts";
 
@@ -64,10 +65,12 @@ export interface GitObjectReader {
   listPaths(commit: string): Promise<IndexedPath[]>;
   /**
    * The files directly in each folder above the project's, up to the repository's top, whose name
-   * `keep` accepts, a link with its target; none when the project is at the top. Paths are
-   * relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.
+   * `filter.file` accepts, and every file below a folder there `filter.folder` accepts beside the
+   * next folder on the way to the project; a link with its target; none when the project is at the
+   * top. Paths are relative to the project's folder (`../AGENTS.md`, `../Webapp/x.md`). A blob
+   * over the cap is a throw.
    */
-  listParents(commit: string, keep: (name: string) => boolean): Promise<BaseEntry[]>;
+  listParents(commit: string, filter: ParentFilter): Promise<BaseEntry[]>;
   /**
    * One path at `commit`, `../` climbing above the project's folder up to the repository's top;
    * absent above it. A blob over the cap is a throw.

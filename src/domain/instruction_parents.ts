@@ -7,9 +7,11 @@ import { holdsShortName, win32Reason } from "./win32_path.ts";
 /**
  * The files above a project that lives in a subfolder (part of the instruction class,
  * `instruction_trust.ts`): a harness started in the project reads `AGENTS.md` and `CLAUDE.md` in
- * every folder up to the repository's top, and git reads `.gitattributes` there. They are judged as HEAD commits them against the base's
- * tip, named relative to the project's folder (`../AGENTS.md`). The work tree's copies are not
- * walked: the walk stays inside the project, and the landing refuses a tree that is not clean.
+ * every folder up to the repository's top, and git reads `.gitattributes` there. They are judged
+ * as HEAD commits them against the base's tip, named relative to the project's folder
+ * (`../AGENTS.md`), with every file below a folder a disk may open as one on the way to the
+ * project ({@link isChainAlias}). The work tree's copies are not walked: the walk stays inside the
+ * project, and the landing refuses a tree that is not clean.
  */
 
 /**
@@ -34,6 +36,24 @@ const FOLDED_NAMES = PARENT_NAMES.map(win32Name);
  */
 export const isParentName = (name: string): boolean =>
   FOLDED_NAMES.includes(win32Name(name)) || holdsShortName(name);
+
+/**
+ * Whether a folder `name`, in a folder on the way from the repository's top to the project, may be
+ * opened as `chain`, the next folder on that way: another spelling of it that a disk folding names
+ * or Win32 opens as it (`win32Name`), or a name shaped like an 8.3 short name, which a volume that
+ * keeps them may open as any folder. A checkout writes what such a folder holds into `chain`, the
+ * project's own folder included, so all of it is listed.
+ */
+export const isChainAlias = (name: string, chain: string): boolean =>
+  name !== chain && (win32Name(name) === win32Name(chain) || holdsShortName(name));
+
+/** What `listParents` lists in each folder above the project: files, and folders read whole. */
+export type ParentFilter = {
+  readonly file: (name: string) => boolean;
+  readonly folder: (name: string, chain: string) => boolean;
+};
+
+export const PARENT_FILTER: ParentFilter = { file: isParentName, folder: isChainAlias };
 
 /** The parent files at HEAD, the base's tip and the merge base, as `listParents` lists them. */
 export type ParentSides = {
@@ -61,22 +81,28 @@ export function parentReasons(sides: ParentSides): Untrusted[] {
 
 const lostReason = (hadIt: boolean) => hadIt ? REASON.missing : REASON.behind;
 
-/**
- * Why HEAD's entry is not the tip's, or `null` when it is. A name the tip lacks that is not a
- * parent name as written is named for how Win32 reads it, else for its letter case.
- */
+/** Why HEAD's entry is not the tip's, or `null` when it is. */
 function headReason(e: BaseEntry, atTip?: BaseEntry, atOld?: BaseEntry): string | null {
   if (sameEntry(e, atTip)) return null;
-  const name = e.path.slice(e.path.lastIndexOf("/") + 1);
-  if (atTip === undefined && !PARENT_NAMES.includes(name)) {
-    return win32Reason(name) ?? REASON.caseDiffers;
-  }
+  const spelled = atTip === undefined ? spellingReason(e.path) : null;
+  if (spelled !== null) return spelled;
   const otherwise = atTip === undefined ? REASON.notOnBase : REASON.differs;
   if (e.kind !== "blob") return sameEntry(e, atOld) ? REASON.behind : otherwise;
   const tipBytes = atTip?.kind === "blob" ? atTip.bytes : undefined;
   const mergeBase = atOld?.kind === "blob" ? atOld.bytes : undefined;
   return invisibleReason(e.bytes) ??
     refinedReason(e.bytes, { copies: [tipBytes], mergeBase }, otherwise);
+}
+
+/**
+ * Why a path the tip lacks is named for its spelling, `null` for a parent name as written: a
+ * parent name in another spelling, or a file below a folder {@link isChainAlias} lists, is named
+ * for how Win32 reads it, else for its letter case.
+ */
+function spellingReason(path: string): string | null {
+  const below = path.replace(/^(\.\.\/)+/, "");
+  if (PARENT_NAMES.includes(below)) return null;
+  return win32Reason(below) ?? REASON.caseDiffers;
 }
 
 function byPath(entries: readonly BaseEntry[]): ReadonlyMap<string, BaseEntry> {

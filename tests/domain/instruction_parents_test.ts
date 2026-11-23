@@ -1,6 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { INSTRUCTION_REASON } from "../../src/domain/instruction_head.ts";
-import { isParentName, PARENT_NAMES, parentReasons } from "../../src/domain/instruction_parents.ts";
+import {
+  isChainAlias,
+  isParentName,
+  PARENT_NAMES,
+  parentReasons,
+} from "../../src/domain/instruction_parents.ts";
 import { type BaseEntry, REASON } from "../../src/domain/script_trust.ts";
 import { SHORT_NAME_REASON, WIN32_ALIAS_REASON } from "../../src/domain/win32_path.ts";
 
@@ -60,6 +65,8 @@ Deno.test("a parent name as Win32 opens it, or shaped like a short name, is list
       assertEquals(isParentName(kept), true, kept);
     }
   }
+  // U+017F folds to `s`: a disk that folds case may store `AGENTſ.md` as `AGENTS.md`.
+  assertEquals(isParentName("AGENT\u017f.md"), true);
   for (const name of ["README.md", "AGENTS.mdx", "notes~1x.md", ".gitignore"]) {
     assertEquals(isParentName(name), false, name);
   }
@@ -85,4 +92,25 @@ Deno.test("a short name or a Win32 alias the tip holds at that path is compared 
       `${path} ${REASON.differs}`,
     ]);
   }
+});
+
+Deno.test("a folder a disk may open as the next one on the way to the project is read whole", () => {
+  for (const name of ["Packages", "PACKAGES", "packages.", "packages ", "PACKAG~1", "DATA~2"]) {
+    assertEquals(isChainAlias(name, "packages"), true, name);
+  }
+  for (const name of ["packages", "packages2", "docs"]) {
+    assertEquals(isChainAlias(name, "packages"), false, name);
+  }
+});
+
+Deno.test("a file below such a folder the tip lacks is named for the folder's spelling", () => {
+  assertEquals(judge([blob("../../PACKAG~1/AGENTS.md"), blob("../Webapp/.claude/x.json")], []), [
+    `../../PACKAG~1/AGENTS.md ${SHORT_NAME_REASON}`,
+    `../Webapp/.claude/x.json ${REASON.caseDiffers}`,
+  ]);
+  assertEquals(judge([blob("../packages./notes.md")], []), [
+    `../packages./notes.md ${WIN32_ALIAS_REASON}`,
+  ]);
+  const held = blob("../Webapp/x.md");
+  assertEquals(judge([held], [held]), []);
 });

@@ -4,7 +4,8 @@ import { isFullSha } from "../domain/commit_sha.ts";
 import type { IndexedPath } from "../domain/path_index.ts";
 import { fromTop, toProject } from "../domain/project_path.ts";
 import type { BaseEntry, CommitEntry } from "../domain/script_trust.ts";
-import { catFiles, lsTree, withBytes } from "./git_tree_records.ts";
+import type { ParentFilter } from "../domain/instruction_parents.ts";
+import { catFiles, lsTree, type TreeRecord, withBytes } from "./git_tree_records.ts";
 import { decode, firstLine } from "./git_text.ts";
 import { UntrustedGit } from "./untrusted_git.ts";
 import { PLAIN_DIFF_FLAGS } from "./untrusted_git_flags.ts";
@@ -98,7 +99,9 @@ export class GitObjects implements GitObjectReader {
   async listCommit(commit: string, keep: (path: string) => boolean): Promise<CommitEntry[]> {
     const records = await lsTree(this.#git, this.projectPrefix, commit, ["-r", "-t"], true);
     const kept = records.filter((r) => keep(r.path));
-    const folders = kept.flatMap((r): CommitEntry[] => r.kind === "tree" ? [r] : []);
+    const folders = kept.flatMap((r): CommitEntry[] =>
+      r.kind === "tree" ? [{ kind: "tree", path: r.path }] : []
+    );
     return [...folders, ...await withBytes(this.#git, commit, kept)];
   }
 
@@ -113,17 +116,32 @@ export class GitObjects implements GitObjectReader {
     });
   }
 
-  async listParents(commit: string, keep: (name: string) => boolean): Promise<BaseEntry[]> {
+  async listParents(commit: string, filter: ParentFilter): Promise<BaseEntry[]> {
     const parts = this.projectPrefix.split("/").filter(Boolean);
     const out: BaseEntry[] = [];
     for (let up = 1; up <= parts.length; up++) {
       const dir = parts.slice(0, parts.length - up).map((p) => `${p}/`).join("");
-      const listed = await lsTree(this.#git, dir, commit, dir === "" ? [] : ["--", dir]);
-      const kept = listed.filter((r) => keep(r.path));
+      const kept = await this.#parentLevel(commit, dir, parts[parts.length - up], filter);
       const entries = await withBytes(this.#git, commit, kept);
       out.push(...entries.map((e) => ({ ...e, path: `${"../".repeat(up)}${e.path}` })));
     }
     return out;
+  }
+
+  /**
+   * The records of folder `dir` that `filter` keeps, relative to it, with everything below each
+   * folder it keeps beside `chain`. That folder is listed by its tree's id, so its name is never
+   * handed back to git as a pathspec, which git on macOS would precompose.
+   */
+  async #parentLevel(commit: string, dir: string, chain: string, filter: ParentFilter) {
+    const listed = await lsTree(this.#git, dir, commit, dir === "" ? [] : ["--", dir], true);
+    const kept: TreeRecord[] = listed.filter((r) => r.kind !== "tree" && filter.file(r.path));
+    for (const r of listed) {
+      if (r.kind !== "tree" || !filter.folder(r.path, chain)) continue;
+      const below = await lsTree(this.#git, "", r.sha, ["-r"]);
+      kept.push(...below.map((b) => ({ ...b, path: `${r.path}/${b.path}` })));
+    }
+    return kept;
   }
 
   async readFile(commit: string, path: string): Promise<BaseFile> {

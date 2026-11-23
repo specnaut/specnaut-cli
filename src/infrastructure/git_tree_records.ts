@@ -11,7 +11,8 @@ import { GitRefused, type UntrustedGit } from "./untrusted_git.ts";
 /** A blob `ls-tree -l` listed: a file's, or a link's, whose bytes are its target. */
 type BlobRecord = { kind: "blob" | "link"; path: string; sha: string; size: number };
 type FileRecord = BlobRecord | { kind: "submodule"; path: string; commit: string };
-type TreeRecord = FileRecord | { kind: "tree"; path: string };
+/** A record `ls-tree` listed; a folder carries its tree's id, which `ls-tree` lists in turn. */
+export type TreeRecord = FileRecord | { kind: "tree"; path: string; sha: string };
 
 /** `ls-tree -z -l --full-tree`, paths made relative to `prefix`; a tree entry only on `trees`. */
 export async function lsTree(
@@ -31,7 +32,7 @@ export async function lsTree(
     if (m[1] === "160000") records.push({ kind: "submodule", path, commit: m[3] });
     else if (m[1] === "120000") records.push({ kind: "link", ...blob });
     else if (m[2] === "blob") records.push({ kind: "blob", ...blob });
-    else if (trees && m[2] === "tree") records.push({ kind: "tree", path });
+    else if (trees && m[2] === "tree") records.push({ kind: "tree", path, sha: m[3] });
   }
   return records;
 }
