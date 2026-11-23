@@ -59,23 +59,27 @@ Deno.test("a binary bundle missing a binary is refused", () => {
   ]);
 });
 
+/** Runs the release check's entrypoint on `dir`; its exit code and everything it printed. */
+async function checkDir(dir: string) {
+  const out = await new Deno.Command("deno", {
+    args: ["run", "--allow-read", SCRIPT, dir],
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  const text = new TextDecoder().decode(out.stdout) + new TextDecoder().decode(out.stderr);
+  return { code: out.code, text };
+}
+
+/** A staged dir holding `binaryBundle` (none when null) and a correct installer bundle. */
 async function runCheck(binaryBundle: string | null) {
   const dir = await Deno.makeTempDir({ prefix: "attestation-bundles-" });
   try {
     if (binaryBundle !== null) {
       await Deno.writeTextFile(join(dir, ATTESTATION_ASSET_NAME), binaryBundle);
     }
-    await Deno.writeTextFile(
-      join(dir, INSTALLER_ATTESTATION_ASSET_NAME),
-      bundleCovering([INSTALLER_ASSET_NAME]),
-    );
-    const out = await new Deno.Command("deno", {
-      args: ["run", "--allow-read", SCRIPT, dir],
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    const text = new TextDecoder().decode(out.stdout) + new TextDecoder().decode(out.stderr);
-    return { code: out.code, text };
+    const installer = bundleCovering([INSTALLER_ASSET_NAME]);
+    await Deno.writeTextFile(join(dir, INSTALLER_ATTESTATION_ASSET_NAME), installer);
+    return await checkDir(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

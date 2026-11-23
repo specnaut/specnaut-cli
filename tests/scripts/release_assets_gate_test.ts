@@ -123,27 +123,22 @@ Deno.test("the release is attested by a workflow-identity signature, with no sto
   // consumed only when a storage record is written, the action gates that
   // behind `push-to-registry`, and the step sets `create-storage-record: false`
   // and pushes to no registry.
-  //
-  // This comment used to question whether the key was valid at all, and rest
-  // the constraint on that. It was checkable, and wrong. A correct constraint
-  // defended by a false premise is one the next reader deletes the moment they
-  // check it — so the reason above is the one that actually holds (cli#597).
   assert(
     !("artifact-metadata" in (build.permissions ?? {})),
     "artifact-metadata grants a permission this workflow never uses — it is " +
       "consumed only when pushing a storage record to a registry, which this " +
       "job does not do",
   );
+});
 
-  const steps = build.steps ?? [];
+Deno.test("every attestation runs before the checksums exist", async () => {
+  const steps = (await releaseWorkflow()).jobs.build?.steps ?? [];
   const attestAt = steps.flatMap((s, i) =>
     String((s as { uses?: string }).uses ?? "").startsWith("actions/attest@") ? [i] : []
   );
   const checksumAt = steps.findIndex((s) => s.name === "Compute checksums");
-  assert(
-    attestAt.length > 0,
-    "nothing attests the build — the release would be checksum-only again",
-  );
+  assert(attestAt.length > 0, "nothing attests the build — the release would be checksum-only");
+  assert(checksumAt >= 0, "the checksum step was renamed");
   assert(
     attestAt.every((i) => i < checksumAt),
     "attest must run before checksums exist, or its dist/specnaut-* glob picks up sidecars",

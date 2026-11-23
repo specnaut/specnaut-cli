@@ -73,24 +73,29 @@ Deno.test("the installer is not swept into the checksum loop", () => {
   assert(!INSTALLER_ASSET_NAME.startsWith("specnaut-"), "it would gain a .sha256 sidecar");
 });
 
+/**
+ * A downloaded release whose only bundle is the binaries', and it does not parse: an asset read
+ * against its own bundle is then `no-bundle` for the installer and anything else for a binary.
+ */
+async function releaseWithBinaryBundleOnly(dir: string): Promise<void> {
+  await Deno.writeTextFile(`${dir}/${ATTESTATION_ASSET_NAME}`, "not a bundle");
+  for (const t of TARGETS) await Deno.writeTextFile(`${dir}/${t.outName}`, t.outName);
+  await Deno.writeTextFile(`${dir}/${INSTALLER_ASSET_NAME}`, "#!/usr/bin/env bash\n");
+}
+
+const NO_ANCHOR = {
+  issuerCertDer: new Uint8Array(),
+  expectedOidcIssuer: "",
+  rekorPublicKeyDer: new Uint8Array(),
+};
+
 Deno.test("the release check reads each asset against its own bundle", async () => {
-  // Only the binary bundle is present, and it is not a bundle: the installer must be reported for
-  // its own absent bundle, the binaries for the one that does not parse.
   const dir = await Deno.makeTempDir({ prefix: "verify-installer-" });
   try {
-    await Deno.writeTextFile(`${dir}/${ATTESTATION_ASSET_NAME}`, "not a bundle");
-    for (const t of TARGETS) await Deno.writeTextFile(`${dir}/${t.outName}`, t.outName);
-    await Deno.writeTextFile(`${dir}/${INSTALLER_ASSET_NAME}`, "#!/usr/bin/env bash\n");
-    const anchor = {
-      issuerCertDer: new Uint8Array(),
-      expectedOidcIssuer: "",
-      rekorPublicKeyDer: new Uint8Array(),
-    };
-    const results = await verifyReleaseDir({ dir, identity: "", anchor });
-    assertEquals(
-      results.map((r) => r.outName),
-      [...TARGETS.map((t) => t.outName), INSTALLER_ASSET_NAME],
-    );
+    await releaseWithBinaryBundleOnly(dir);
+    const results = await verifyReleaseDir({ dir, identity: "", anchor: NO_ANCHOR });
+    const names = [...TARGETS.map((t) => t.outName), INSTALLER_ASSET_NAME];
+    assertEquals(results.map((r) => r.outName), names);
     const installer = results.find((r) => r.outName === INSTALLER_ASSET_NAME);
     assertEquals(installer?.reason, "no-bundle", "the installer was read against another bundle");
     const binaries = results.filter((r) => r.outName !== INSTALLER_ASSET_NAME);
