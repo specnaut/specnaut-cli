@@ -1,6 +1,6 @@
 import { climb } from "./project_path.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_index.ts";
-import { PS_PATH, PS_PATH_WORD } from "./powershell_path.ts";
+import { PS_PATH_WORD, psPathAsShell } from "./powershell_path.ts";
 
 /**
  * Which program a bare command name runs is decided by the folders on PATH, so a folder a judged
@@ -11,12 +11,11 @@ import { PS_PATH, PS_PATH_WORD } from "./powershell_path.ts";
  * or `${env:Path}` and every word after it (`$env:Path += ';bin'`), a list split on its commas
  * (`pathAssignments`). The key is read in any letter case, as Windows reads it, and in any object:
  * an unrelated key `path` (or a raw `--x-path=`) puts its value's folders on PATH too, which only
- * looks for more names in the listing. A folder
- * that cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
- * word spelled `PATH`, or a key `path` in any letter case of an object that sets a command's
- * environment (`surelySetsPath`). Any other is skipped, or every merge would stop for an
- * unrelated key. Only what the configs say is read: the PATH a shell builds before the session
- * starts is not.
+ * looks for more names in the listing. A folder that cannot be read makes the reading not whole
+ * only when its value surely sets PATH: a key or a word spelled `PATH`, or a key `path` in any
+ * letter case of an object that sets a command's environment (`surelySetsPath`). Any other is
+ * skipped, or every merge would stop for an unrelated key. Only what the configs say is read: the
+ * PATH a shell builds before the session starts is not.
  */
 
 /** A key or a word that sets PATH, in any letter case. */
@@ -50,15 +49,18 @@ function pathWordValue(word: string): PathValue | undefined {
 /**
  * What the PATH assignments among one command's words set PATH to: each `PATH=…` word, and, from
  * the first word naming PowerShell's PATH, every word after it, its `=` or `+=` taken off, glued or
- * not (`$env:Path+='x'`, `$env:Path +='x'`). A value PowerShell builds from parts (`$env:Path +
- * ';' + 'tools'`) is read part by part, a part too many only looking for more names; a word
- * holding a comma, which builds a list (`@('tools', $env:Path) -join ';'`), is read whole and
- * split on its commas, as the split words no longer say which comma was quoted. Not read here,
+ * not (`$env:Path+=';x'`, `$env:Path +=';x'`). A value PowerShell joins from parts at a `;`
+ * (`$env:Path + ';' + 'tools'`, `-join ';'`) is read part by part, a part too many only looking
+ * for more names; a word holding a comma, which builds a list (`@('tools', $env:Path) -join
+ * ';'`), is read whole and split on its commas, as the split words no longer say which comma was
+ * quoted. Words read one by one give a value whole only so: not read here,
  * each naming its source as not read whole (`setsPathUnread`, `buildsPathUnread`): PATH set
  * through the `env:` drive (`Set-Item env:Path`, `New-Item`, `Set-Content`, an alias) or .NET's
  * `[Environment]::SetEnvironmentVariable('Path', …)`; a value holding a `(` (`(Resolve-Path
- * tools).Path`, `(Join-Path $PWD 'tools')`), a `$(…)` or a bare name, which a cmdlet or a command
- * builds; a list holding anything but a quoted string with no variable but PATH, or PATH itself.
+ * tools).Path`, `(Join-Path $PWD 'tools')`), a `$(…)`, a bare name, a pipeline (`|`) or a call
+ * (`&`), which a cmdlet or a command builds; parts joined other than at a `;` (`'./to' + 'ols'`,
+ * `$env:Path + 'tools'`, `-join ''`) or by another operator (`-replace`, `-f`); a list holding
+ * anything but a quoted string with no variable but PATH, or PATH itself.
  * Not read at all: an assignment spelled across quotes a shell joins (`'$env:Path'' = …'`), whose
  * value is read from its words alone, as the string searched for it does not spell it.
  */
@@ -92,7 +94,7 @@ export function rawPathValues(line: string): PathValue[] {
  * PowerShell's `$env:Path` is read as `$PATH`, the PATH in effect, before its `:` splits it.
  */
 export const pathPieces = (value: string): string[] =>
-  value.replace(PS_PATH, "$$PATH").split(/[:;]/).filter(Boolean);
+  psPathAsShell(value).split(/[:;]/).filter(Boolean);
 
 /** The extensions Windows tries a bare name with: `PATHEXT`'s default, and PowerShell's `.ps1`. */
 const WINDOWS_EXTENSION = /\.(?:com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc|ps1)$/;

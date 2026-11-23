@@ -5,9 +5,10 @@ import { pathIndex } from "../../src/domain/path_index.ts";
 
 /**
  * PowerShell's PATH, `$env:Path` or `${env:Path}`, in any letter case: every word after it in its
- * command is read as a value it may be set to, so no way of building the value hides a folder. A
- * command that sets PATH another way, through the `env:` drive or .NET, is not read: its source is
- * named as not fully read.
+ * command is read as a value it may be set to, when the value is built only of quoted strings and
+ * PATH joined at a `;`. A value built any other way (a bracket, a command, a pipeline, parts joined
+ * elsewhere than at a `;`), or PATH set through the `env:` drive or .NET, is not read: its source
+ * is named as not fully read.
  */
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -27,7 +28,6 @@ function targets(found: ReturnType<typeof span>): string[] {
 Deno.test("each spelling of a PowerShell PATH set or appended to puts `tools` on PATH", () => {
   const spellings = [
     "$env:Path = $env:Path + ';tools'; lint",
-    "$env:Path = $env:Path + 'tools'; lint",
     "$env:Path+=';tools'; lint",
     "$env:Path += ';' + 'tools'; lint",
     "$env:Path +=';tools'; lint",
@@ -123,6 +123,7 @@ Deno.test("a list of quoted strings and PowerShell's PATH is read through, split
     "$env:Path = @('bin','tools') -join ';'; lint",
     "$env:Path = 'tools', $env:Path -join ';'; lint",
     '$env:Path = @("tools", "${env:Path}") -join \';\'; lint',
+    "$env:Path = @('tools', $env:Path) -join \";\"; lint",
   ];
   for (const command of lists) {
     const found = span(command);
@@ -138,6 +139,26 @@ Deno.test("a list holding anything but a quoted string or PATH is not read whole
     "$env:Path = @('tools', (Resolve-Path bin)) -join ';'; lint",
     "$env:Path = @(\"tools;$x\") -join ';'; lint",
     "$env:Path = 'tools', $x -join ';'; lint",
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("a pipeline or a call in a PowerShell PATH value is not read whole", () => {
+  const unread = [
+    "$env:Path = 'x' | ForEach-Object { './tools' }; lint",
+    "$env:Path = & { './tools' }; lint",
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("PowerShell PATH parts joined other than at a `;` are not read whole", () => {
+  const unread = [
+    "$env:Path = './to' + 'ols;' + $env:Path; lint",
+    "$env:Path = @('./to','ols') -join ''; lint",
+    "$env:Path = 'tXols' -replace 'X','o'; lint",
+    "$env:Path = '{0}ols' -f 'to'; lint",
+    "$env:Path = $env:Path + 'tools'; lint",
+    "$env:Path += 'tools'; lint",
   ];
   for (const command of unread) assertEquals(span(command).whole, false, command);
 });
