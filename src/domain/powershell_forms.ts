@@ -1,3 +1,4 @@
+import { psOption } from "./powershell_options.ts";
 import { quotedEnd } from "./powershell_text.ts";
 
 /**
@@ -60,20 +61,12 @@ export const PS_UNREAD_FORMS: readonly (readonly [form: string, pattern: RegExp]
 const SHELL = /(?:^|[\\/])(?:pwsh|powershell)(?:\.exe)?$/i;
 
 /**
- * Whether `word` is an option that hands PowerShell an encoded command: `-EncodedCommand` or any of
- * its prefixes from `-e`, or `-ec`, after a `-`, a `/` or a dash PowerShell reads as one
- * (`–`, `—`, `―`), in any letter case. Never `-ex` or `-ep`, which set the execution policy.
+ * Whether one command's words run PowerShell with an encoded command: an option after its name
+ * (`psOption`).
  */
-function encodedOption(word: string): boolean {
-  if (!/^[-/\u2013\u2014\u2015]/.test(word)) return false;
-  const option = word.slice(1).split(":")[0].toLowerCase();
-  return option === "ec" || (option !== "" && "encodedcommand".startsWith(option));
-}
-
-/** Whether one command's words run PowerShell with an encoded command: an option after its name. */
 export function encodedWords(words: readonly string[]): boolean {
   const shell = words.findIndex((w) => SHELL.test(w));
-  return shell >= 0 && words.slice(shell + 1).some(encodedOption);
+  return shell >= 0 && words.slice(shell + 1).some((w) => psOption(w, "encodedcommand"));
 }
 
 /**
