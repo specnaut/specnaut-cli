@@ -1,5 +1,6 @@
 import { isAbsolute, join } from "@std/path";
 import { type Dropped, filterGitPath, gitMissing } from "./git_path.ts";
+import { programOnPath } from "./program_on_path.ts";
 import {
   ENV_ALLOWLIST,
   LAZY_FETCH_FLAG,
@@ -51,9 +52,11 @@ const PROMISOR = "^(extensions\\.partialclone|remote\\..*\\.promisor)$";
 
 let lazySupport: Promise<boolean> | undefined;
 
-/** git's environment, and the first PATH entry left out of it. */
+/** git's environment, the git its PATH holds, and the first PATH entry left out of it. */
 export type GitEnv = {
   readonly env: Record<string, string>;
+  /** Started by this path, never by its name: Windows would look in the working folder first. */
+  readonly git: string;
   readonly dropped: Dropped | undefined;
 };
 
@@ -146,7 +149,10 @@ async function knowsLazyFetch(at: Place): Promise<boolean> {
     (major === LAZY_FETCH_SINCE[0] && minor >= LAZY_FETCH_SINCE[1]);
 }
 
-/** git's environment: the allowlist, its PATH kept outside `tree`, the hardened variables. */
+/**
+ * git's environment: the allowlist, its PATH kept outside `tree`, the hardened variables; and the
+ * git that PATH holds (`programOnPath`), refused when it holds none.
+ */
 export function untrustedGitEnv(source: EnvSource, tree: string): GitEnv {
   const env: Record<string, string> = {};
   for (const name of ENV_ALLOWLIST) {
@@ -158,7 +164,9 @@ export function untrustedGitEnv(source: EnvSource, tree: string): GitEnv {
   if (kept === "") {
     throw new GitRefused(gitMissing("no PATH entry outside the repository", dropped));
   }
-  return { env: { ...env, PATH: kept, ...UNTRUSTED_GIT_ENV }, dropped };
+  const git = programOnPath("git", kept);
+  if (git === undefined) throw new GitRefused(gitMissing(NOT_ON_PATH, dropped));
+  return { env: { ...env, PATH: kept, ...UNTRUSTED_GIT_ENV }, git, dropped };
 }
 
 /** The one spawn of git in the binary's reads of an unvetted repository. */
@@ -171,8 +179,8 @@ async function spawnGit(at: Place, args: string[], input?: Uint8Array): Promise<
 }
 
 function start(at: Place, args: string[], piped: boolean): Deno.ChildProcess {
-  const { env, dropped } = at.gitEnv();
-  const command = new Deno.Command("git", {
+  const { env, git, dropped } = at.gitEnv();
+  const command = new Deno.Command(git, {
     args,
     cwd: at.cwd,
     clearEnv: true,
@@ -185,6 +193,8 @@ function start(at: Place, args: string[], piped: boolean): Deno.ChildProcess {
     return command.spawn();
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) throw err;
-    throw new GitRefused(gitMissing("git is not on the PATH", dropped), { cause: err });
+    throw new GitRefused(gitMissing(NOT_ON_PATH, dropped), { cause: err });
   }
 }
+
+const NOT_ON_PATH = "git is not on the PATH";

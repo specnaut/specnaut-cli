@@ -147,10 +147,10 @@ const QUIET = { stdin: "null", stdout: "null", stderr: "piped" } as const;
 async function spawn(
   cwd: string,
   args: string[],
-  { env, dropped }: GitEnv,
+  { env, git, dropped }: GitEnv,
   signal: AbortSignal,
 ): Promise<Deno.CommandOutput> {
-  const command = new Deno.Command("git", { ...QUIET, args, cwd, clearEnv: true, env, signal });
+  const command = new Deno.Command(git, { ...QUIET, args, cwd, clearEnv: true, env, signal });
   try {
     return await command.output();
   } catch (err) {
@@ -178,10 +178,11 @@ function initArgs(format: string, gitDir: string): string[] {
  * is the checkout a branch could have put a `git` in.
  */
 function fetchEnv(source: EnvSource, project: string): GitEnv {
-  const { env, dropped } = untrustedGitEnv(source, project);
+  const { env, git, dropped } = untrustedGitEnv(source, project);
   const agent = source("SSH_AUTH_SOCK");
   const ssh: Record<string, string> = agent === undefined ? {} : { SSH_AUTH_SOCK: agent };
-  return { env: { ...env, ...ssh, LC_ALL: "C", LANG: "C", GIT_PROTOCOL_FROM_USER: "0" }, dropped };
+  const fixed = { LC_ALL: "C", LANG: "C", GIT_PROTOCOL_FROM_USER: "0" };
+  return { env: { ...env, ...ssh, ...fixed }, git, dropped };
 }
 
 /** git states the cause before the step that failed (fsck, then index-pack): keep each. */

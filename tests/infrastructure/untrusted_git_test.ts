@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
+import { dirname, fromFileUrl, join } from "@std/path";
+import { programOnPath } from "../../src/infrastructure/program_on_path.ts";
 import {
   GitRefused,
   UntrustedGit,
@@ -59,7 +60,8 @@ Deno.test("the variables the script exports are set, and no system configuration
 });
 
 Deno.test("only the allowlist of the caller's environment reaches git, and no GIT_* variable", () => {
-  const bin = Deno.build.os === "windows" ? "C:\\Windows" : "/bin";
+  // The folder of the caller's own git: a PATH holding no git is refused before any env is made.
+  const bin = dirname(programOnPath("git", Deno.env.get("PATH") ?? "")!);
   const caller: Record<string, string> = {
     PATH: bin,
     HOME: "/home/u",

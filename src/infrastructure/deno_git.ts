@@ -1,5 +1,6 @@
 import type { GitAdapter } from "../application/ports.ts";
 import { type Dropped, filterGitPath, gitMissing } from "./git_path.ts";
+import { programOnPath } from "./program_on_path.ts";
 import { UNREACHABLE } from "./fs_containment.ts";
 
 /**
@@ -32,12 +33,10 @@ export class DenoGit implements GitAdapter {
   }
 
   async init(dir: string): Promise<void> {
-    const { command, dropped } = projectGit(dir, ["init", "--quiet"], "null");
-    if (command === undefined) {
-      throw new Error(gitMissing("no PATH entry outside the repository", dropped));
-    }
+    const { command, missing, dropped } = projectGit(dir, ["init", "--quiet"], "null");
+    if (command === undefined) throw new Error(gitMissing(missing, dropped));
     const status = await answered(command);
-    if (status === undefined) throw new Error(gitMissing("git is not on the PATH", dropped));
+    if (status === undefined) throw new Error(gitMissing(NOT_ON_PATH, dropped));
     if (!status.success) throw new Error("git init failed");
   }
 
@@ -66,19 +65,27 @@ export function listTags(dir: string): string[] {
   return new TextDecoder().decode(out.stdout).split("\n").map((s) => s.trim()).filter(Boolean);
 }
 
-/** A git command for `dir`, or none when no PATH entry is left; the first entry left out. */
-type ProjectGit = { readonly command: Deno.Command | undefined; readonly dropped?: Dropped };
+/** A git command for `dir`, or none and why; the first entry left out. */
+type ProjectGit = {
+  readonly command: Deno.Command | undefined;
+  readonly missing: string;
+  readonly dropped?: Dropped;
+};
 
 /**
- * git in `dir` with the caller's environment, its PATH kept outside `dir`'s tree. With no entry
- * left there is no command: an empty PATH can mean the working folder, which is the project.
+ * git in `dir` with the caller's environment, its PATH kept outside `dir`'s tree, started by the
+ * file found there (`programOnPath`): Windows would look in the working folder first, which is the
+ * project. With no entry left, or no git on them, there is no command: an empty PATH can mean the
+ * working folder too.
  */
 function projectGit(dir: string, args: string[], stdout: "null" | "piped"): ProjectGit {
   const { kept, dropped } = filterGitPath(Deno.env.get("PATH") ?? "", dir);
-  if (kept === "") return { command: undefined, dropped };
+  const git = programOnPath("git", kept);
+  const missing = kept === "" ? "no PATH entry outside the repository" : NOT_ON_PATH;
+  if (git === undefined) return { command: undefined, missing, dropped };
   // Every spelling of the caller's PATH goes: Windows would see `Path` and `PATH` as two.
   const env = Object.entries(Deno.env.toObject()).filter(([k]) => k.toUpperCase() !== "PATH");
-  const command = new Deno.Command("git", {
+  const command = new Deno.Command(git, {
     args,
     cwd: dir,
     clearEnv: true,
@@ -86,7 +93,7 @@ function projectGit(dir: string, args: string[], stdout: "null" | "piped"): Proj
     stdout,
     stderr: "null",
   });
-  return { command, dropped };
+  return { command, missing, dropped };
 }
 
 /** What `command` returned, or undefined when there is none or no git is found to run it. */
@@ -100,3 +107,5 @@ async function answered(
     throw err;
   }
 }
+
+const NOT_ON_PATH = "git is not on the PATH";
