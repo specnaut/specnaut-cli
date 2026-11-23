@@ -102,9 +102,11 @@ Deno.test("the row names the PowerShell forms that set PATH no value is read fro
   );
   assert(row.includes("or the `Environment` provider, makes a drive (`New-PSDrive`, `ndr`"), row);
   assert(row.includes("hands an item cmdlet (`Set-Item`, `New-Item`, `Set-Content`"), row);
-  assert(row.includes('a path that is not a constant (`si "E$()nv$([char]58)Pa$()th"`'), row);
-  assert(row.includes("a `+`, a path from the pipeline, a `Path` the location decides"), row);
-  assert(row.includes("`&` before a `(`, a quote or a `$`, a `.` before a `$`"), row);
+  assert(row.includes("a path other than a plain word or string of letters, digits and"), row);
+  assert(row.includes("`si @a`, a variable, a `(…)`, a backtick, a wildcard, a `Path` the"), row);
+  assert(row.includes("location decides), or runs one after a `|`"), row);
+  assert(row.includes("`&` or `.` before a `(`, a quote or a `$`"), row);
+  assert(row.includes("one inside a quoted string a nested command runs ends its value"), row);
   assert(row.includes("assigns `$env:Path` in a list or with `??=`"), row);
   assert(row.includes("builds code or a member at run time (`Invoke-Expression`"), row);
   assert(row.includes("hands `pwsh` or `powershell` an encoded command"), row);
