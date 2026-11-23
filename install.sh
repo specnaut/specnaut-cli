@@ -170,8 +170,8 @@ install_with_sudo() {
 
 # Move $1 to $2, handling permission elevation transparently.
 # Sets FINAL_DEST to the actual install path (may differ from $2 on fallback).
-# The mode is set once, on the file the user owns, before any move carries it (cli#825): a chmod
-# after the move, as root, follows a link at $2 to whatever it names.
+# The mode is set once, on the file the user owns, before any move carries it (cli#825), so no
+# chmod runs as root after the move, where it would follow a link at $2 to whatever it names.
 install_binary() {
   local src="$1" dest="$2" dest_dir
   dest_dir="$(dirname "$dest")"

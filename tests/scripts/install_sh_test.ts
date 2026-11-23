@@ -129,3 +129,24 @@ Deno.test({
     }
   },
 });
+
+/**
+ * Whether the user may write the default PREFIX, or the nearest folder above it that exists. When
+ * so, a run with PREFIX unset would install into the host's own /usr/local/bin.
+ */
+const defaultPrefixWritable = !ignore && new Deno.Command("/bin/sh", {
+  args: ["-c", 'd=/usr/local/bin; while [ ! -e "$d" ]; do d=$(dirname "$d"); done; [ -w "$d" ]'],
+}).outputSync().success;
+
+Deno.test({
+  name: "install.sh falls back to ~/.local/bin, mode 755, when sudo is refused for the default",
+  ignore: !UNREADABLE_OK || defaultPrefixWritable, // only a refused default reaches the fallback
+  fn: () =>
+    inSandbox({}, async (s) => {
+      const { code, out } = await install(s, { PREFIX: "" }); // unset: the default
+      assertEquals(code, 0, out);
+      const fallback = join(s.home, ".local/bin");
+      assertStringIncludes(out, `installed to ${fallback} instead of /usr/local/bin`);
+      assertEquals((await Deno.stat(join(fallback, "specnaut"))).mode! & 0o777, 0o755);
+    }),
+});

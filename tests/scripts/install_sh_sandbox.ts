@@ -37,8 +37,9 @@ export type World = {
   /** install.sh as it is run; the repository's copy by default. */
   script?: string;
   /**
-   * A folder sudo makes writable for the command it then runs, as root could. Without a terminal
-   * to read a password from, the script's /dev/tty is then a file beside the stubs.
+   * A folder sudo makes writable for the command it then runs, as root could. The script's
+   * /dev/tty is then always a file beside the stubs, which opens without a terminal: this sudo reads
+   * no stdin.
    */
   sudoWrites?: string;
 };
