@@ -61,11 +61,12 @@ export function shippedLookup(
 }
 
 /**
- * Each of HEAD's skill files that Specnaut ships (`shipped`, by path in any letter case,
- * {@link shippedLookup}) and that holds neither copy. A link where Specnaut ships a file is named:
- * it reads as some other file. A path holding a code point outside ASCII that a disk may open as
- * a shipped one ({@link shippedAlias}) is named whatever it holds and whatever the base holds: no
- * fold here can say which file a disk opens for it, so it is asked about rather than matched.
+ * Each of HEAD's skill files that Specnaut ships (`shipped`, by path as written, or an ASCII path
+ * in any letter case, {@link shippedLookup}) and that holds neither copy. A link where Specnaut
+ * ships a file is named: it reads as some other file. A path holding a code point outside ASCII
+ * that a disk may open as a shipped one ({@link shippedAlias}) and that Specnaut does not ship as
+ * written is named whatever it holds and whatever the base holds: no fold here can say which file
+ * a disk opens for it, so it is asked about rather than matched.
  */
 export async function shippedReasons(
   head: readonly BaseEntry[],
