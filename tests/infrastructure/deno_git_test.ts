@@ -11,47 +11,71 @@ import { callerPath, plantGit, ran, withPath } from "../helpers/planted_git.ts";
  * proves the real git ran is what it did.
  */
 
-type Project = { dir: string; bin: string; fired: string };
+type Project = { dir: string; bin: string; fired: string; config: Record<string, string> };
 
-/** `fn` given a project folder whose `bin` holds a planted git, removed after. */
+/**
+ * `fn` given a project folder whose `bin` holds a planted git, removed after. Every git started
+ * meanwhile, the fixture's and the one under test, reads no global or system configuration: both
+ * name a file that is not there, so a caller's `url.*.insteadOf`, signing or hook settings cannot
+ * change what a test sees.
+ */
 async function inProject(fn: (p: Project) => Promise<void>): Promise<void> {
   const base = await Deno.realPath(await Deno.makeTempDir({ prefix: "deno-git-" }));
   const dir = join(base, "project");
-  const p = { dir, bin: join(dir, "bin"), fired: join(base, "fired") };
+  const none = join(base, "no-config");
+  const config = { GIT_CONFIG_GLOBAL: none, GIT_CONFIG_SYSTEM: none };
+  const p = { dir, bin: join(dir, "bin"), fired: join(base, "fired"), config };
   try {
     await plantGit(p.bin, p.fired);
-    await fn(p);
+    await withVars(config, () => fn(p));
     assertEquals(await ran(p.fired), false, "the planted git ran");
   } finally {
     await Deno.remove(base, { recursive: true });
   }
 }
 
+/** `fn` with `vars` set in this process, the value each had restored after. */
+async function withVars(vars: Record<string, string>, fn: () => Promise<void>): Promise<void> {
+  const before = Object.keys(vars).map((k) => [k, Deno.env.get(k)] as const);
+  for (const [k, v] of Object.entries(vars)) Deno.env.set(k, v);
+  try {
+    await fn();
+  } finally {
+    for (const [k, v] of before) {
+      if (v === undefined) Deno.env.delete(k);
+      else Deno.env.set(k, v);
+    }
+  }
+}
+
 const leftOut = (bin: string) =>
   `the entry "${bin}" was left out because it is inside the repository`;
 
-/**
- * The fixture's own git, checked: a step that fails throws with git's cause. It reads no global or
- * system configuration, so a developer's signing or hook settings cannot fail a commit here.
- */
-async function git(cwd: string, ...args: string[]): Promise<void> {
-  const env = { GIT_CONFIG_GLOBAL: join(cwd, "..", "no-global-config"), GIT_CONFIG_NOSYSTEM: "1" };
+/** The fixture's own git, in the project, checked: a step that fails throws with git's cause. */
+async function git(p: Project, ...args: string[]): Promise<void> {
   const id = ["-c", "user.name=t", "-c", "user.email=t@t"];
-  const out = await new Deno.Command("git", { args: [...id, ...args], cwd, env, stderr: "piped" })
+  const env = p.config;
+  const out = await new Deno.Command("git", {
+    args: [...id, ...args],
+    cwd: p.dir,
+    env,
+    stderr: "piped",
+  })
     .output();
   if (!out.success) throw new Error(`git ${args[0]}: ${new TextDecoder().decode(out.stderr)}`);
 }
 
 Deno.test("init, the version probe, the remote and the tags skip a git the project holds", () =>
-  inProject(async ({ dir, bin }) => {
+  inProject(async (p) => {
+    const { dir, bin } = p;
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(await new DenoGit(dir).isAvailable(), true);
       await new DenoGit(dir).init(dir);
     });
     assertEquals(await exists(join(dir, ".git")), true);
-    await git(dir, "remote", "add", "origin", "https://example.com/acme/my-app.git");
-    await git(dir, "commit", "--allow-empty", "-q", "-m", "base");
-    await git(dir, "tag", "v1.2.3");
+    await git(p, "remote", "add", "origin", "https://example.com/acme/my-app.git");
+    await git(p, "commit", "--allow-empty", "-q", "-m", "base");
+    await git(p, "tag", "v1.2.3");
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(
         await new DenoGit(dir).getRemoteUrl(dir, "origin"),
