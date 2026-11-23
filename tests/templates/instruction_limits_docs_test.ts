@@ -130,3 +130,47 @@ Deno.test("the row states what a command's targets leave unread", () => {
   assert(limits.includes("a path whose file name is a variable alone (`scripts/$NAME`)"), limits);
   assert(limits.includes("or that names no folder before a variable (`$NAME.sh`)"), limits);
 });
+
+Deno.test("the row says how each harness reads a `$` in a value that sets the environment", () => {
+  const row = instructionsRow();
+  assert(row.includes("a value Claude Code's settings `env` holds (copied as typed"), row);
+  assert(
+    row.includes("or an MCP server's `env` in `.codex/config.toml` (whose reading Codex"),
+    row,
+  );
+  assert(row.includes("when it holds a `$`, a backquote, a `~` or a `%`"), row);
+  assert(
+    row.includes("(where only `${VAR}` is expanded, from Claude Code's own environment)"),
+    row,
+  );
+  assert(row.includes("when it holds anything but an exact `${PATH}`"), row);
+  assert(row.includes("looked up both expanded and as written (`$PATH` copied as typed"), row);
+});
+
+Deno.test("the row names code a command assembles while it runs, and PATH bound otherwise", () => {
+  const row = instructionsRow();
+  assert(row.includes("a program named by an expansion or a pattern (`$CMD`, `./bin/l?nt`)"), row);
+  assert(
+    row.includes("handed to `eval`, a shell's `-c`, PowerShell's `-Command` or `cmd /c`"),
+    row,
+  );
+  assert(row.includes("or held by a word read as a command line, a quoted sentence holding"), row);
+  assert(row.includes("(no script, `-s`, `-`, `/dev/stdin`, a heredoc or a here-string)"), row);
+  assert(row.includes("a process substitution (`<(…)`, `>(…)`, `=(…)`)"), row);
+  assert(row.includes("(`read PATH`, `for PATH in`, `printf -v PATH`, `set -x PATH`"), row);
+  assert(row.includes("or a binder whose name holds an expansion"), row);
+  assert(row.includes("(a hook's `matcher`, a server's `url`, `cwd` or `headers`, an"), row);
+  assert(notRead().includes("the code `python -c`, `node -e` or `perl -e` is handed"), notRead());
+});
+
+Deno.test("the row names the files a command runs in its own process, the one read, and its cost", () => {
+  const row = instructionsRow();
+  assert(row.includes("(`.` or `source`, `--rcfile` or `--init-file`, a `.ps1` or `.psm1`"), row);
+  assert(row.includes("a `.bat` or `.cmd` run or `call`ed, `BASH_ENV` or `ENV`)"), row);
+  assert(row.includes("or `ZDOTDIR`, `HOME` or `XDG_CONFIG_HOME` set"), row);
+  assert(row.includes("a repository file named by a constant path from the project"), row);
+  assert(row.includes("read at HEAD and at the tip for the `PATH` it sets when each of its"), row);
+  assert(row.includes("the one target read for its text rather than judged by its bytes"), row);
+  assert(row.includes("(a virtualenv's `activate`, nvm's or cargo's environment)"), row);
+  assert(row.includes("so names its config on every merge"), row);
+});
