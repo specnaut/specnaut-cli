@@ -158,11 +158,19 @@ function place(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split
   }
 }
 
-/** A name holding a code point outside ASCII is judged as written, never as the name it may be. */
+/**
+ * A name holding a code point outside ASCII is judged as written, never as the name it may be. One
+ * that may stand for a root's folder and is not a folder is named so whatever the tip holds, as
+ * its ASCII twin in another letter case is.
+ */
 function placeNonAscii(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split): void {
   if (e.kind === "tree") return;
-  split.entries.push(e);
-  if (!tip.has(e.path)) split.reasons.push(why(e.path, NON_ASCII_REASON));
+  if (FOLDERS.includes(asciiSkeleton(e.path))) {
+    split.reasons.push(why(e.path, NOT_A_FOLDER));
+  } else {
+    split.entries.push(e);
+    if (!tip.has(e.path)) split.reasons.push(why(e.path, NON_ASCII_REASON));
+  }
 }
 
 const isOverride = (path: string) => COMMITTED_INSTRUCTIONS.some((p) => p === path);

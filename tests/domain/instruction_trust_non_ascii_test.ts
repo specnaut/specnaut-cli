@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
-import { keptAtHead } from "../../src/domain/instruction_scope.ts";
+import { keptAtHead, NOT_A_FOLDER } from "../../src/domain/instruction_scope.ts";
 import { NON_ASCII_REASON } from "../../src/domain/non_ascii_path.ts";
+import type { BaseEntry } from "../../src/domain/script_trust.ts";
 import { blob, file, judge, walked } from "./instruction_trust_fixture.ts";
 
 /**
@@ -40,4 +41,19 @@ Deno.test("a name holding a non-ASCII code point inside a root is named until th
   ]);
   const tip = [blob(path)];
   assertEquals(judge({ tree: walked(file(path)), tip, head: tip }), ["trusted"]);
+});
+
+Deno.test("a link HEAD holds where its skeleton names a root's folder is not one, tip or not", () => {
+  const link: BaseEntry = { kind: "link", path: ".\u017fpecnaut", target: "elsewhere" };
+  assert(keptAtHead(link.path));
+  for (const tip of [[], [link]]) {
+    assertEquals(judge({ tree: walked(), tip, head: [link] }), [`${link.path} ${NOT_A_FOLDER}`]);
+  }
+});
+
+Deno.test("a name holding U+212A, which lower-cases to an ASCII k, is named, never matched", () => {
+  const path = ".claude/skills/tas\u212a/SKILL.md";
+  assertEquals(judge({ tree: walked(), tip: [], head: [blob(path)] }), [
+    `${path} ${NON_ASCII_REASON}`,
+  ]);
 });
