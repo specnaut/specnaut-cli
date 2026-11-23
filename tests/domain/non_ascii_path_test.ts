@@ -27,6 +27,11 @@ Deno.test("U+0131 LATIN SMALL LETTER DOTLESS I reads as an i", () => {
   assertEquals(asciiSkeleton(".claude/sett\u0131ngs.json"), ".claude/settings.json");
 });
 
+Deno.test("U+1E9E LATIN CAPITAL LETTER SHARP S reads as ss, as full case folding reads it", () => {
+  assertEquals(asciiSkeleton(".claude/sub\u1e9eub/AGENTS.md"), ".claude/subssub/agents.md");
+  assertEquals(asciiSkeleton("\u1e9e\u00df"), "ssss", "and U+00DF, its small letter");
+});
+
 Deno.test("a mark or a code point with no ASCII reading is dropped, as a disk may ignore it", () => {
   assertEquals(asciiSkeleton("CLAUDE\u200b.md"), "claude.md");
   assertEquals(asciiSkeleton("caf\u00e9/\u0418.md"), "cafe/.md");

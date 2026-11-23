@@ -16,11 +16,12 @@ export const holdsNonAscii = (path: string): boolean => /\P{ASCII}/u.test(path);
 /**
  * The ASCII names a disk might open for `path`, as one string, folded to lower case: each code
  * point read through its compatibility decomposition and its upper case (U+017F is an s, U+0131
- * an i once upper-cased, U+212A a k), and each one still outside ASCII dropped, as a disk drops a
- * code point it ignores. It errs towards a match: a name it brings into scope is asked about, and
+ * an i once upper-cased, U+212A a k), lower-cased first so that U+1E9E reaches the ss its small
+ * letter upper-cases to, and each one still outside ASCII dropped, as a disk drops a code point
+ * it ignores. It errs towards a match: a name it brings into scope is asked about, and
  * never taken for the name it reads as.
  */
 export function asciiSkeleton(path: string): string {
-  const read = path.normalize("NFKD").toUpperCase().toLowerCase().normalize("NFKD");
+  const read = path.normalize("NFKD").toLowerCase().toUpperCase().toLowerCase().normalize("NFKD");
   return read.replace(/\P{ASCII}/gu, "");
 }
