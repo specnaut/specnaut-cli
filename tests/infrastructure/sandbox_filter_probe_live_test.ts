@@ -10,7 +10,7 @@ import { engineRunEnv } from "../../src/infrastructure/sandbox_engine_env.ts";
 import { filterObserver } from "../../src/infrastructure/sandbox_filter_observer.ts";
 import { DenoProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { ContainerRunner } from "../../src/infrastructure/sandbox_runners.ts";
-import { live, LIVE_IMAGE, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
+import { capture, live, LIVE_IMAGE, probed, runIn, withLayout } from "./sandbox_live_fixture.ts";
 
 /**
  * On a real engine, a container run records the names of the CLI's syscall profile its OCI runtime
@@ -89,7 +89,8 @@ async function recordedWithout(engine: Engine, left: string): Promise<FilterReco
         cpus: null,
         seccomp: runEnv.seccomp,
       };
-      const launcher = new DenoProcessLauncher();
+      // Its own sinks: a launcher on the process's stdout holds its writer for life.
+      const launcher = new DenoProcessLauncher(capture().stream, capture().stream);
       record = await filterObserver(archOf(engine))({
         launcher,
         program: engine,
