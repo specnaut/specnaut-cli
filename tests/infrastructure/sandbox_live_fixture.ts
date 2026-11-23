@@ -24,7 +24,7 @@ import { liveEngine } from "./sandbox_live_engine.ts";
 
 const host = { os: Deno.build.os, arch: Deno.build.arch };
 export const probed = await new HostBackendProber(
-  new DenoSubprocessRunner({ wholeEnv: true, inheritedPath: true }),
+  new DenoSubprocessRunner({ wholeEnv: true }),
   host,
   () => Promise.resolve({ kind: "none", why: "not read here" }),
 ).probe();

@@ -5,6 +5,7 @@ import {
   type ExecOutcome,
   type ExecRequest,
 } from "../../application/sandbox_exec.ts";
+import type { BackendProber } from "../../application/sandbox_ports.ts";
 import { userBus } from "../../domain/sandbox_bwrap_args.ts";
 import { type CappedLog, openCappedLog } from "../../infrastructure/capped_log.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
@@ -12,7 +13,7 @@ import { baseTipOf } from "../../application/verify_scripts.ts";
 import type { ImageSource } from "../../domain/sandbox_image.ts";
 import { readDevcontainerImage } from "../../infrastructure/devcontainer_image.ts";
 import { GitObjects } from "../../infrastructure/git_object_reader.ts";
-import { treeTop } from "../../infrastructure/git_path.ts";
+import { filterGitPath, treeTop } from "../../infrastructure/git_path.ts";
 import { decode } from "../../infrastructure/git_text.ts";
 import { GitRefused, type GitResult, UntrustedGit } from "../../infrastructure/untrusted_git.ts";
 import { FsSandboxHost } from "../../infrastructure/fs_sandbox_host.ts";
@@ -29,9 +30,9 @@ export function sandboxHostDeps(): SandboxDeps {
   const { os, arch } = Deno.build;
   const image = async () => baseImage(await checkout());
   // The engines are asked with the environment a run gives them, and nothing of ours beside it,
-  // and found on the PATH the run finds them on.
+  // and found, as every program started by name is, on the PATH the run finds them on.
   const prober = new HostBackendProber(
-    new DenoSubprocessRunner({ wholeEnv: true, inheritedPath: true }),
+    new DenoSubprocessRunner({ wholeEnv: true }),
     { os, arch },
     image,
   );
@@ -86,15 +87,25 @@ async function execWithLog(
   }
 }
 
-/** The real host's folders and runners; bubblewrap is found on our PATH, as the probe found it. */
-function execDeps(
-  prober: HostBackendProber,
+/**
+ * The PATH the sandbox's engines are found on by a run: ours, kept to the entries outside the tree
+ * the binary runs in (`filterGitPath`), the ones the probe's runner keeps (`DenoSubprocessRunner`).
+ * An entry in the checkout would supply the engine meant to isolate it, and a run that searched
+ * another PATH than the probe could start an engine the probe never saw.
+ */
+export function enginePath(): string {
+  return filterGitPath(Deno.env.get("PATH") ?? "", Deno.cwd()).kept;
+}
+
+/** The real host's folders and runners; each engine is found on `enginePath`, as the probe was. */
+export function execDeps(
+  prober: BackendProber,
   checkout: () => Promise<string>,
   log: CappedLog | null,
 ): ExecDeps {
   const { os, arch } = Deno.build;
   const env = (name: string) => Deno.env.get(name);
-  const path = env("PATH") ?? "/usr/bin:/bin";
+  const path = enginePath();
   return {
     prober,
     host: new FsSandboxHost(exportCacheRoot(os, env), env("HOME") ?? "", checkout),

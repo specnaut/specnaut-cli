@@ -67,11 +67,7 @@ function refusing(made: string[]): ExecDeps["runnerFor"] {
 async function execOnWindows(w: World, head: string) {
   const facts = { os: "windows", arch: Deno.build.arch };
   const none = () => Promise.resolve({ kind: "none", why: "not read here" } as const);
-  const prober = new HostBackendProber(
-    new DenoSubprocessRunner({ inheritedPath: true }),
-    facts,
-    none,
-  );
+  const prober = new HostBackendProber(new DenoSubprocessRunner(), facts, none);
   const made: string[] = [];
   const deps: ExecDeps = { prober, host: hostOf(w), runnerFor: refusing(made) };
   const [out, err]: string[][] = [[], []];

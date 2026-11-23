@@ -90,8 +90,8 @@ function containerName(): string {
 }
 
 /**
- * The host facts a runner needs: the architecture its filter is for, the PATH that finds bwrap,
- * and the user bus (`userBus`) a systemd user scope is reached through.
+ * The host facts a runner needs: the architecture its filter is for, the PATH that finds its
+ * engine (the probe's), and the user bus (`userBus`) a systemd user scope is reached through.
  */
 export type RunnerHost = {
   readonly arch: string;
@@ -105,8 +105,10 @@ export function runnerFor(
   host: RunnerHost,
 ): SandboxRunner {
   switch (backend.kind) {
-    case "container":
-      return new ContainerRunner(backend.engine, backend.image, launcher, backend);
+    case "container": {
+      const env = () => ({ ...Deno.env.toObject(), PATH: host.path });
+      return new ContainerRunner(backend.engine, backend.image, launcher, backend, undefined, env);
+    }
     case "bwrap":
       return new BwrapRunner(host.arch, launcher, host.path, backend.scope, host.bus);
     case "seatbelt":

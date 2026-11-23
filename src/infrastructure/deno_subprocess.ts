@@ -11,11 +11,6 @@ export type RunnerOptions = {
    * none keeps ours either way.
    */
   readonly wholeEnv?: boolean;
-  /**
-   * The program is looked up on the PATH as given, the working folder's own entries included.
-   * Only the sandbox's engines keep it: its run finds them on that PATH too, so the probe must.
-   */
-  readonly inheritedPath?: boolean;
 };
 
 /** The child's environment, and the first PATH entry left out of it. */
@@ -58,7 +53,6 @@ export class DenoSubprocessRunner implements SubprocessRunner {
 
   private launch(opts?: SubprocessOptions): Launch {
     const whole = this.options.wholeEnv === true && opts?.env !== undefined;
-    if (this.options.inheritedPath === true) return { env: opts?.env, clearEnv: whole };
     const given = whole ? opts?.env : { ...Deno.env.toObject(), ...opts?.env };
     return { ...outsideTree(given ?? {}, opts?.cwd ?? Deno.cwd()), clearEnv: true };
   }
