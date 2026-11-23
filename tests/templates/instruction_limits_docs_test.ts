@@ -57,13 +57,16 @@ Deno.test("the row names the programs on a judged PATH, and the PATH a shell bui
   assert(row.includes("each program a command names by name alone in each folder a judged"), row);
   assert(row.includes("so the one a wrapper runs too (`timeout 30 lint`, `bash -c 'lint'`)"), row);
   assert(row.includes("bare or with a Windows extension (`lint.cmd`)"), row);
-  assert(
-    row.includes("`PATH` folder that holds a variable past its start (`./tools/$OS/bin`)"),
-    row,
-  );
+  assert(row.includes("`PATH` folder that holds any expansion but `$PATH` and that variable"), row);
+  assert(row.includes("(`$T/bin`, `${X:+…}`, `$(…)`) or a variable past its start"), row);
   assert(row.includes("(`./tools/$OS/bin`) under a key or a word spelled `PATH`"), row);
   assert(row.includes("a key `path` in any letter case of an `env` object or of Codex's"), row);
-  assert(row.includes("a variable alone other than `$PATH`, such as `$CLAUDE_PROJECT_DIR`"), row);
+  assert(
+    row.includes("`$CLAUDE_PROJECT_DIR` or `${CLAUDE_PROJECT_DIR}`, alone or before a `/`"),
+    row,
+  );
+  assert(row.includes("while no judged source spells that name another way"), row);
+  assert(row.includes("or binds a variable through `eval` or an expansion"), row);
   assert(row.includes("a path with `..` after a variable (`tools/$OS/../run.sh`)"), row);
   const limits = notRead();
   assert(limits.includes("such a folder under another spelling (a key `path`"), limits);
@@ -82,8 +85,27 @@ Deno.test("the row names each PowerShell PATH form it reads, and each it does no
   assert(row.includes("or by another operator (`-replace`, `-f`)"), row);
   assert(row.includes('a variable other than `$env:Path` (`"$t;$env:Path"`)'), row);
   assert(row.includes("a typographic quote (`’`, `”`), no item before the line's end"), row);
+  assert(row.includes("a string PowerShell reads otherwise than its words do (`'to''ols'`"), row);
+  assert(row.includes("or not ended by its `-join ';'`"), row);
   const limits = notRead();
   assert(limits.includes("assignment spelled across quotes a shell joins (`'$env:Path'' = …'`)"));
+  assert(limits.includes("reflection through none of those primitives"), limits);
+});
+
+Deno.test("the row names the PowerShell forms that set PATH no value is read from", () => {
+  const row = instructionsRow();
+  assert(
+    row.includes("names the `env:` drive (`Set-Item env:Path …`, `gci env:`, a wildcard"),
+    row,
+  );
+  assert(row.includes("or the `Environment` provider, makes a drive (`New-PSDrive`, `ndr`"), row);
+  assert(row.includes("builds a drive's name from parts (`'en' + 'v:Path'`"), row);
+  assert(row.includes("assigns `$env:Path` in a list or with `??=`"), row);
+  assert(row.includes("builds code or a member at run time (`Invoke-Expression`"), row);
+  assert(row.includes("hands `pwsh` or `powershell` an encoded command"), row);
+  assert(row.includes("writes what the next session inherits (`setx`, the registry's"), row);
+  assert(row.includes("as written and as PowerShell's tokenizer reads it, where a `PATH`"), row);
+  assert(row.includes("spelled through a backtick, a comment or a line's join"), row);
 });
 
 Deno.test("the row states what a command's targets leave unread", () => {
