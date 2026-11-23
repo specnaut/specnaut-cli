@@ -41,16 +41,34 @@ export type ShippedCopy = {
 export const isSkillPath = (path: string): boolean => SKILL_ROOTS.some((r) => path.startsWith(r));
 
 /**
- * Each of HEAD's skill files that Specnaut ships (`shipped`, by path) and that holds neither copy.
- * A link where Specnaut ships a file is named: it reads as some other file.
+ * The copy Specnaut ships at a path, looked up as written, else in any letter case: a case-blind
+ * disk gives a session one file for both names, so a case twin or a case-only rename is the
+ * shipped skill customised, never a skill Specnaut does not ship. A copy found only in another case
+ * carries no approval: a yes binds the one path it names (`skill_approvals.ts`).
+ */
+export function shippedLookup(
+  shipped: ReadonlyMap<string, ShippedCopy>,
+): (path: string) => ShippedCopy | undefined {
+  const folded = new Map<string, ShippedCopy>();
+  for (const [path, { approvedSha256: _, ...copy }] of shipped) {
+    folded.set(path.toLowerCase(), copy);
+  }
+  return (path) => shipped.get(path) ?? folded.get(path.toLowerCase());
+}
+
+/**
+ * Each of HEAD's skill files that Specnaut ships (`shipped`, by path in any letter case,
+ * {@link shippedLookup}) and that holds neither copy. A link where Specnaut ships a file is named:
+ * it reads as some other file.
  */
 export async function shippedReasons(
   head: readonly BaseEntry[],
   shipped: ReadonlyMap<string, ShippedCopy>,
 ): Promise<Untrusted[]> {
   const out: Untrusted[] = [];
+  const copyAt = shippedLookup(shipped);
   for (const e of head) {
-    const copy = isSkillPath(e.path) ? shipped.get(e.path) : undefined;
+    const copy = copyAt(e.path);
     if (copy !== undefined && !await holdsCopy(e, copy)) {
       out.push({ path: e.path, reason: SHIPPED_REASON });
     }

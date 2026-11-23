@@ -12,6 +12,7 @@ import {
   leavingCopies,
   lockSkillReasons,
   type ShippedCopy,
+  shippedLookup,
 } from "../domain/shipped_skills.ts";
 import { lockShaInput } from "../domain/template.ts";
 import { committedApprovals } from "./committed_approvals.ts";
@@ -24,10 +25,12 @@ import type { GitObjectReader } from "./script_trust_ports.ts";
  * The skill files Specnaut ships to this project, as `shipped_skills.ts` judges them: each path the
  * lock at the base's tip records, with the digest it records, each regular file this binary
  * bundles for that lock, with its bytes, and the digest the approvals at that tip record for it
- * (`committed_approvals.ts`), honoured only on a path Specnaut ships. No lock there, or one this
- * binary cannot map, ships nothing here: the script check already names a lock it cannot use. Each
- * path the lock at the merge base ships and HEAD's does not is judged too (`leavingCopies`), so a
- * HEAD lock this binary cannot read leaves every path the merge base's ships.
+ * (`committed_approvals.ts`), honoured only on a path Specnaut ships in some letter case: one named
+ * in another case is added as a copy of its own, so a renamed skill a yes covered holds under the
+ * name the yes gave (`shippedLookup`). No lock there, or one this binary cannot map, ships nothing
+ * here: the script check already names a lock it cannot use. Each path the lock at the merge base
+ * ships and HEAD's does not is judged too (`leavingCopies`), so a HEAD lock this binary cannot read
+ * leaves every path the merge base's ships.
  */
 
 export type ShippedDeps = {
@@ -62,8 +65,9 @@ export type ShippedInput = {
 export async function shippedInput(deps: ShippedDeps, base: ShippedBase): Promise<ShippedInput> {
   const { approvals, refused } = await committedApprovals(deps.git, base.tip);
   const copies = shippedSkills(deps, await baseLock(deps.git, base.tip));
+  const copyAt = shippedLookup(copies);
   for (const [path, approvedSha256] of approvals) {
-    const copy = copies.get(path);
+    const copy = copyAt(path);
     if (copy !== undefined) copies.set(path, { ...copy, approvedSha256 });
   }
   const head = await baseLock(deps.git, base.head);

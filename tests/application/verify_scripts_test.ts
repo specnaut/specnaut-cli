@@ -127,6 +127,15 @@ Deno.test("a local base ahead of origin's copy is a reason; level with it is non
   assertEquals(await reasons({ commits, ahead: 0 }), []);
 });
 
+// What a yes is judged against, and what `--base-tip` hands the approvals write: origin's copy.
+Deno.test("the base tip is origin's copy, never a local base behind it", async () => {
+  const stale = "d".repeat(40);
+  const out = await run({
+    commits: { "refs/remotes/origin/main": TIP, "refs/heads/main": stale, HEAD },
+  });
+  assertEquals(out.kind === "judged" && out.baseTip, TIP);
+});
+
 Deno.test("each way the lock at the base cannot be used is a reason on the verdict", async () => {
   const at = (r: string[]) => r.filter((l) => l.startsWith(`${BASE_LOCK} at base: `));
   assertEquals(await reasons({ lock: { kind: "not_regular" } }), [

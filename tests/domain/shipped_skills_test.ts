@@ -8,6 +8,7 @@ import {
   lockSkillReasons,
   SHIPPED_REASON,
   type ShippedCopy,
+  shippedLookup,
   shippedReasons,
 } from "../../src/domain/shipped_skills.ts";
 
@@ -74,6 +75,24 @@ Deno.test("an approval never holds a link where Specnaut ships a file", async ()
   const link: BaseEntry = { kind: "link", path: SKILL, target: "mine" };
   const copy: ShippedCopy = { bytes: enc("ship"), approvedSha256: await sha256Hex("mine") };
   assertEquals(await judge([link], [[SKILL, copy]]), [`${SKILL} ${SHIPPED_REASON}`]);
+});
+
+// A case-blind disk gives a session one file for both names: the twin is the shipped skill.
+const TWIN = ".claude/skills/Task/SKILL.md";
+
+Deno.test("a skill in another letter case than a shipped one is judged against its copy", async () => {
+  const ship: [string, ShippedCopy][] = [[SKILL, { bytes: enc("ship") }]];
+  assertEquals(await judge([blob(SKILL, "ship"), blob(TWIN, "edited")], ship), [
+    `${TWIN} ${SHIPPED_REASON}`,
+  ]);
+  assertEquals(await judge([blob(TWIN, "ship")], ship), [], "a rename holding the shipped bytes");
+});
+
+Deno.test("a copy found only in another letter case carries no approval", async () => {
+  const copy: ShippedCopy = { bytes: enc("ship"), approvedSha256: await sha256Hex("mine") };
+  assertEquals(await judge([blob(TWIN, "mine")], [[SKILL, copy]]), [`${TWIN} ${SHIPPED_REASON}`]);
+  const copyAt = shippedLookup(new Map([[SKILL, copy]]));
+  assertEquals([copyAt(SKILL), copyAt(TWIN)], [copy, { bytes: enc("ship") }]);
 });
 
 const entry = (sha256: string) => ({ sha256, installedAt: "", templatesVersion: "" });
