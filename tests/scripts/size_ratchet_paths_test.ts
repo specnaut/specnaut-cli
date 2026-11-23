@@ -9,7 +9,7 @@
 //
 // cli#812: every case runs under the bash PATH finds and under macOS's stock
 // /bin/bash 3.2, pinned as twin_runner.ts pins it. On a Mac PATH usually finds
-// a newer bash, and `size_quoted`'s byte ranges are read by both.
+// a newer bash, and `c_quoted`'s byte ranges are read by both.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";

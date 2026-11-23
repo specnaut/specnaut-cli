@@ -13,7 +13,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { dirname, fromFileUrl, join } from "@std/path";
 import { BOUNDARIES_CONFIG_PATH } from "../../src/domain/constitution_paths.ts";
-import { run, symlinkUnsure } from "./size_ratchet_fixture.ts";
+import { quoted, run, symlinkUnsure } from "./size_ratchet_fixture.ts";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 
 const SCRIPT = bashPath(fromFileUrl(
@@ -65,7 +65,7 @@ Deno.test("a forbidden import fails, as file:line: pattern", async () => {
   const dir = await repo({ "src/domain/order.ts": VIOLATION }, config(DOMAIN, FORBID));
   const r = await check(dir);
   assertEquals(r.code, 1, r.stdout + r.stderr);
-  assertStringIncludes(r.stderr, `src/domain/order.ts:2: ${FORBID[0]}`);
+  assertStringIncludes(r.stderr, `src/domain/order.ts:2: ${quoted(FORBID[0])}`); // its `"`s
   assert(!r.stdout.includes(CLEAN));
 });
 
@@ -112,11 +112,11 @@ Deno.test("an unreadable config, a link at its path, or a bad pattern exits 2", 
   assertStringIncludes(b.stderr, "line 4: forbid: '(unbalanced' is not an extended regular");
 });
 
-Deno.test("a non-ASCII file name is read and reported verbatim", async () => {
+Deno.test("a non-ASCII file name is read, and reported as git quotes it", async () => {
   const dir = await repo({ "src/domain/café.ts": VIOLATION }, config(DOMAIN, FORBID));
   const r = await check(dir);
   assertEquals(r.code, 1, r.stdout + r.stderr);
-  assertStringIncludes(r.stderr, "src/domain/café.ts:2:");
+  assertStringIncludes(r.stderr, `${quoted("src/domain/café.ts")}:2:`);
 });
 
 Deno.test("a pattern starting with - is a pattern, not an option", async () => {

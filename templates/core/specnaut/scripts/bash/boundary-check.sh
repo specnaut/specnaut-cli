@@ -34,6 +34,9 @@
 # blob read by id: no work tree file is. No GIT_* variable the script inherits is
 # kept: a hook's GIT_DIR or index names another view of the repository.
 #
+# Every configured value and every path is printed through `c_quoted` (_c_quoted.sh), as the
+# size ratchet prints its paths: a control byte in one would act on the terminal.
+#
 # Exit codes — a skip is never a pass, and neither is a check that broke:
 #   0   every tracked file under `domain:` was checked and none matches
 #   1   at least one match — each printed as `path:line: pattern`
@@ -54,8 +57,8 @@ usage() { fail "usage: boundary-check.sh [--head <sha> [--objects <dir>]]"; }
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
-{ . "$here/_config.sh" && . "$here/_explicit_head.sh"; } ||
-  fail "_config.sh or _explicit_head.sh is missing beside the script"
+{ . "$here/_config.sh" && . "$here/_c_quoted.sh" && . "$here/_explicit_head.sh"; } ||
+  fail "_config.sh, _c_quoted.sh or _explicit_head.sh is missing beside the script"
 # Every git call below, given an objects folder, reads it under explicit_head_git's settings.
 git() { explicit_head_git "$@"; }
 explicit_head_clear_env || fail "an inherited GIT_* variable cannot be dropped"
@@ -68,7 +71,7 @@ rc=0 && explicit_head_options "$@" || rc=$?
 [ "$rc" -eq 0 ] || usage
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
-cd -- "$REPO_ROOT" || fail "cannot enter $REPO_ROOT"
+cd -- "$REPO_ROOT" || fail "cannot enter $(c_quoted "$REPO_ROOT")"
 explicit_head_from_options git || fail "--head: $EXPLICIT_REFUSAL"
 explicit_head_env
 
@@ -88,7 +91,7 @@ while IFS=$'\t' read -r kind n key value; do
       # name the entry instead. Exit 1 is "no match", which is fine here.
       grep -E -q -e "$value" </dev/null 2>/dev/null
       [ "$?" -le 1 ] ||
-        fail "$CONFIG_BOUNDARIES: line $n: forbid: '$value' is not an extended regular expression"
+        fail "$CONFIG_BOUNDARIES: line $n: forbid: '$(c_quoted "$value")' is not an extended regular expression"
       patterns+=("$value")
       ;;
   esac
@@ -118,7 +121,7 @@ files=() objects=() tracked=0
 for i in "${!domains[@]}"; do
   domain="${domains[$i]}"
   err="$(list_domain "$domain" 2>&1 >"$listing")" ||
-    fail "$CONFIG_BOUNDARIES: line ${domain_lines[$i]}: domain: '$domain' cannot be listed — ${err%%$'\n'*}"
+    fail "$CONFIG_BOUNDARIES: line ${domain_lines[$i]}: domain: '$(c_quoted "$domain")' cannot be listed — $(c_quoted "${err%%$'\n'*}")"
   found=0 prev=""
   # Each record: `<mode> <object> <stage>\t<path>` from the index, or `<mode> blob
   # <object>\t<path>` from a head's tree. A conflicted path comes once per stage,
@@ -138,7 +141,7 @@ for i in "${!domains[@]}"; do
     if [ -z "$EXPLICIT_HEAD" ] && [ -L "$path" ]; then continue; fi
     is_exempt "$path" || { files+=("$path") && objects+=("$object"); }
   done <"$listing"
-  [ "$found" = 1 ] || echo "  note: domain: '$domain' (line ${domain_lines[$i]}) names no tracked file"
+  [ "$found" = 1 ] || echo "  note: domain: '$(c_quoted "$domain")' (line ${domain_lines[$i]}) names no tracked file"
 done
 
 [ "$tracked" -gt 0 ] || skip "no tracked file under domain: in $CONFIG_BOUNDARIES"
@@ -153,22 +156,23 @@ violations=()
 for i in "${!files[@]}"; do
   file="${files[$i]}" src="${files[$i]}"
   if [ -n "$EXPLICIT_HEAD" ] || [ ! -e "$file" ]; then
-    git cat-file blob "${objects[$i]}" >"$blob" || fail "$file: git could not read its blob"
+    git cat-file blob "${objects[$i]}" >"$blob" || fail "$(c_quoted "$file"): git could not read its blob"
     src="$blob"
   fi
   # One pass with every pattern; only a file that matches is read again, per
   # pattern, to say which one. -a: a file holding a NUL is read as text, never skipped.
   grep -E -a -q "${grep_args[@]}" -- "$src"
   status=$?
-  [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
+  [ "$status" -le 1 ] || fail "$(c_quoted "$file"): grep could not read it (exit $status)"
   [ "$status" = 0 ] || continue
+  shown="$(c_quoted "$file")"
   for pat in "${patterns[@]}"; do
     # Only the line numbers: a line's own bytes, a NUL among them, never reach a variable.
     hits="$(grep -E -a -n -e "$pat" -- "$src" | cut -d: -f1)"
     status=$?
-    [ "$status" -le 1 ] || fail "$file: grep could not read it (exit $status)"
+    [ "$status" -le 1 ] || fail "$shown: grep could not read it (exit $status)"
     while IFS= read -r hit; do
-      [ -n "$hit" ] && violations+=("$file:$hit: $pat")
+      [ -n "$hit" ] && violations+=("$shown:$hit: $(c_quoted "$pat")")
     done <<<"$hits"
   done
 done

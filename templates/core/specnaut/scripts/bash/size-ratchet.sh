@@ -35,7 +35,7 @@
 # lists — Specnaut's own artefacts, which `specnaut upgrade` rewrites — plus
 # binary files, the config's `exempt:` globs and generated code. Only generated
 # code is named, as `generated:` (`_size_exempt.sh` says what counts); the rest
-# is left out unnamed. Every line names a path through `size_quoted`, C-quoted
+# is left out unnamed. Every line names a path through `c_quoted`, C-quoted
 # as git quotes it, never raw. One file is the exception: `docs/constitution.md`, loaded into every session, is held to the
 # `constitution` unit whenever it changes. No exemption reaches it; a project
 # that wants no limit sets its `target` and `ceiling` to `none`.
@@ -59,9 +59,9 @@ set -uo pipefail
 # Sourced before the `cd` below: the script's own directory may be relative.
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/_config.sh disable=SC1091
-{ . "$here/_config.sh" && . "$here/_explicit_head.sh" && . "$here/_size_ratchet_args.sh" &&
-  . "$here/_size_exempt.sh"; } || {
-  echo "size-ratchet: _config.sh, _explicit_head.sh, _size_ratchet_args.sh or _size_exempt.sh is missing beside the script" >&2
+{ . "$here/_config.sh" && . "$here/_c_quoted.sh" && . "$here/_explicit_head.sh" &&
+  . "$here/_size_ratchet_args.sh" && . "$here/_size_exempt.sh"; } || {
+  echo "size-ratchet: _config.sh, _c_quoted.sh, _explicit_head.sh, _size_ratchet_args.sh or _size_exempt.sh is missing beside the script" >&2
   exit 3
 }
 git() { explicit_head_git "$@"; } # every git call below: an --objects folder, read safely
@@ -156,7 +156,7 @@ while IFS= read -r -d '' status; do
   if [ -n "$base" ]; then before="$(count_at "$base:$old")"; else before=0; fi
   after="$(count_at "$head_prefix$path")"
   checked=$((checked + 1))
-  shown="$(size_quoted "$path")"
+  shown="$(c_quoted "$path")"
   line="$shown: $before → $after (target $t, ceiling $c)$label"
   [ "$REPORT" = 1 ] && echo "  $shown: $before → $after"
 
