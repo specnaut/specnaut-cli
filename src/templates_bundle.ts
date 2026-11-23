@@ -38110,6 +38110,8 @@ function Read-SelectedRecords(\$Records) {
 # A string holding a lone surrogate escape parses here, and throws only when GetString()
 # reads it; jq refuses the whole file at parse. So each reader's one try spans every
 # GetString() it reaches, the predicates' included, and the twins name the same widening.
+# That try also spans this file's own code, so its catch writes the exception to stderr
+# first: the named problem alone would read a bug here as the user's file being malformed.
 
 \$script:GateOwnerId = '\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z'
 # A path holding a code point outside printable ASCII, \`~\` and a digit, or \`:\`, or a name ending
@@ -38154,6 +38156,13 @@ function Get-SortedUnique(\$Value) {
     \$set.CopyTo(\$sorted)
     [Array]::Sort(\$sorted, [StringComparer]::Ordinal)
     return , \$sorted
+}
+# One line on stderr: the innermost exception's type and message, control characters
+# blanked, as a message can quote the file it failed on.
+function Write-GateReadFailure([string]\$What, \$ErrorRecord) {
+    \$inner = \$ErrorRecord.Exception.GetBaseException()
+    \$why = \$inner.Message -replace '[\\x00-\\x1f\\x7f]', ' '
+    [Console]::Error.WriteLine("gate-impact: \$What (\$(\$inner.GetType().Name): \$why)")
 }
 function Test-SchemaOne(\$Value) { return ((Test-JsonKind \$Value 'Number') -and \$Value.GetDouble() -eq 1) }
 function Read-JsonRoot([string]\$File) {
@@ -38206,7 +38215,7 @@ function Read-GateDeclaration([string]\$File) {
             Inert          = Get-JsonStrings (Get-JsonProperty \$root 'inert')
             Checks         = Get-DeclaredChecks \$root
         }
-    } catch { return @{ Problem = 'not-json' } }
+    } catch { Write-GateReadFailure 'declaration not-json' \$_; return @{ Problem = 'not-json' } }
 }
 
 function Get-DeclaredChecks(\$Root) {
@@ -38277,7 +38286,7 @@ function Read-GateSnapshot([string]\$File, [string]\$Commit) {
             \$owners[(Get-JsonProperty \$owner 'id').GetString()] = @{ Roots = \$roots; DependsOn = \$deps; Record = (\$roots -join "\`0") + "\`u{1}" + (\$deps -join "\`0") }
         }
         return @{ Problem = ''; Owners = \$owners }
-    } catch { return @{ Problem = 'invalid-json' } }
+    } catch { Write-GateReadFailure 'adapter output invalid-json' \$_; return @{ Problem = 'invalid-json' } }
 }
 `,
     executable: false,

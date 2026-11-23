@@ -25,6 +25,8 @@ export type Case = {
    * Windows cannot be put in from the scripts' environment.
    */
   posixOnly?: boolean;
+  /** What the PowerShell twin's stderr holds: its readers say why a file was refused. */
+  pwshStderr?: string;
 };
 
 export const FULL_MARKS = ["suite unset", "web-only unset", "always unset"];

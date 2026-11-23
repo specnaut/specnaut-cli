@@ -3,7 +3,7 @@
 // run what the case says must run, and the two must print the same report and exit
 // the same. Skipped for the second twin where pwsh is absent; CI's Windows job has it.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { type Case, CORPUS } from "./gate_impact_corpus.ts";
 import { ESCAPED } from "./gate_impact_corpus_escape.ts";
 import { impactRepo, labelled, type Report } from "./gate_impact_fixture.ts";
@@ -19,6 +19,7 @@ function assertCase(c: Case, r: Report, twin: string) {
   } else assertEquals(labelled(r, "fallback"), ["none"], where);
   assertEquals(r.marks, c.marks, where);
   assertEquals(labelled(r, "removed"), c.removed ?? ["none"], where);
+  if (twin === "pwsh" && c.pwshStderr) assertStringIncludes(r.stderr, c.pwshStderr, where);
 }
 
 const WINDOWS = Deno.build.os === "windows";

@@ -20,26 +20,33 @@ const escaped = (json: string): string => {
   return text;
 };
 
-const inDeclaration = (name: string, over: Record<string, unknown>): Case =>
-  malformed(
+/** The line the PowerShell reader writes: the decode failure, by its type, under the problem. */
+const decodeFailure = (what: string) => `gate-impact: ${what} (InvalidOperationException: `;
+
+const inDeclaration = (name: string, over: Record<string, unknown>): Case => ({
+  ...malformed(
     `a lone surrogate escape in ${name}`,
     escaped(JSON.stringify(declaration(over))),
     "not-json",
-  );
+  ),
+  pwshStderr: decodeFailure("declaration not-json"),
+});
 
-const inSnapshot = (name: string, commit: string, owners: unknown): Case =>
-  adapterCase(
+const inSnapshot = (name: string, commit: string, owners: unknown): Case => ({
+  ...adapterCase(
     `a lone surrogate escape in ${name}`,
     out(escaped(
       `{"schema":1,"commit":"${commit}","complete":true,"owners":${JSON.stringify(owners)}}`,
     )),
     "adapter-invalid-json: base",
-  );
+  ),
+  pwshStderr: decodeFailure("adapter output invalid-json"),
+});
 
 const COMMIT = "$SPECNAUT_IMPACT_COMMIT";
 
 export const ESCAPES: Case[] = [
-  inDeclaration("a gate command", { checks: [{ gate: `a${MARK}`, scoped: "b" }] }),
+  inDeclaration("a check's gate name", { checks: [{ gate: `a${MARK}`, scoped: "b" }] }),
   inDeclaration("an adapter file", { adapter: { command: "a", files: [`a${MARK}`] } }),
   inDeclaration("a scoped tier", { scoped_tiers: [`fast${MARK}`] }),
   inSnapshot("the echoed commit", MARK, []),
