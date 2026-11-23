@@ -47,7 +47,7 @@ function sortEntries(
   const kept: string[] = [];
   let dropped: Dropped | undefined;
   for (const entry of path.split(separator)) {
-    const why = unsafe(entry);
+    const why: string | undefined = unsafe(entry) === "" ? "" : undefined;
     if (why === undefined) kept.push(entry);
     else dropped ??= { entry, why };
   }
