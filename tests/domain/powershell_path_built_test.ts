@@ -38,6 +38,13 @@ Deno.test("an item cmdlet handed a path that is not a constant is not read whole
       "si {x} tools",
       "si $x tools",
       "si (x) tools",
+      'cd ("en"+"v:"); si Path tools',
+      'cd ("en"+"v:"); si Pat* tools',
+      "si .\\Path tools",
+      "si ./PATH tools",
+      "si 'path' tools",
+      "si P?th tools",
+      "si [P]ath tools",
     ]),
     [],
   );
@@ -48,6 +55,8 @@ Deno.test("an item cmdlet handed a path that is not a constant is not read whole
     "si -Force x $v",
     'si "a b" $v',
     "Set-Content out.txt ($a + $b)",
+    "Set-Content path.txt x",
+    "si ./paths x",
   ];
   assertEquals(constant.filter((c) => !whole(c)), []);
 });

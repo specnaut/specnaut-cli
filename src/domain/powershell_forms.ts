@@ -106,12 +106,18 @@ const SWITCH = /^(?:force|passthru|recurse|whatif|confirm|verbose|debug|nonewlin
 const COMMAND = /(?<=^|[\s;|&({}=])(?:[\w.]+\\)?([a-z][\w-]*)(?=$|[\s;|)}])/gi;
 /** What makes a path built at run time: a variable or a `$(…)`, a bracket, a `+`, a `[char]`. */
 const BUILT = /[$({+]|\[char\]/i;
+/**
+ * A path the current location decides: `Path` itself, as a name relative to it (`.\Path`), or a
+ * wildcard. Wherever the location was set (`cd ("en"+"v:")`), such a path may be PATH's item.
+ */
+const RELATIVE = /^['"]?(?:\.[\\/])?path['"]?$|[*?[]/i;
 
 /**
  * Whether `text` hands an item cmdlet a path that is not a constant: one holding what
  * {@link BUILT} names (`si "E$()nv$([char]58)Pa$()th" tools`, a name from `(gdr -PSProvider
- * Environment).Name`), or none at all after a `|`, which the pipeline gives (`gci env: | si -Value
- * tools`). Such a path may name any drive, so no spelling of the environment's can be listed.
+ * Environment).Name`), one the location decides ({@link RELATIVE}), or none at all after a `|`,
+ * which the pipeline gives (`gci env: | si -Value tools`). Such a path may name any drive, so no
+ * spelling of the environment's can be listed.
  */
 export function computedItemPath(text: string): boolean {
   for (const m of text.matchAll(COMMAND)) {
@@ -119,7 +125,8 @@ export function computedItemPath(text: string): boolean {
     if (!ITEM_CMDLETS.has(name)) continue;
     const paths = pathArguments(name, argumentsAt(text, m.index + m[0].length));
     const piped = /(?<!\|)\|\s*$/.test(text.slice(Math.max(0, m.index - 64), m.index));
-    if (paths.some((p) => BUILT.test(p)) || (piped && paths.length === 0)) return true;
+    if (paths.some((p) => BUILT.test(p) || RELATIVE.test(p))) return true;
+    if (piped && paths.length === 0) return true;
   }
   return false;
 }

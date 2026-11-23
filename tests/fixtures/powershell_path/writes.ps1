@@ -3,6 +3,8 @@ using namespace System.Management.Automation.Language
 # names, paths and aliases say (oracle.ps1). Each write is the folders it puts on PATH when it is
 # built of constants, else $null. Dot-sourced by oracle.ps1; runs nothing it reads.
 Set-StrictMode -Version 3
+# What resolves a path; rethrow_check.ps1 puts a stand-in here to show a failure stops the oracle.
+$PathIntrinsics = $ExecutionContext.SessionState.Path
 
 $Sentinel = [string][char]0 + 'PATH' + [char]0
 $WriteVerbs = 'Set', 'New', 'Add', 'Clear', 'Remove', 'Rename', 'Move', 'Copy', 'Push'
@@ -56,7 +58,7 @@ function Get-Folders($value) {
 # Whether a constant argument names an item of the Environment provider, or the registry's.
 function Test-EnvironmentPath([string] $path) {
     if ($path -match '(?i)^(hk\w+:|registry::|hkey_).*[\\/]environment$') { return $true }
-    $provider = $null; $drive = $null; $paths = $ExecutionContext.SessionState.Path
+    $provider = $null; $drive = $null; $paths = $PathIntrinsics
     # A path on no drive or provider PowerShell knows names no item of any provider; any other
     # failure is the oracle's own, and stops it.
     try { $null = $paths.GetUnresolvedProviderPathFromPSPath($path, [ref]$provider, [ref]$drive) }

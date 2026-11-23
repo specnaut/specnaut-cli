@@ -14,7 +14,7 @@ import { commandPaths } from "../../src/domain/command_targets.ts";
 
 const FIXTURES = fromFileUrl(new URL("../fixtures/powershell_path/", import.meta.url));
 /** How many lines of the corpus write PATH, as PowerShell's parser reads them. */
-const WRITING_LINES = 58;
+const WRITING_LINES = 60;
 
 /**
  * A line or a variant of it: its corpus line, how it was varied (`base` for none), its text, its
@@ -117,5 +117,19 @@ Deno.test({
     assert(lines.filter((l) => l.kind !== "base" && l.writes > 0).length > WRITING_LINES * 10);
     const missed = lines.filter((l) => l.errors === 0 && l.writes > 0 && !held(l));
     assertEquals(missed.map((l) => l.text), []);
+  },
+});
+
+Deno.test({
+  name:
+    "the oracle takes only an unknown drive or provider as naming no item, and stops on any other failure",
+  ignore: !PWSH && !REQUIRED,
+  async fn() {
+    assert(PWSH, "pwsh is required here: install PowerShell on this runner");
+    const args = ["-NoProfile", "-NonInteractive", "-File", `${FIXTURES}rethrow_check.ps1`];
+    const run = await new Deno.Command("pwsh", { args, stdout: "piped" }).output();
+    assert(run.success);
+    const outcome = JSON.parse(new TextDecoder().decode(run.stdout));
+    assertEquals(outcome, { drive: "False", provider: "False", other: "stopped" });
   },
 });
