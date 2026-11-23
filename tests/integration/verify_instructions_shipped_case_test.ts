@@ -42,10 +42,12 @@ Deno.test("an approval at a renamed path holds nothing once its shipped twin lea
   assertEquals(await lines(root), [NAMED]);
 });
 
-// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i.
+// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i;
+// U+212A KELVIN SIGN, which lower-cases to an ASCII k, in place of k.
 const ALIASES = [
   ["U+017F", ".claude/skills/ta\u017fk/SKILL.md"],
   ["U+0131", ".claude/skills/task/SK\u0131LL.md"],
+  ["U+212A", ".claude/skills/tas\u212a/SKILL.md"],
 ];
 
 for (const [code, alias] of ALIASES) {

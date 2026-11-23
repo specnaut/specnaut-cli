@@ -45,16 +45,19 @@ export const isSkillPath = (path: string): boolean => SKILL_ROOTS.some((r) => pa
  * The copy Specnaut ships at a path, looked up as written, else in any letter case: a case-blind
  * disk gives a session one file for both names, so a case twin or a case-only rename is the
  * shipped skill customised, never a skill Specnaut does not ship. A copy found only in another case
- * carries no approval: a yes binds the one path it names (`skill_approvals.ts`).
+ * carries no approval: a yes binds the one path it names (`skill_approvals.ts`). A path holding a
+ * code point outside ASCII is looked up as written only, on either side: lower case maps U+212A
+ * to an ASCII k, and such a name is asked about ({@link shippedAlias}), never matched.
  */
 export function shippedLookup(
   shipped: ReadonlyMap<string, ShippedCopy>,
 ): (path: string) => ShippedCopy | undefined {
   const folded = new Map<string, ShippedCopy>();
   for (const [path, { approvedSha256: _, ...copy }] of shipped) {
-    folded.set(path.toLowerCase(), copy);
+    if (!holdsNonAscii(path)) folded.set(path.toLowerCase(), copy);
   }
-  return (path) => shipped.get(path) ?? folded.get(path.toLowerCase());
+  return (path) =>
+    shipped.get(path) ?? (holdsNonAscii(path) ? undefined : folded.get(path.toLowerCase()));
 }
 
 /**

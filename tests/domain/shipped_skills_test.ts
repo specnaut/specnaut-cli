@@ -133,17 +133,26 @@ Deno.test("an approval at a case-renamed path is dropped when its shipped twin l
   assertEquals(leavingCopies(tip, new Map([[SKILL, {}]]), new Set([SKILL])).get(TWIN), twin);
 });
 
-// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i.
+// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i;
+// U+212A KELVIN SIGN, which lower-cases to an ASCII k, in place of k.
 const LONG_S = ".claude/skills/ta\u017fk/SKILL.md";
 const DOTLESS_I = ".claude/skills/task/SK\u0131LL.md";
+const KELVIN = ".claude/skills/tas\u212a/SKILL.md";
 
-Deno.test("a skill path holding U+017F or U+0131 that may open a shipped one is named", async () => {
+Deno.test("a skill path holding U+017F, U+0131 or U+212A that may open a shipped one is named", async () => {
   const ship: [string, ShippedCopy][] = [[SKILL, { bytes: enc("ship") }]];
-  for (const path of [LONG_S, DOTLESS_I]) {
+  for (const path of [LONG_S, DOTLESS_I, KELVIN]) {
     assertEquals(await judge([blob(path, "ship")], ship), [`${path} ${NON_ASCII_REASON}`], path);
   }
   assertEquals(await judge([blob(".claude/skills/t\u00e2sk/SKILL.md", "x")], ship), [
     `.claude/skills/t\u00e2sk/SKILL.md ${NON_ASCII_REASON}`,
   ]);
   assertEquals(await judge([blob(".claude/skills/caf\u00e9/SKILL.md", "x")], ship), []);
+});
+
+Deno.test("a path holding a non-ASCII code point is never looked up folded, either way", () => {
+  const copy: ShippedCopy = { bytes: enc("ship"), approvedSha256: "a".repeat(64) };
+  assertEquals(shippedLookup(new Map([[SKILL, copy]]))(KELVIN), undefined);
+  assertEquals(shippedLookup(new Map([[KELVIN, copy]]))(SKILL), undefined);
+  assertEquals(shippedLookup(new Map([[KELVIN, copy]]))(KELVIN), copy, "as written");
 });
