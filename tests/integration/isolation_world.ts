@@ -129,7 +129,10 @@ export async function sandboxed(kind: SandboxedBackend, iso: Isolation, command:
   const outcome = await execInSandbox(deps, { sha: iso.exported.sha, toolchain: [], command });
   assert(outcome.kind === "ran", `nothing ran: ${JSON.stringify(outcome)}`);
   assertEquals(outcome.backend, kind);
-  return { outcome: outcome.outcome, out: out.text(), err: err.text() };
+  // A container run observes its syscall filter; that record is the filter live test's to judge.
+  const { filter, ...run } = outcome.outcome;
+  assertEquals(filter?.kind, kind === "container" ? "observed" : undefined, JSON.stringify(filter));
+  return { outcome: run, out: out.text(), err: err.text() };
 }
 
 /** The probe's results, by `<kind> <target>`; it must have started, or it proved nothing. */
