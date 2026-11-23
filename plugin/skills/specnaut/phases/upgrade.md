@@ -21,7 +21,7 @@ expected them to print.
 ## Steps
 
 1. **The binary is there.** `command -v specnaut`. If it is missing, stop and give the install
-   line: `curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash`.
+   line: `curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash`.
    Do not install it yourself.
 
 2. **The tree is clean.** `git status --porcelain`. If it is not empty, the upgrade still runs,

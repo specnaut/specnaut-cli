@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
 # specnaut installer: downloads a release binary, verifies it, and places it in $PREFIX
-# (default /usr/local/bin). Each release publishes its own copy of this script, which installs
-# that release; the one on `releases/latest` installs the latest.
-#
-# Usage:
+# (default /usr/local/bin). Each release publishes its own copy, which installs that release.
 #   curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash
-#   curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/download/vX.Y.Z/install.sh | bash
-#     (pins the script and the binary to vX.Y.Z; SPECNAUT_VERSION=vX.Y.Z pins only the binary)
+#   .../releases/download/vX.Y.Z/install.sh pins the script and the binary; SPECNAUT_VERSION=vX.Y.Z only the binary.
 #   ... | PREFIX=$HOME/.local/bin bash    ... | DRY_RUN=1 bash    ... | REQUIRE_ATTESTATION=1 bash
-#
-# Verification: the SHA-256 checksum, then the release's Sigstore attestation, with
-# `gh attestation verify` pinned to release.yml at the exact tag installed (the identity
-# `specnaut self-update` checks). A refused attestation stops the install: nothing is placed or run.
-# Without gh, or with a gh lacking `attestation`, the checksum alone is checked and a warning
-# prints the command that verifies afterwards; REQUIRE_ATTESTATION=1 stops instead.
-# Releases before 4.3.0 carry no attestation: they install on the checksum alone, and only when
-# pinned by SPECNAUT_VERSION. REQUIRE_ATTESTATION=1 refuses them. VERSION, read for older
-# instructions, pins only attested releases: a variable that generic may be set for anything else.
+# Checks the SHA-256, then the release's Sigstore attestation via `gh attestation verify`, pinned to
+# release.yml at the exact tag (the identity `specnaut self-update` checks); a refusal installs nothing.
+# Without gh, the checksum alone and a warning with the command to verify later; REQUIRE_ATTESTATION=1
+# stops instead. Releases before 4.3.0 carry no attestation: checksum only, and only when pinned by
+# SPECNAUT_VERSION. VERSION, read for older instructions, pins only attested releases.
 set -euo pipefail
 
 REPO="${REPO:-specnaut/specnaut-cli}"
@@ -45,9 +37,7 @@ ok()    { printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$*"; }
 warn()  { printf "  %s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
 abort() { printf "%serror:%s %s\n" "$RED$BOLD" "$RESET" "$*" >&2; exit 1; }
 
-require() {
-  command -v "$1" >/dev/null 2>&1 || abort "$1 is required but not found in PATH"
-}
+require() { command -v "$1" >/dev/null 2>&1 || abort "$1 is required but not found in PATH"; }
 
 # Every download: HTTPS only, TLS 1.2 or later, a failed status is a failure.
 fetch() { curl --proto '=https' --tlsv1.2 -fsSL "$@"; }
@@ -179,39 +169,24 @@ install_binary() {
   chmod 755 "$src"
   make_dir_as_user "$dest_dir"
 
-  # Best case: directory exists and is writable.
-  if [[ -d "$dest_dir" && -w "$dest_dir" ]]; then
-    mv -f "$src" "$dest"
-    FINAL_DEST="$dest"
-    return 0
-  fi
+  # A writable folder, else sudo, else (unless PREFIX was set) $HOME/.local/bin.
+  if [[ -d "$dest_dir" && -w "$dest_dir" ]]; then mv -f "$src" "$dest"; FINAL_DEST="$dest"; return 0; fi
+  if install_with_sudo "$src" "$dest"; then FINAL_DEST="$dest"; return 0; fi
 
-  if install_with_sudo "$src" "$dest"; then
-    FINAL_DEST="$dest"
-    return 0
-  fi
-
-  # Fallback: install into $HOME/.local/bin (no admin needed).
   if [[ -n "${PREFIX_EXPLICIT:-}" && "$PREFIX" != "/usr/local/bin" ]]; then
     abort "cannot write to ${dest_dir} and you set PREFIX explicitly — aborting."
   fi
-  local fallback_dir="$HOME/.local/bin"
-  local fallback_dest="$fallback_dir/specnaut"
-  mkdir -p "$fallback_dir"
-  mv -f "$src" "$fallback_dest"
-  warn "installed to ${fallback_dir} instead of ${dest_dir}."
-  FINAL_DEST="$fallback_dest"
+  mkdir -p "$HOME/.local/bin"
+  mv -f "$src" "$HOME/.local/bin/specnaut"
+  warn "installed to $HOME/.local/bin instead of ${dest_dir}."
+  FINAL_DEST="$HOME/.local/bin/specnaut"
 }
 
 # Sets SHA_CMD to the SHA-256 tool this system has.
 pick_sha_command() {
-  if command -v shasum >/dev/null 2>&1; then
-    SHA_CMD="shasum -a 256"
-  elif command -v sha256sum >/dev/null 2>&1; then
-    SHA_CMD="sha256sum"
-  else
-    abort "shasum or sha256sum is required"
-  fi
+  if command -v shasum >/dev/null 2>&1; then SHA_CMD="shasum -a 256"
+  elif command -v sha256sum >/dev/null 2>&1; then SHA_CMD="sha256sum"
+  else abort "shasum or sha256sum is required"; fi
 }
 
 # Downloads the binary to $1/specnaut and its checksum beside it; aborts unless they match.
@@ -223,9 +198,7 @@ download_checked() {
   fetch "$(release_url "$TARGET.sha256")" -o "$dir/specnaut.sha256"
   expected_sha="$(awk '{print $1}' < "$dir/specnaut.sha256")"
   actual_sha="$(cd "$dir" && $SHA_CMD specnaut | awk '{print $1}')"
-  if [[ "$expected_sha" != "$actual_sha" ]]; then
-    abort "checksum mismatch: expected $expected_sha, got $actual_sha"
-  fi
+  [[ "$expected_sha" == "$actual_sha" ]] || abort "checksum mismatch: expected $expected_sha, got $actual_sha"
   ok "checksum verified"
 }
 

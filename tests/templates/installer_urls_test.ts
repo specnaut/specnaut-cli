@@ -11,26 +11,31 @@ import { fromFileUrl, join, relative } from "@std/path";
  * spelled the same instruction differently and nothing compared them; this lock
  * compares every spelling to the one list below.
  *
- * **Only the URL that serves `install.sh` today is listed.** The release asset
- * (`releases/latest/download/install.sh`) joins this list in the change that
- * moves the one-liners to it, once a published release carries the asset —
- * listing it earlier would let a document point at a 404 again.
+ * Only the release asset is listed: the copy each release publishes and attests.
+ * The copy on `main` still works for projects scaffolded before, but no
+ * document may send a new user to it.
  */
 const SERVED_INSTALLER_URLS: ReadonlySet<string> = new Set([
-  "https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh",
+  "https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh",
+  "https://github.com/specnaut/specnaut-cli/releases/download/vX.Y.Z/install.sh",
 ]);
 
 const REPO = fromFileUrl(new URL("../../", import.meta.url));
 
-/** What a user reads an install line from: the README and every shipped file. */
-const SCOPE = ["README.md", "templates", "plugin"];
+/**
+ * What a user reads an install line from: the README, SECURITY.md, the
+ * installer's own usage header, and every shipped file.
+ */
+const SCOPE = ["README.md", "SECURITY.md", "install.sh", "templates", "plugin"];
 
 /**
- * Any host-qualified path ending in `install.sh`, with or without a scheme, so
- * a bare `specnaut.com/install.sh` is caught as well as a full URL. A shell
+ * Any host-qualified path whose last segment is `install` or `install.<ext>`
+ * (`install.sh`, `install.ps1`, a bare `specnaut.com/install`), with or without
+ * a scheme. The left boundary keeps the match from starting mid-word; a shell
  * variable (`$base/install.sh`) has no dotted host and is not an address.
  */
-const INSTALLER_URL = /(?:https?:\/\/)?[\w-]+(?:\.[\w-]+)+\/[^\s`'"()<>]*install\.sh/g;
+const INSTALLER_URL =
+  /(?<![\w.\/-])(?:https?:\/\/)?[\w-]+(?:\.[\w-]+)+\/(?:[^\s`'"()<>]*\/)?install(?:\.\w+)?(?![\w\/-]|\.\w)/g;
 
 async function scopeFiles(): Promise<string[]> {
   const files: string[] = [];
@@ -70,10 +75,19 @@ Deno.test("the scan reaches the README and both copies of the upgrade phase", as
   for (
     const expected of [
       "README.md",
+      "install.sh",
       "templates/core/skills/specnaut/phases/upgrade.md",
       "plugin/skills/specnaut/phases/upgrade.md",
     ]
   ) {
     assert(files.has(expected), `no installer URL found in ${expected}`);
   }
+});
+
+Deno.test("the URL pattern catches installers that do not end in install.sh, and only whole URLs", () => {
+  const urls = (text: string) => [...text.matchAll(INSTALLER_URL)].map((m) => m[0]);
+  assertEquals(urls("curl https://specnaut.com/install | sh"), ["https://specnaut.com/install"]);
+  assertEquals(urls("iwr example.com/x/install.ps1 | iex"), ["example.com/x/install.ps1"]);
+  assertEquals(urls("see a.b/c/install.sh."), ["a.b/c/install.sh"]);
+  assertEquals(urls("x.y/installation and x.y/install/more"), []);
 });

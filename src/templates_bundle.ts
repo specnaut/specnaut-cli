@@ -2031,7 +2031,7 @@ expected them to print.
 ## Steps
 
 1. **The binary is there.** \`command -v specnaut\`. If it is missing, stop and give the install
-   line: \`curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash\`.
+   line: \`curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash\`.
    Do not install it yourself.
 
 2. **The tree is clean.** \`git status --porcelain\`. If it is not empty, the upgrade still runs,
@@ -5353,7 +5353,7 @@ Frozen at scaffold time. Run the live fetch protocol for anything newer.
 
 Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specnaut.com/llms.txt>. Source: <https://github.com/specnaut/specnaut-cli>.
 
-**Install:** \`curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash\` or \`brew tap specnaut/tap && brew install specnaut\`.
+**Install:** \`curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash\` or \`brew tap specnaut/tap && brew install specnaut\`.
 
 **Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 

@@ -62,10 +62,18 @@ Specnaut scaffolds for one AI harness per invocation:
 ### curl | bash
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash
+curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash
 ```
 
-Pin a version: `VERSION=v0.1.0-alpha.1`. Change install directory: `PREFIX=$HOME/.local/bin`.
+The installer checks the binary's SHA-256, then the release's Sigstore attestation with
+`gh attestation verify`; a refused attestation installs nothing. Without `gh` it checks the checksum
+alone and prints the command to verify later — `REQUIRE_ATTESTATION=1` stops instead.
+[SECURITY.md](SECURITY.md#what-installsh-checks) shows how to verify the installer itself first.
+
+Pin a version: `SPECNAUT_VERSION=v9.5.0`, or run that release's own installer
+(`…/releases/download/v9.5.0/install.sh`). Releases before 4.3.0 carry no attestation: they install
+on the checksum alone, and only when pinned with `SPECNAUT_VERSION`. Change install directory:
+`PREFIX=$HOME/.local/bin`.
 
 ### Homebrew
 
