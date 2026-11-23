@@ -5,7 +5,7 @@ import {
   INSTRUCTION_SCOPE,
   judgeInstructions,
 } from "../domain/instruction_trust.ts";
-import { PARENT_NAMES, parentReasons, type ParentSides } from "../domain/instruction_parents.ts";
+import { isParentName, parentReasons, type ParentSides } from "../domain/instruction_parents.ts";
 import { importReasons } from "../domain/claude_imports.ts";
 import { targetWalk, type Walk } from "./head_targets.ts";
 import { readCommands } from "./instruction_commands.ts";
@@ -95,11 +95,11 @@ function tipOverrides(committed: readonly CommittedInstruction[]): BaseEntry[] {
   );
 }
 
-/** The files above the project ({@link PARENT_NAMES}) at HEAD, the tip and the merge base. */
+/** The files above the project ({@link isParentName}) at HEAD, the tip and the merge base. */
 async function readParents(git: GitObjectReader, base: InstructionBase): Promise<ParentSides> {
-  const head = await git.listParents(base.head, PARENT_NAMES);
-  const tip = await git.listParents(base.tip, PARENT_NAMES);
-  return { head, tip, mergeBase: await git.listParents(base.mergeBase, PARENT_NAMES) };
+  const head = await git.listParents(base.head, isParentName);
+  const tip = await git.listParents(base.tip, isParentName);
+  return { head, tip, mergeBase: await git.listParents(base.mergeBase, isParentName) };
 }
 
 /**

@@ -64,10 +64,10 @@ export interface GitObjectReader {
   listPaths(commit: string): Promise<IndexedPath[]>;
   /**
    * The files directly in each folder above the project's, up to the repository's top, whose name
-   * is one of `names` but for letter case, a link with its target; none when the project is at the
-   * top. Paths are relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.
+   * `keep` accepts, a link with its target; none when the project is at the top. Paths are
+   * relative to the project's folder (`../AGENTS.md`). A blob over the cap is a throw.
    */
-  listParents(commit: string, names: readonly string[]): Promise<BaseEntry[]>;
+  listParents(commit: string, keep: (name: string) => boolean): Promise<BaseEntry[]>;
   /**
    * One path at `commit`, `../` climbing above the project's folder up to the repository's top;
    * absent above it. A blob over the cap is a throw.

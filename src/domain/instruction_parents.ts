@@ -1,6 +1,8 @@
 import { invisibleReason, sameEntry } from "./instruction_head.ts";
 import { type BaseEntry, REASON, type Untrusted } from "./script_trust.ts";
+import { win32Name } from "./tree_names.ts";
 import { refinedReason } from "./trust_reason.ts";
+import { holdsShortName, win32Reason } from "./win32_path.ts";
 
 /**
  * The files above a project that lives in a subfolder (part of the instruction class,
@@ -22,6 +24,16 @@ export const PARENT_NAMES: readonly string[] = [
   ".gitattributes",
   ".lfsconfig",
 ];
+
+const FOLDED_NAMES = PARENT_NAMES.map(win32Name);
+
+/**
+ * Whether a name in a folder above the project is listed: one of {@link PARENT_NAMES} as Win32
+ * opens it (any case, a trailing dot or space, a stream suffix), or a name shaped like an 8.3
+ * short name, which a volume that keeps them may open as any of them (`win32_path.ts`).
+ */
+export const isParentName = (name: string): boolean =>
+  FOLDED_NAMES.includes(win32Name(name)) || holdsShortName(name);
 
 /** The parent files at HEAD, the base's tip and the merge base, as `listParents` lists them. */
 export type ParentSides = {
@@ -49,11 +61,16 @@ export function parentReasons(sides: ParentSides): Untrusted[] {
 
 const lostReason = (hadIt: boolean) => hadIt ? REASON.missing : REASON.behind;
 
-/** Why HEAD's entry is not the tip's, or `null` when it is. */
+/**
+ * Why HEAD's entry is not the tip's, or `null` when it is. A name the tip lacks that is not a
+ * parent name as written is named for how Win32 reads it, else for its letter case.
+ */
 function headReason(e: BaseEntry, atTip?: BaseEntry, atOld?: BaseEntry): string | null {
   if (sameEntry(e, atTip)) return null;
   const name = e.path.slice(e.path.lastIndexOf("/") + 1);
-  if (atTip === undefined && !PARENT_NAMES.includes(name)) return REASON.caseDiffers;
+  if (atTip === undefined && !PARENT_NAMES.includes(name)) {
+    return win32Reason(name) ?? REASON.caseDiffers;
+  }
   const otherwise = atTip === undefined ? REASON.notOnBase : REASON.differs;
   if (e.kind !== "blob") return sameEntry(e, atOld) ? REASON.behind : otherwise;
   const tipBytes = atTip?.kind === "blob" ? atTip.bytes : undefined;
