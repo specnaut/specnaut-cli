@@ -71,6 +71,16 @@ Deno.test("the row names the programs on a judged PATH, and the PATH a shell bui
   assert(limits.includes("`.envrc`'s `PATH_add`, mise's configuration"), limits);
 });
 
+Deno.test("the row names each PowerShell PATH form it reads, and each it does not read whole", () => {
+  const row = instructionsRow();
+  assert(row.includes("its `=` or `+=` glued or not, and a list split on its commas"), row);
+  assert(row.includes("(`[Environment]::SetEnvironmentVariable('Path', …)`)"), row);
+  assert(row.includes("through a `(…)` (`(Resolve-Path tools).Path`, `(Join-Path $PWD"), row);
+  assert(row.includes("or a list holding anything but quoted strings and `$env:Path`"), row);
+  const limits = notRead();
+  assert(limits.includes("assignment spelled across quotes a shell joins (`'$env:Path'' = …'`)"));
+});
+
 Deno.test("the row states what a command's targets leave unread", () => {
   const limits = notRead();
   assert(limits.includes("a folder a command names (`node server/`)"), limits);

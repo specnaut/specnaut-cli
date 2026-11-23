@@ -1,5 +1,6 @@
 import { climb } from "./project_path.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_index.ts";
+import { PS_PATH, PS_PATH_WORD } from "./powershell_path.ts";
 
 /**
  * Which program a bare command name runs is decided by the folders on PATH, so a folder a judged
@@ -7,9 +8,10 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
  * run: `"env": {"PATH": "./bin:$PATH"}` and a hook `lint` run `bin/lint`. A command source names
  * such folders by a key `PATH` (a settings file's `env`, an MCP server's, Codex's shell policy) or
  * a word `PATH=…` or `PATH+=…` (set before a command, or exported), or PowerShell's `$env:Path`
- * or `${env:Path}` and every word after it (`$env:Path += ';bin'`). The key is read in any letter
- * case, as Windows reads it, and in any object: an unrelated key `path` (or a raw `--x-path=`)
- * puts its value's folders on PATH too, which only looks for more names in the listing. A folder
+ * or `${env:Path}` and every word after it (`$env:Path += ';bin'`), a list split on its commas
+ * (`pathAssignments`). The key is read in any letter case, as Windows reads it, and in any object:
+ * an unrelated key `path` (or a raw `--x-path=`) puts its value's folders on PATH too, which only
+ * looks for more names in the listing. A folder
  * that cannot be read makes the reading not whole only when its value surely sets PATH: a key or a
  * word spelled `PATH`, or a key `path` in any letter case of an object that sets a command's
  * environment (`surelySetsPath`). Any other is skipped, or every merge would stop for an
@@ -20,21 +22,6 @@ import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_in
 /** A key or a word that sets PATH, in any letter case. */
 export const isPathKey = (key: string): boolean => /^path$/i.test(key);
 const PATH_WORD = /^(path)\+?=(.*)$/is;
-
-/**
- * PowerShell's PATH, `$env:Path` or `${env:Path}`: in any letter case, as PowerShell reads a
- * variable's name, so always surely PATH. Inside a value it is the PATH in effect, as `$PATH` is a
- * shell's.
- */
-const PS_PATH = /\$(?:env:path\b|\{env:path\})/gi;
-const PS_PATH_WORD = /^\$(?:env:path|\{env:path\})(?:\+?=(.*))?$/is;
-
-/**
- * A word that sets PATH in a way no value is read from: the `env:` drive's `Path` item, which
- * `Set-Item`, `New-Item`, `Set-Content` and their aliases write, or .NET's
- * `SetEnvironmentVariable`. Its source is not read whole.
- */
-const PS_PATH_UNREAD = /(?<![${])env:[\\/]?path\b|SetEnvironmentVariable/i;
 
 /** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
 export const isSurelyPath = (name: string): boolean => name === "PATH";
@@ -62,21 +49,29 @@ function pathWordValue(word: string): PathValue | undefined {
 
 /**
  * What the PATH assignments among one command's words set PATH to: each `PATH=…` word, and, from
- * the first word naming PowerShell's PATH, every word after it, its `=` or `+=` taken off. A value
- * PowerShell builds from parts (`$env:Path + ';' + 'tools'`) is read part by part, a part too many
- * only looking for more names.
+ * the first word naming PowerShell's PATH, every word after it, its `=` or `+=` taken off, glued or
+ * not (`$env:Path+='x'`, `$env:Path +='x'`). A value PowerShell builds from parts (`$env:Path +
+ * ';' + 'tools'`) is read part by part, a part too many only looking for more names; a word
+ * holding a comma, which builds a list (`@('tools', $env:Path) -join ';'`), is read whole and
+ * split on its commas, as the split words no longer say which comma was quoted. Not read here,
+ * each naming its source as not read whole (`setsPathUnread`, `buildsPathUnread`): PATH set
+ * through the `env:` drive (`Set-Item env:Path`, `New-Item`, `Set-Content`, an alias) or .NET's
+ * `[Environment]::SetEnvironmentVariable('Path', …)`; a value holding a `(` (`(Resolve-Path
+ * tools).Path`, `(Join-Path $PWD 'tools')`), a `$(…)` or a bare name, which a cmdlet or a command
+ * builds; a list holding anything but a quoted string with no variable but PATH, or PATH itself.
+ * Not read at all: an assignment spelled across quotes a shell joins (`'$env:Path'' = …'`), whose
+ * value is read from its words alone, as the string searched for it does not spell it.
  */
 export function pathAssignments(words: readonly string[]): PathValue[] {
   const values = words.flatMap((word) => pathWordValue(word) ?? []);
   const at = words.findIndex((word) => PS_PATH_WORD.test(word));
   if (at < 0) return values;
   const rest = [PS_PATH_WORD.exec(words[at])![1] ?? "", ...words.slice(at + 1)]
-    .map((word) => word.replace(/^\+?=/, "")).filter(Boolean);
+    .map((word) => word.replace(/^\+?=/, ""))
+    .flatMap((word) => word.includes(",") ? [word, ...word.split(",")] : [word])
+    .filter(Boolean);
   return [...values, ...rest.map((value) => ({ value, sure: true }))];
 }
-
-/** Whether `word` sets PATH in a way {@link pathAssignments} reads no value from. */
-export const setsPathUnread = (word: string): boolean => PS_PATH_UNREAD.test(word);
 
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
 const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;

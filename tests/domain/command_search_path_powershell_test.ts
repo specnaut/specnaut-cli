@@ -27,6 +27,8 @@ function targets(found: ReturnType<typeof span>): string[] {
 Deno.test("each spelling of a PowerShell PATH set or appended to puts `tools` on PATH", () => {
   const spellings = [
     "$env:Path = $env:Path + ';tools'; lint",
+    "$env:Path = $env:Path + 'tools'; lint",
+    "$env:Path+=';tools'; lint",
     "$env:Path += ';' + 'tools'; lint",
     "$env:Path +=';tools'; lint",
     "$env:Path= 'tools;' + $env:Path; lint",
@@ -86,4 +88,56 @@ Deno.test("PowerShell's PATH inside a value is the PATH in effect, braced or not
   for (const command of ['$env:Path = "tools;$env:Path"', '$env:Path = "tools;${env:Path}"']) {
     assertEquals(span(command).onPath, ["tools"], command);
   }
+});
+
+Deno.test("a PowerShell PATH value built by a bracket, a `$(…)` or a command is not read whole", () => {
+  const unread = [
+    "$env:Path = (Resolve-Path tools).Path; lint",
+    "$env:Path = ('tools;' + $env:Path); lint",
+    "$env:Path += ';' + (Resolve-Path tools).Path; lint",
+    "$env:Path = (Join-Path $PWD 'tools'); lint",
+    "$env:Path=(Join-Path $PWD 'tools'); lint",
+    "$env:Path = $(Resolve-Path tools); lint",
+    '$env:Path = "$(Resolve-Path tools);$env:Path"; lint',
+    "$env:Path = Join-Path $PWD tools; lint",
+    'pwsh -c "$env:Path = (Resolve-Path tools).Path; lint"',
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
+});
+
+Deno.test("a bracket in another statement or a comment than PATH's leaves the reading whole", () => {
+  for (
+    const command of [
+      "$env:Path += ';tools'; Write-Host (Get-Date); lint",
+      "$env:Path += ';tools' # (from the docs)\nlint",
+    ]
+  ) {
+    const found = span(command);
+    assertEquals([targets(found), found.whole], [["tools/lint.ps1"], true], command);
+  }
+});
+
+Deno.test("a list of quoted strings and PowerShell's PATH is read through, split on its commas", () => {
+  const lists = [
+    "$env:Path = @('tools', $env:Path) -join ';'; lint",
+    "$env:Path = @('bin','tools') -join ';'; lint",
+    "$env:Path = 'tools', $env:Path -join ';'; lint",
+    '$env:Path = @("tools", "${env:Path}") -join \';\'; lint',
+  ];
+  for (const command of lists) {
+    const found = span(command);
+    assertEquals([targets(found), found.whole], [["tools/lint.ps1"], true], command);
+  }
+});
+
+Deno.test("a list holding anything but a quoted string or PATH is not read whole", () => {
+  const unread = [
+    "$env:Path = @('tools', $x) -join ';'; lint",
+    "$env:Path = @($PWD, $env:Path) -join ';'; lint",
+    "$env:Path = @(tools) -join ';'; lint",
+    "$env:Path = @('tools', (Resolve-Path bin)) -join ';'; lint",
+    "$env:Path = @(\"tools;$x\") -join ';'; lint",
+    "$env:Path = 'tools', $x -join ';'; lint",
+  ];
+  for (const command of unread) assertEquals(span(command).whole, false, command);
 });
