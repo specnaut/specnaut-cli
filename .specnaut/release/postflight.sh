@@ -43,7 +43,7 @@ gh run watch "$run_id" --exit-status || run_failed=1
 
 echo "▶ verifying GitHub Release exists with assets"
 asset_count="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets | length')"
-[ "$asset_count" -ge 12 ] || { echo "FAIL release has $asset_count assets (expected 12 or more: 5 binaries, 5 checksums, the attestation bundle, install.sh)"; exit 1; }
+[ "$asset_count" -ge 13 ] || { echo "FAIL release has $asset_count assets (expected 13 or more: 5 binaries, 5 checksums, the binary attestation bundle, install.sh and its attestation bundle)"; exit 1; }
 
 # The two packaging channels PULL from this repository's public Releases API;
 # nothing is pushed to them, and neither this repo nor they hold a credential

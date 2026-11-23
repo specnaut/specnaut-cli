@@ -2,7 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { parse } from "@std/yaml";
 import { ATTESTATION_ASSET_NAME } from "../../src/domain/sigstore/trust_anchor.ts";
-import { RELEASE_EXTRAS } from "../../scripts/verify-release.ts";
+import { RELEASE_EXTRAS } from "../../scripts/release/attestation-bundles.ts";
 
 /**
  * #521 — `Create release` could publish a short asset set and still exit 0.
@@ -75,21 +75,21 @@ Deno.test("the workflow uploads a binary and a checksum for every built target",
   }
   // Named, not merely counted. A count passes on any stray file, including a
   // renamed bundle — which is the one failure that reaches users as a refused
-  // update. The names are verify-release.ts's, so what is uploaded is what it verifies.
+  // update. The names are the ones verify-release.ts verifies, so what is uploaded is what it checks.
   const extras = files.filter((f) =>
     !outNames.some((n) => f === `dist/${n}` || f === `dist/${n}.sha256`)
   );
   assertEquals(
     extras.toSorted(),
     RELEASE_EXTRAS.map((n) => `dist/${n}`),
-    `beyond one binary + one checksum per target, the release publishes exactly ` +
-      `the attestation bundle and the installer — nothing else, and not under another name`,
+    `beyond one binary + one checksum per target, the release publishes exactly the ` +
+      `installer and the two attestation bundles — nothing else, and not under another name`,
   );
   assertEquals(
     files.length,
-    outNames.length * 2 + 2,
+    outNames.length * 2 + 3,
     `${outNames.length} targets → ${outNames.length * 2} per-target files, plus ` +
-      `the attestation bundle and the installer`,
+      `the installer and the two attestation bundles`,
   );
 });
 
@@ -136,13 +136,16 @@ Deno.test("the release is attested by a workflow-identity signature, with no sto
   );
 
   const steps = build.steps ?? [];
-  const attestAt = steps.findIndex((s) =>
-    String((s as { uses?: string }).uses ?? "").startsWith("actions/attest@")
+  const attestAt = steps.flatMap((s, i) =>
+    String((s as { uses?: string }).uses ?? "").startsWith("actions/attest@") ? [i] : []
   );
   const checksumAt = steps.findIndex((s) => s.name === "Compute checksums");
-  assert(attestAt >= 0, "nothing attests the build — the release would be checksum-only again");
   assert(
-    attestAt < checksumAt,
+    attestAt.length > 0,
+    "nothing attests the build — the release would be checksum-only again",
+  );
+  assert(
+    attestAt.every((i) => i < checksumAt),
     "attest must run before checksums exist, or its dist/specnaut-* glob picks up sidecars",
   );
 });

@@ -108,7 +108,7 @@ async function run(dir: string, version = VERSION) {
     identity: expectedSignerIdentity(version),
     anchor: await anchorOf(dir),
     now: NOW,
-    targets: TARGETS,
+    bundles: [{ bundle: ATTESTATION_ASSET_NAME, subjects: TARGETS.map((t) => t.outName) }],
   });
 }
 

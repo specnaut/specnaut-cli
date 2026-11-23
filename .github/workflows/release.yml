@@ -374,10 +374,6 @@ jobs:
           MACOS_JSON: ${{ needs.compile.outputs.macos }}
           CANONICAL: ${{ github.repository_id == '1218483524' }}
         run: bash scripts/release/require-macos-signed.sh
-      - name: Stage the installer
-        # After the signed-set check, before attest, which signs it with the
-        # binaries (cli#817). The tag is the runner's GITHUB_REF_NAME variable.
-        run: bash scripts/release/stage-installer.sh "$GITHUB_REF_NAME" dist/install.sh
       - name: Attest build provenance
         id: attest
         # Pinned to a commit, and this is the pin that must not float. The
@@ -396,13 +392,23 @@ jobs:
         # Enforced by tests/scripts/release_actions_pinned_test.ts.
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          # The binaries by glob: `dist/` was checked above to hold exactly
-          # build.ts's targets, and no checksum exists yet. Then the installer.
-          subject-path: |
-            dist/specnaut-*
-            dist/install.sh
+          # The binaries alone: `dist/` was checked above to hold exactly
+          # build.ts's targets, and no checksum exists yet. The installer has
+          # its own bundle, so every digest in this one is a binary's.
+          subject-path: dist/specnaut-*
           # No registry push, so no storage record — and therefore no need for
           # the permission key the comment above declines to add.
+          create-storage-record: false
+      - name: Stage the installer
+        # After the signed-set check, before its own attestation. The tag is
+        # the runner's GITHUB_REF_NAME variable.
+        run: bash scripts/release/stage-installer.sh "$GITHUB_REF_NAME" dist/install.sh
+      - name: Attest the installer
+        id: attest-installer
+        # The same pinned action as the binaries, for the same reason.
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/install.sh
           create-storage-record: false
       - name: Compute checksums
         run: |
@@ -410,12 +416,16 @@ jobs:
           for f in specnaut-*; do
             shasum -a 256 "$f" > "$f.sha256"
           done
-      - name: Stage the attestation bundle for upload
+      - name: Stage the attestation bundles for upload
         # AFTER the checksum loop, and named with a dot rather than a hyphen:
-        # `for f in specnaut-*` would otherwise give it a `.sha256`, an asset
-        # no gate expects. `bundle-path` is outside the workspace, so it is
-        # copied in. One bundle covers every binary and the installer.
-        run: cp "${{ steps.attest.outputs.bundle-path }}" dist/specnaut.attestation.sigstore.json
+        # `for f in specnaut-*` would otherwise give them a `.sha256`, an asset
+        # no gate expects. `bundle-path` is outside the workspace, so each is
+        # copied in. Then each bundle must cover exactly its own assets: a
+        # binary bundle that also covers the installer fails the release here.
+        run: |
+          cp "${{ steps.attest.outputs.bundle-path }}" dist/specnaut.attestation.sigstore.json
+          cp "${{ steps.attest-installer.outputs.bundle-path }}" dist/installer.attestation.sigstore.json
+          deno run --allow-read scripts/release/attestation-bundles.ts dist
       - name: Generate release notes
         env:
           # Authenticate `gh pr view` so each feat PR's `## Agent adoption`
@@ -456,6 +466,7 @@ jobs:
             dist/specnaut-windows-x64.exe
             dist/specnaut-windows-x64.exe.sha256
             dist/specnaut.attestation.sigstore.json
+            dist/installer.attestation.sigstore.json
             dist/install.sh
           body_path: dist/release-notes.md
           # Without this the action defaults to false: a missing file means it

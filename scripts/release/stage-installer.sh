@@ -5,8 +5,8 @@
 #
 # The staged copy installs <tag> unless the user pins another version, so
 # `releases/download/<tag>/install.sh` names the script and the binary in one URL, and
-# `releases/latest/download/install.sh` needs no API lookup (cli#817). It is attested with the
-# binaries, so the tag is checked before it is written: it must be the tag this workflow runs for,
+# `releases/latest/download/install.sh` needs no API lookup (cli#817). It is attested, in a bundle
+# of its own, so the tag is checked before it is written: it must be the tag this workflow runs for,
 # the version deno.json declares, and a version install.sh itself would accept.
 #
 # The placeholder must occur exactly once, as a whole line, and the copy must parse; anything else

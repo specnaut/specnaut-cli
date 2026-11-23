@@ -26,30 +26,9 @@
 // is how they drift.
 
 import { type VerificationOutcome, verifyArtifact } from "../src/domain/sigstore/verify.ts";
-import {
-  ATTESTATION_ASSET_NAME,
-  expectedSignerIdentity,
-} from "../src/domain/sigstore/trust_anchor.ts";
+import { expectedSignerIdentity } from "../src/domain/sigstore/trust_anchor.ts";
 import { DEFAULT_TRUST_ANCHOR } from "../src/application/self_update.ts";
-import { TARGETS } from "./build.ts";
-
-/**
- * The installer each release publishes (cli#817), attested with the binaries in the same bundle:
- * a user who verifies the script first runs it knowing it is the one release.yml built.
- */
-export const INSTALLER_ASSET_NAME = "install.sh";
-
-/**
- * Every release asset beyond one binary and one checksum per target, sorted. One list, read by
- * the workflow's asset gate test, so the upload list and what this verifies cannot drift apart.
- */
-export const RELEASE_EXTRAS = [ATTESTATION_ASSET_NAME, INSTALLER_ASSET_NAME].sort();
-
-/** What the bundle must cover: every binary, and the installer. */
-export const ATTESTED_ASSETS: readonly { readonly outName: string }[] = [
-  ...TARGETS,
-  { outName: INSTALLER_ASSET_NAME },
-];
+import { ATTESTATION_BUNDLES, type AttestationBundle } from "./release/attestation-bundles.ts";
 
 export type ArtifactVerification = {
   readonly outName: string;
@@ -72,7 +51,7 @@ type Anchor = {
 };
 
 /**
- * Verify every published binary, and the installer, in `dir` against the bundle beside it.
+ * Verify every published binary, and the installer, in `dir` against its own bundle beside it.
  *
  * The anchor is a parameter rather than a constant so the negative self-test
  * can drive this with a synthetic authority. Production passes the compiled-in
@@ -84,20 +63,22 @@ export async function verifyReleaseDir(opts: {
   readonly identity: string;
   readonly anchor: Anchor;
   readonly now?: Date;
-  readonly targets?: readonly { readonly outName: string }[];
+  readonly bundles?: readonly AttestationBundle[];
 }): Promise<ArtifactVerification[]> {
-  const bundleJson = await readBundle(opts.dir);
-  const check = { ...opts, bundleJson, now: opts.now ?? new Date() };
+  const now = opts.now ?? new Date();
   const results: ArtifactVerification[] = [];
-  for (const t of opts.targets ?? ATTESTED_ASSETS) results.push(await verifyOne(t.outName, check));
+  for (const b of opts.bundles ?? ATTESTATION_BUNDLES) {
+    const check = { ...opts, now, bundleJson: await readBundle(opts.dir, b.bundle) };
+    for (const name of b.subjects) results.push(await verifyOne(name, check));
+  }
   return results;
 }
 
-/** The bundle beside the binaries, or null — which the verifier reports as
+/** The named bundle beside the assets, or null — which the verifier reports as
  *  `no-bundle`, per artefact, rather than this script deciding for it. */
-async function readBundle(dir: string): Promise<string | null> {
+async function readBundle(dir: string, name: string): Promise<string | null> {
   try {
-    return await Deno.readTextFile(`${dir}/${ATTESTATION_ASSET_NAME}`);
+    return await Deno.readTextFile(`${dir}/${name}`);
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return null;
     throw err;
