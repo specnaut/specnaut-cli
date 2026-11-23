@@ -64,8 +64,8 @@ Deno.test("an item cmdlet handed a path that is not a constant is not read whole
     "New-Item -ItemType Directory tools",
     "si x -Value $v",
     "si -Force x $v",
-    'si x "$v w"',
-    "Set-Content out.txt ($a + $b)",
+    "si x 'v w'",
+    "Set-Content out.txt (1 + 2)",
     "Set-Content path.txt x",
     "si ./paths x",
   ];

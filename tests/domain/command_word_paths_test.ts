@@ -72,9 +72,10 @@ Deno.test("an assignment is read for its value, never as a whole name", () => {
 });
 
 Deno.test("past the pattern cap, the reading is not whole", () => {
+  // Run by `bash`: a program named by a variable is not read whole by a rule of its own.
   const many = Array.from({ length: 100 }, (_, i) => `t${i}/$X.sh`).join(" ");
-  assertEquals(read(many).whole, false);
-  assertEquals(read("t/$X.sh").whole, true);
+  assertEquals(read(`bash ${many}`).whole, false);
+  assertEquals(read("bash t/$X.sh").whole, true);
 });
 
 Deno.test("an absolute path is tried from each folder above a project in a subfolder", () => {

@@ -1,6 +1,6 @@
 import { isPathKey } from "./command_search_path.ts";
 import { commandWords, PARSE_LIMIT, type Reading } from "./command_words.ts";
-import { semanticsOf, surelySetsPath } from "./env_surfaces.ts";
+import { isEnvSurface, semanticsOf, surelySetsPath } from "./env_surfaces.ts";
 import { respellsProjectVariable } from "./project_variable.ts";
 
 /**
@@ -34,17 +34,58 @@ function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string
   if (typeof value === "string") return [value];
   if (!firstVisit(value, walk)) return [];
   if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, walk, below(under, "")));
-  const strings: string[] = [];
+  const [strings, code]: string[][] = [[], []];
+  const exec = execForm(value);
   for (const [key, v] of Object.entries(value)) {
     if (respellsProjectVariable(key)) walk.read.rebindsProject = true;
     if (isPathKey(key) && typeof v === "string") {
       const [sure, semantics] = [surelySetsPath(key, under), semanticsOf(walk.read.source, under)];
       walk.read.pathValues.push({ value: v, sure, semantics });
     }
-    strings.push(...stringsOf(v, walk, below(under, key)));
+    const own = stringsOf(v, walk, below(under, key));
+    strings.push(...own);
+    if (!(exec.length > 0 && key === "command") && runs(key, under)) {
+      code.push(...own);
+    }
   }
-  walk.entries.push(commandWords(strings, walk.read));
+  walk.entries.push(
+    commandWords(strings, walk.read, { code, argv: exec.length > 0 ? [exec] : [] }),
+  );
   return [];
+}
+
+/**
+ * The command an object starts with no shell: its `command` and each string of its `args`, a
+ * hook's exec form or an MCP server's; none when it has no `args` list.
+ */
+function execForm(value: object): string[] {
+  const { command, args } = value as Record<string, unknown>;
+  if (typeof command !== "string" || !Array.isArray(args)) return [];
+  return [command, ...args.filter((a): a is string => typeof a === "string")];
+}
+
+/**
+ * The keys whose string a harness never runs: a hook's `matcher` (a pattern), `type`, `shell` and
+ * `statusMessage`, a server's `url` and `cwd`, a `description`, Codex's environment filters
+ * (`include_only`, `exclude`, `env_vars`), and `args`, a command's arguments, run with it alone
+ * (`execForm`).
+ */
+const NOT_RUN = new Set(
+  "matcher type shell statusMessage url cwd description include_only exclude env_vars args"
+    .split(" "),
+);
+
+/**
+ * Whether a harness may run the string of `key` in an object held under `under`: not a key of
+ * {@link NOT_RUN} or a key `path` (a folder), a value of an object that sets the environment
+ * (`env_surfaces.ts`) or of a `headers` object, nor a permission rule, which grants a command
+ * rather than runs one. A string it never runs is read for its paths as any other, but no rule on
+ * code a command runs holds it.
+ */
+function runs(key: string, under: readonly string[]): boolean {
+  if (NOT_RUN.has(key) || isPathKey(key) || isEnvSurface(under)) return false;
+  if (/headers$/i.test(under.at(-1) ?? "")) return false;
+  return !(under.at(-1) === "permissions" && ["allow", "deny", "ask"].includes(key));
 }
 
 /** The last two keys above a value held at `key` of one held under `under`. */

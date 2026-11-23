@@ -65,12 +65,18 @@ const EXPANDS = /[$`]/;
 
 /**
  * Whether one command's words may bind the variable through a name only running it gives: `eval`,
- * or a binder whose name holds an expansion (`export "$n=…"`, `env ${n}DIR=…`, `read $n`,
- * `mapfile $n`, `let "$n=1"`, `printf -v$n`).
+ * or a binder whose name holds an expansion (`bindsThroughExpansion`).
  */
-export function bindsByExpansion(words: readonly string[]): boolean {
+export const bindsByExpansion = (words: readonly string[]): boolean =>
+  words.includes("eval") || bindsThroughExpansion(words);
+
+/**
+ * Whether one command's words hold a binder whose name holds an expansion (`export "$n=…"`,
+ * `env ${n}DIR=…`, `read $n`, `mapfile $n`, `let "$n=1"`, `printf -v$n`): any variable, PATH and
+ * the project's included, may be the one it binds.
+ */
+export function bindsThroughExpansion(words: readonly string[]): boolean {
   return words.some((word, at) => {
-    if (word === "eval") return true;
     const v = words[at + 1] ?? "";
     const names = BINDERS.has(word)
       ? words.slice(at + 1)

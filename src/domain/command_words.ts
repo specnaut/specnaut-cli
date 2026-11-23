@@ -2,7 +2,8 @@ import { manifestsOf } from "./command_runners.ts";
 import { pathAssignments, type PathValue } from "./command_search_path.ts";
 import { buildsPathUnread, joinedPathUnread, setsPathUnread } from "./powershell_path.ts";
 import { encodedWords } from "./powershell_forms.ts";
-import { nestedSegments } from "./nested_commands.ts";
+import { isCommandLine, nestedSegments } from "./nested_commands.ts";
+import { runsAssembledCode } from "./assembled_code.ts";
 import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts";
 
 /**
@@ -75,10 +76,12 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
  * a word or a string that sets PATH where no value is read (`setsPathUnread`), a string or a word
  * spelled across quotes that sets PowerShell's PATH to a value its words do not give whole
  * (`buildsPathUnread`, `joinedPathUnread`), or a command handing PowerShell an encoded command
- * (`encodedWords`), leaves the reading not whole.
+ * (`encodedWords`), leaves the reading not whole. So does code the strings a harness runs (`run`:
+ * all of them, unless the walk says otherwise) assemble at run time (`ranCode`).
  */
-export function commandWords(strings: readonly string[], read: Reading): string[] {
+export function commandWords(strings: readonly string[], read: Reading, run?: Run): string[] {
   const commands = nestedSegments(strings, read);
+  ranCode(run ?? { code: strings, argv: [] }, run === undefined ? commands : null, read);
   for (const words of commands) read.pathValues.push(...pathAssignments(words));
   for (const word of commands.flat()) {
     if (isProgram(word)) read.programs.add(word);
@@ -89,6 +92,26 @@ export function commandWords(strings: readonly string[], read: Reading): string[
   const respells = [...strings, ...commands.flat()].some(respellsProjectVariable);
   if (respells || commands.some(bindsByExpansion)) read.rebindsProject = true;
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];
+}
+
+/**
+ * What of a group of strings a harness runs: the strings it hands a shell (`code`), and each
+ * command it starts with no shell, its program and arguments as written (`argv`: a hook's or a
+ * server's `command` with `args`). A string it never runs (a hook's `matcher`, a server's `url`,
+ * an environment's value) is in neither: it is read for its paths alone (`command_values.ts`).
+ */
+export type Run = { readonly code: readonly string[]; readonly argv: readonly string[][] };
+
+/**
+ * Notes in `read` whether what `run` runs assembles code at run time (`assembled_code.ts`): its
+ * code's commands (`commands`, when already split), each argument that is a command line of its
+ * own read as one, and each command started with no shell as one command.
+ */
+function ranCode(run: Run, commands: readonly string[][] | null, read: Reading): void {
+  const lines = run.argv.flat().filter(isCommandLine);
+  const texts = [...run.code, ...lines];
+  const split = commands !== null && lines.length === 0 ? commands : nestedSegments(texts, read);
+  if (runsAssembledCode(texts, [...split, ...run.argv])) read.whole = false;
 }
 
 /**

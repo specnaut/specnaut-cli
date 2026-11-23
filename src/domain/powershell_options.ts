@@ -3,7 +3,7 @@
  * script file, an encoded command. PowerShell reads an option by a prefix of its name, after a
  * `-`, a `/` or a dash it reads as one (`–`, `—`, `―`), in any letter case, and its value glued
  * after a `:` or as the next word. One predicate, so each reader of a launcher's words names an
- * option the same way (`powershell_forms.ts`, `generated_code.ts`).
+ * option the same way (`powershell_forms.ts`, `assembled_code.ts`).
  */
 
 /** What an option hands the launcher. */

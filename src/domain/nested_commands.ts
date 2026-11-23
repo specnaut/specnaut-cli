@@ -40,13 +40,21 @@ export function nestedSegments(texts: readonly string[], read: { whole: boolean 
 const BACKQUOTED_ESCAPE = /\\([\\`$])/g;
 
 /**
- * The commands `word` holds: itself, when a second split reads it otherwise (a command line, or a
- * level of quoting left), whose own nested commands the next level finds; else what each `$(…)` and
- * backquote in it runs, `${X:-$(…)}` included. Each is shorter than `word`, so the levels end.
+ * Whether `word` is read as a command line of its own: a second split reads it otherwise than as
+ * itself (a command line, or a level of quoting left). The one place that says which word is code.
+ */
+export function isCommandLine(word: string): boolean {
+  const again = shellWords(word);
+  return again.length !== 1 || again[0] !== word;
+}
+
+/**
+ * The commands `word` holds: itself, when it is a command line (`isCommandLine`), whose own nested
+ * commands the next level finds; else what each `$(…)` and backquote in it runs, `${X:-$(…)}`
+ * included. Each is shorter than `word`, so the levels end.
  */
 function innerCommands(word: string): string[] {
-  const again = shellWords(word);
-  if (again.length !== 1 || again[0] !== word) return [word];
+  if (isCommandLine(word)) return [word];
   const found: string[] = [];
   for (let i = 0; i < word.length; i++) {
     if (word.startsWith("$(", i)) {

@@ -33,7 +33,8 @@ Deno.test("a word that is a command line is read as one, in any form a shell is 
 Deno.test("a command nested in a command nested in another is read, level by level", () => {
   const found = read("bash -c 'echo \"$(cat $(tools/inner.sh --list))\"'");
   has(found.paths, "tools/inner.sh");
-  assertEquals(found.whole, true);
+  // Code handed to a shell holding an expansion is code built at run time: not read whole.
+  assertEquals(found.whole, false);
 });
 
 Deno.test("past the nesting cap, what is left is not read, and the reading is not whole", () => {
