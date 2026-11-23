@@ -313,11 +313,8 @@ jobs:
       #   2. `env: GH_TOKEN: ${{ github.token }}` on the "Generate release
       #      notes" step actually places the token in the step env so `gh`
       #      is authenticated — a permission scope alone does NOT do this.
-      # Earlier only (1) was applied, so `gh` ran unauthenticated and every
-      # adoption fetch failed silently, shipping a body with no
-      # `### Adoption guide` block (e.g. v1.6.0 / v1.13.0, amended manually
-      # post-release). The step now also runs `--strict`, which fails the
-      # build on any retrieval failure rather than publishing a partial guide.
+      # With (1) alone `gh` ran unauthenticated and every adoption fetch
+      # failed silently; `--strict` now fails the build on any such failure.
       pull-requests: read
       # Keyless signing (#577). `id-token: write` mints the OIDC token Fulcio
       # exchanges for a short-lived signing certificate; `attestations: write`
@@ -337,14 +334,6 @@ jobs:
       # `push-to-registry`, and the step below sets `create-storage-record:
       # false` and pushes to no registry. Granting it would widen the token for
       # a code path this workflow never reaches.
-      #
-      # An earlier version of this comment closed on a parse-failure risk,
-      # having already conceded in its previous clause that the action's prose
-      # lists the key — it contradicted itself, and the half that was wrong is
-      # the half that read as the reason. A correct constraint defended by a
-      # checkable false premise is one somebody deletes the moment they check
-      # (cli#597). The `repository-advisories` note above makes the
-      # parse-failure argument correctly, about a genuinely invalid key.
       id-token: write
       attestations: write
     steps:
@@ -504,8 +493,6 @@ jobs:
       # were deleted from this repository's secrets on 2026-08-22. Do not
       # re-provision any of them.
       #
-      # Latency is the trade: each target syncs on its own cron rather than
-      # within seconds of the tag. `.specnaut/release/postflight.sh` dispatches
-      # both immediately after a release using the operator's own credentials,
-      # so a normal release still publishes at once — and it verifies the
-      # published artefacts rather than trusting an exit code.
+      # Latency is the trade: each target syncs on its own cron. postflight.sh
+      # dispatches both at once with the operator's own credentials, and
+      # verifies the published artefacts rather than trusting an exit code.
