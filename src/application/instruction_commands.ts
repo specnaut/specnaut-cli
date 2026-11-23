@@ -4,14 +4,16 @@ import {
   type CommandPaths,
   commandPaths,
   isCommandSource,
+  withSourced,
 } from "../domain/command_targets.ts";
+import { MAX_SOURCED_BYTES, onlyAssignments } from "../domain/sourced_files.ts";
 import { matching } from "../domain/command_word_paths.ts";
 import { onPathTargets } from "../domain/command_search_path.ts";
 import { keptAtHead } from "../domain/instruction_scope.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "../domain/path_index.ts";
 import { canonical } from "../domain/project_path.ts";
 import { type BaseEntry, SCRIPTS_DIR } from "../domain/script_trust.ts";
-import { indexAt, sourceAt, visit, type Walk } from "./head_targets.ts";
+import { indexAt, sourceAt, targetSides, visit, type Walk } from "./head_targets.ts";
 
 /**
  * The files the judged configs' commands run (`command_targets.ts`), resolved and judged as HEAD
@@ -19,7 +21,10 @@ import { indexAt, sourceAt, visit, type Walk } from "./head_targets.ts";
  * each word that names a file HEAD or the tip holds, in any letter case, or a path through a link
  * HEAD holds. Resolved and judged, never refused: a target the branch leaves alone stays silent,
  * so only a changed one is named, where refusing would name an unchanged hook on every merge.
- * A target is judged by its bytes alone; its text is never read for imports or for commands. A
+ * A target is judged by its bytes alone; its text is never read for imports or for commands, but
+ * for one case: a file a command runs in its own process (`. ./env.sh`), whose PATH carries back
+ * into that command, is read for the PATH it sets when each of its lines, at HEAD and at the tip,
+ * is only an assignment (`sourced_files.ts`); any other leaves its source not read whole. A
  * program a command names by name alone is tried in each folder any source puts on PATH: a
  * settings file's PATH reaches a skill's hooks too.
  */
@@ -39,7 +44,7 @@ export async function readCommands(
   ];
   if (read.length === 0) return;
   const at = { head: await indexAt(walk, walk.base.head), tip: await indexAt(walk, walk.base.tip) };
-  for (const path of commandTargets(walk, read, at)) {
+  for (const path of await commandTargets(walk, read, at)) {
     for (const target of heldAs(walk.git.projectPrefix, path, at.head, at.tip)) {
       await visit(walk, target);
     }
@@ -55,13 +60,15 @@ type Found = CommandPaths & { readonly source: Read };
  * holds that is not read whole gets the reason. An absolute path is tried from each folder above
  * a project in a subfolder (its depth).
  */
-function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
+async function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
   const isFolder = (path: string) => (at.head.get(fold(path)) ?? []).some((p) => p.kind === "tree");
   const depth = walk.git.projectPrefix.split("/").filter(Boolean).length;
-  const found: Found[] = acrossSources(read.map((source) => ({
-    source,
-    ...commandPaths(source.entry.path, source.bytes, isFolder, depth),
-  })));
+  const each: Found[] = [];
+  for (const source of read) {
+    const paths = commandPaths(source.entry.path, source.bytes, isFolder, depth);
+    each.push(await withCarried(walk, { source, ...paths }, depth));
+  }
+  const found = acrossSources(each);
   for (const f of found) if (!f.whole && f.source.atHead) partial(walk, f.source.entry.path);
   const targets = new Set(found.flatMap((f) => f.paths));
   const patterns = [...new Set(found.flatMap((f) => f.patterns))];
@@ -71,6 +78,43 @@ function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
 }
 
 type Indexes = { readonly head: PathIndex; readonly tip: PathIndex };
+
+/**
+ * `found` with the PATH each repository file it runs in its own process sets (`withSourced`), read
+ * before any program is looked up on PATH; not whole when one cannot be read so (`carriedTexts`).
+ */
+async function withCarried(walk: Walk, found: Found, depth: number): Promise<Found> {
+  const texts: string[] = [];
+  for (const file of found.sourced) {
+    const read = await carriedTexts(walk, file, found.source.atHead);
+    if (read === null) return { ...found, whole: false };
+    texts.push(...read);
+  }
+  return texts.length === 0 ? found : withSourced(found, texts, depth);
+}
+
+/**
+ * The texts `file` holds at HEAD and at the tip, read as `visit` reads a target (`targetSides`),
+ * or `null` when it is not one plain file made only of assignments: absent from the commit its
+ * source was read at, a link or a submodule on its way, another letter case, not a regular file,
+ * past {@link MAX_SOURCED_BYTES}, or a line of any other kind (`onlyAssignments`).
+ */
+async function carriedTexts(walk: Walk, file: string, atHead: boolean): Promise<string[] | null> {
+  const target = canonical(walk.git.projectPrefix, file);
+  if (target === null) return null;
+  const { sides, ends, twins, reason } = await targetSides(walk, target);
+  if (ends.length > 0 || twins.length > 0 || reason !== null) return null;
+  if (!((atHead ? sides.head : sides.tip) instanceof Uint8Array)) return null;
+  const texts: string[] = [];
+  for (const side of [sides.head, sides.tip]) {
+    if (side === "absent") continue;
+    if (!(side instanceof Uint8Array) || side.length > MAX_SOURCED_BYTES) return null;
+    const text = new TextDecoder().decode(side);
+    if (!onlyAssignments(text)) return null;
+    texts.push(text);
+  }
+  return texts;
+}
 
 /**
  * Each program the sources name in each folder any of them puts on PATH, looked up in both

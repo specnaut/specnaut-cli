@@ -68,7 +68,7 @@ const NOT_COMMANDS = new Set(["for", "case", "select", "function", "[", "[["]);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*\+?=/;
 
 /** The place of the program among one command's words, or -1 when it starts none. */
-function programAt(words: readonly string[]): number {
+export function programAt(words: readonly string[]): number {
   const at = words.findIndex((w) => !ASSIGNMENT.test(w) && !LEADS.has(w));
   return at < 0 || NOT_COMMANDS.has(words[at]) ? -1 : at;
 }

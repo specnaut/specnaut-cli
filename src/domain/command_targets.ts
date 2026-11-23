@@ -2,6 +2,7 @@ import { parse as parseJsonc } from "@std/jsonc";
 import { parse as parseToml } from "@std/toml";
 import { climb } from "./project_path.ts";
 import {
+  commandWords,
   MAX_WORD,
   PARSE_LIMIT,
   parsedGroups,
@@ -51,7 +52,8 @@ const MAX_JOINS = 50_000;
  * bare name runs (`command_search_path.ts`), the folders it puts on PATH and the programs it names;
  * and the patterns its paths built around a variable read as (`command_word_paths.ts`); and whether
  * it spells the project's variable otherwise than reading it, or puts a folder on PATH through it
- * (`project_variable.ts`).
+ * (`project_variable.ts`); and the repository files it runs in its own process, whose PATH the
+ * caller reads when their lines allow it (`sourced_files.ts`).
  */
 export type CommandPaths = {
   readonly paths: readonly string[];
@@ -61,6 +63,7 @@ export type CommandPaths = {
   readonly patterns: readonly string[];
   readonly rebindsProject: boolean;
   readonly leansOnProject: boolean;
+  readonly sourced: readonly string[];
 };
 
 /**
@@ -96,6 +99,29 @@ function found(paths: readonly string[], read: Reading): CommandPaths {
     patterns: [...read.patterns],
     rebindsProject: read.rebindsProject,
     leansOnProject: read.leansOnProject,
+    sourced: [...read.sourced],
+  };
+}
+
+/**
+ * The PATH a sourced file's `texts` (its bytes at HEAD and at the tip, each made only of
+ * assignments: `onlyAssignments`) set, read through their words as a command's are, added to what
+ * `found` read: a file a command runs in its own process sets the PATH that command runs with.
+ */
+export function withSourced<T extends CommandPaths>(
+  found: T,
+  texts: readonly string[],
+  depth: number,
+): T {
+  const read = reading(depth);
+  for (const text of texts) commandWords(text.split(/\r?\n/), read);
+  const more = pathFolders(read);
+  return {
+    ...found,
+    whole: found.whole && read.whole,
+    onPath: [...new Set([...found.onPath, ...more])],
+    rebindsProject: found.rebindsProject || read.rebindsProject,
+    leansOnProject: found.leansOnProject || read.leansOnProject,
   };
 }
 

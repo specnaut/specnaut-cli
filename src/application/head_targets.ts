@@ -77,16 +77,24 @@ export function indexAt(walk: Walk, commit: string): Promise<PathIndex> {
 export async function visit(walk: Walk, written: string): Promise<string[]> {
   const target = canonical(walk.git.projectPrefix, written);
   if (target === null || walk.files.has(target)) return [];
-  const { sides, ends, outside } = await readSides(walk, target);
+  const { sides, ends, twins, reason } = await targetSides(walk, target);
   walk.files.set(target, sides);
-  const head = await indexAt(walk, walk.base.head);
-  const twins = twinsAtHead(target, head);
-  const moved = submoduleMoved(target, head, await indexAt(walk, walk.base.tip));
-  const reason = wayReason(sides, { outside, moved, twin: twins[0] });
   if (reason !== null) walk.reasons.push({ path: target, reason });
   const recorded = [target];
   for (const next of [...ends, ...twins]) recorded.push(...await visit(walk, next));
   return recorded;
+}
+
+/**
+ * `target`'s three sides as {@link visit} reads them, recording nothing: the end of each link it
+ * leads through, HEAD's names that fold to it, and the reason its way gives (`wayReason`).
+ */
+export async function targetSides(walk: Walk, target: string) {
+  const { sides, ends, outside } = await readSides(walk, target);
+  const head = await indexAt(walk, walk.base.head);
+  const twins = twinsAtHead(target, head);
+  const moved = submoduleMoved(target, head, await indexAt(walk, walk.base.tip));
+  return { sides, ends, twins, reason: wayReason(sides, { outside, moved, twin: twins[0] }) };
 }
 
 /**

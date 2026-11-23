@@ -2,6 +2,7 @@ import { isPathKey } from "./command_search_path.ts";
 import { commandWords, PARSE_LIMIT, type Reading } from "./command_words.ts";
 import { isEnvSurface, semanticsOf, surelySetsPath } from "./env_surfaces.ts";
 import { respellsProjectVariable } from "./project_variable.ts";
+import { type Carried, noteKey } from "./sourced_files.ts";
 
 /**
  * The walk of a parsed command source (a JSON or TOML config, a YAML frontmatter): each object's
@@ -35,9 +36,11 @@ function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string
   if (!firstVisit(value, walk)) return [];
   if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, walk, below(under, "")));
   const [strings, code]: string[][] = [[], []];
+  const carried: Carried = { unread: false, files: [] };
   const exec = execForm(value);
   for (const [key, v] of Object.entries(value)) {
     if (respellsProjectVariable(key)) walk.read.rebindsProject = true;
+    if (isEnvSurface(under) && typeof v === "string") noteKey(carried, key, v);
     if (isPathKey(key) && typeof v === "string") {
       const [sure, semantics] = [surelySetsPath(key, under), semanticsOf(walk.read.source, under)];
       walk.read.pathValues.push({ value: v, sure, semantics });
@@ -48,9 +51,10 @@ function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string
       code.push(...own);
     }
   }
-  walk.entries.push(
-    commandWords(strings, walk.read, { code, argv: exec.length > 0 ? [exec] : [] }),
-  );
+  const [argv, moved] = [exec.length > 0 ? [exec] : [], Object.hasOwn(value, "cwd")];
+  walk.entries.push(commandWords(strings, walk.read, { code, argv, moved }));
+  if (carried.unread) walk.read.whole = false;
+  carried.files.forEach((file) => walk.read.sourced.add(file));
   return [];
 }
 

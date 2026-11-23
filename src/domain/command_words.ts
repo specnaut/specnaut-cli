@@ -4,6 +4,7 @@ import { buildsPathUnread, joinedPathUnread, setsPathUnread } from "./powershell
 import { encodedWords } from "./powershell_forms.ts";
 import { isCommandLine, nestedSegments } from "./nested_commands.ts";
 import { runsAssembledCode } from "./assembled_code.ts";
+import { carriedFiles } from "./sourced_files.ts";
 import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts";
 
 /**
@@ -22,7 +23,8 @@ import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts
  * What a reading of one source found beside its words: whether it met no limit (a source that did
  * not parse, a word or an expansion past a cap), each value it sets PATH to, each word its
  * commands hold that may be a program named by name alone (`isProgram`), and each pattern a path
- * built around a variable reads as (`command_word_paths.ts`). Whether it spells the project's
+ * built around a variable reads as (`command_word_paths.ts`), and each repository file it runs in
+ * its own process, to be read for the PATH it sets (`sourced_files.ts`). Whether it spells the project's
  * variable otherwise than reading it, and whether a folder it puts on PATH leans on that variable
  * (`project_variable.ts`). And the source's path, and how many folders the project sits below the
  * repository's top.
@@ -35,6 +37,7 @@ export type Reading = {
   readonly pathValues: PathValue[];
   readonly programs: Set<string>;
   readonly patterns: Set<string>;
+  readonly sourced: Set<string>;
   readonly depth: number;
 };
 
@@ -51,6 +54,7 @@ export const reading = (depth = 0, source = ""): Reading => ({
   pathValues: [],
   programs: new Set(),
   patterns: new Set(),
+  sourced: new Set(),
   depth,
 });
 
@@ -100,18 +104,26 @@ export function commandWords(strings: readonly string[], read: Reading, run?: Ru
  * server's `command` with `args`). A string it never runs (a hook's `matcher`, a server's `url`,
  * an environment's value) is in neither: it is read for its paths alone (`command_values.ts`).
  */
-export type Run = { readonly code: readonly string[]; readonly argv: readonly string[][] };
+export type Run = {
+  readonly code: readonly string[];
+  readonly argv: readonly string[][];
+  readonly moved?: boolean;
+};
 
 /**
- * Notes in `read` whether what `run` runs assembles code at run time (`assembled_code.ts`): its
- * code's commands (`commands`, when already split), each argument that is a command line of its
- * own read as one, and each command started with no shell as one command.
+ * Notes in `read` whether what `run` runs assembles code at run time (`assembled_code.ts`), and the
+ * files it runs in its own process, whose PATH carries back (`sourced_files.ts`): its code's
+ * commands (`commands`, when already split), each argument that is a command line of its own read
+ * as one, and each command started with no shell as one command.
  */
 function ranCode(run: Run, commands: readonly string[][] | null, read: Reading): void {
   const lines = run.argv.flat().filter(isCommandLine);
   const texts = [...run.code, ...lines];
   const split = commands !== null && lines.length === 0 ? commands : nestedSegments(texts, read);
   if (runsAssembledCode(texts, [...split, ...run.argv])) read.whole = false;
+  const carried = carriedFiles([...split, ...run.argv], run.moved);
+  if (carried.unread) read.whole = false;
+  carried.files.forEach((file) => read.sourced.add(file));
 }
 
 /**
