@@ -23,20 +23,25 @@ async function withProject(
     const root = join(base, "project");
     await Deno.mkdir(root);
     await initRepo(root);
-    for (const [path, text] of Object.entries(files)) {
-      await Deno.mkdir(join(root, path, ".."), { recursive: true });
-      await Deno.writeTextFile(join(root, path), text);
-    }
-    await git(root, ["add", "-A"]);
-    await git(root, ["commit", "-q", "--allow-empty", "-m", "base"]);
-    await git(base, ["init", "-q", "--bare", "-b", "main", "origin.git"]);
-    await git(root, ["remote", "add", "origin", join(base, "origin.git")]);
-    await git(root, ["push", "-q", "origin", "main"]);
-    await git(root, ["remote", "set-head", "origin", "main"]);
+    await publish(root, join(base, "origin.git"), files);
     await fn(root, await git(root, ["rev-parse", "HEAD"]));
   } finally {
     await Deno.remove(base, { recursive: true });
   }
+}
+
+/** `files` committed on the repository at `root` and pushed to a new bare `origin`, its HEAD. */
+async function publish(root: string, origin: string, files: Record<string, string>) {
+  for (const [path, text] of Object.entries(files)) {
+    await Deno.mkdir(join(root, path, ".."), { recursive: true });
+    await Deno.writeTextFile(join(root, path), text);
+  }
+  await git(root, ["add", "-A"]);
+  await git(root, ["commit", "-q", "--allow-empty", "-m", "base"]);
+  await git(join(origin, ".."), ["init", "-q", "--bare", "-b", "main", origin]);
+  await git(root, ["remote", "add", "origin", origin]);
+  await git(root, ["push", "-q", "origin", "main"]);
+  await git(root, ["remote", "set-head", "origin", "main"]);
 }
 
 const image = (ref: string) => `// a devcontainer\n{\n  "image": "${ref}", // pinned\n}\n`;
@@ -55,6 +60,16 @@ Deno.test("a devcontainer only the work tree holds gives no image", () =>
   withProject({ "a.txt": "a\n" }, async (root) => {
     await Deno.writeTextFile(join(root, ".devcontainer.json"), image(PINNED));
     assertEquals(await baseImage(root), { kind: "none", why: "no devcontainer" });
+  }));
+
+Deno.test("from a folder of a submodule, the image is the submodule's base, not the superproject's", () =>
+  withProject({ ".devcontainer.json": image(PINNED) }, async (root) => {
+    const [mod, modules] = [join(root, "mod"), join(root, ".git", "modules")];
+    await Deno.mkdir(modules);
+    await git(root, ["init", "-q", "-b", "main", "--separate-git-dir", join(modules, "mod"), mod]);
+    const files = { ".devcontainer.json": image(OTHER), "sub/a.txt": "a\n" };
+    await publish(mod, join(root, "..", "mod-origin.git"), files);
+    assertEquals(await baseImage(join(mod, "sub")), { kind: "pinned", ref: OTHER });
   }));
 
 Deno.test("outside a repository, or with no base tip, there is no image, and why", async () => {

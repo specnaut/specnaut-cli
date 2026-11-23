@@ -28,7 +28,7 @@ import type { SandboxDeps } from "./sandbox_handler.ts";
 export function sandboxHostDeps(): SandboxDeps {
   const checkout = () => checkoutRoot(Deno.cwd());
   const { os, arch } = Deno.build;
-  const image = async () => baseImage(await checkout());
+  const image = () => baseImage(Deno.cwd());
   // The engines are asked with the environment a run gives them, and nothing of ours beside it,
   // and found, as every program started by name is, on the PATH the run finds them on.
   const prober = new HostBackendProber(
@@ -48,13 +48,14 @@ export function sandboxHostDeps(): SandboxDeps {
 
 /**
  * The image the base branch's tip pins, as `verify-scripts` resolves that tip: never the work
- * tree's devcontainer, which the branch under review can edit. Outside a repository there is no
- * base, so no image.
+ * tree's devcontainer, which the branch under review can edit. The repository is the one git
+ * names from `cwd`, read from its top: in a submodule, the submodule's own base, not the
+ * superproject's that `checkoutRoot` widens to. Outside a repository there is no base, so no image.
  */
-export async function baseImage(checkout: string): Promise<ImageSource> {
+export async function baseImage(cwd: string): Promise<ImageSource> {
   let git: GitObjects;
   try {
-    git = await GitObjects.open(checkout);
+    git = await GitObjects.open(await gitTop(cwd) ?? cwd);
   } catch (err) {
     if (!(err instanceof GitRefused)) throw err;
     return { kind: "none", why: `no base to read the devcontainer from: ${err.message}` };
@@ -119,13 +120,24 @@ export function execDeps(
 }
 
 /**
- * The checkout `cwd` is in: the repository's top, asked of the hardened git so the checkout's own
- * folders cannot supply the git that answers. When git gives no answer, because it failed or was
- * refused before it ran (no PATH entry outside the tree, a grafts file), the top is the nearest
- * folder holding a `.git`, found without git; outside a repository, `cwd` itself. Never a folder
- * narrower than the checkout: the sandbox keeps every folder of it out of sight.
+ * The checkout `cwd` is in, at `treeTop`'s width: from a submodule or a linked work tree inside
+ * another, the superproject's top, not the folder holding the `.git` file. The sandbox keeps every
+ * folder of the checkout out of sight, so the wider folder is the one that fails safe, and the two
+ * paths below answer with the same one. The repository's top is asked of the hardened git
+ * (`gitTop`), so the checkout's own folders cannot supply the git that answers, then widened by
+ * `treeTop`. When git gives no answer, because it failed or was refused before it ran (no PATH entry
+ * outside the tree, a grafts file), `treeTop` is asked from `cwd` itself; outside a repository,
+ * that is `cwd`.
  */
 export async function checkoutRoot(cwd: string): Promise<string> {
+  return treeTop(await gitTop(cwd) ?? cwd);
+}
+
+/**
+ * The top of the repository `cwd` is in as the hardened git names it: the nearest folder holding a
+ * `.git`, a submodule's own. Undefined when git gives no answer.
+ */
+async function gitTop(cwd: string): Promise<string | undefined> {
   let top: GitResult | undefined;
   try {
     top = await new UntrustedGit(cwd).call("rev-parse", ["--show-toplevel"]);
@@ -133,5 +145,5 @@ export async function checkoutRoot(cwd: string): Promise<string> {
     if (!(err instanceof GitRefused)) throw err;
   }
   const answer = top?.code === 0 ? decode(top.stdout).trim() : "";
-  return answer === "" ? treeTop(cwd) : await Deno.realPath(answer);
+  return answer === "" ? undefined : answer;
 }
