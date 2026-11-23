@@ -16,7 +16,8 @@ sits in the tree (the nearest folder holding a `.git` folder, a submodule's or a
 sits in the tree when it is spelled there, whatever a link of the tree
 points at, or when the links on it lead there. Then it sets `sn` to the physical file `specnaut` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
-folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
+folder, or any link on the way to it, sits in that same tree - never git's toplevel, which in a
+submodule stops short of the superproject the hooks judge against. `-ef` compares device and inode, so
 neither case, a drive-letter spelling nor a `<repo>-x` sibling passes for the repository. It runs
 in bash and in zsh alike, in the session's own shell: it reaches `cd`, `pwd` and `command` through
 `\builtin`, and clears zsh's `chpwd` hooks inside each `$(…)` that changes folder, so no function,
@@ -53,9 +54,8 @@ while [ -z "$why" ] && [ -n "$rest" ]; do
   [ -z "$why" ] || { p="PATH entry '$e'"; why="$why - start the session from a shell without that entry"; }
 done
 if [ -z "$why" ]; then
-  p=$(\builtin command -v specnaut); top=$(git rev-parse --show-toplevel)
+  p=$(\builtin command -v specnaut)
   case $p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
-  [ -n "$why" ] || [ -n "$top" ] || why="has no repository to be judged outside of"
 fi
 while [ -z "$why" ]; do
   d=$(\builtin unset -f chpwd 2>/dev/null; \builtin unset chpwd_functions

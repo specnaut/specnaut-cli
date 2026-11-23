@@ -3907,7 +3907,8 @@ sits in the tree (the nearest folder holding a \`.git\` folder, a submodule's or
 sits in the tree when it is spelled there, whatever a link of the tree
 points at, or when the links on it lead there. Then it sets \`sn\` to the physical file \`specnaut\` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
-folder, or any link on the way to it, sits in this repository. \`-ef\` compares device and inode, so
+folder, or any link on the way to it, sits in that same tree - never git's toplevel, which in a
+submodule stops short of the superproject the hooks judge against. \`-ef\` compares device and inode, so
 neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository. It runs
 in bash and in zsh alike, in the session's own shell: it reaches \`cd\`, \`pwd\` and \`command\` through
 \`\\builtin\`, and clears zsh's \`chpwd\` hooks inside each \`\$(…)\` that changes folder, so no function,
@@ -3944,9 +3945,8 @@ while [ -z "\$why" ] && [ -n "\$rest" ]; do
   [ -z "\$why" ] || { p="PATH entry '\$e'"; why="\$why - start the session from a shell without that entry"; }
 done
 if [ -z "\$why" ]; then
-  p=\$(\\builtin command -v specnaut); top=\$(git rev-parse --show-toplevel)
+  p=\$(\\builtin command -v specnaut)
   case \$p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
-  [ -n "\$why" ] || [ -n "\$top" ] || why="has no repository to be judged outside of"
 fi
 while [ -z "\$why" ]; do
   d=\$(\\builtin unset -f chpwd 2>/dev/null; \\builtin unset chpwd_functions
@@ -33554,8 +33554,10 @@ entry_in_tree() {
 }
 
 # The verifier, resolved before it runs, into \`sn\`: \`specnaut\` on the PATH must be an absolute
-# path, and neither its folder nor any link on the way to it may sit in this repository - the PATH
-# can name a folder of the tree, where the branch being landed puts a \`specnaut\` of its own. Each
+# path, and neither its folder nor any link on the way to it may sit in the tree - the PATH can
+# name a folder of it, where the branch being landed puts a \`specnaut\` of its own. The tree is
+# tree_top's, the one the PATH and the hooks are judged against: git's toplevel would stop at a
+# submodule and let a \`specnaut\` of its superproject through. Each
 # link is followed one hop at a time to the physical file; \`-ef\` compares device and inode, so
 # neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository. The
 # rule of phases/script-gate.md § Resolving the verifier, which runs before any script of the tree
@@ -33563,7 +33565,7 @@ entry_in_tree() {
 resolve_specnaut() {
   local p why="" n=0 d a t top
   p=\$(command -v specnaut) || p=""
-  top=\$(git rev-parse --show-toplevel) || top=""
+  tree_top "\$(pwd -P)"
   case \$p in /*) ;; "") why="is not on the PATH" ;; *) why="is not an absolute path" ;; esac
   [ -n "\$why" ] || [ -n "\$top" ] || why="has no repository to be judged outside of"
   while [ -z "\$why" ]; do

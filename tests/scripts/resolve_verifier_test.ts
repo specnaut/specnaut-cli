@@ -106,6 +106,9 @@ function pastThePath(l: Layout): Case[] {
     kept("a chain of relative links outside", t("outside", "chain"), { resolved: l.outside }),
     kept("outside the repository", t("outside", "real"), { resolved: l.outside }),
     kept("a link outside naming an in-repo file", t("outside", "links"), { refused: INSIDE }),
+    // The top is the superproject's, as for a PATH entry, never git's toplevel, the submodule.
+    { ...kept("a link outside naming a superproject file, from a submodule", t("outside", "links"),
+      { refused: INSIDE }), cwd: l.submodule, project: l.submodule },
     { name: "no specnaut at all", entries: [l.tools], cwd: l.repo, spec: { refused: "is not on the PATH" } },
   ];
 }
