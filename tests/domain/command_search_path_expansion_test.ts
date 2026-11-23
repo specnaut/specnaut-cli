@@ -93,6 +93,13 @@ Deno.test("a binding through an expansion, or eval, cancels the project's variab
     "readonly $n=/tmp",
     "read $n",
     "printf -v $n /tmp",
+    "printf -v$n /tmp",
+    "env ${n}DIR=/tmp lint",
+    "mapfile $n",
+    "readarray -t $n",
+    "getopts ab $n",
+    'let "$n=1"',
+    "read -a$n",
   ];
   assertEquals(bound.filter((command) => env(PATH, { statusLine: { command } }).whole), []);
 });
@@ -105,6 +112,7 @@ Deno.test("reading the project's variable leaves it the project's folder", () =>
     'pwsh -File "$env:CLAUDE_PROJECT_DIR/x.ps1"',
     "Write-Host ${env:CLAUDE_PROJECT_DIR}",
     "export PATH=$PATH:x",
+    "printf '%s' \"$x\"",
   ];
   const lost = read.filter((command) => !env(PATH, { statusLine: { command } }).whole);
   assertEquals(lost, []);

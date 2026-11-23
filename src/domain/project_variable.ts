@@ -53,21 +53,29 @@ function readsAt(text: string, at: number): boolean {
   return (braced ? after.startsWith("}") : !/^\w/.test(after)) && !ASSIGNED.test(after);
 }
 
-/** The words that bind a variable named by the word after them. */
-const BINDERS = new Set(["export", "declare", "typeset", "local", "readonly", "read"]);
+/**
+ * The words that bind a variable named by a word after them, an option glued to its name
+ * (`read -a$n`) included: the shell's builtins, and `env`, which sets each `NAME=…` for the
+ * command it runs. `printf` binds only the name its `-v` gives (`printf -v "$n"`, `printf -v$n`).
+ */
+const BINDERS = new Set(
+  "export declare typeset local readonly read mapfile readarray getopts let env".split(" "),
+);
 const EXPANDS = /[$`]/;
 
 /**
  * Whether one command's words may bind the variable through a name only running it gives: `eval`,
- * or a binder whose name holds an expansion (`export "$n=…"`, `read $n`, `printf -v "$n"`).
+ * or a binder whose name holds an expansion (`export "$n=…"`, `env ${n}DIR=…`, `read $n`,
+ * `mapfile $n`, `let "$n=1"`, `printf -v$n`).
  */
 export function bindsByExpansion(words: readonly string[]): boolean {
   return words.some((word, at) => {
     if (word === "eval") return true;
+    const v = words[at + 1] ?? "";
     const names = BINDERS.has(word)
-      ? words.slice(at + 1).filter((w) => !w.startsWith("-"))
-      : word === "printf" && words[at + 1] === "-v"
-      ? words.slice(at + 2, at + 3)
+      ? words.slice(at + 1)
+      : word === "printf" && v.startsWith("-v")
+      ? [v === "-v" ? words[at + 2] ?? "" : v.slice(2)]
       : [];
     return names.some((name) => EXPANDS.test(name.split("=")[0]));
   });
