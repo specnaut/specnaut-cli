@@ -34,14 +34,15 @@ const WATCHDOG = [
 /**
  * The watchdog of process group `group`: past `seconds` (rounded up) it kills the group; once the
  * group is gone, by its kill, or by its own end and then ours or the deadline, it runs `removal`,
- * in `env`: a container engine's removal is given the engine's environment. Without one it runs
- * in ours, starting nothing but `date`, `sleep` and `kill` on the host.
+ * in `env`, which every caller chooses: the script starts `date` and `sleep` by name, so the PATH
+ * it is given decides which files run on the host. A container engine's removal is given the
+ * engine's environment; a run with no such environment gives a fixed system PATH, never ours.
  */
 export function watchdogSpec(
   group: number,
   seconds: number,
-  removal: readonly string[] = [],
-  env: ProcessSpec["env"] = "host",
+  removal: readonly string[],
+  env: ProcessSpec["env"],
 ): ProcessSpec {
   const after = String(Math.ceil(seconds));
   return {

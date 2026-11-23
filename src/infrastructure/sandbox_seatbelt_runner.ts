@@ -12,6 +12,13 @@ import { watched } from "./sandbox_watched.ts";
 import { watchdogSpec } from "./sandbox_watchdog.ts";
 
 /**
+ * The watchdog's whole environment: macOS keeps `date` and `sleep` in these folders, and ours
+ * could name a folder of the checkout, a relative entry or an empty one, each of which would let
+ * the branch supply the program the watchdog starts on the host.
+ */
+export const WATCHDOG_ENV = { PATH: "/usr/bin:/bin" } as const;
+
+/**
  * `sandbox-exec` with the policy's profile, in its working folder, with its environment only. The
  * sandbox's home and temp are host folders here, so they are made, new and empty, before the run,
  * on the volume that caps the scratch (`CAP_ENFORCEMENT`): it is attached on the policy's scratch
@@ -51,7 +58,8 @@ export class SeatbeltRunner implements SandboxRunner {
       cwd: policy.workdir,
     });
     const seconds = policy.limits.wallClockSeconds;
-    const watchdog = (pid: number) => watchdogSpec(pid, seconds + DRAIN_GRACE_SECONDS, removal);
+    const deadline = seconds + DRAIN_GRACE_SECONDS;
+    const watchdog = (pid: number) => watchdogSpec(pid, deadline, removal, WATCHDOG_ENV);
     return await watched(this.launcher, started, seconds, watchdog);
   }
 }

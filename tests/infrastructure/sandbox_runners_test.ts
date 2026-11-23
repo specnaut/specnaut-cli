@@ -5,7 +5,7 @@ import { SECCOMP_FD, seccompFilter } from "../../src/domain/sandbox_seccomp.ts";
 import type { ProcessLauncher } from "../../src/infrastructure/sandbox_process.ts";
 import { BwrapRunner } from "../../src/infrastructure/sandbox_bwrap_runner.ts";
 import { ContainerRunner, runnerFor } from "../../src/infrastructure/sandbox_runners.ts";
-import { SeatbeltRunner } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
+import { SeatbeltRunner, WATCHDOG_ENV } from "../../src/infrastructure/sandbox_seatbelt_runner.ts";
 import { HdiutilVolumes } from "../../src/infrastructure/sandbox_scratch_volume.ts";
 import { DRAIN_GRACE_SECONDS } from "../../src/infrastructure/sandbox_wall_clock.ts";
 import { watchdogSpec } from "../../src/infrastructure/sandbox_watchdog.ts";
@@ -82,8 +82,11 @@ Deno.test({
       // Its watchdog kills the group past the clock and the grace, then ends the scratch volume,
       // and is stopped after the run.
       const wall = policy.limits.wallClockSeconds;
-      const watchdog = watchdogSpec(launches[0].pid, wall + DRAIN_GRACE_SECONDS, VOLUME_REMOVAL);
+      const deadline = wall + DRAIN_GRACE_SECONDS;
+      const watchdog = watchdogSpec(launches[0].pid, deadline, VOLUME_REMOVAL, WATCHDOG_ENV);
       assertEquals(launches[1].spec, watchdog);
+      // Never our environment: its PATH would decide which `date` and `sleep` run on the host.
+      assertEquals(launches[1].spec.env, { PATH: "/usr/bin:/bin" });
       assertEquals([launches.length, launches[1].stopped], [2, 1]);
     } finally {
       await Deno.remove(scratch, { recursive: true });

@@ -27,6 +27,8 @@ async function withMarker(fn: (marker: string) => Promise<void>): Promise<void> 
 }
 
 const launcher = () => new DenoProcessLauncher(capture().stream, capture().stream);
+/** A fixed system PATH: where `date` and `sleep` live on every host these tests run on. */
+const SYSTEM = { PATH: "/usr/bin:/bin" };
 
 Deno.test({
   name: "watchdog: past its deadline it kills the run's process group and runs the removal",
@@ -35,7 +37,7 @@ Deno.test({
     withMarker(async (marker) => {
       const l = launcher();
       const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 30.613; :"], env: {} });
-      const dog = l.start(watchdogSpec(run.pid, 1, ["/usr/bin/touch", marker]));
+      const dog = l.start(watchdogSpec(run.pid, 1, ["/usr/bin/touch", marker], SYSTEM));
       assertEquals(await Promise.race([dog.exited, later(5000, "still watching")]), 0);
       assertEquals(await Promise.race([run.ended, later(2000, "still running")]), 137);
       assertEquals(exists(marker), true);
@@ -50,7 +52,7 @@ Deno.test({
       const l = launcher();
       const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 30.614; :"], env: {} });
       const slow = ["/bin/sh", "-c", 'sleep 1; touch "$0"', marker];
-      const dog = l.start(watchdogSpec(run.pid, 1, slow));
+      const dog = l.start(watchdogSpec(run.pid, 1, slow, SYSTEM));
       assertEquals(await Promise.race([run.ended, later(5000, "still running")]), 137);
       assertEquals(exists(marker), false, "the removal ran before the group was killed");
       assertEquals(await Promise.race([dog.exited, later(4000, "still watching")]), 0);
@@ -65,7 +67,7 @@ Deno.test({
     withMarker(async (marker) => {
       const l = launcher();
       const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 0.2"], env: {} });
-      const dog = l.start(watchdogSpec(run.pid, 30, ["/usr/bin/touch", marker]));
+      const dog = l.start(watchdogSpec(run.pid, 30, ["/usr/bin/touch", marker], SYSTEM));
       try {
         assertEquals(await run.exited, 0);
         await later(2500, null);
@@ -84,7 +86,7 @@ Deno.test({
     withMarker(async (marker) => {
       const l = launcher();
       const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 0.2"], env: {} });
-      const dog = l.start(watchdogSpec(run.pid, 2, ["/usr/bin/touch", marker]));
+      const dog = l.start(watchdogSpec(run.pid, 2, ["/usr/bin/touch", marker], SYSTEM));
       assertEquals(await run.exited, 0);
       assertEquals(await Promise.race([dog.exited, later(6000, "still watching")]), 0);
       assertEquals(exists(marker), true);
@@ -98,7 +100,7 @@ Deno.test({
     withMarker(async (marker) => {
       const l = launcher();
       const run = l.start({ cmd: "/bin/sh", args: ["-c", "sleep 0.2"], env: {} });
-      const spec = watchdogSpec(run.pid, 30, ["/usr/bin/touch", marker]);
+      const spec = watchdogSpec(run.pid, 30, ["/usr/bin/touch", marker], SYSTEM);
       // A launcher that starts the watchdog, then dies, as one killed with SIGKILL would.
       const dying = ["-c", '"$@" & sleep 1; exit 0', "sh", spec.cmd, ...spec.args];
       await new Deno.Command("/bin/sh", { args: dying, stdout: "null", stderr: "null" }).output();
@@ -108,8 +110,8 @@ Deno.test({
     }),
 });
 
-Deno.test("watchdogSpec: its own process, quiet, in our environment, the deadline rounded up", () => {
-  assertEquals(watchdogSpec(4321, 61.2).env, "host");
+Deno.test("watchdogSpec: its own process, quiet, in the environment given, the deadline rounded up", () => {
+  assertEquals(watchdogSpec(4321, 61.2, [], SYSTEM).env, SYSTEM);
   const env = { PATH: "/usr/bin:/bin" };
   const spec = watchdogSpec(4321, 61.2, ["podman", "rm", "--force", "x"], env);
   assertEquals([spec.cmd, spec.env, spec.stdout], ["/bin/sh", env, "discarded"]);
