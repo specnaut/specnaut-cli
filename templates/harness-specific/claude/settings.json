@@ -97,7 +97,7 @@
     "specnaut-marketplace": {
       "source": {
         "source": "url",
-        "url": "https://raw.githubusercontent.com/specnaut/specnaut-cli/v9.4.0/packaging/marketplace/.claude-plugin/marketplace.json"
+        "url": "https://raw.githubusercontent.com/specnaut/specnaut-cli/v9.5.0/packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
   },

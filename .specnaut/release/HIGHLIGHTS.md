@@ -1,33 +1,27 @@
-**`/task review` can review a pull request it cannot trust.** Give it a PR number or a
-`<remote>/<branch>`, and the review exports that branch as inert files rather than checking it out.
-Its gates then run in a sandbox: a container (podman, then docker) first, then bubblewrap on Linux
-or `sandbox-exec` on macOS. Anything that cannot run there is reviewed statically and is never run.
-`specnaut review trust <pr> <sha>` decides from the forge's own facts whether a PR needs this. On
-Claude Code, a session that starts such a review stays locked to it until it ends. On every other
-harness, this mode is refused. The verdict never merges.
+**`install.sh` verifies what it installs.** It installs from a published release, never from `main`,
+and with `gh` on the machine it checks the release's attestation before it runs anything. Each
+release now publishes the installer beside the binaries, in its own attestation bundle, and
+`SECURITY.md` shows the commands to verify it by hand before running it.
 
-**`specnaut sandbox probe` and `specnaut sandbox exec`** show which sandbox your machine offers and
-run a command under it. Both say which resource caps a run goes without.
+**`/task kanban` opens your backlog board in the browser** and prints its link.
 
-**`specnaut upgrade` ends with what is new:** the highlights of every release it crossed, from the
-binary itself, with no network needed.
+**A container run records the syscall filter it really got.** A probe inside the container reads
+which names of the CLI's profile the OCI runtime put in force and which it dropped, and the run's
+evidence lists both. A runtime whose libseccomp is too old to know a name is no longer silent about
+it.
 
-**`/task` starts no new work while an earlier landing is unsettled**, and text sent to Specnaut
-Cloud is checked for credentials before it leaves your machine. The macOS binaries are now signed
-and notarized, so the Keychain keeps "Always Allow" across `self-update`.
+**The size ratchet exempts generated code by default**, so a regenerated file no longer counts
+against the size limits.
 
-**The cockpit loads on Claude Code again.** Claude Code could not refresh the marketplace that
-`specnaut upgrade` declared, so the `specnaut-cockpit` mod never loaded. The marketplace is now
-declared in a form Claude Code refreshes, still pinned to your Specnaut release, and the next
-`specnaut upgrade` repairs a project's existing declaration.
+**The merge's instruction check reads more of what a branch can run.** It reads commands nested in
+substitutions and `-c` strings, the files those commands run, a skill's fenced shell blocks and
+`allowed-tools` grants, PowerShell `$env:Path` and `PATH+=` forms, and nested `.gitattributes` and
+`.lfsconfig` files. A customised shipped skill is asked about once per content, in any letter case,
+and a non-ASCII name is asked about rather than matched.
 
-**The Cockpit no longer draws the chain.** The `plan ● implement ○ …` segment of the band and the
-pane's chain row stayed "in progress" long after a chain had stopped, so they are gone. Usage
-windows, context, cost and the quota hold are unchanged.
+**Programs Specnaut starts are never taken from your project's folders.** git, gh, the sandbox
+engines, bubblewrap and the toolchain probes are looked up only on PATH entries outside the
+repository. When that leaves nothing, the error names the entry that was left out and why.
 
-**`/task merge` runs no git hook.** Its squash, fixup fold, rebase and closeout commands now run
-with hooks off, as the landing itself already did. Your project's own commit, checkout and push
-hooks do not fire during a merge; the full gate tier still runs before anything lands. Git LFS
-objects are now pushed explicitly before the landing's push and the `--pr` push, since git-lfs's own
-pre-push upload no longer runs. If you track files with Git LFS and landed with 9.4.0, run
-`git lfs push --all origin <base>` once: those landings pushed without the objects.
+**`/task merge` pushes Git LFS objects** when it pushes with hooks off, with trace variables cleared
+and signed URLs cut to their host.
