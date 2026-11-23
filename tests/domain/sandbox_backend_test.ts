@@ -43,6 +43,7 @@ const ON_DOCKER = {
   image: IMAGE.ref,
   dropped: [],
   cpus: null,
+  arch: "x86_64",
 } as const;
 
 const probe = (over: Partial<BackendProbe>): BackendProbe => ({ ...NOTHING, ...over });

@@ -1,6 +1,7 @@
 import { red } from "@std/fmt/colors";
 import type { ExecOutcome, ExecRequest } from "../../application/sandbox_exec.ts";
 import type { RunOutcome } from "../../application/sandbox_ports.ts";
+import type { FilterRecord } from "../../domain/sandbox_filter_probe.ts";
 import {
   assessBackends,
   type BackendProbe,
@@ -30,7 +31,10 @@ type SandboxExecIntent = Extract<SandboxIntent, { sub: "exec" }>;
  *          use. Exit 0 when a backend is available, 1 when a run would be static.
  *   exec   the command's own exit code, whatever caps it ran without; after a run, its backend's
  *          `UNCAPPED` and `LIMIT` lines on stderr, prefixed `notice: specnaut sandbox exec: `, so
- *          stdout stays the command's. 124: the wall clock ran out and the run was stopped;
+ *          stdout stays the command's. A container run then says what its probe observed of the
+ *          syscall filter in force: `SECCOMP container applied <name,...>`, and, prefixed
+ *          `warning:`, `SECCOMP container dropped <name,...>` for the names the OCI runtime left
+ *          out, or `SECCOMP container unobserved <why>` when the probe could not tell. 124: the wall clock ran out and the run was stopped;
  *          a stop that failed (a container left behind) is said on a second line.
  *          125: nothing ran (static only, no such export, a layout the policy refuses, a
  *          launcher that could not start, a `--log` whose folder does not resolve, or a run the
@@ -121,11 +125,25 @@ function answer(outcome: ExecOutcome, deps: SandboxDeps): number {
     deps.err(`notice: specnaut sandbox exec: ${line}`);
   }
   const run = outcome.outcome;
+  if (run.filter !== undefined) filterLines(run.filter).forEach((line) => deps.err(line));
   if (run.volumeLeft !== undefined) {
     const why = terminalText(run.volumeLeft);
     deps.err(`warning: specnaut sandbox exec: the sandbox's scratch volume may be left: ${why}`);
   }
   return run.kind === "exited" ? exited(run, deps) : timedOut(run, deps);
+}
+
+/** What a container run's probe observed of its syscall filter: what held, what was dropped. */
+function filterLines(record: FilterRecord): string[] {
+  const say = (level: string, what: string) => `${level}: specnaut sandbox exec: SECCOMP ${what}`;
+  if (record.kind === "unobserved") {
+    return [say("warning", `container unobserved ${terminalText(record.why)}`)];
+  }
+  const { applied, dropped } = record;
+  return [
+    say("notice", `container applied ${applied.join(",")}`),
+    ...(dropped.length === 0 ? [] : [say("warning", `container dropped ${dropped.join(",")}`)]),
+  ];
 }
 
 /** The command's own code; a container its run left behind is warned of first. */

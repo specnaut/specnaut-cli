@@ -51,7 +51,13 @@ Deno.test({
       const deps = execDeps(prober, () => Promise.resolve(outside), null);
       const bwrap = deps.runnerFor({ kind: "bwrap", scope: false }) as BwrapRunner;
       assertEquals([bwrap.path, bwrap.bwrap], [outside, join(outside, "bwrap")]);
-      const backend = { engine: "podman", image: "x", dropped: [], cpus: null } as const;
+      const backend = {
+        engine: "podman",
+        image: "x",
+        dropped: [],
+        cpus: null,
+        arch: "x86_64",
+      } as const;
       const container = deps.runnerFor({ kind: "container", ...backend }) as ContainerRunner;
       assertEquals([container.hostEnv().PATH, container.program], [
         outside,

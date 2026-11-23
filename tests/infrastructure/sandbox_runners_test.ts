@@ -167,19 +167,28 @@ Deno.test("runnerFor: one runner per backend, each handed its program's file on 
   await using planted = await plantedPrograms(["docker", "bwrap"]);
   const host = { arch: "x86_64", path: planted.dir, bus: {} };
   const container = runnerFor(
-    { kind: "container", engine: "docker", image: IMAGE, dropped: ["cpus"], cpus: null },
+    {
+      kind: "container",
+      engine: "docker",
+      image: IMAGE,
+      dropped: ["cpus"],
+      cpus: null,
+      arch: "x86_64",
+    },
     launcher,
     host,
   );
   assert(container instanceof ContainerRunner);
   assertEquals([container.engine, container.caps.dropped], ["docker", ["cpus"]]);
   assertEquals(container.program, planted.at("docker"));
+  assert(container.observe !== undefined, "a container run observes its filter");
   const oneCpu = {
     kind: "container",
     engine: "docker",
     image: IMAGE,
     dropped: [],
     cpus: 1,
+    arch: "x86_64",
   } as const;
   assertEquals((runnerFor(oneCpu, launcher, host) as ContainerRunner).caps.cpus, 1);
   const bwrap = runnerFor({ kind: "bwrap", scope: false }, launcher, host);

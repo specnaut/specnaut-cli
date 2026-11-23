@@ -11,6 +11,7 @@ import { armExitTrap } from "./exit_trap.ts";
 import { removalOf, removed, thenRemoved } from "./sandbox_container_removal.ts";
 import { BwrapRunner } from "./sandbox_bwrap_runner.ts";
 import { engineRunEnv, type RunEnv } from "./sandbox_engine_env.ts";
+import { type FilterObserver, filterObserver } from "./sandbox_filter_observer.ts";
 import type { ProcessLauncher, ProcessSpec } from "./sandbox_process.ts";
 import { programOnPath } from "./program_on_path.ts";
 import { SeatbeltRunner } from "./sandbox_seatbelt_runner.ts";
@@ -45,20 +46,26 @@ export class ContainerRunner implements SandboxRunner {
     readonly caps: Pick<ContainerRun, "dropped" | "cpus">,
     readonly name: () => string = containerName,
     readonly hostEnv: () => Readonly<Record<string, string>> = () => Deno.env.toObject(),
+    /** What the run observes of its syscall filter first; `runnerFor` hands it the engine's. */
+    readonly observe?: FilterObserver,
   ) {}
 
   /**
    * The run's engine environment is written first: the arguments name the syscall profile in it.
-   * What was written goes once the run is over, however it ends, a refused run included.
+   * The filter probe runs next, in that environment, and its record goes on the outcome. What was
+   * written goes once the run is over, however it ends, a refused run included.
    */
   async run(policy: SandboxPolicy, command: readonly string[]): Promise<RunOutcome> {
     const name = this.name();
     const runEnv = await engineRunEnv(this.engine, this.hostEnv());
     try {
       const { dropped, cpus } = this.caps;
-      const run = { image: this.image, name, engine: this.engine, dropped, cpus };
-      const args = containerArgs(policy, { ...run, seccomp: runEnv.seccomp }, command);
-      return await this.#removed(name, runEnv, args, policy.limits.wallClockSeconds);
+      const { image, engine, launcher, program } = this;
+      const run = { image, name, engine, dropped, cpus, seccomp: runEnv.seccomp };
+      const filter = await this.observe?.({ launcher, program, runEnv, policy, run });
+      const args = containerArgs(policy, run, command);
+      const outcome = await this.#removed(name, runEnv, args, policy.limits.wallClockSeconds);
+      return filter === undefined ? outcome : { ...outcome, filter };
     } finally {
       runEnv.release();
     }
@@ -129,7 +136,10 @@ export function runnerFor(
   }
 }
 
-/** The engine's client and each removal start with ours, PATH the probe's, at the engine's file. */
+/**
+ * The engine's client and each removal start with ours, PATH the probe's, at the engine's file;
+ * the run observes its filter with a probe built for the engine's machine.
+ */
 function containerRunner(
   backend: Extract<RunnableBackend, { kind: "container" }>,
   launcher: ProcessLauncher,
@@ -138,7 +148,8 @@ function containerRunner(
   const env = () => ({ ...Deno.env.toObject(), PATH: path });
   const { engine, image } = backend;
   const program = programAt(engine, path);
-  return new ContainerRunner(engine, program, image, launcher, backend, undefined, env);
+  const observe = filterObserver(backend.arch);
+  return new ContainerRunner(engine, program, image, launcher, backend, undefined, env, observe);
 }
 
 /** The file `name` is on `path`, as the probe found it; one gone since is refused, never guessed. */

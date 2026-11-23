@@ -90,7 +90,13 @@ Deno.test("engineDrops: each limit an engine's host lacks drops its own cap, and
 });
 
 Deno.test("capsWithout: a container lacks what its engine drops, in the table's order", () => {
-  const docker = { kind: "container", engine: "docker", image: RUN.image, cpus: null } as const;
+  const docker = {
+    kind: "container",
+    engine: "docker",
+    image: RUN.image,
+    cpus: null,
+    arch: "x86_64",
+  } as const;
   assertEquals(capsWithout({ ...docker, dropped: [] }), []);
   assertEquals(capsWithout({ ...docker, dropped: ["cpus", "processes"] }), ["processes", "cpus"]);
   assertEquals(capsWithout({ kind: "bwrap", scope: false }), unenforcedCaps("bwrap"));

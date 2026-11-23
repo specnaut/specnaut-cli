@@ -1,4 +1,5 @@
 import type { Backend, BackendProbe, SandboxPolicy } from "../domain/sandbox.ts";
+import type { FilterRecord } from "../domain/sandbox_filter_probe.ts";
 
 /**
  * The ports a branch's gates are run through in a sandbox: what the host offers, where the run's
@@ -50,18 +51,21 @@ export interface SandboxHost {
  * part of the run may still be going. A run that ended whose container could not be removed after
  * it names that in `removalFailed`. Each is the last removal's word, said once. A run whose
  * scratch volume (`sandbox-exec`'s cap) could not be detached after it names that in `volumeLeft`:
- * the command ran all the same, and its outcome stands.
+ * the command ran all the same, and its outcome stands. A container run carries in `filter` what
+ * its probe observed of the syscall filter in force (`FilterRecord`).
  */
 export type RunOutcome =
   | {
     readonly kind: "exited";
     readonly code: number;
+    readonly filter?: FilterRecord;
     readonly removalFailed?: string;
     readonly volumeLeft?: string;
   }
   | {
     readonly kind: "timed_out";
     readonly seconds: number;
+    readonly filter?: FilterRecord;
     readonly haltFailed?: string;
     readonly volumeLeft?: string;
   };

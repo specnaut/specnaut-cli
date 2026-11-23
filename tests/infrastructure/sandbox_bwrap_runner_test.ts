@@ -141,6 +141,7 @@ Deno.test("runnerFor: a program gone from the PATH since the probe is refused, n
     image: IMAGE,
     dropped: [],
     cpus: null,
+    arch: "x86_64",
   } as const;
   assertThrows(() => runnerFor(podman, launcher, host), SandboxRefused, "podman");
   const scoped = () => runnerFor({ kind: "bwrap", scope: true }, launcher, host);

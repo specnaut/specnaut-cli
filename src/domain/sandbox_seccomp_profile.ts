@@ -25,7 +25,8 @@
  * library that decides (runc's or crun's, as the engine runs it), not the host's nor the engine's.
  * Every rule is added name by name, so the skip reaches any rule: the denied list, the `clone3`
  * ENOSYS rule, and the argument rules on `clone`, `socket` and `personality`. runc logs the skip at
- * debug level only, so a run says nothing; crun warns, and fails instead only under an annotation
+ * debug level only, so only the run's filter probe (`sandbox_filter_probe.ts`), which names each
+ * name it saw dropped, says so; crun warns, and fails instead only under an annotation
  * (`run.oci.seccomp_fail_unknown_syscall`) a run does not set. Behind an older runtime library the
  * list in force is shorter than this one. The newest calls are the likely ones: `open_tree_attr`
  * (Linux 6.15) first, then `set_mempolicy_home_node` (5.17), `quotactl_fd` (5.14) and

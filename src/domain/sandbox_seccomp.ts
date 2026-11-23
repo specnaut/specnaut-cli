@@ -61,7 +61,7 @@ export function isFilterArch(arch: string): arch is FilterArch {
   return Object.hasOwn(AUDIT_ARCH, arch);
 }
 
-type Insn = { code: number; jt: number; jf: number; k: number };
+export type Insn = { code: number; jt: number; jf: number; k: number };
 
 /**
  * The program for `arch`: kill a call made under any other architecture; then refuse each denied
@@ -110,7 +110,7 @@ function argumentRules(arch: FilterArch): Insn[] {
   });
 }
 
-function insn(code: number, k: number): Insn {
+export function insn(code: number, k: number): Insn {
   return { code, jt: 0, jf: 0, k };
 }
 
@@ -121,7 +121,7 @@ function jump(offset: number): number {
 }
 
 /** `struct sock_filter[]` in the byte order of both architectures: little-endian. */
-function encode(program: readonly Insn[]): Uint8Array {
+export function encode(program: readonly Insn[]): Uint8Array {
   const out = new Uint8Array(program.length * 8);
   const view = new DataView(out.buffer);
   program.forEach(({ code, jt, jf, k }, i) => {

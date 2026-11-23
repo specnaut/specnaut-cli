@@ -7,6 +7,7 @@ import type { BackendProbe, BackendStatus, Engine } from "./sandbox.ts";
 import type { EnginePlatform } from "./sandbox_hosts.ts";
 import { engineDrops } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
+import type { FilterArch } from "./sandbox_syscalls.ts";
 
 const NO_ROOTLESS = "no rootless podman";
 const NO_DOCKER = "no docker";
@@ -104,6 +105,12 @@ function platformWhy(engine: Engine, { arch, kernel }: EnginePlatform): string |
   return `${engine}'s kernel is ${OLD_KERNEL}`;
 }
 
+/** The machine of an engine {@link platformWhy} accepted, which is always one the profile is for. */
+function filterArch({ arch }: EnginePlatform): FilterArch {
+  if (arch === null || !isFilterArch(arch)) throw new Error(`no syscall profile for ${arch}`);
+  return arch;
+}
+
 /** The engine a container runs on: rootless podman first, then docker. */
 export function containerEngine(probe: BackendProbe): Engine | null {
   if (podmanWhy(probe) === null) return "podman";
@@ -117,9 +124,10 @@ export function containerStatus(probe: BackendProbe): BackendStatus {
     const onPodman = engine === "podman";
     const dropped = engineDrops(onPodman ? probe.podmanLimits : probe.dockerLimits);
     const cpus = onPodman ? probe.podmanCpus : probe.dockerCpus;
+    const arch = filterArch(onPodman ? probe.podmanPlatform : probe.dockerPlatform);
     return {
       kind: "container",
-      offered: { kind: "container", engine, image: probe.image.ref, dropped, cpus },
+      offered: { kind: "container", engine, image: probe.image.ref, dropped, cpus, arch },
     };
   }
   const why = probe.image.kind === "none"

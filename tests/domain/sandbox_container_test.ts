@@ -41,6 +41,7 @@ const ON_PODMAN = {
   image: IMAGE,
   dropped: [],
   cpus: null,
+  arch: "x86_64",
 } as const;
 const ON_DOCKER = {
   kind: "container",
@@ -48,6 +49,7 @@ const ON_DOCKER = {
   image: IMAGE,
   dropped: [],
   cpus: null,
+  arch: "x86_64",
 } as const;
 const REMOTE_WHY =
   "container: podman answers from a remote service, which reads its own containers.conf, " +
@@ -177,4 +179,11 @@ Deno.test("container: an engine without a syscall filter is passed over, with it
     "container: podman runs containers without a syscall filter (seccomp), and docker runs " +
       "containers without a syscall filter (seccomp)",
   );
+});
+
+Deno.test("container: the offered engine carries its own machine, the filter probe's", () => {
+  const arm = { arch: "aarch64", kernel: "6.8.0" } as const;
+  assertEquals(chooseBackend(probe({ podmanPlatform: arm })), { ...ON_PODMAN, arch: "aarch64" });
+  const docker = probe({ podman: "absent", docker: true, dockerPlatform: arm });
+  assertEquals(chooseBackend(docker), { ...ON_DOCKER, arch: "aarch64" });
 });

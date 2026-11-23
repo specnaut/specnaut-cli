@@ -92,6 +92,12 @@ export const PERSONALITY_NUMBERS: Readonly<Record<FilterArch, number>> = {
   aarch64: 92,
 };
 
+/** `clone`'s and `clone3`'s numbers: the container profile refuses each under a rule of its own. */
+export const CLONE_NUMBERS: Readonly<Record<FilterArch, { clone: number; clone3: number }>> = {
+  x86_64: { clone: 56, clone3: 435 },
+  aarch64: { clone: 220, clone3: 435 },
+};
+
 /** The vsock address family: no network namespace holds it. */
 export const AF_VSOCK = 40;
 

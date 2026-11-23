@@ -25,6 +25,7 @@ import {
 import { containerStatus } from "./sandbox_container.ts";
 import { LIMITS, type ReportedCap, type SandboxLimits } from "./sandbox_limits.ts";
 import { isFilterArch } from "./sandbox_seccomp.ts";
+import type { FilterArch } from "./sandbox_syscalls.ts";
 import { ancestors, layoutProblem, type SandboxPaths, within } from "./sandbox_paths.ts";
 
 export type { BackendProbe };
@@ -40,6 +41,8 @@ export type Backend =
     readonly dropped: readonly ReportedCap[];
     /** The CPUs on its engine's host, or `null` where the engine did not say (`containerArgs`). */
     readonly cpus: number | null;
+    /** Its engine's machine: the one its filter probe (`probeElf`) is built for. */
+    readonly arch: FilterArch;
   }
   /** `scope`: run inside a systemd user scope that caps memory, processes and CPU. */
   | { readonly kind: "bwrap"; readonly scope: boolean }

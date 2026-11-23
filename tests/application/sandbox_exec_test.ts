@@ -115,6 +115,7 @@ Deno.test("execInSandbox: a container runner is handed its engine and pinned ima
     image: IMAGE,
     dropped: [],
     cpus: null,
+    arch: "x86_64",
   });
   assertEquals(seen.runs[0].policy.reads, [FOLDERS.tree]);
 });
