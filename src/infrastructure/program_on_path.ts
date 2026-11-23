@@ -1,7 +1,6 @@
 import * as posix from "@std/path/posix";
 import * as windows from "@std/path/windows";
-import { UNREACHABLE } from "./fs_containment.ts";
-import { spellingUnsafe } from "./git_path.ts";
+import { attempt, spellingUnsafe } from "./git_path.ts";
 
 type Os = typeof Deno.build.os;
 type PathApi = Pick<typeof posix, "join" | "extname" | "dirname">;
@@ -62,12 +61,6 @@ function withExtensions(name: string, host: LookupHost, api: PathApi): string[] 
 
 /** A file, followed through its links, that this process could execute (any x bit on POSIX). */
 function isProgramFile(file: string, win: boolean): boolean {
-  let info: Deno.FileInfo;
-  try {
-    info = Deno.statSync(file);
-  } catch (err) {
-    if (UNREACHABLE.some((c) => err instanceof c)) return false;
-    throw err;
-  }
-  return info.isFile && (win || ((info.mode ?? 0) & 0o111) !== 0);
+  const info = attempt(() => Deno.statSync(file));
+  return info?.isFile === true && (win || ((info.mode ?? 0) & 0o111) !== 0);
 }

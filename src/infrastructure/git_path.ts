@@ -143,8 +143,12 @@ function identity(p: string): string | undefined {
   return info.ino === null ? attempt(() => Deno.realPathSync(p)) : `${info.dev}:${info.ino}`;
 }
 
-/** `read()`, or undefined when no file is there for this process; any other failure throws. */
-function attempt<T>(read: () => T): T | undefined {
+/**
+ * `read()`, or undefined when no file is there for this process; any other failure throws. The one
+ * guarded stat of both lookups, git's PATH and a program's (`programOnPath`), so the two never
+ * differ on which entry is unreadable and which failure is a fault.
+ */
+export function attempt<T>(read: () => T): T | undefined {
   try {
     return read();
   } catch (err) {
