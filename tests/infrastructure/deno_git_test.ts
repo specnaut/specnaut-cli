@@ -11,7 +11,7 @@ import { callerPath, plantGit, ran, withPath } from "../helpers/planted_git.ts";
  * proves the real git ran is what it did.
  */
 
-type Project = { dir: string; bin: string; fired: string; config: Record<string, string> };
+type Project = { dir: string; bin: string; fired: string };
 
 /**
  * `fn` given a project folder whose `bin` holds a planted git, removed after. Every git started
@@ -24,7 +24,7 @@ async function inProject(fn: (p: Project) => Promise<void>): Promise<void> {
   const dir = join(base, "project");
   const none = join(base, "no-config");
   const config = { GIT_CONFIG_GLOBAL: none, GIT_CONFIG_SYSTEM: none };
-  const p = { dir, bin: join(dir, "bin"), fired: join(base, "fired"), config };
+  const p = { dir, bin: join(dir, "bin"), fired: join(base, "fired") };
   try {
     await plantGit(p.bin, p.fired);
     await withVars(config, () => fn(p));
@@ -51,31 +51,27 @@ async function withVars(vars: Record<string, string>, fn: () => Promise<void>): 
 const leftOut = (bin: string) =>
   `the entry "${bin}" was left out because it is inside the repository`;
 
-/** The fixture's own git, in the project, checked: a step that fails throws with git's cause. */
-async function git(p: Project, ...args: string[]): Promise<void> {
+/**
+ * The fixture's own git, checked: a step that fails throws with git's cause. It runs inside
+ * `inProject`, so it reads no global or system configuration either.
+ */
+async function git(cwd: string, ...args: string[]): Promise<void> {
   const id = ["-c", "user.name=t", "-c", "user.email=t@t"];
-  const env = p.config;
-  const out = await new Deno.Command("git", {
-    args: [...id, ...args],
-    cwd: p.dir,
-    env,
-    stderr: "piped",
-  })
+  const out = await new Deno.Command("git", { args: [...id, ...args], cwd, stderr: "piped" })
     .output();
   if (!out.success) throw new Error(`git ${args[0]}: ${new TextDecoder().decode(out.stderr)}`);
 }
 
 Deno.test("init, the version probe, the remote and the tags skip a git the project holds", () =>
-  inProject(async (p) => {
-    const { dir, bin } = p;
+  inProject(async ({ dir, bin }) => {
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(await new DenoGit(dir).isAvailable(), true);
       await new DenoGit(dir).init(dir);
     });
     assertEquals(await exists(join(dir, ".git")), true);
-    await git(p, "remote", "add", "origin", "https://example.com/acme/my-app.git");
-    await git(p, "commit", "--allow-empty", "-q", "-m", "base");
-    await git(p, "tag", "v1.2.3");
+    await git(dir, "remote", "add", "origin", "https://example.com/acme/my-app.git");
+    await git(dir, "commit", "--allow-empty", "-q", "-m", "base");
+    await git(dir, "tag", "v1.2.3");
     await withPath([bin, ...callerPath()], async () => {
       assertEquals(
         await new DenoGit(dir).getRemoteUrl(dir, "origin"),
