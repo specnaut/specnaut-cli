@@ -62,7 +62,9 @@ Deno.test("the git an unvetted read starts is the absolute path the kept entries
     await plantGit(outside, join(outside, "fired-outside"), "git");
     const source = (name: string) => Deno.env.get(name);
     const file = Deno.build.os === "windows" ? "git.exe" : "git";
-    assertEquals(untrustedGitEnv(source, repo).git, join(outside, file));
+    // Windows names a file in any case: the lookup keeps PATHEXT's spelling (`.EXE`).
+    const fold = (p: string) => Deno.build.os === "windows" ? p.toLowerCase() : p;
+    assertEquals(fold(untrustedGitEnv(source, repo).git), fold(join(outside, file)));
     await Deno.remove(join(outside, file));
   }));
 
