@@ -5,7 +5,8 @@ import {
   type PathValue,
   surelySetsPath,
 } from "./command_search_path.ts";
-import { buildsPathUnread, setsPathUnread } from "./powershell_path.ts";
+import { buildsPathUnread, joinedPathUnread, setsPathUnread } from "./powershell_path.ts";
+import { encodedWords } from "./powershell_forms.ts";
 import { nestedSegments } from "./nested_commands.ts";
 import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts";
 
@@ -86,9 +87,10 @@ export function parsedGroups(read: Reading, parse: () => string[][]): string[][]
  * The words of `strings` and of every command nested in them (`nested_commands.ts`), and the
  * manifest each of those commands runs (`manifestsOf`); each word that may be a program
  * (`isProgram`), and the value each PATH assignment sets (`pathAssignments`), are noted in `read`;
- * a word or a string that sets PATH where no value is read (`setsPathUnread`), or a string that
- * sets PowerShell's PATH to a value its words do not give whole (`buildsPathUnread`), leaves the
- * reading not whole.
+ * a word or a string that sets PATH where no value is read (`setsPathUnread`), a string or a word
+ * spelled across quotes that sets PowerShell's PATH to a value its words do not give whole
+ * (`buildsPathUnread`, `joinedPathUnread`), or a command handing PowerShell an encoded command
+ * (`encodedWords`), leaves the reading not whole.
  */
 export function commandWords(strings: readonly string[], read: Reading): string[] {
   const commands = nestedSegments(strings, read);
@@ -98,6 +100,7 @@ export function commandWords(strings: readonly string[], read: Reading): string[
     if (setsPathUnread(word)) read.whole = false;
   }
   if (strings.some((s) => setsPathUnread(s) || buildsPathUnread(s))) read.whole = false;
+  if (joinedPathUnread(strings, commands.flat()) || commands.some(encodedWords)) read.whole = false;
   const respells = [...strings, ...commands.flat()].some(respellsProjectVariable);
   if (respells || commands.some(bindsByExpansion)) read.rebindsProject = true;
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];

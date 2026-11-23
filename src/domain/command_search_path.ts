@@ -62,8 +62,8 @@ function pathWordValue(word: string): PathValue | undefined {
  * a line before may set to anything; a typographic quote (`’`, `”`), where PowerShell closes a
  * string; no item before the line's end (`$env:Path =⏎…`); parts joined other than at a `;`
  * (`'./to' + 'ols'`, `$env:Path + 'tools'`, `-join ''`) or by another operator (`-replace`, `-f`).
- * Not read at all: an assignment spelled across quotes a shell joins (`'$env:Path'' = …'`), whose
- * value is read from its words alone, as the string searched for it does not spell it.
+ * An assignment spelled across quotes a shell joins (`'$env:Path'' = …'`) is read from its words,
+ * its value held to the same rules (`joinedPathUnread`).
  */
 export function pathAssignments(words: readonly string[]): PathValue[] {
   const values = words.flatMap((word) => pathWordValue(word) ?? []);

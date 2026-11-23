@@ -1,4 +1,4 @@
-import { encodedCommand, PS_PATH, PS_UNREAD_FORMS } from "./powershell_forms.ts";
+import { computedItemPath, encodedCommand, PS_PATH, PS_UNREAD_FORMS } from "./powershell_forms.ts";
 import {
   type HashReading,
   normalizedPowerShell,
@@ -45,7 +45,8 @@ export function setsPathUnread(text: string): boolean {
 const HASH_READINGS: readonly HashReading[] = ["comment", "literal"];
 
 const unreadForm = (text: string): boolean =>
-  PS_UNREAD_FORMS.some(([, pattern]) => pattern.test(text)) || encodedCommand(text);
+  PS_UNREAD_FORMS.some(([, pattern]) => pattern.test(text)) || encodedCommand(text) ||
+  computedItemPath(text);
 
 /** PowerShell's PATH assigned, `=` or `+=`, glued or not. */
 const PS_PATH_SET = new RegExp(`${PS_PATH}\\s*\\+?=`, "gi");
@@ -96,6 +97,30 @@ export function buildsPathUnread(text: string): boolean {
   }
   return false;
 }
+
+/**
+ * Whether a word a shell splits a command into assigns PowerShell's PATH a value no reading gives
+ * whole (`buildsPathUnread`), where the strings as written spell that assignment fewer times than
+ * the words do: one spelled across quotes a shell joins (`'$env:Pa''th = (…)'`), which a search of
+ * the strings never meets. A word whose assignment the strings spell as it is is read from them:
+ * the split takes off the quotes its value is read by (`$env:Path+=';x'` is `$env:Path+=;x`). A
+ * word inside another is that one split again, and not counted twice. Past
+ * {@link MAX_SETTING_WORDS} such words the reading is not whole.
+ */
+export function joinedPathUnread(strings: readonly string[], words: readonly string[]): boolean {
+  const setting = [...new Set(words.filter((w) => w.match(PS_PATH_SET) !== null))];
+  if (setting.length > MAX_SETTING_WORDS) return true;
+  const own = setting.filter((w) => !setting.some((other) => other !== w && other.includes(w)));
+  const counts = new Map<string, number>();
+  for (const m of own.flatMap((w) => [...w.matchAll(PS_PATH_SET)])) {
+    counts.set(m[0], (counts.get(m[0]) ?? 0) + 1);
+  }
+  const written = (set: string) => strings.reduce((n, s) => n + s.split(set).length - 1, 0);
+  const joined = [...counts].filter(([set, n]) => written(set) < n).map(([set]) => set);
+  return own.some((w) => joined.some((set) => w.includes(set)) && buildsPathUnread(w));
+}
+
+const MAX_SETTING_WORDS = 256;
 
 /** The items of the value starting at `from`, up to its statement's end, blanks aside. */
 function valueItems(text: string, from: number): string[] {
