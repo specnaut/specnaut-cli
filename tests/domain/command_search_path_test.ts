@@ -20,19 +20,21 @@ Deno.test("a settings file's env.PATH puts its folders on PATH; a hook's bare na
   const found = read(
     hook("lint --fix", { env: { PATH: "./bin:$CLAUDE_PROJECT_DIR/tools:$PATH" } }),
   );
-  assertEquals(sorted(found.onPath), ["bin", "tools"]);
+  // Copied as typed: each piece is looked up as expanded and as written, and is not read whole.
+  const written = ["$CLAUDE_PROJECT_DIR/tools", "$PATH"];
+  assertEquals([sorted(found.onPath), found.whole], [[...written, "bin", "tools"], false]);
   assertEquals(found.programs.includes("lint"), true);
 });
 
 Deno.test("a PATH set before a command, or exported, is read from the command's words", () => {
   // A command file's text is read for its spans alone, never as raw lines: only the words see it.
   const span = read(enc("Run !`PATH=./bin:$PATH lint` first.\n"), ".claude/commands/c.md");
-  assertEquals([span.onPath, span.programs.includes("lint")], [["bin"], true]);
+  assertEquals([sorted(span.onPath), span.programs.includes("lint")], [["$PATH", "bin"], true]);
   const exported = read(
     enc('Run !`export PATH="node_modules/.bin:$PATH"; eslint .`\n'),
     ".claude/commands/c.md",
   );
-  assertEquals(exported.onPath, ["node_modules/.bin"]);
+  assertEquals(sorted(exported.onPath), ["$PATH", "node_modules/.bin"]);
 });
 
 Deno.test("a PATH appended to, before a command or exported, adds its folders to the PATH in effect", () => {
@@ -41,13 +43,13 @@ Deno.test("a PATH appended to, before a command or exported, adds its folders to
   assertEquals(md("export PATH+=:tools; lint").onPath, ["tools"]);
   assertEquals(md("PATH+=:./tools/$OS/bin lint").whole, false);
   const both = read(hook("PATH+=:tools lint", { env: { PATH: "./bin:$PATH" } }));
-  assertEquals(sorted(both.onPath), ["bin", "tools"]);
+  assertEquals(sorted(both.onPath), ["$PATH", "bin", "tools"]);
   assertEquals(read(enc('{"hooks": "PATH+=:bin2 lint", ')).onPath, ["bin2"]);
 });
 
 Deno.test("a PATH key spelled with an escape is read through the parse", () => {
   const escaped = enc('{"env": {"P\\u0041TH": "bin3:$PATH"}}');
-  assertEquals(read(escaped).onPath, ["bin3"]);
+  assertEquals(sorted(read(escaped).onPath), ["$PATH", "bin3"]);
 });
 
 Deno.test("Codex's shell policy and an MCP server's env put folders on PATH too", () => {
@@ -65,7 +67,7 @@ Deno.test("a PATH value longer than a word may be is not read, and the reading i
 
 Deno.test("a PATH the parser rejects is read from the bytes", () => {
   const broken = enc('{"env": {"PATH": "bin2:$PATH"}, "hooks": ');
-  assertEquals(read(broken).onPath, ["bin2"]);
+  assertEquals(sorted(read(broken).onPath), ["$PATH", "bin2"]);
 });
 
 Deno.test("a word holding a slash, or setting a variable, is not a program; any other may be", () => {
@@ -88,14 +90,15 @@ Deno.test("the program a wrapper runs is read, in each form a wrapper takes", ()
 });
 
 Deno.test("a PATH folder holding a variable past its start is not read, and the reading is not whole", () => {
-  const found = read(json({ env: { PATH: "./bin:./tools/$OS/bin:$PATH" } }));
-  assertEquals([found.onPath, found.whole], [["bin"], false]);
-  const plain = read(json({ env: { PATH: "./bin:$CLAUDE_PROJECT_DIR/tools:$PATH" } }));
-  assertEquals(plain.whole, true);
+  const md = (span: string) => read(enc(`Run !\`${span}\`\n`), ".claude/commands/c.md");
+  const found = md("PATH=./bin:./tools/$OS/bin:$PATH lint");
+  assertEquals([sorted(found.onPath), found.whole], [["$PATH", "bin", "tools/$OS/bin"], false]);
+  // A shell expands the project's variable; a settings file's `env` copies it as typed.
+  assertEquals(md("PATH=./bin:$CLAUDE_PROJECT_DIR/tools:$PATH lint").whole, true);
 });
 
 Deno.test("`.` on PATH is the project's folder", () => {
-  assertEquals(read(json({ env: { PATH: ".:$PATH" } })).onPath, [""]);
+  assertEquals(sorted(read(json({ env: { PATH: ".:$PATH" } })).onPath), ["", "$PATH"]);
 });
 
 Deno.test("a program a `$(…)`, a backquote or a `-c` string runs is read with PATH set", () => {
@@ -104,18 +107,20 @@ Deno.test("a program a `$(…)`, a backquote or a `-c` string runs is read with 
     const command of ["$(lint)", "x=`lint --all`", "bash -c 'lint --all'", "`echo \\`lint\\``"]
   ) {
     const found = read(hook(command, env));
-    assertEquals([found.onPath, found.programs.includes("lint")], [["bin"], true], command);
+    const on = sorted(found.onPath);
+    assertEquals([on, found.programs.includes("lint")], [["$PATH", "bin"], true], command);
   }
 });
 
 Deno.test("the project's variable alone on PATH is the project's folder; another is not read whole", () => {
+  const md = (span: string) => read(enc(`Run !\`${span}\`\n`), ".claude/commands/c.md");
   for (const PATH of ["$CLAUDE_PROJECT_DIR:$PATH", "${CLAUDE_PROJECT_DIR}/:$PATH"]) {
-    const found = read(json({ env: { PATH } }));
-    assertEquals([found.onPath, found.whole], [[""], true], PATH);
+    const found = md(`PATH=${PATH} lint`);
+    assertEquals([found.onPath.includes(""), found.whole], [true, true], PATH);
   }
   // Only the harness sets its own variable; any other may be set to any folder before it runs.
-  assertEquals(read(json({ env: { PATH: "${ROOT}" } })).whole, false);
-  assertEquals(read(json({ env: { PATH: "$PATH:${PATH}" } })).onPath, []);
+  assertEquals(md("PATH=${ROOT} lint").whole, false);
+  assertEquals(sorted(md("PATH=$PATH:${PATH} lint").onPath), ["$PATH", "${PATH}"]);
 });
 
 Deno.test("a variable past the start of another key `path` skips that folder, and stays whole", () => {

@@ -1,6 +1,7 @@
 import { climb } from "./project_path.ts";
 import { fold, linkOnTheWay, type PathIndex, submoduleOnTheWay } from "./path_index.ts";
 import { PS_PATH_WORD, psPathAsShell } from "./powershell_path.ts";
+import type { EnvSemantics } from "./env_surfaces.ts";
 
 /**
  * Which program a bare command name runs is decided by the folders on PATH, so a folder a judged
@@ -13,9 +14,10 @@ import { PS_PATH_WORD, psPathAsShell } from "./powershell_path.ts";
  * an unrelated key `path` (or a raw `--x-path=`) puts its value's folders on PATH too, which only
  * looks for more names in the listing. A folder that cannot be read makes the reading not whole
  * only when its value surely sets PATH: a key or a word spelled `PATH`, or a key `path` in any
- * letter case of an object that sets a command's environment (`surelySetsPath`). Any other is
- * skipped, or every merge would stop for an unrelated key. Only what the configs say is read: the
- * PATH a shell builds before the session starts is not.
+ * letter case of an object that sets a command's environment (`surelySetsPath`, `env_surfaces.ts`,
+ * which also says how each harness reads a `$` there). Any other is skipped, or every merge would
+ * stop for an unrelated key. Only what the configs say is read: the PATH a shell builds before the
+ * session starts is not.
  */
 
 /** A key or a word that sets PATH, in any letter case. */
@@ -26,24 +28,19 @@ const PATH_WORD = /^(path)\+?=(.*)$/is;
 export const isSurelyPath = (name: string): boolean => name === "PATH";
 
 /**
- * Whether a key `key` of an object held under the keys `under` (the last two) surely sets PATH:
- * spelled `PATH`; or, in any letter case, as Windows reads a variable's name, in an object that
- * sets the environment a command runs with: a settings file's or an MCP server's `env`, Codex's
- * `shell_environment_policy.set`.
+ * A value PATH may be set to, whether what sets it surely sets PATH (`surelySetsPath` in
+ * `env_surfaces.ts`), and how what sets it reads a `$` in it (`env_surfaces.ts`).
  */
-export function surelySetsPath(key: string, under: readonly string[]): boolean {
-  if (isSurelyPath(key)) return true;
-  const sets = under.at(-1) === "env" || under.join("/") === "shell_environment_policy/set";
-  return sets && isPathKey(key);
-}
-
-/** A value PATH may be set to, and whether what sets it surely sets PATH (`isSurelyPath`). */
-export type PathValue = { readonly value: string; readonly sure: boolean };
+export type PathValue = {
+  readonly value: string;
+  readonly sure: boolean;
+  readonly semantics: EnvSemantics;
+};
 
 /** What a word sets PATH to, when it sets it: `PATH=./bin:$PATH` sets it to `./bin:$PATH`. */
 function pathWordValue(word: string): PathValue | undefined {
   const set = PATH_WORD.exec(word);
-  return set ? { value: set[2], sure: isSurelyPath(set[1]) } : undefined;
+  return set ? { value: set[2], sure: isSurelyPath(set[1]), semantics: "shell" } : undefined;
 }
 
 /**
@@ -73,7 +70,7 @@ export function pathAssignments(words: readonly string[]): PathValue[] {
     .map((word) => word.replace(/^\+?=/, ""))
     .flatMap((word) => word.includes(",") ? [word, ...word.split(",")] : [word])
     .filter(Boolean);
-  return [...values, ...rest.map((value) => ({ value, sure: true }))];
+  return [...values, ...rest.map((value) => ({ value, sure: true, semantics: "shell" as const }))];
 }
 
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
@@ -81,12 +78,14 @@ const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/
 
 /**
  * What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. One
- * after a `-` is an option's name (`--out-path=`), never surely PATH.
+ * after a `-` is an option's name (`--out-path=`), never surely PATH. Read as a shell reads it: a
+ * raw line says no surface, and a source whose parse fails is not read whole anyway.
  */
 export function rawPathValues(line: string): PathValue[] {
   return [...line.matchAll(RAW_PATH)].filter((m) => m[2] !== "").map((m) => ({
     value: m[2],
     sure: isSurelyPath(m[1]) && line[m.index - 1] !== "-",
+    semantics: "shell",
   }));
 }
 

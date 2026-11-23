@@ -1,10 +1,6 @@
 import { manifestsOf } from "./command_runners.ts";
-import {
-  isPathKey,
-  pathAssignments,
-  type PathValue,
-  surelySetsPath,
-} from "./command_search_path.ts";
+import { isPathKey, pathAssignments, type PathValue } from "./command_search_path.ts";
+import { semanticsOf, surelySetsPath } from "./env_surfaces.ts";
 import { buildsPathUnread, joinedPathUnread, setsPathUnread } from "./powershell_path.ts";
 import { encodedWords } from "./powershell_forms.ts";
 import { nestedSegments } from "./nested_commands.ts";
@@ -27,9 +23,11 @@ import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts
  * commands hold that may be a program named by name alone (`isProgram`), and each pattern a path
  * built around a variable reads as (`command_word_paths.ts`). Whether it spells the project's
  * variable otherwise than reading it, and whether a folder it puts on PATH leans on that variable
- * (`project_variable.ts`). And how many folders the project sits below the repository's top.
+ * (`project_variable.ts`). And the source's path, and how many folders the project sits below the
+ * repository's top.
  */
 export type Reading = {
+  readonly source: string;
   whole: boolean;
   rebindsProject: boolean;
   leansOnProject: boolean;
@@ -51,7 +49,8 @@ export const MAX_WORD = 4096;
  */
 const MAX_VISITS = PARSE_LIMIT;
 
-export const reading = (depth = 0): Reading => ({
+export const reading = (depth = 0, source = ""): Reading => ({
+  source,
   whole: true,
   rebindsProject: false,
   leansOnProject: false,
@@ -135,7 +134,8 @@ function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string
   for (const [key, v] of Object.entries(value)) {
     if (respellsProjectVariable(key)) walk.read.rebindsProject = true;
     if (isPathKey(key) && typeof v === "string") {
-      walk.read.pathValues.push({ value: v, sure: surelySetsPath(key, under) });
+      const [sure, semantics] = [surelySetsPath(key, under), semanticsOf(walk.read.source, under)];
+      walk.read.pathValues.push({ value: v, sure, semantics });
     }
     strings.push(...stringsOf(v, walk, below(under, key)));
   }

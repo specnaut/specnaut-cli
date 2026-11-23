@@ -79,7 +79,8 @@ Deno.test("a variable only named like PATH, or PATH only read, leaves the readin
 
 Deno.test("PowerShell's PATH inside a value is the PATH in effect, braced or not", () => {
   for (const command of ['$env:Path = "tools;$env:Path"', '$env:Path = "tools;${env:Path}"']) {
-    assertEquals(span(command).onPath, ["tools"], command);
+    // `$env:Path` is read as `$PATH`, which is looked up as written too.
+    assertEquals(span(command).onPath, ["tools", "$PATH"], command);
   }
 });
 

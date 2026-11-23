@@ -12,8 +12,17 @@ const none = (_path: string) => false;
 const json = (value: unknown) => enc(JSON.stringify(value));
 const span = (command: string) =>
   commandPaths(".claude/commands/c.md", enc(`Run !\`${command}\`\n`), none);
+/**
+ * A settings file whose hook sets PATH to `PATH` as a shell does: a settings file's `env` is copied
+ * as typed, so a value holding a variable there is never whole (`env_surfaces_test.ts`).
+ */
+const hooks = (command: string) => ({ Stop: [{ hooks: [{ type: "command", command }] }] });
 const env = (PATH: string, extra: Record<string, unknown> = {}) =>
-  commandPaths(".claude/settings.json", json({ env: { PATH }, ...extra }), none);
+  commandPaths(
+    ".claude/settings.json",
+    json({ hooks: hooks(`PATH="${PATH}" lint`), ...extra }),
+    none,
+  );
 
 Deno.test("a PATH piece built from an expansion other than PATH is not read whole", () => {
   const built = [
@@ -35,10 +44,11 @@ Deno.test("a PATH piece built from an expansion other than PATH is not read whol
 Deno.test("the project's variable, exactly so spelled, is the project's folder", () => {
   for (const PATH of ["$CLAUDE_PROJECT_DIR/bin:$PATH", "${CLAUDE_PROJECT_DIR}/bin:${PATH}"]) {
     const found = env(PATH);
-    assertEquals([found.onPath, found.whole, found.leansOnProject], [["bin"], true, true], PATH);
+    const on = found.onPath.filter((f) => !f.includes("$"));
+    assertEquals([on, found.whole, found.leansOnProject], [["bin"], true, true], PATH);
   }
   for (const PATH of ["$CLAUDE_PROJECT_DIR:$PATH", "${CLAUDE_PROJECT_DIR}/:$PATH"]) {
-    assertEquals([env(PATH).onPath, env(PATH).whole], [[""], true], PATH);
+    assertEquals([env(PATH).onPath.includes(""), env(PATH).whole], [true, true], PATH);
   }
 });
 
@@ -70,16 +80,20 @@ Deno.test("a source spelling the project's variable otherwise cancels it as the 
   ];
   const kept = respelled.filter((command) => env(PATH, { statusLine: { command } }).whole);
   assertEquals(kept, []);
-  const key = enc(`{"env": {"PATH": "${PATH}", "CLAUDE_PROJECT_\\u0044IR": "/tmp"}}`);
+  const sets = JSON.stringify(hooks(`PATH=${PATH} lint`));
+  const key = enc(`{"hooks": ${sets}, "env": {"CLAUDE_PROJECT_\\u0044IR": "/tmp"}}`);
   assertEquals(commandPaths(".claude/settings.json", key, none).whole, false);
   // Spelled through an escape the parse reads, and a comment only PowerShell's reading takes off.
   const escaped = `$env:CLAUDE_PROJECT_\\u0044IR <#c#>= 'x'`;
-  const string = enc(`{"env": {"PATH": "${PATH}"}, "statusLine": {"command": "${escaped}"}}`);
+  const string = enc(`{"hooks": ${sets}, "statusLine": {"command": "${escaped}"}}`);
   assertEquals(commandPaths(".claude/settings.json", string, none).whole, false);
   // A key met twice is parsed once, as its last value: the text as written holds the first.
   const twice = `"statusLine": {"command": "export CLAUDE_PROJECT_DIR=/tmp"}`;
-  const duplicated = `{"env": {"PATH": "${PATH}"}, ${twice}, "statusLine": {"command": "lint"}}`;
+  const duplicated = `{"hooks": ${sets}, ${twice}, "statusLine": {"command": "lint"}}`;
   assertEquals(commandPaths(".claude/settings.json", enc(duplicated), none).whole, false);
+  // Without them, the same hook is read whole.
+  const plain = `{"hooks": ${sets}, "statusLine": {"command": "lint"}}`;
+  assertEquals(commandPaths(".claude/settings.json", enc(plain), none).whole, true);
 });
 
 Deno.test("a binding through an expansion, or eval, cancels the project's variable", () => {
