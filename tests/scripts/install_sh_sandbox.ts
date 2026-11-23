@@ -62,33 +62,40 @@ exit 1
 `;
 }
 
-async function writeExecutable(path: string, text: string): Promise<void> {
+export async function writeExecutable(path: string, text: string): Promise<void> {
   await Deno.writeTextFile(path, text);
   await Deno.chmod(path, 0o755);
 }
 
-async function linkTools(bin: string): Promise<void> {
-  for (const tool of TOOLS) {
+/**
+ * Links each of `tools` into `bin` from /usr/bin or /bin, whichever holds it; a tool neither holds
+ * is left out, as on a machine without it.
+ */
+export async function linkTools(bin: string, tools: readonly string[]): Promise<void> {
+  for (const tool of tools) {
     for (const dir of ["/usr/bin", "/bin"]) {
-      const found = await Deno.stat(join(dir, tool)).then(() => true, () => false);
-      if (found) {
-        await Deno.symlink(join(dir, tool), join(bin, tool));
-        break;
-      }
+      if (!(await exists(join(dir, tool)))) continue;
+      await Deno.symlink(join(dir, tool), join(bin, tool));
+      break;
     }
   }
 }
 
-async function build(world: World): Promise<Sandbox> {
-  const [bin, home, tmp] = await Promise.all(
-    ["bin", "home", "tmp"].map((p) => Deno.makeTempDir({ prefix: `install-sh-${p}-` })),
-  );
+/** The fake release curl serves: the binary, a checksum of `world.summed`, a lookup, a bundle. */
+async function serveRelease(bin: string, world: World): Promise<void> {
   const summed = new TextEncoder().encode(world.summed ?? BINARY);
   const sha = encodeHex(await crypto.subtle.digest("SHA-256", summed));
   await Deno.writeTextFile(join(bin, "fake"), BINARY);
   await Deno.writeTextFile(join(bin, "fake.sha256"), `${sha}  specnaut\n`);
   await Deno.writeTextFile(join(bin, "latest"), world.latest ?? BINARY);
   await Deno.writeTextFile(join(bin, "bundle"), '{"fake": "bundle"}\n');
+}
+
+async function build(world: World): Promise<Sandbox> {
+  const [bin, home, tmp] = await Promise.all(
+    ["bin", "home", "tmp"].map((p) => Deno.makeTempDir({ prefix: `install-sh-${p}-` })),
+  );
+  await serveRelease(bin, world);
   await writeExecutable(join(bin, "curl"), curlStub(bin, world.missing ?? ""));
   await writeExecutable(
     join(bin, "sudo"),
@@ -96,10 +103,24 @@ async function build(world: World): Promise<Sandbox> {
   );
   const gh = world.gh === undefined ? "valid" : world.gh;
   if (gh !== null) await writeExecutable(join(bin, "gh"), ghStub(bin, gh));
-  await linkTools(bin);
+  await linkTools(bin, TOOLS);
   const script = join(bin, "install.sh");
   await Deno.writeTextFile(script, world.script ?? await Deno.readTextFile(INSTALL));
   return { bin, home, tmp, script };
+}
+
+/** /bin/bash run with exactly `env`: its exit code and its stdout and stderr, joined. */
+export async function bash(args: string[], env: Record<string, string>, cwd?: string) {
+  const r = await new Deno.Command("/bin/bash", {
+    args,
+    cwd,
+    clearEnv: true,
+    env,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  const dec = new TextDecoder();
+  return { code: r.code, out: dec.decode(r.stdout) + dec.decode(r.stderr) };
 }
 
 /** `fn` given a sandbox built for `world`, every folder of it removed afterwards. */
@@ -126,23 +147,20 @@ export async function install(s: Sandbox, env: Record<string, string> = {}) {
     ...env,
   };
   for (const [k, v] of Object.entries(all)) if (v === "") delete all[k];
-  const { code, stdout, stderr } = await new Deno.Command("/bin/bash", {
-    args: [s.script],
-    cwd: s.home,
-    clearEnv: true,
-    env: all,
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  return { code, out: new TextDecoder().decode(stdout) + new TextDecoder().decode(stderr) };
+  return await bash([s.script], all, s.home);
+}
+
+/** The text at `path`, or null when nothing is there; any other failure is thrown. */
+export function readIfPresent(path: string): Promise<string | null> {
+  return Deno.readTextFile(path).catch((e) => {
+    if (e instanceof Deno.errors.NotFound) return null;
+    throw e;
+  });
 }
 
 /** A stub's log, empty when it was never called. */
-export function stubLog(s: Sandbox, name: "curl" | "gh" | "sudo"): Promise<string> {
-  return Deno.readTextFile(join(s.bin, `${name}.log`)).catch((e) => {
-    if (e instanceof Deno.errors.NotFound) return "";
-    throw e;
-  });
+export async function stubLog(s: Sandbox, name: "curl" | "gh" | "sudo"): Promise<string> {
+  return await readIfPresent(join(s.bin, `${name}.log`)) ?? "";
 }
 
 /** Whether anything was placed at `path`. */

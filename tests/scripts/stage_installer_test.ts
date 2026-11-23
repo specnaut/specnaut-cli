@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
-import { INSTALL, PLACEHOLDER, staged } from "./install_sh_sandbox.ts";
+import { bash, INSTALL, PLACEHOLDER, readIfPresent, staged } from "./install_sh_sandbox.ts";
 
 /**
  * cli#817 — `scripts/release/stage-installer.sh` writes the tag into the copy of install.sh a
@@ -14,25 +14,17 @@ const VERSION = JSON.parse(await Deno.readTextFile(`${ROOT}deno.json`)).version 
 const TAG = `v${VERSION}`;
 const ignore = Deno.build.os === "windows"; // runs on the release's Linux runner
 
+/** The script staging `tag` for the run of `opts.ref`, from `opts.source` or install.sh. */
 async function stage(tag: string, opts: { ref?: string; source?: string } = {}) {
   const dir = await Deno.makeTempDir({ prefix: "stage-installer-" });
   try {
-    const out = join(dir, "install.sh");
     const env: Record<string, string> = { PATH: "/usr/bin:/bin", GITHUB_REF_NAME: opts.ref ?? tag };
     if (opts.source !== undefined) {
       env.STAGE_INSTALLER_SOURCE = join(dir, "source.sh");
       await Deno.writeTextFile(env.STAGE_INSTALLER_SOURCE, opts.source);
     }
-    const r = await new Deno.Command("/bin/bash", {
-      args: [SCRIPT, tag, out],
-      clearEnv: true,
-      env,
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    const text = await Deno.readTextFile(out).catch(() => null);
-    const dec = new TextDecoder();
-    return { code: r.code, out: dec.decode(r.stdout) + dec.decode(r.stderr), text };
+    const r = await bash([SCRIPT, tag, join(dir, "install.sh")], env);
+    return { ...r, text: await readIfPresent(join(dir, "install.sh")) };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -56,7 +48,7 @@ test("a tag that is not this run's is refused", async () => {
 test("a tag deno.json does not declare is refused", async () => {
   const r = await stage("v0.0.1");
   assertEquals(r.code, 1, r.out);
-  assertStringIncludes(r.out, `deno.json declares '${VERSION}'`);
+  assertStringIncludes(r.out, `'v0.0.1' is not '${TAG}', the version deno.json declares`);
 });
 
 for (const bad of ["9.4.0", "v9.4", "v9.4.0/x", "v9.4.0'", "latest"]) {

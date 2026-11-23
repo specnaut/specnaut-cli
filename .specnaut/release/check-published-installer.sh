@@ -44,24 +44,27 @@ grep -qF "attestation verified for $ID" "$dir/good.log" || { tail -20 "$dir/good
 got="$("$dir/good/specnaut" --version 2>/dev/null | awk '{print $2}')"
 [ "v$got" = "$TAG" ] || fail "the binary it placed reports '$got', not $TAG"
 
-# The tampering curl: the published binary plus one byte, and a checksum of exactly that.
+# The tampering curl: the published binary plus one byte, and a checksum of exactly that. It
+# matches the file name, never the whole URL: every URL holds /specnaut-cli/, and the bundle must
+# arrive untouched, or the refusal would be the bundle's and prove nothing about the binary.
 real_curl="$(command -v curl)"
 mkdir "$dir/shim"
 cat > "$dir/shim/curl" <<EOF
 #!/bin/sh
 out="" url="" prev=""
 for a in "\$@"; do [ "\$prev" = -o ] && out=\$a; case \$a in https://*) url=\$a ;; esac; prev=\$a; done
-case \$url in
-  *.sha256) '$real_curl' --proto =https --tlsv1.2 -fsSL "\${url%.sha256}" -o "\$out.bin" || exit 1
+name=\${url##*/}
+case \$name in
+  specnaut-*.sha256) '$real_curl' --proto =https --tlsv1.2 -fsSL "\${url%.sha256}" -o "\$out.bin" || exit 1
     printf x >> "\$out.bin"
     { shasum -a 256 "\$out.bin" 2>/dev/null || sha256sum "\$out.bin"; } | awk '{print \$1 "  specnaut"}' > "\$out"
     rm -f "\$out.bin" ;;
-  */specnaut-*) '$real_curl' "\$@" || exit 1; printf x >> "\$out" ;;
+  specnaut-*) '$real_curl' "\$@" || exit 1; printf x >> "\$out" ;;
   *) exec '$real_curl' "\$@" ;;
 esac
 EOF
 chmod 755 "$dir/shim/curl"
 PATH="$dir/shim:$PATH" run "$dir/bad" > "$dir/bad.log" 2>&1 && fail "it installed a tampered binary"
-grep -qF "attestation verification failed" "$dir/bad.log" || { tail -20 "$dir/bad.log"; fail "it refused the tampered binary, but not on its attestation"; }
+grep -qF "gh refused the attestation for $TAG" "$dir/bad.log" || { tail -20 "$dir/bad.log"; fail "it refused the tampered binary, but not on its attestation"; }
 [ ! -e "$dir/bad/specnaut" ] || fail "it placed the tampered binary before refusing it"
 echo "ok published installer: installs $TAG on its attestation, and refuses a tampered binary"

@@ -28,7 +28,7 @@ re='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
 [[ "$TAG" =~ $re ]] || fail "'$TAG' is not a release tag"
 [ "${GITHUB_REF_NAME:-}" = "$TAG" ] || fail "'$TAG' is not the tag this run is for ('${GITHUB_REF_NAME:-}')"
 BIN_VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$root/deno.json")"
-[ "$TAG" = "v$BIN_VERSION" ] || fail "'$TAG' is not v\$BIN_VERSION (deno.json declares '$BIN_VERSION')"
+[ "$TAG" = "v$BIN_VERSION" ] || fail "'$TAG' is not 'v$BIN_VERSION', the version deno.json declares"
 
 found="$(grep -cxF "$PLACEHOLDER" "$SOURCE" || true)"
 [ "$found" = 1 ] || fail "$SOURCE holds the placeholder line $found times, expected once"

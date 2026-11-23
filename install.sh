@@ -15,7 +15,8 @@
 # Without gh, or with a gh lacking `attestation`, the checksum alone is checked and a warning
 # prints the command that verifies afterwards; REQUIRE_ATTESTATION=1 stops instead.
 # Releases before 4.3.0 carry no attestation: they install on the checksum alone, and only when
-# pinned by SPECNAUT_VERSION (or VERSION). REQUIRE_ATTESTATION=1 refuses them.
+# pinned by SPECNAUT_VERSION. REQUIRE_ATTESTATION=1 refuses them. VERSION, read for older
+# instructions, pins only attested releases: a variable that generic may be set for anything else.
 set -euo pipefail
 
 REPO="${REPO:-specnaut/specnaut-cli}"
@@ -76,13 +77,19 @@ latest_version() {
     | sed -E 's/.*"([^"]+)"$/\1/'
 }
 
-# Succeeds when $1 is older than 4.3.0, the first release carrying an attestation
-# (FIRST_SIGNED_VERSION in src/domain/sigstore/trust_anchor.ts). Parsed with the pattern of
-# src/domain/release.ts and compared as integers, a prerelease before its release, as
-# SemVer.compare orders them. Anything else aborts: it must never reach the unsigned branch.
-predates_signing() {
-  local re='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$' floor=(4 3 0) i n
+# Aborts unless $1 is a version, by the pattern of src/domain/release.ts, leaving its parts in
+# BASH_REMATCH: anything else must never reach a URL or the unsigned branch.
+require_release_version() {
+  local re='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$'
   [[ "$1" =~ $re ]] || abort "not a release version: '$1'"
+}
+
+# Succeeds when $1 is older than 4.3.0, the first release carrying an attestation
+# (FIRST_SIGNED_VERSION in src/domain/sigstore/trust_anchor.ts), compared as integers with a
+# prerelease before its release, as SemVer.compare orders them.
+predates_signing() {
+  local floor=(4 3 0) i n
+  require_release_version "$1"
   for i in 0 1 2; do
     n=$((10#${BASH_REMATCH[i + 1]}))
     if (( n != floor[i] )); then (( n < floor[i] )); return; fi
@@ -91,14 +98,14 @@ predates_signing() {
 }
 
 # Sets VERSION_TAG and PINNED. The user's pin wins, then the release this copy was staged for,
-# then the latest release.
+# then the latest release. Only SPECNAUT_VERSION is PINNED, the key to the checksum-only branch.
 resolve_version() {
   local v="${SPECNAUT_VERSION:-${VERSION:-}}"
-  PINNED="${v:+1}"
+  PINNED="${SPECNAUT_VERSION:+1}"
   v="${v:-$RELEASE_TAG}"
   [[ -n "$v" ]] || v="$(latest_version || true)" # a failed lookup is named below, not a silent exit
   [[ -n "$v" ]] || abort "could not resolve latest version from GitHub"
-  predates_signing "$v" || true # aborts on what is not a version, named as it was given
+  require_release_version "$v" # named as it was given, before the v is added
   VERSION_TAG="v${v#v}"
 }
 
@@ -108,7 +115,7 @@ choose_verification() {
   [[ "$REPO" == "$SIGNER_REPO" ]] || REQUIRE_ATTESTATION=1 # another origin: never its own checksum alone
   ATTEST=1
   predates_signing "$VERSION_TAG" || return 0
-  [[ -n "$PINNED" ]] || abort "$VERSION_TAG predates signed releases (4.3.0) and was not pinned - refusing it."
+  [[ -n "$PINNED" ]] || abort "$VERSION_TAG predates signed releases (4.3.0) and SPECNAUT_VERSION does not pin it - refusing it."
   [[ -z "$REQUIRE_ATTESTATION" ]] || abort "$VERSION_TAG predates signed releases (4.3.0): it has no attestation, and REQUIRE_ATTESTATION is set."
   ATTEST=""
 }
@@ -230,7 +237,7 @@ verify_attestation() {
   gh attestation verify "$dir/specnaut" --bundle "$dir/bundle.json" --repo "$SIGNER_REPO" \
     --cert-identity "$(signer_identity)" --cert-oidc-issuer "$SIGNER_ISSUER" \
     --deny-self-hosted-runners >"$dir/gh.log" 2>&1 ||
-    { cat "$dir/gh.log" >&2; abort "attestation verification failed: this is not the binary release.yml built for $VERSION_TAG."; }
+    { cat "$dir/gh.log" >&2; abort "gh refused the attestation for $VERSION_TAG (reason above): nothing was installed."; }
   ok "attestation verified for $(signer_identity)"
 }
 
@@ -268,6 +275,16 @@ print_verify_hint() {
   info "  gh attestation verify $1 --repo $SIGNER_REPO --cert-identity $(signer_identity) --cert-oidc-issuer $SIGNER_ISSUER --deny-self-hosted-runners"
 }
 
+# Says where the binary went, what is still to do, and runs it once.
+report_install() {
+  echo
+  ok "installed ${BOLD}$1${RESET}"
+  print_path_hint "$1"
+  [[ -z "$VERIFY_LATER" ]] || print_verify_hint "$1"
+  echo
+  "$1" --version || true
+}
+
 main() {
   require curl
   pick_sha_command
@@ -283,12 +300,7 @@ main() {
   verify_download "$tmp"
   chmod 755 "$tmp/specnaut"
   install_binary "$tmp/specnaut" "${PREFIX}/specnaut"
-  echo
-  ok "installed ${BOLD}${FINAL_DEST}${RESET}"
-  print_path_hint "$FINAL_DEST"
-  [[ -z "$VERIFY_LATER" ]] || print_verify_hint "$FINAL_DEST"
-  echo
-  "$FINAL_DEST" --version || true
+  report_install "$FINAL_DEST"
 }
 
 main "$@"

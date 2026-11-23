@@ -59,7 +59,7 @@ test("a valid attestation is checked with the pinned identity, then installed", 
 test("a refused attestation stops the install before anything is placed or run", () =>
   inSandbox({ gh: "mismatch" }, async (s) => {
     const r = await install(s);
-    await assertRefused(s, r, "attestation verification failed");
+    await assertRefused(s, r, "gh refused the attestation for v9.9.9 (reason above)");
     assertStringIncludes(r.out, "verification failed"); // gh's own reason is shown
     assert(!r.out.includes(MARKER), r.out);
   }));

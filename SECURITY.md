@@ -114,8 +114,8 @@ What it does **not** claim:
   The script says so and prints the command that verifies the installed binary afterwards.
   `REQUIRE_ATTESTATION=1` makes it stop instead.
 - **Releases before v4.3.0** carry no attestation. The script installs them on the checksum alone,
-  and only when you pin one with `SPECNAUT_VERSION` (or `VERSION`); `REQUIRE_ATTESTATION=1` refuses
-  them.
+  and only when you pin one with `SPECNAUT_VERSION` (`VERSION`, still read, pins only signed
+  releases); `REQUIRE_ATTESTATION=1` refuses them.
 - **The script comes from the release it installs.** Releases are not yet immutable and `v*` tags
   are not yet protected by a ruleset, so whoever can amend a release can amend its `install.sh` too.
   Piping it into `bash` trusts that release's origin. To remove that trust, verify the script first:

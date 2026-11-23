@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { bash, linkTools, writeExecutable } from "./install_sh_sandbox.ts";
 
 /**
  * cli#817 — `postflight.sh` runs the published installer through
@@ -18,7 +19,7 @@ const ID =
 const ignore = Deno.build.os === "windows";
 const TOOLS = [
   ...["env", "grep", "awk", "mktemp", "rm", "mkdir", "tail", "cat", "chmod", "cp", "bash", "sh"],
-  ...["shasum", "sha256sum"],
+  ...["shasum", "sha256sum", "cmp"],
 ];
 
 type Fake = {
@@ -30,17 +31,26 @@ type Fake = {
   gh?: boolean;
 };
 
-/** An installer that downloads the binary through curl and judges it as `f` says. */
+/** The release's URLs, as install.sh spells them: every one holds `/specnaut-cli/`. */
+const RELEASE = `https://github.com/specnaut/specnaut-cli/releases/download/${TAG}`;
+
+/**
+ * An installer that downloads the binary, its checksum and the bundle through curl, and judges
+ * them as `f` says. A bundle that does not arrive byte for byte is its own refusal: the tampered
+ * run must be refused for the binary, never for a bundle the check itself broke.
+ */
 const installer = (dir: string, f: Fake) =>
   `#!/bin/bash
 ${f.baked ?? `RELEASE_TAG='${TAG}'`}
 set -e
 [ "$REQUIRE_ATTESTATION" = 1 ] && [ -z "\${SPECNAUT_VERSION:-}" ] || { echo "steered"; exit 9; }
-curl -fsSL https://github.com/r/releases/download/${TAG}/specnaut-linux-x64 -o "$PREFIX.dl"
-curl -fsSL https://github.com/r/releases/download/${TAG}/specnaut-linux-x64.sha256 -o "$PREFIX.sha"
+curl -fsSL ${RELEASE}/specnaut-linux-x64 -o "$PREFIX.dl"
+curl -fsSL ${RELEASE}/specnaut-linux-x64.sha256 -o "$PREFIX.sha"
+curl -fsSL ${RELEASE}/specnaut.attestation.sigstore.json -o "$PREFIX.bundle"
+cmp -s "$PREFIX.bundle" '${dir}/bundle' || { echo "error: the bundle arrived altered"; exit 1; }
 if ! cmp -s "$PREFIX.dl" '${dir}/published'; then
   case '${f.tampered ?? "attestation"}' in
-    attestation) echo "error: attestation verification failed"; exit 1 ;;
+    attestation) echo "error: gh refused the attestation for ${TAG} (reason above)"; exit 1 ;;
     checksum) echo "error: checksum mismatch"; exit 1 ;;
   esac
 fi
@@ -48,35 +58,30 @@ ${f.marker === false ? "" : `echo "  ok attestation verified for ${ID}"`}
 mkdir -p "$PREFIX" && cp "$PREFIX.dl" "$PREFIX/specnaut" && chmod 755 "$PREFIX/specnaut"
 `;
 
+/** curl serving the installer, the published binary and a checksum from `dir`. */
+const curl = (dir: string) =>
+  `#!/bin/sh
+out="" prev="" url=""
+for a in "$@"; do [ "$prev" = -o ] && out=$a; case $a in https://*) url=$a ;; esac; prev=$a; done
+case \${url##*/} in install.sh) f=install.sh ;; *.sha256) f=published.sha ;; *.sigstore.json) f=bundle ;; specnaut-*) f=published ;; *) exit 22 ;; esac
+cp '${dir}/'$f "$out"
+`;
+
+/** The stubs and the files they serve, in `dir`; returns the folder that is the whole PATH. */
 async function world(dir: string, f: Fake): Promise<string> {
   const bin = join(dir, "bin");
   await Deno.mkdir(bin);
-  const files: Record<string, string> = {
-    published: `#!/bin/sh\necho "specnaut ${f.version ?? "9.9.9"}"\n`,
-    "install.sh": installer(dir, f),
-    "bin/curl": `#!/bin/sh
-out="" prev="" url=""
-for a in "$@"; do [ "$prev" = -o ] && out=$a; case $a in https://*) url=$a ;; esac; prev=$a; done
-case $url in */install.sh) f=install.sh ;; *.sha256) f=published.sha ;; */specnaut-*) f=published ;; *) exit 22 ;; esac
-cp '${dir}/'$f "$out"
-`,
-    "bin/gh": `#!/bin/sh\n${
-      f.gh === false ? "exit 1" : '[ "$*" = "attestation verify --help" ]'
-    }\n`,
-  };
-  for (const [name, text] of Object.entries(files)) {
-    await Deno.writeTextFile(join(dir, name), text);
-    await Deno.chmod(join(dir, name), 0o755);
-  }
+  await writeExecutable(
+    join(dir, "published"),
+    `#!/bin/sh\necho "specnaut ${f.version ?? "9.9.9"}"\n`,
+  );
   await Deno.writeTextFile(join(dir, "published.sha"), "0  specnaut\n");
-  for (const tool of [...TOOLS, "cmp"]) {
-    for (const d of ["/usr/bin", "/bin"]) {
-      if (await Deno.stat(join(d, tool)).then(() => true, () => false)) {
-        await Deno.symlink(join(d, tool), join(bin, tool));
-        break;
-      }
-    }
-  }
+  await Deno.writeTextFile(join(dir, "bundle"), '{"fake": "bundle"}\n');
+  await Deno.writeTextFile(join(dir, "install.sh"), installer(dir, f));
+  await writeExecutable(join(bin, "curl"), curl(dir));
+  const gh = f.gh === false ? "exit 1" : '[ "$*" = "attestation verify --help" ]';
+  await writeExecutable(join(bin, "gh"), `#!/bin/sh\n${gh}\n`);
+  await linkTools(bin, TOOLS);
   return bin;
 }
 
@@ -84,20 +89,13 @@ async function check(f: Fake = {}) {
   const dir = await Deno.makeTempDir({ prefix: "check-installer-" });
   try {
     const PATH = await world(dir, f);
-    const r = await new Deno.Command("/bin/bash", {
-      args: [SCRIPT, TAG],
-      clearEnv: true,
-      env: {
-        PATH,
-        HOME: dir,
-        SPECNAUT_VERSION: "v1.0.0",
-        CHECK_INSTALLER_URL: "https://x/install.sh",
-      },
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    const dec = new TextDecoder();
-    return { code: r.code, out: dec.decode(r.stdout) + dec.decode(r.stderr) };
+    const env = {
+      PATH,
+      HOME: dir,
+      SPECNAUT_VERSION: "v1.0.0",
+      CHECK_INSTALLER_URL: "https://x/install.sh",
+    };
+    return await bash([SCRIPT, TAG], env);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -153,8 +151,7 @@ async function postflightBlock(code: number) {
       `exit ${code}\n`,
     );
     const script = `set -euo pipefail\nTAG=${TAG}\n${m[1]}\necho "skipped=$installer_skipped"\n`;
-    const r = await new Deno.Command("/bin/bash", { args: ["-c", script], cwd: dir }).output();
-    return { code: r.code, out: new TextDecoder().decode(r.stdout) };
+    return await bash(["-c", script], { PATH: "/usr/bin:/bin" }, dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { bash, readIfPresent, writeExecutable } from "./install_sh_sandbox.ts";
 
 /**
  * cli#696 — `pretag.sh` runs the upgrade smoke on a locally compiled binary
@@ -29,6 +30,17 @@ echo "${say}"
 exit ${code}
 `;
 
+/** The fake binary, smoke and installer in `dir`; returns the smoke's and the installer's paths. */
+async function fakes(dir: string, smokeExit: number, inst: { say: string; code: number }) {
+  await Deno.mkdir(join(dir, "bin"));
+  await writeExecutable(join(dir, "bin", "specnaut"), "#!/usr/bin/env bash\nexit 0\n");
+  const smoke = join(dir, "smoke.sh");
+  await Deno.writeTextFile(smoke, `echo "$@" > "${dir}/smoke-args"\nexit ${smokeExit}\n`);
+  const fakeInstaller = join(dir, "install.sh");
+  await Deno.writeTextFile(fakeInstaller, installer(dir, inst.say, inst.code));
+  return { PRETAG_SMOKE: smoke, PRETAG_INSTALLER: fakeInstaller };
+}
+
 async function run(
   smokeExit: number,
   args: string[] = [TAG, "bin/specnaut"],
@@ -36,31 +48,11 @@ async function run(
 ) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-pretag-" });
   try {
-    await Deno.mkdir(join(dir, "bin"));
-    const bin = join(dir, "bin", "specnaut");
-    await Deno.writeTextFile(bin, "#!/usr/bin/env bash\nexit 0\n");
-    await Deno.chmod(bin, 0o755);
-    const smoke = join(dir, "smoke.sh");
-    await Deno.writeTextFile(smoke, `echo "$@" > "${dir}/smoke-args"\nexit ${smokeExit}\n`);
-    const fake = join(dir, "install.sh");
-    await Deno.writeTextFile(fake, installer(dir, inst.say, inst.code));
-    const out = await new Deno.Command("bash", {
-      args: [SCRIPT, ...args],
-      cwd: dir,
-      env: { PRETAG_SMOKE: smoke, PRETAG_INSTALLER: fake, VERSION: "v1.0.0", REPO: "a/b" },
-    }).output();
-    const dec = new TextDecoder();
-    const smokeArgs = await Deno.readTextFile(join(dir, "smoke-args")).then(
-      (t) => t.trim(),
-      () => "",
-    );
-    return {
-      code: out.code,
-      out: dec.decode(out.stdout) + dec.decode(out.stderr),
-      smokeArgs,
-      instEnv: await Deno.readTextFile(join(dir, "inst-env")).then((t) => t.trim(), () => ""),
-      bin: await Deno.realPath(bin),
-    };
+    const env = { ...await fakes(dir, smokeExit, inst), VERSION: "v1.0.0", REPO: "a/b" };
+    const r = await bash([SCRIPT, ...args], { PATH: "/usr/bin:/bin", ...env }, dir);
+    const read = async (name: string) => (await readIfPresent(join(dir, name)) ?? "").trim();
+    const bin = await Deno.realPath(join(dir, "bin", "specnaut"));
+    return { ...r, smokeArgs: await read("smoke-args"), instEnv: await read("inst-env"), bin };
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
