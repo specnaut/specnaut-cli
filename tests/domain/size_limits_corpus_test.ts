@@ -76,6 +76,12 @@ async function generated(): Promise<{ name: string; text: string; expected: stri
       text: "file:\n  target: 300\r  ceiling: 500\n",
       expected: "unreadable: line 2: a carriage return inside a line\n",
     },
+    // cli#828: every C0 byte and DEL, not only a tab and a CR; a NUL too, which awk cannot hold.
+    ...["\x00", "\x01", "\x1b", "\x7f"].map((byte) => ({
+      name: `control byte 0x${byte.charCodeAt(0).toString(16)}`,
+      text: `file:\n  target: 300\n  ceiling: 5${byte}00\n`,
+      expected: "unreadable: line 3: a control character inside a line\n",
+    })),
   ];
 }
 

@@ -9,6 +9,13 @@ export type ParsedRecord =
   | { kind: "child"; line: number; key: string; child: string; value: string }
   | { kind: "item"; line: number; key: string; value: string };
 
+/**
+ * Any other C0 byte or DEL (cli#828): echoed from a value, it would act on the terminal, and no
+ * setting or glob needs one. A C1 character is a value's to refuse: it is not ASCII.
+ */
+// deno-lint-ignore no-control-regex -- matching C0 and DEL is the point
+const CONTROL = /[\x00-\x1f\x7f]/;
+
 /** A plain list entry YAML would read as something else: flow, alias, tag, comment, map. */
 const PLAIN_TRAP = /^[\][{}*&!|>%@`#,?:'"]|^- | #|: |:$/;
 
@@ -18,7 +25,7 @@ const PLAIN_TRAP = /^[\][{}*&!|>%@`#,?:'"]|^- | #|: |:$/;
  * `  - value` (a list). Full-line `#` comments and blank lines are skipped; a
  * trailing comment is not stripped — it fails the value check or the list
  * rule. CRLF line ends are taken (an autocrlf checkout), any other carriage
- * return, and every tab, are refused. Flow maps, inline values, block
+ * return, every tab and every other C0 or DEL byte, are refused. Flow maps, inline values, block
  * scalars, deeper indentation and a key given twice are refused. Mirrors the
  * awk in `_config.sh`, message for message.
  */
@@ -66,6 +73,7 @@ function parseLine(st: ParseState, raw: string, n: number): string | null {
   const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
   if (line.includes("\r")) return "a carriage return inside a line";
   if (line.includes("\t")) return "a tab — indent with two spaces";
+  if (CONTROL.test(line)) return "a control character inside a line";
   if (/^ *$/.test(line) || /^ *#/.test(line)) return null;
   const top = /^([a-z_]+): *$/.exec(line);
   if (top) return topKey(st, top[1], n);

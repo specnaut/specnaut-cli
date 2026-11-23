@@ -31,13 +31,20 @@ Deno.test("a bad class value stops the ratchet, as any bad value does", async ()
 });
 
 // cli#812: the refusal names a bad value only when it is printable ASCII; an escape sequence or a
-// C1 byte in it would act on the terminal, as an unescaped path would (cli#807).
+// C1 byte in it would act on the terminal, as an unescaped path would (cli#807). A C0 byte never
+// reaches the value check: the reader refuses its line first (cli#828).
 Deno.test("a value holding a control or non-ASCII character is refused without being echoed", async () => {
-  const dir = await repo(10, UNIT("file", "3\x1b[2J\x9b00", 500));
-  await stage(dir, "big.ts", 20);
-  const r = await ratchet(dir);
-  assertEquals(r.code, 2, r.stdout + r.stderr);
-  assertStringIncludes(r.stderr, "'file.target' holds a control or non-ASCII character — expected");
-  const out = r.stdout + r.stderr;
-  assert(!out.includes("\x1b") && !/[\u0080-\u009f]/.test(out), out);
+  const cases = [
+    ["3\x9b[2J00", "'file.target' holds a control or non-ASCII character — expected"],
+    ["3\x1b[2J\x9b00", "line 2: a control character inside a line"],
+  ];
+  for (const [value, refusal] of cases) {
+    const dir = await repo(10, UNIT("file", value, 500));
+    await stage(dir, "big.ts", 20);
+    const r = await ratchet(dir);
+    assertEquals(r.code, 2, r.stdout + r.stderr);
+    assertStringIncludes(r.stderr, refusal);
+    const out = r.stdout + r.stderr;
+    assert(!out.includes("\x1b") && !/[\u0080-\u009f]/.test(out), out);
+  }
 });

@@ -33948,13 +33948,12 @@ fi
 #   exempt:
 #     - "*.lock"        a list entry; "…" or '…' quotes are stripped
 #
-# Refused, with exit 2: a tab, a carriage return other than a CRLF line end,
-# a flow map or inline value (\`file: {…}\`, \`exempt: [...]\`), a block scalar or
-# deeper indentation (a multi-line value), an unknown or repeated key, a key
-# with no value, and a plain entry YAML would read as something else (\`*x\`,
-# \`a: b\`, a trailing \` #\`). A trailing comment is not stripped: it fails the
-# value check. A link at the config path is refused too — the hooks guard the
-# file by its path, and a link moves it where they do not look.
+# Refused, with exit 2: a tab, a carriage return other than a CRLF line end, any other C0
+# byte or DEL, a flow map or inline value (\`file: {…}\`, \`exempt: [...]\`), a block scalar or
+# deeper indentation (a multi-line value), an unknown or repeated key, a key with no value,
+# and a plain entry YAML would read as something else (\`*x\`, \`a: b\`, a trailing \` #\`). A
+# trailing comment is not stripped: it fails the value check. A link at the config path is
+# refused too — the hooks guard the file by its path, and a link moves it where they do not look.
 #
 # Values are checked, never evaluated: a limit is \`none\` or at most nine
 # digits, so a later \`[ -gt ]\` can neither run code nor overflow.
@@ -34005,6 +34004,7 @@ function fail(m) { if (err == "") err = "line " NR ": " m; exit }
   sub(/\\r\$/, "", line)
   if (index(line, "\\r")) fail("a carriage return inside a line")
   if (index(line, "\\t")) fail("a tab — indent with two spaces")
+  if (line ~ /[[:cntrl:]]/) fail("a control character inside a line")
   if (line ~ /^ *\$/ || line ~ /^ *#/) next
   if (line ~ /^[a-z_]+: *\$/) {
     key = line; sub(/: *\$/, "", key)
@@ -34047,7 +34047,8 @@ config_parse() {
   [ -e "\$file" ] || return 0
   if [ ! -f "\$file" ]; then echo "is not a regular file"; return 2; fi
   if [ ! -r "\$file" ]; then echo "cannot be read"; return 2; fi
-  awk -v maps="\$2" -v lists="\$3" "\$_CONFIG_AWK" "\$file" || return 2
+  # Bytes under LC_ALL=C, so [[:cntrl:]] is C0 and DEL only; a NUL, which awk ends a line at, as 0x01.
+  tr '\\000' '\\001' <"\$file" | LC_ALL=C awk -v maps="\$2" -v lists="\$3" "\$_CONFIG_AWK" || return 2
 }
 
 # One unit's "<target> <ceiling>" from its M records, or the reason and 2.

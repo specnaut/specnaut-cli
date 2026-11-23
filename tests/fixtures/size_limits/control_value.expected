@@ -1,1 +1,1 @@
-unreadable: line 2: 'file.target' holds a control or non-ASCII character — expected a whole number of lines or none
+unreadable: line 2: a control character inside a line
