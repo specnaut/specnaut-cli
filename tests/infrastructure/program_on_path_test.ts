@@ -59,6 +59,23 @@ Deno.test("on Windows a name whose extension PATHEXT lists is tried as it is, al
   assertEquals(programOnPath("gh.v2", "C:\\a", upper), "C:\\a\\gh.v2.EXE");
 });
 
+Deno.test("on Windows a PATHEXT entry other than a dot and letters or digits is never tried", () => {
+  // `..` would make `gh..`, which Windows opens as `gh`; a separator would leave the entry.
+  const isProgram = holds("C:\\a\\bin\\gh..", "C:\\a\\b\\x", "C:\\a\\bin\\gh.EXE");
+  const lookup = (pathext: string) =>
+    programOnPath("gh", "C:\\a\\bin", { os: "windows", pathext, isProgram });
+  for (const entry of ["..", "\\..\\..\\b\\x", "/../../b/x"]) {
+    assertEquals(lookup(entry), undefined, entry);
+  }
+  assertEquals(lookup("..;.EXE"), "C:\\a\\bin\\gh.EXE");
+});
+
+Deno.test("a file found outside the entry searched is never the program", () => {
+  // `..` names the entry's parent: a stand-in that calls it a program is still not believed.
+  const host = { os: "linux", isProgram: holds("/a", "/a/b/..") } as const;
+  assertEquals(programOnPath("..", "/a/b", host), undefined);
+});
+
 Deno.test({
   name: "on POSIX a program is an executable file: a folder or a plain file of the name is not",
   ignore: Deno.build.os === "windows",

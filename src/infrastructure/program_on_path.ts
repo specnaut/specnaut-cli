@@ -4,7 +4,7 @@ import { UNREACHABLE } from "./fs_containment.ts";
 import { spellingUnsafe } from "./git_path.ts";
 
 type Os = typeof Deno.build.os;
-type PathApi = Pick<typeof posix, "join" | "extname">;
+type PathApi = Pick<typeof posix, "join" | "extname" | "dirname">;
 
 /** Where a program is looked for: the platform, its PATHEXT, and what counts as a program there. */
 export type LookupHost = {
@@ -18,12 +18,19 @@ export type LookupHost = {
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
 /**
+ * The one shape of PATHEXT entry tried: an extension. PATHEXT is the caller's to set, and an entry
+ * holding a separator or `..` would make the name a path that leaves the PATH entry searched, past
+ * its filter; a trailing `..` is one Windows strips, opening another file than the one checked.
+ */
+const EXTENSION = /^\.[A-Za-z0-9]+$/;
+
+/**
  * The absolute path of the program `name` names, found on `path`'s entries alone, in their order;
  * undefined when none holds it. A program started by its bare name is handed this path, so the
  * spawn looks nothing up itself: Windows would search the working folder first, which no PATH
  * filter covers. An entry the spelling rule refuses is never searched. On Windows a name is tried
- * with each PATHEXT extension unless it ends in one already. A name with a separator is a path
- * already: given back as it is.
+ * with each PATHEXT extension unless it ends in one already. A file is taken only when its folder
+ * is the entry searched. A name with a separator is a path already: given back as it is.
  */
 export function programOnPath(
   name: string,
@@ -37,7 +44,8 @@ export function programOnPath(
   const names = win ? withExtensions(name, host, api) : [name];
   for (const entry of path.split(win ? ";" : ":")) {
     if (spellingUnsafe(entry, host.os) !== undefined) continue;
-    const found = names.map((n) => api.join(entry, n)).find(isProgram);
+    const inEntry = (file: string) => api.dirname(file) === api.join(entry, ".");
+    const found = names.map((n) => api.join(entry, n)).find((f) => inEntry(f) && isProgram(f));
     if (found !== undefined) return found;
   }
   return undefined;
@@ -46,7 +54,7 @@ export function programOnPath(
 /** `name` alone when it ends in an extension PATHEXT lists, else `name` with each of them. */
 function withExtensions(name: string, host: LookupHost, api: PathApi): string[] {
   const pathext = host.pathext ?? Deno.env.get("PATHEXT");
-  const exts = (pathext ?? DEFAULT_PATHEXT).split(";").filter((e) => e !== "");
+  const exts = (pathext ?? DEFAULT_PATHEXT).split(";").filter((e) => EXTENSION.test(e));
   const ext = api.extname(name).toUpperCase();
   if (ext !== "" && exts.some((e) => e.toUpperCase() === ext)) return [name];
   return exts.map((e) => name + e);
