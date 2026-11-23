@@ -13,8 +13,10 @@ import {
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
-const SECURITY = Deno.readTextFileSync(`${ROOT}SECURITY.md`);
-const INSTALL = Deno.readTextFileSync(`${ROOT}install.sh`);
+/** A file as text, its line ends LF: a Windows checkout writes CRLF. */
+const text = (name: string) => Deno.readTextFileSync(`${ROOT}${name}`).replaceAll("\r\n", "\n");
+const SECURITY = text("SECURITY.md");
+const INSTALL = text("install.sh");
 
 /** The recipe's commands after the two assignments, one per entry, continuations joined. */
 function recipe(): string[] {
