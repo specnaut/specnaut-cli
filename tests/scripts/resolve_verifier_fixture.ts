@@ -59,8 +59,11 @@ async function seen(l: Layout): Promise<Answer | undefined> {
   return { resolved: ran, path };
 }
 
-/** One run of a spelling: the PATH, where it runs from, and the shells that run it. */
-export type Run = { entries: string[]; cwd: string } & Shells;
+/**
+ * One run of a spelling: the PATH, where it runs from, and the shells that run it; the hooks'
+ * project folder is the repository's top unless `project` names another.
+ */
+export type Run = { entries: string[]; cwd: string; project?: string } & Shells;
 
 /** A doc block or `_verifier.sh` run: what `sn` was set to, else the refusal it printed. */
 export async function resolver(
@@ -145,7 +148,7 @@ async function fire(
 const hookEnv = (l: Layout, r: Run) => ({
   ...hermetic(),
   ...path(r),
-  CLAUDE_PROJECT_DIR: l.repo,
+  CLAUDE_PROJECT_DIR: r.project ?? l.repo,
   XDG_STATE_HOME: l.state,
 });
 

@@ -17,6 +17,8 @@ export type Layout = {
   repo: string;
   /** The folder of the tree that holds a marker for every external, `specnaut` included. */
   bin: string;
+  /** A submodule's work tree in the repository: its `.git` is a file, its git folder the top's. */
+  submodule: string;
   tools: string;
   outside: string;
   sibling: string;
@@ -49,10 +51,15 @@ async function layout(tmp: string): Promise<Layout> {
   const bin = join(repo, "bin");
   await markers(tmp, bin);
   await markers(tmp, join(repo, "~", "bin"));
+  const submodule = join(repo, "mod");
+  const modules = join(repo, ".git", "modules", "mod");
+  await Deno.mkdir(join(repo, ".git", "modules"));
+  await git(repo, "init", "--quiet", `--separate-git-dir=${modules}`, submodule);
   const l: Layout = {
     tmp,
     repo,
     bin,
+    submodule,
     tools: await toolsIn(tmp, ["git", "readlink", "cat", "env", "rm", "dirname", "bash"]),
     outside: await stub({ tmp }, join(tmp, "outside", "real")),
     sibling: await stub({ tmp }, join(tmp, "repo-x", "bin")),

@@ -35,6 +35,8 @@ type Case = {
   name: string;
   entries: string[];
   cwd: string;
+  /** The hooks' project folder, when it is not the repository's top. */
+  project?: string;
   bad?: [index: number, why: string];
   spec?: Spec;
   want?: Record<string, Answer>;
@@ -73,6 +75,8 @@ function inTree(l: Layout): Case[] {
   // deno-fmt-ignore
   return [
     bad(l, "an in-repo folder", l.bin, INSIDE),
+    { ...bad(l, "a folder of the superproject, from a submodule", l.bin, INSIDE, l.submodule),
+      project: l.submodule },
     bad(l, "an in-repo folder not made yet", join(l.repo, "nothere"), INSIDE),
     bad(l, "an in-repo folder through a linked parent", t("alias", "bin"), INSIDE),
     bad(l, "a link outside naming an in-repo folder", t("binlink"), INSIDE),
@@ -157,7 +161,8 @@ Deno.test({
           console.warn(`skipped "${c.name}": ${c.skip}`);
           continue;
         }
-        const got = await answers(l, { entries: c.entries, cwd: c.cwd, ...shells });
+        const run = { entries: c.entries, cwd: c.cwd, project: c.project, ...shells };
+        const got = await answers(l, run);
         for (const [spelling, answer] of Object.entries(got)) {
           const want = expected(c, SAME_AS[spelling] ?? spelling, l);
           if (want) assertEquals(answer, want, `${spelling}, ${c.name}`);

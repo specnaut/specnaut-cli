@@ -86,16 +86,24 @@ export function spellingUnsafe(entry: string, os: Os = Deno.build.os): string | 
 
 /**
  * The top of the tree `cwd` is in, `tree_top` in the scripts: the nearest folder at or above it,
- * resolved, that holds a `.git`, found without git, which is the program being looked up. A bare
- * repository holds none, so one nested in a work tree has that tree's top, the wider of the two.
- * With none at or above (a bare repository outside any work tree, or no repository) `cwd` itself,
- * so its own folders still count in.
+ * resolved, that holds a `.git` folder, found without git, which is the program being looked up.
+ * A `.git` file (a submodule's, a linked work tree's) is walked through: the superproject's own
+ * folders are the same checkout's, so its PATH entries are in too. With no `.git` folder above
+ * one, the outermost folder holding a `.git` file. A bare repository holds none, so one nested
+ * in a work tree has that tree's top, the wider of the two. With no `.git` at or above (a bare
+ * repository outside any work tree, or no repository) `cwd` itself, so its own folders count in.
  */
 export function treeTop(cwd: string, os: Os = Deno.build.os): string {
   const path = pathApi(os);
   const real = attempt(() => Deno.realPathSync(cwd)) ?? cwd;
-  const holdsGit = (dir: string) => attempt(() => Deno.statSync(path.join(dir, ".git")));
-  return upFrom(real, path).find((dir) => holdsGit(dir) !== undefined) ?? real;
+  let top: string | undefined;
+  for (const dir of upFrom(real, path)) {
+    const git = attempt(() => Deno.statSync(path.join(dir, ".git")));
+    if (git === undefined) continue;
+    top = dir;
+    if (!git.isFile) break;
+  }
+  return top ?? real;
 }
 
 /**

@@ -3903,8 +3903,9 @@ Every block that runs the verifier runs this one first, in the same shell, and t
 verify-scripts\`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
 \`specnaut\` of its own. Before git runs, it judges the PATH itself, every command being looked up on
 it: an entry that is empty or relative (searched from the working folder), holds a \`.\` or \`..\`, or
-sits in the tree (the nearest folder holding a \`.git\`) can supply any command, and the first one is
-refused by name. An entry sits in the tree when it is spelled there, whatever a link of the tree
+sits in the tree (the nearest folder holding a \`.git\` folder, a submodule's or a linked work tree's
+\`.git\` file walked through) can supply any command, and the first one is refused by name. An entry
+sits in the tree when it is spelled there, whatever a link of the tree
 points at, or when the links on it lead there. Then it sets \`sn\` to the physical file \`specnaut\` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. \`-ef\` compares device and inode, so
@@ -3928,7 +3929,7 @@ Codex hook commands still start bash from the PATH as given.
 <!-- script-gate: resolve-verifier -->
 \`\`\`bash
 sn=""; why=""; n=0; p=""; top=""; d=\$(\\builtin pwd -P); rest=\${PATH-}:
-while [ -z "\$top" ]; do [ -e "\$d/.git" ] && top=\${d:-/}; [ -n "\$d" ] || break; d=\${d%/*}; done
+while :; do if [ -e "\$d/.git" ]; then top=\${d:-/}; [ -f "\$d/.git" ] || break; fi; [ -n "\$d" ] || break; d=\${d%/*}; done
 [ -n "\$top" ] || why="has no repository to be judged outside of"
 while [ -z "\$why" ] && [ -n "\$rest" ]; do
   e=\${rest%%:*}; rest=\${rest#*:}; a=\$e
@@ -33496,15 +33497,17 @@ refuse_unsafe_path() {
   done
 }
 
-# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
-# found without git. Empty with none.
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`
+# folder, found without git. A \`.git\` file (a submodule's, a linked work tree's) is walked through,
+# as the superproject's folders are the same checkout's; with no folder above one, the outermost
+# holding a file. Empty with no \`.git\` at all.
 tree_top() {
   local d=\$1
   top=""
   while :; do
     if [ -e "\$d/.git" ]; then
       top=\${d:-/}
-      return 0
+      [ -f "\$d/.git" ] || return 0
     fi
     [ -n "\$d" ] || return 0
     d=\${d%/*}
@@ -40025,15 +40028,17 @@ b2859eca33343d90825e83dfbdeae2652ea8e72185c024024c63716e72f65535  _paths.sh
 # so the /bin/sh that runs the launcher reads it as bash does; an assignment is quoted, as a shell
 # that splits the arguments of \`local\` and \`export\` reads it the same.
 
-# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`,
-# found without git. Empty with none.
+# The top of the tree \$1 is in, into \`top\`: the nearest folder at or above it holding a \`.git\`
+# folder, found without git. A \`.git\` file (a submodule's, a linked work tree's) is walked through,
+# as the superproject's folders are the same checkout's; with no folder above one, the outermost
+# holding a file. Empty with no \`.git\` at all.
 tree_top() {
   local d="\$1"
   top=""
   while :; do
     if [ -e "\$d/.git" ]; then
       top=\${d:-/}
-      return 0
+      [ -f "\$d/.git" ] || return 0
     fi
     [ -n "\$d" ] || return 0
     d=\${d%/*}
@@ -40107,6 +40112,7 @@ resolve_cmd() {
     if ! d=\$(cd -P "\${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
     p="\$d/\${p##*/}"
     if under_top "\$d"; then why="is inside the repository"; break; fi
+    # shellcheck disable=SC2034 # cmd: read by the hook that sources this file
     if ! [ -L "\$p" ]; then cmd=\$p; return 0; fi
     n=\$((n + 1)); if [ "\$n" -gt 40 ]; then why="links more than 40 times"; break; fi
     if ! t=\$(readlink "\$p"); then why="is a link that cannot be read"; break; fi

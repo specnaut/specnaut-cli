@@ -11,8 +11,9 @@ Every block that runs the verifier runs this one first, in the same shell, and t
 verify-scripts`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
 `specnaut` of its own. Before git runs, it judges the PATH itself, every command being looked up on
 it: an entry that is empty or relative (searched from the working folder), holds a `.` or `..`, or
-sits in the tree (the nearest folder holding a `.git`) can supply any command, and the first one is
-refused by name. An entry sits in the tree when it is spelled there, whatever a link of the tree
+sits in the tree (the nearest folder holding a `.git` folder, a submodule's or a linked work tree's
+`.git` file walked through) can supply any command, and the first one is refused by name. An entry
+sits in the tree when it is spelled there, whatever a link of the tree
 points at, or when the links on it lead there. Then it sets `sn` to the physical file `specnaut` resolves to, following each
 link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
 folder, or any link on the way to it, sits in this repository. `-ef` compares device and inode, so
@@ -36,7 +37,7 @@ Codex hook commands still start bash from the PATH as given.
 <!-- script-gate: resolve-verifier -->
 ```bash
 sn=""; why=""; n=0; p=""; top=""; d=$(\builtin pwd -P); rest=${PATH-}:
-while [ -z "$top" ]; do [ -e "$d/.git" ] && top=${d:-/}; [ -n "$d" ] || break; d=${d%/*}; done
+while :; do if [ -e "$d/.git" ]; then top=${d:-/}; [ -f "$d/.git" ] || break; fi; [ -n "$d" ] || break; d=${d%/*}; done
 [ -n "$top" ] || why="has no repository to be judged outside of"
 while [ -z "$why" ] && [ -n "$rest" ]; do
   e=${rest%%:*}; rest=${rest#*:}; a=$e

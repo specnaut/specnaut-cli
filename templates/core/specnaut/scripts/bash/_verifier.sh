@@ -27,15 +27,17 @@ refuse_unsafe_path() {
   done
 }
 
-# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`,
-# found without git. Empty with none.
+# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`
+# folder, found without git. A `.git` file (a submodule's, a linked work tree's) is walked through,
+# as the superproject's folders are the same checkout's; with no folder above one, the outermost
+# holding a file. Empty with no `.git` at all.
 tree_top() {
   local d=$1
   top=""
   while :; do
     if [ -e "$d/.git" ]; then
       top=${d:-/}
-      return 0
+      [ -f "$d/.git" ] || return 0
     fi
     [ -n "$d" ] || return 0
     d=${d%/*}

@@ -88,6 +88,23 @@ Deno.test("a bare repository nested in a work tree has that tree's top, not its 
     assertEquals(treeTop(bare), repo);
   }));
 
+Deno.test("a .git file (a submodule, a linked work tree) is walked through to the tree above", () =>
+  inTree((tmp, repo) => {
+    const gitlink = (dir: string) => {
+      Deno.mkdirSync(dir, { recursive: true });
+      Deno.writeTextFileSync(join(dir, ".git"), "gitdir: elsewhere\n");
+    };
+    gitlink(join(repo, "sub", "mod", "inner"));
+    gitlink(join(repo, "sub", "mod"));
+    assertEquals(treeTop(join(repo, "sub", "mod", "inner")), repo);
+    // A .git folder ends the walk; with none above, the outermost folder holding a .git file.
+    Deno.mkdirSync(join(repo, "sub", "clone", ".git"), { recursive: true });
+    assertEquals(treeTop(join(repo, "sub", "clone")), join(repo, "sub", "clone"));
+    gitlink(join(tmp, "out", "wt", "deeper"));
+    gitlink(join(tmp, "out", "wt"));
+    assertEquals(treeTop(join(tmp, "out", "wt", "deeper")), join(tmp, "out", "wt"));
+  }));
+
 Deno.test({
   name: "the tree's top is found from the folder the working folder resolves to",
   // A link needs a privilege Windows runners lack.

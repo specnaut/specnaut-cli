@@ -9,15 +9,17 @@
 # so the /bin/sh that runs the launcher reads it as bash does; an assignment is quoted, as a shell
 # that splits the arguments of `local` and `export` reads it the same.
 
-# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`,
-# found without git. Empty with none.
+# The top of the tree $1 is in, into `top`: the nearest folder at or above it holding a `.git`
+# folder, found without git. A `.git` file (a submodule's, a linked work tree's) is walked through,
+# as the superproject's folders are the same checkout's; with no folder above one, the outermost
+# holding a file. Empty with no `.git` at all.
 tree_top() {
   local d="$1"
   top=""
   while :; do
     if [ -e "$d/.git" ]; then
       top=${d:-/}
-      return 0
+      [ -f "$d/.git" ] || return 0
     fi
     [ -n "$d" ] || return 0
     d=${d%/*}
@@ -91,6 +93,7 @@ resolve_cmd() {
     if ! d=$(cd -P "${p%/*}/" && pwd); then why="names a folder that cannot be entered"; break; fi
     p="$d/${p##*/}"
     if under_top "$d"; then why="is inside the repository"; break; fi
+    # shellcheck disable=SC2034 # cmd: read by the hook that sources this file
     if ! [ -L "$p" ]; then cmd=$p; return 0; fi
     n=$((n + 1)); if [ "$n" -gt 40 ]; then why="links more than 40 times"; break; fi
     if ! t=$(readlink "$p"); then why="is a link that cannot be read"; break; fi
