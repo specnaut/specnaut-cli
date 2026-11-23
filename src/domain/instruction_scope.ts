@@ -3,6 +3,7 @@ import type { ConfigFile } from "./config_trust.ts";
 import { asciiSkeleton, holdsNonAscii, NON_ASCII_REASON } from "./non_ascii_path.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { APPROVALS_FILE } from "./skill_approvals.ts";
+import { holdsShortName, shortNameReasons, win32Fold, win32Reason } from "./win32_path.ts";
 
 /**
  * Which paths the instruction class (`instruction_trust.ts`) judges, and how HEAD's listing is
@@ -12,6 +13,7 @@ import { APPROVALS_FILE } from "./skill_approvals.ts";
  * to lower case, and a path in scope only when folded is named. A disk may fold beyond ASCII too:
  * a path holding a code point outside it is kept when its ASCII skeleton is in scope
  * (`non_ascii_path.ts`), and named unless the tip holds it as written, never matched to another.
+ * Win32's spellings are folded too, and a name shaped like a short name kept (`win32_path.ts`).
  */
 
 /**
@@ -75,6 +77,10 @@ const inRoots = (path: string) => INSTRUCTION_SCOPE.some((r) => inScopeRoot(r, p
  */
 export const isNested = (path: string): boolean => isNestedSurface(path) && !inRoots(path);
 
+/** Whether `path` is listed from a commit's whole tree, outside the roots: nested, or a short name. */
+export const outsideRoots = (path: string): boolean =>
+  isNested(path) || (holdsShortName(path) && !inRoots(path));
+
 /** Whether `path` is an instruction path, its letter case aside. */
 const foldedInScope = (path: string) => inRoots(path) || isNested(path);
 
@@ -112,8 +118,9 @@ export function keptAtHead(path: string): boolean {
 }
 
 function keptFolded(path: string): boolean {
-  const folded = path.toLowerCase();
-  return foldedInScope(path) || OVERRIDES.includes(folded) || FOLDERS.includes(folded);
+  const folded = win32Fold(path);
+  return foldedInScope(folded) || OVERRIDES.includes(folded) || FOLDERS.includes(folded) ||
+    holdsShortName(path);
 }
 
 /** HEAD's listing as the class reads it. */
@@ -144,19 +151,21 @@ type Split = { entries: BaseEntry[]; overrides: Map<string, ConfigFile>; reasons
 /** Where one listed entry goes: a folder that is not one, an override, an instruction path. */
 function place(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split): void {
   if (holdsNonAscii(e.path)) return placeNonAscii(e, tip, split);
-  const folded = e.path.toLowerCase();
+  const folded = win32Fold(e.path);
   if (FOLDERS.includes(folded) && e.kind !== "tree") split.reasons.push(why(e.path, NOT_A_FOLDER));
   if (e.kind === "tree") return;
   if (OVERRIDES.includes(folded)) {
     if (isOverride(e.path)) split.overrides.set(e.path, atHead(e));
-    else split.reasons.push(why(e.path, REASON.caseDiffers));
-  } else if (foldedInScope(e.path)) {
+    else split.reasons.push(why(e.path, spelled(e.path)));
+  } else if (foldedInScope(folded)) {
     split.entries.push(e);
-    if (!exactlyInScope(e.path) && !tip.has(e.path)) {
-      split.reasons.push(why(e.path, REASON.caseDiffers));
-    }
-  }
+    const asWritten = exactlyInScope(e.path) && !holdsShortName(e.path);
+    if (!asWritten && !tip.has(e.path)) split.reasons.push(why(e.path, spelled(e.path)));
+  } else if (holdsShortName(e.path)) split.reasons.push(...shortNameReasons(e, tip.get(e.path)));
 }
+
+/** Why a name in scope only once folded is named: Win32's spelling first, else its letter case. */
+const spelled = (path: string) => win32Reason(path) ?? REASON.caseDiffers;
 
 /**
  * A name holding a code point outside ASCII is judged as written, never as the name it may be. One

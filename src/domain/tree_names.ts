@@ -57,7 +57,7 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
  * them), an NTFS stream suffix, the 8.3 short name `git~1`, HFS+ ignorable code points.
  */
 function isDotGit(name: string): boolean {
-  const stem = foldKey(foldKey(name).split(":")[0]);
+  const stem = win32Name(name);
   return stem === ".git" || stem === "git~1";
 }
 
@@ -71,6 +71,12 @@ export function foldKey(name: string): string {
   return name.replace(HFS_IGNORABLE, "").normalize("NFC").toUpperCase().toLowerCase()
     .replace(/[. ]+$/, "");
 }
+
+/**
+ * The name Win32 opens for `name`: its {@link foldKey}, read up to an NTFS stream suffix (`:x`,
+ * `::$DATA` open the file before the colon) and folded again, as the stem may end in a dot.
+ */
+export const win32Name = (name: string): string => foldKey(foldKey(name).split(":")[0]);
 
 /**
  * Files a coding agent or its harness reads as instructions or configuration when it finds them

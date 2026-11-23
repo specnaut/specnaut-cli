@@ -10,7 +10,7 @@ import { importReasons } from "../domain/claude_imports.ts";
 import { targetWalk, type Walk } from "./head_targets.ts";
 import { readCommands } from "./instruction_commands.ts";
 import { importedAtHead, type ImportSources, readImports } from "./instruction_imports.ts";
-import { isNested, keptAtHead, nestedRoots } from "../domain/instruction_scope.ts";
+import { keptAtHead, nestedRoots, outsideRoots } from "../domain/instruction_scope.ts";
 import { linkEnd } from "../domain/head_link.ts";
 import { headDigest } from "../domain/script_digest.ts";
 import { shippedReasons } from "../domain/shipped_skills.ts";
@@ -129,7 +129,7 @@ export type InstructionBase = ConfigBase & { readonly head: string };
 
 /**
  * Each {@link INSTRUCTION_SCOPE} root walked in the tree and listed at the tip and the merge base,
- * then the nested instruction files (`isNested`), listed whole at the tip and the merge base and
+ * then the files outside them (`outsideRoots`: nested, or a short name), listed whole at the tip and the merge base and
  * walked in each folder that holds one at any of the three commits (`nestedRoots`). HEAD is listed
  * whole by the caller (`keptAtHead`), so a name in another letter case is seen.
  */
@@ -147,9 +147,9 @@ async function listRoots(deps: VerifyConfigDeps, base: InstructionBase, head: Co
   return { tree, tip, mergeBase };
 }
 
-/** The nested instruction files `commit` holds, folders left out. */
+/** The files `commit` holds outside the roots (`outsideRoots`), folders left out. */
 async function nestedAt(git: GitObjectReader, commit: string): Promise<BaseEntry[]> {
-  return (await git.listCommit(commit, isNested)).flatMap((e) => e.kind === "tree" ? [] : [e]);
+  return (await git.listCommit(commit, outsideRoots)).flatMap((e) => e.kind === "tree" ? [] : [e]);
 }
 
 /** Each of {@link COMMITTED_INSTRUCTIONS} at the tip and the merge base: HEAD's is listed whole. */
