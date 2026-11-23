@@ -2,6 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { parse } from "@std/yaml";
 import { ATTESTATION_ASSET_NAME } from "../../src/domain/sigstore/trust_anchor.ts";
+import { RELEASE_EXTRAS } from "../../scripts/verify-release.ts";
 
 /**
  * #521 — `Create release` could publish a short asset set and still exit 0.
@@ -72,23 +73,23 @@ Deno.test("the workflow uploads a binary and a checksum for every built target",
       `${binary} is uploaded without its checksum`,
     );
   }
-  // Named, not merely counted. Counting `outNames.length * 2 + 1` passes on any
-  // stray eleventh file, including a renamed bundle — which is the one failure
-  // that reaches users as a refused update.
+  // Named, not merely counted. A count passes on any stray file, including a
+  // renamed bundle — which is the one failure that reaches users as a refused
+  // update. The names are verify-release.ts's, so what is uploaded is what it verifies.
   const extras = files.filter((f) =>
     !outNames.some((n) => f === `dist/${n}` || f === `dist/${n}.sha256`)
   );
   assertEquals(
-    extras,
-    [`dist/${ATTESTATION_ASSET_NAME}`],
+    extras.toSorted(),
+    RELEASE_EXTRAS.map((n) => `dist/${n}`),
     `beyond one binary + one checksum per target, the release publishes exactly ` +
-      `the attestation bundle — nothing else, and not under another name`,
+      `the attestation bundle and the installer — nothing else, and not under another name`,
   );
   assertEquals(
     files.length,
-    outNames.length * 2 + 1,
+    outNames.length * 2 + 2,
     `${outNames.length} targets → ${outNames.length * 2} per-target files, plus ` +
-      `the attestation bundle`,
+      `the attestation bundle and the installer`,
   );
 });
 

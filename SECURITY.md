@@ -5,7 +5,7 @@ your project — it does NOT call any LLM and does NOT execute remote code at ru
 surface we care about is:
 
 - The installer pipeline (`install.sh`, the Homebrew tap formula, the GitHub Releases binaries +
-  their SHA-256 checksums).
+  their SHA-256 checksums and Sigstore attestation).
 - The bundled templates and skills shipped into user projects via `specnaut init` /
   `specnaut upgrade`.
 - The repository's CI / release workflows.
@@ -97,6 +97,40 @@ updates once.
 If Sigstore ever rotates its certificate authority, `self-update` will refuse rather than fall back
 to the checksum — falling back would hand an attacker the weaker control on request — and the fix is
 to reinstall from <https://specnaut.com>.
+
+## What `install.sh` checks
+
+Each release publishes its own `install.sh`, with its tag written in and covered by the same
+attestation as the binaries. Before it places anything, the script checks the binary's checksum and
+then runs `gh attestation verify` against the release's bundle, requiring the identity `self-update`
+requires: this repository's `release.yml` at the exact tag, the GitHub Actions OIDC issuer, and a
+GitHub-hosted runner. A refusal stops the install; the binary is neither placed nor run. `REPO` may
+point the downloads elsewhere, but the signer stays this repository, and such an install is never
+accepted on a checksum alone.
+
+What it does **not** claim:
+
+- **Without `gh`** (or with a `gh` that has no `attestation` command), only the checksum is checked.
+  The script says so and prints the command that verifies the installed binary afterwards.
+  `REQUIRE_ATTESTATION=1` makes it stop instead.
+- **Releases before v4.3.0** carry no attestation. The script installs them on the checksum alone,
+  and only when you pin one with `SPECNAUT_VERSION` (or `VERSION`); `REQUIRE_ATTESTATION=1` refuses
+  them.
+- **The script comes from the release it installs.** Releases are not yet immutable and `v*` tags
+  are not yet protected by a ruleset, so whoever can amend a release can amend its `install.sh` too.
+  Piping it into `bash` trusts that release's origin. To remove that trust, verify the script first:
+
+```sh
+tag=vX.Y.Z # a release that carries install.sh
+base="https://github.com/specnaut/specnaut-cli/releases/download/$tag"
+curl --proto '=https' --tlsv1.2 -fsSLO "$base/install.sh"
+curl --proto '=https' --tlsv1.2 -fsSLO "$base/specnaut.attestation.sigstore.json"
+gh attestation verify install.sh --bundle specnaut.attestation.sigstore.json \
+  --repo specnaut/specnaut-cli --deny-self-hosted-runners \
+  --cert-identity "https://github.com/specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/$tag" \
+  --cert-oidc-issuer https://token.actions.githubusercontent.com
+REQUIRE_ATTESTATION=1 bash install.sh
+```
 
 ## Scope
 

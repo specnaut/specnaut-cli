@@ -43,7 +43,7 @@ gh run watch "$run_id" --exit-status || run_failed=1
 
 echo "▶ verifying GitHub Release exists with assets"
 asset_count="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets | length')"
-[ "$asset_count" -ge 11 ] || { echo "❌ release has $asset_count assets (expected ≥11: 5 binaries + 5 checksums + 1 attestation bundle)"; exit 1; }
+[ "$asset_count" -ge 12 ] || { echo "FAIL release has $asset_count assets (expected 12 or more: 5 binaries, 5 checksums, the attestation bundle, install.sh)"; exit 1; }
 
 # The two packaging channels PULL from this repository's public Releases API;
 # nothing is pushed to them, and neither this repo nor they hold a credential
@@ -115,7 +115,7 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
   case "$formula" in
     *"version \"${TAG#v}\""*) break ;;
   esac
-  [ "$attempt" -eq 12 ] && homebrew_warned=1 || sleep 10
+  if [ "$attempt" -eq 12 ]; then homebrew_warned=1; else sleep 10; fi
 done
 if [ "$homebrew_warned" -eq 1 ]; then
   echo "⚠ tap formula does not declare ${TAG#v} yet — its sync runs on an hourly cron"
@@ -334,11 +334,11 @@ release_env() {
   return 1
 }
 if command -v codesign >/dev/null 2>&1; then
-  macsig_team="$(release_env MACOS_TEAM_ID)" && macsig_id="$(release_env MACOS_IDENTIFIER)" || {
+  if ! macsig_team="$(release_env MACOS_TEAM_ID)" || ! macsig_id="$(release_env MACOS_IDENTIFIER)"; then
     rm -rf "$verify_tmp"
     echo "❌ release.yml names no MACOS_TEAM_ID / MACOS_IDENTIFIER — nothing to check against"
     exit 1
-  }
+  fi
   macsig_found=0
   for f in "$verify_tmp"/specnaut-macos-*; do
     case "$f" in *.sha256 | *"*") continue ;; esac
@@ -361,6 +361,21 @@ else
 fi
 # END macos-signature-check
 rm -rf "$verify_tmp"
+
+# The installer users pipe into bash (cli#817), run as they run it: HARD, like the attestation it
+# checks. Its gh may lack `attestation`; that is a skip, said as one, never a pass.
+# BEGIN installer-check
+installer_skipped=0
+echo "> running the published installer"
+installer_rc=0
+bash .specnaut/release/check-published-installer.sh "$TAG" || installer_rc=$?
+if [ "$installer_rc" -eq 3 ]; then
+  installer_skipped=1
+elif [ "$installer_rc" -ne 0 ]; then
+  echo "FAIL the published install.sh does not install $TAG on its attestation. Publish a patch."
+  exit 1
+fi
+# END installer-check
 
 # The attestation proves the bytes are the ones the workflow built; it does not
 # prove they RUN. Everything else that exercises the CLI — the test suite, the
@@ -411,6 +426,7 @@ warnings=()
 [ "$docs_warned" -eq 1 ] && warnings+=("docs site stale, specnaut.com/version.json not updated") || true
 [ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale or rejected, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
+[ "$installer_skipped" -eq 1 ] && warnings+=("published installer NOT run: this gh has no attestation command") || true
 [ "$macsig_skipped" -eq 1 ] && warnings+=("macOS signatures NOT checked — run postflight on macOS") || true
 [ "$publishedsmoke_skipped" -eq 1 ] && warnings+=("published binary NOT smoke-tested — run .specnaut/release/smoke-published.sh $TAG once updated") || true
 [ -n "$upgradesmoke_skip" ] && warnings+=("upgrade from the previous release NOT smoke-tested ($upgradesmoke_skip)") || true

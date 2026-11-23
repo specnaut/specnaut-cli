@@ -7,15 +7,23 @@ The design spec (2026-05-26, "release flow") lives in the maintainer workspace.
   release-tag protection configured, the `ci` AND `smoke` workflows green on HEAD, smoke audit,
   bundle, test. Exits non-zero on any gate failure.
 - `pretag.sh <tag> [binary]` — runs after the version bump, `deno task bundle` and the tests, before
-  the tag: compiles the host target with `scripts/build.ts` (or takes `[binary]`) and runs
-  `smoke-upgrade.sh <tag>` on it with an absolute path. It cannot be part of `preflight.sh`, because
-  the smoke asserts the lock ends at `<tag>`'s templates version, which only exists once bumped.
-  Exit 1 blocks the tag. Exit 3 (no release before `<tag>`) and exit 4 (the previous project could
-  not be prepared) are named skips that print the re-run command — never a pass.
+  the tag. First a hard check: this tree's `install.sh`, with `REQUIRE_ATTESTATION=1`, must install
+  the latest published release and print `attestation verified for <identity>`. Then it compiles the
+  host target with `scripts/build.ts` (or takes `[binary]`) and runs `smoke-upgrade.sh <tag>` on it
+  with an absolute path. It cannot be part of `preflight.sh`, because the smoke asserts the lock
+  ends at `<tag>`'s templates version, which only exists once bumped. Exit 1 blocks the tag. Exit 3
+  (no release before `<tag>`) and exit 4 (the previous project could not be prepared) are named
+  skips that print the re-run command — never a pass.
 - `postflight.sh <tag>` — runs after the tag has been pushed: watches `release.yml`, verifies the
   GitHub Release has its assets, verifies the Homebrew tap formula bumped, refreshes the local
-  binary, verifies the artefacts against the attestation, then runs the published binary end to end
-  through `smoke-published.sh` and `smoke-upgrade.sh`.
+  binary, verifies the artefacts against the attestation, runs the published installer through
+  `check-published-installer.sh`, then runs the published binary end to end through
+  `smoke-published.sh` and `smoke-upgrade.sh`.
+- `check-published-installer.sh <tag>` — fetches `releases/latest/download/install.sh`, checks it is
+  staged for `<tag>`, runs it with `REQUIRE_ATTESTATION=1` (it must print the attestation marker and
+  place a binary reporting `<tag>`), then runs it again on a tampered binary with a matching
+  checksum, which it must refuse on the attestation. Exit 3 is a skip when the local `gh` has no
+  `attestation` command.
 - `smoke-published.sh <tag> [binary]` — `init`, scaffold check and `check --project` with the
   installed binary in a throwaway directory. With `smoke-upgrade.sh`, the only checks that execute
   what users download.

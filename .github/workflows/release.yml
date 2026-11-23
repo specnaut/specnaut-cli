@@ -385,6 +385,10 @@ jobs:
           MACOS_JSON: ${{ needs.compile.outputs.macos }}
           CANONICAL: ${{ github.repository_id == '1218483524' }}
         run: bash scripts/release/require-macos-signed.sh
+      - name: Stage the installer
+        # After the signed-set check, before attest, which signs it with the
+        # binaries (cli#817). The tag is the runner's GITHUB_REF_NAME variable.
+        run: bash scripts/release/stage-installer.sh "$GITHUB_REF_NAME" dist/install.sh
       - name: Attest build provenance
         id: attest
         # Pinned to a commit, and this is the pin that must not float. The
@@ -403,13 +407,11 @@ jobs:
         # Enforced by tests/scripts/release_actions_pinned_test.ts.
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          # Enumerated by the pipeline, not by a list. `dist/` is the set
-          # sign-macos uploaded, checked above to be exactly the binaries
-          # `scripts/build.ts` lists, and this runs BEFORE any checksum exists:
-          # the glob covers the signed bytes and nothing else. The notary zips
-          # and the entitlements never enter `dist/`, and the glob cannot fall
-          # behind the target list the way the `files:` block below can.
-          subject-path: dist/specnaut-*
+          # The binaries by glob: `dist/` was checked above to hold exactly
+          # build.ts's targets, and no checksum exists yet. Then the installer.
+          subject-path: |
+            dist/specnaut-*
+            dist/install.sh
           # No registry push, so no storage record — and therefore no need for
           # the permission key the comment above declines to add.
           create-storage-record: false
@@ -420,14 +422,10 @@ jobs:
             shasum -a 256 "$f" > "$f.sha256"
           done
       - name: Stage the attestation bundle for upload
-        # AFTER the checksum loop, and named with a dot rather than a hyphen,
-        # for the same reason twice: `for f in specnaut-*` would otherwise match
-        # the bundle, emit a `.sha256` for it, and quietly add a twelfth asset
-        # to a release the gates expect to hold eleven.
-        #
-        # `bundle-path` is absolute and outside the workspace, so it is copied
-        # in rather than referenced from `files:` directly. One bundle covers
-        # every subject — the in-toto statement lists all five binaries.
+        # AFTER the checksum loop, and named with a dot rather than a hyphen:
+        # `for f in specnaut-*` would otherwise give it a `.sha256`, an asset
+        # no gate expects. `bundle-path` is outside the workspace, so it is
+        # copied in. One bundle covers every binary and the installer.
         run: cp "${{ steps.attest.outputs.bundle-path }}" dist/specnaut.attestation.sigstore.json
       - name: Generate release notes
         env:
@@ -469,15 +467,15 @@ jobs:
             dist/specnaut-windows-x64.exe
             dist/specnaut-windows-x64.exe.sha256
             dist/specnaut.attestation.sigstore.json
+            dist/install.sh
           body_path: dist/release-notes.md
-          # Without this the action defaults to false: nine of the ten files
-          # present means it uploads nine, creates the release, and reports
-          # success. A tag and its release are effectively immutable, so the
-          # only recovery is another patch — and until it ships, every user on
-          # the missing platform gets a 404 from `install.sh` and `self-update`,
-          # both of which resolve assets by tag. Fail before publishing instead
-          # (#521). `postflight.sh` still asserts `asset_count >= 10` as the
-          # second net; this is the gate upstream of it.
+          # Without this the action defaults to false: a missing file means it
+          # uploads the rest, creates the release, and reports success. A tag
+          # and its release are effectively immutable, so the only recovery is
+          # another patch, and until it ships every user on the missing
+          # platform gets a 404 from `install.sh` and `self-update`. Fail
+          # before publishing instead (#521). `postflight.sh`'s `asset_count`
+          # floor is the second net; this is the gate upstream of it.
           fail_on_unmatched_files: true
           # Both packaging channels resolve exclusively through
           # `releases/latest`. Whether a new release becomes latest is an

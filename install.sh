@@ -1,20 +1,36 @@
 #!/usr/bin/env bash
-# specnaut installer — downloads the latest (or pinned) release binary,
-# verifies SHA256, and places it in $PREFIX (default /usr/local/bin).
+# specnaut installer: downloads a release binary, verifies it, and places it in $PREFIX
+# (default /usr/local/bin). Each release publishes its own copy of this script, which installs
+# that release; the one on `releases/latest` installs the latest.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash
-#   curl -fsSL https://.../install.sh | VERSION=v0.1.0-alpha.1 bash
-#   curl -fsSL https://.../install.sh | PREFIX=$HOME/.local/bin bash
-#   curl -fsSL https://.../install.sh | DRY_RUN=1 bash
+#   curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/latest/download/install.sh | bash
+#   curl --proto '=https' --tlsv1.2 -fsSL https://github.com/specnaut/specnaut-cli/releases/download/vX.Y.Z/install.sh | bash
+#     (pins the script and the binary to vX.Y.Z; SPECNAUT_VERSION=vX.Y.Z pins only the binary)
+#   ... | PREFIX=$HOME/.local/bin bash    ... | DRY_RUN=1 bash    ... | REQUIRE_ATTESTATION=1 bash
 #
+# Verification: the SHA-256 checksum, then the release's Sigstore attestation, with
+# `gh attestation verify` pinned to release.yml at the exact tag installed (the identity
+# `specnaut self-update` checks). A refused attestation stops the install: nothing is placed or run.
+# Without gh, or with a gh lacking `attestation`, the checksum alone is checked and a warning
+# prints the command that verifies afterwards; REQUIRE_ATTESTATION=1 stops instead.
+# Releases before 4.3.0 carry no attestation: they install on the checksum alone, and only when
+# pinned by SPECNAUT_VERSION (or VERSION). REQUIRE_ATTESTATION=1 refuses them.
 set -euo pipefail
 
 REPO="${REPO:-specnaut/specnaut-cli}"
 PREFIX_EXPLICIT="${PREFIX+1}"
 PREFIX="${PREFIX:-/usr/local/bin}"
-VERSION="${VERSION:-}"
 DRY_RUN="${DRY_RUN:-}"
+REQUIRE_ATTESTATION="${REQUIRE_ATTESTATION:-}"
+# What is trusted, as literals: REPO moves where files come from, never who must have signed them.
+SIGNER_REPO="specnaut/specnaut-cli"
+SIGNER_ISSUER="https://token.actions.githubusercontent.com"
+BUNDLE_NAME="specnaut.attestation.sigstore.json"
+# The release this copy belongs to, written in by scripts/release/stage-installer.sh. The
+# repository's copy keeps the placeholder, and installs the latest release.
+RELEASE_TAG='__SPECNAUT_RELEASE_TAG__'
+case "$RELEASE_TAG" in __*) RELEASE_TAG="" ;; esac
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'; DIM=$'\033[2m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; CYAN=$'\033[36m'; RESET=$'\033[0m'
@@ -32,6 +48,9 @@ require() {
   command -v "$1" >/dev/null 2>&1 || abort "$1 is required but not found in PATH"
 }
 
+# Every download: HTTPS only, TLS 1.2 or later, a failed status is a failure.
+fetch() { curl --proto '=https' --tlsv1.2 -fsSL "$@"; }
+
 detect_target() {
   local os arch
   os="$(uname -s)"
@@ -39,7 +58,7 @@ detect_target() {
   case "$os" in
     Darwin) os="macos" ;;
     Linux)  os="linux" ;;
-    MINGW*|MSYS*|CYGWIN*) abort "Windows detected — please download the binary manually from https://github.com/${REPO}/releases" ;;
+    MINGW*|MSYS*|CYGWIN*) abort "Windows detected - please download the binary manually from https://github.com/${REPO}/releases" ;;
     *) abort "unsupported OS: $os" ;;
   esac
   case "$arch" in
@@ -51,10 +70,67 @@ detect_target() {
 }
 
 latest_version() {
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+  fetch "https://api.github.com/repos/${REPO}/releases/latest" \
     | grep -Eo '"tag_name":\s*"[^"]+"' \
     | head -n1 \
     | sed -E 's/.*"([^"]+)"$/\1/'
+}
+
+# Succeeds when $1 is older than 4.3.0, the first release carrying an attestation
+# (FIRST_SIGNED_VERSION in src/domain/sigstore/trust_anchor.ts). Parsed with the pattern of
+# src/domain/release.ts and compared as integers, a prerelease before its release, as
+# SemVer.compare orders them. Anything else aborts: it must never reach the unsigned branch.
+predates_signing() {
+  local re='^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$' floor=(4 3 0) i n
+  [[ "$1" =~ $re ]] || abort "not a release version: '$1'"
+  for i in 0 1 2; do
+    n=$((10#${BASH_REMATCH[i + 1]}))
+    if (( n != floor[i] )); then (( n < floor[i] )); return; fi
+  done
+  [[ -n "${BASH_REMATCH[4]}" ]]
+}
+
+# Sets VERSION_TAG and PINNED. The user's pin wins, then the release this copy was staged for,
+# then the latest release.
+resolve_version() {
+  local v="${SPECNAUT_VERSION:-${VERSION:-}}"
+  PINNED="${v:+1}"
+  v="${v:-$RELEASE_TAG}"
+  [[ -n "$v" ]] || v="$(latest_version || true)" # a failed lookup is named below, not a silent exit
+  [[ -n "$v" ]] || abort "could not resolve latest version from GitHub"
+  predates_signing "$v" || true # aborts on what is not a version, named as it was given
+  VERSION_TAG="v${v#v}"
+}
+
+# Sets ATTEST when the binary must carry an attestation, decided by version, never by what a
+# download returns. Only a user's own pin may take the checksum-only branch of an older release.
+choose_verification() {
+  [[ "$REPO" == "$SIGNER_REPO" ]] || REQUIRE_ATTESTATION=1 # another origin: never its own checksum alone
+  ATTEST=1
+  predates_signing "$VERSION_TAG" || return 0
+  [[ -n "$PINNED" ]] || abort "$VERSION_TAG predates signed releases (4.3.0) and was not pinned - refusing it."
+  [[ -z "$REQUIRE_ATTESTATION" ]] || abort "$VERSION_TAG predates signed releases (4.3.0): it has no attestation, and REQUIRE_ATTESTATION is set."
+  ATTEST=""
+}
+
+release_url() { printf 'https://github.com/%s/releases/download/%s/%s' "$REPO" "$VERSION_TAG" "$1"; }
+
+# The certificate identity the attestation must carry: release.yml at the exact tag installed, as
+# expectedSignerIdentity in src/domain/sigstore/trust_anchor.ts spells it for self-update.
+signer_identity() { printf 'https://github.com/%s/.github/workflows/release.yml@refs/tags/%s' "$SIGNER_REPO" "$VERSION_TAG"; }
+
+dry_run() {
+  info "DRY_RUN=1 - would download:"
+  info "  $(release_url "$TARGET")"
+  info "  $(release_url "$TARGET.sha256")"
+  if [[ -n "$ATTEST" ]]; then
+    info "  $(release_url "$BUNDLE_NAME")"
+    info "verify the attestation for $(signer_identity) (issuer $SIGNER_ISSUER)"
+  else
+    info "check the checksum only: $VERSION_TAG predates signed releases"
+  fi
+  info "and install to ${PREFIX}/specnaut"
+  exit 0
 }
 
 # Creates the folder $1 as the user when it is missing and its nearest existing parent is a folder
@@ -130,19 +206,46 @@ pick_sha_command() {
   fi
 }
 
-# Downloads $1 to $3/specnaut and its checksum $2 beside it; aborts unless they match.
-download_verified() {
-  local bin_url="$1" sha_url="$2" dir="$3" expected_sha actual_sha
+# Downloads the binary to $1/specnaut and its checksum beside it; aborts unless they match.
+download_checked() {
+  local dir="$1" expected_sha actual_sha
   info "downloading binary..."
-  curl -fsSL "$bin_url" -o "$dir/specnaut"
+  fetch "$(release_url "$TARGET")" -o "$dir/specnaut"
   info "downloading checksum..."
-  curl -fsSL "$sha_url" -o "$dir/specnaut.sha256"
+  fetch "$(release_url "$TARGET.sha256")" -o "$dir/specnaut.sha256"
   expected_sha="$(awk '{print $1}' < "$dir/specnaut.sha256")"
   actual_sha="$(cd "$dir" && $SHA_CMD specnaut | awk '{print $1}')"
   if [[ "$expected_sha" != "$actual_sha" ]]; then
     abort "checksum mismatch: expected $expected_sha, got $actual_sha"
   fi
   ok "checksum verified"
+}
+
+# Verifies $1/specnaut against the release's bundle. gh exits 1 alike for a mismatch and for a
+# network or trust-root failure, so any refusal stops the install; neither is read as a pass.
+verify_attestation() {
+  local dir="$1"
+  info "downloading attestation..."
+  fetch "$(release_url "$BUNDLE_NAME")" -o "$dir/bundle.json" || abort "$VERSION_TAG carries no attestation bundle - refusing it."
+  gh attestation verify "$dir/specnaut" --bundle "$dir/bundle.json" --repo "$SIGNER_REPO" \
+    --cert-identity "$(signer_identity)" --cert-oidc-issuer "$SIGNER_ISSUER" \
+    --deny-self-hosted-runners >"$dir/gh.log" 2>&1 ||
+    { cat "$dir/gh.log" >&2; abort "attestation verification failed: this is not the binary release.yml built for $VERSION_TAG."; }
+  ok "attestation verified for $(signer_identity)"
+}
+
+# Checks the binary in $1 as far as this system allows. Sets VERIFY_LATER when gh is missing.
+verify_download() {
+  VERIFY_LATER=""
+  download_checked "$1"
+  [[ -n "$ATTEST" ]] || { warn "$VERSION_TAG predates signed releases: checked against its checksum only."; return 0; }
+  if command -v gh >/dev/null 2>&1 && gh attestation verify --help >/dev/null 2>&1; then
+    verify_attestation "$1"
+  elif [[ -n "$REQUIRE_ATTESTATION" ]]; then
+    abort "REQUIRE_ATTESTATION is set, and gh with \`gh attestation\` is not on PATH."
+  else
+    VERIFY_LATER=1
+  fi
 }
 
 # Tells how to put the folder of $1 on PATH, when it is not there yet.
@@ -157,43 +260,35 @@ print_path_hint() {
   info "Then restart your shell, or run: ${BOLD}source ~/.zshrc${RESET}"
 }
 
+# The command that checks the attestation of $1 once gh is installed.
+print_verify_hint() {
+  echo
+  warn "gh (with \`gh attestation\`) was not found: $1 was checked against its checksum only."
+  info "Install gh, then verify it:"
+  info "  gh attestation verify $1 --repo $SIGNER_REPO --cert-identity $(signer_identity) --cert-oidc-issuer $SIGNER_ISSUER --deny-self-hosted-runners"
+}
+
 main() {
   require curl
   pick_sha_command
-
-  local target version bin_url sha_url dest
-  target="$(detect_target)"
-  version="${VERSION:-$(latest_version || true)}" # a failed lookup is named below, not a silent exit
-  [[ -n "$version" ]] || abort "could not resolve latest version from GitHub"
-  bin_url="https://github.com/${REPO}/releases/download/${version}/${target}"
-  sha_url="${bin_url}.sha256"
-
-  step "specnaut ${BOLD}${version}${RESET} ${DIM}(${target})${RESET}"
+  TARGET="$(detect_target)"
+  resolve_version
+  choose_verification
+  step "specnaut ${BOLD}${VERSION_TAG}${RESET} ${DIM}(${TARGET})${RESET}"
   info "${DIM}prefix:${RESET} ${PREFIX}"
-
-  if [[ -n "$DRY_RUN" ]]; then
-    info "DRY_RUN=1 — would download:"
-    info "  $bin_url"
-    info "  $sha_url"
-    info "  and install to ${PREFIX}/specnaut"
-    exit 0
-  fi
-
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT # tmp is global: the trap runs after main returns
-  download_verified "$bin_url" "$sha_url" "$tmp"
-
+  [[ -z "$DRY_RUN" ]] || dry_run
+  # Under TMPDIR by name: macOS mktemp -d alone may ignore it. tmp is global: the trap runs after main.
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/specnaut-install.XXXXXX")"
+  trap 'rm -rf "$tmp"' EXIT
+  verify_download "$tmp"
   chmod 755 "$tmp/specnaut"
-  dest="${PREFIX}/specnaut"
-  install_binary "$tmp/specnaut" "$dest"
-  dest="$FINAL_DEST"
-
+  install_binary "$tmp/specnaut" "${PREFIX}/specnaut"
   echo
-  ok "installed ${BOLD}${dest}${RESET}"
-  print_path_hint "$dest"
-
+  ok "installed ${BOLD}${FINAL_DEST}${RESET}"
+  print_path_hint "$FINAL_DEST"
+  [[ -z "$VERIFY_LATER" ]] || print_verify_hint "$FINAL_DEST"
   echo
-  "$dest" --version || true
+  "$FINAL_DEST" --version || true
 }
 
 main "$@"

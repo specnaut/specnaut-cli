@@ -25,7 +25,13 @@
 #   4 = skipped, the previous release's project could not be prepared.
 # 3 and 4 are skips, said as skips, with the command to re-run — never a pass.
 #
-# PRETAG_SMOKE (the smoke script run) exists for the tests; a release uses none.
+# Before the smoke, a hard check with no skip (cli#817): this tree's install.sh,
+# unpinned, with REQUIRE_ATTESTATION=1 and none of the variables that steer it,
+# installs the latest published release (the one before <tag>) and prints
+# `attestation verified for <identity>`. Anything else is exit 1.
+#
+# PRETAG_SMOKE (the smoke script run) and PRETAG_INSTALLER (the installer run)
+# exist for the tests; a release uses none.
 set -uo pipefail
 
 TAG="${1:-}"
@@ -34,6 +40,7 @@ BIN="${2:-}"
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 SMOKE="${PRETAG_SMOKE:-$here/smoke-upgrade.sh}"
+INSTALLER="${PRETAG_INSTALLER:-$root/install.sh}"
 
 # Resolved before anything changes directory: a relative path is the caller's.
 if [ -n "$BIN" ]; then
@@ -50,6 +57,20 @@ host_target() {
      const t = TARGETS.find((x) => x.triple === Deno.build.target);
      if (t) console.log(`${t.triple} ${t.outName}`);' 2>/dev/null)
 }
+
+echo "> installing the previous release with this install.sh, its attestation required"
+inst="$(mktemp -d)"
+signer="attestation verified for https://github.com/specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/v"
+if env -u VERSION -u SPECNAUT_VERSION -u REPO REQUIRE_ATTESTATION=1 PREFIX="$inst/bin" \
+  bash "$INSTALLER" > "$inst/log" 2>&1 && grep -qF "$signer" "$inst/log"; then
+  rm -rf "$inst"
+  echo "ok install.sh verified the previous release's attestation"
+else
+  tail -20 "$inst/log"
+  rm -rf "$inst"
+  echo "FAIL install.sh did not install the previous release on its attestation - do NOT tag $TAG."
+  exit 1
+fi
 
 if [ -z "$BIN" ]; then
   echo "▶ compiling $TAG for this host"

@@ -33,6 +33,24 @@ import {
 import { DEFAULT_TRUST_ANCHOR } from "../src/application/self_update.ts";
 import { TARGETS } from "./build.ts";
 
+/**
+ * The installer each release publishes (cli#817), attested with the binaries in the same bundle:
+ * a user who verifies the script first runs it knowing it is the one release.yml built.
+ */
+export const INSTALLER_ASSET_NAME = "install.sh";
+
+/**
+ * Every release asset beyond one binary and one checksum per target, sorted. One list, read by
+ * the workflow's asset gate test, so the upload list and what this verifies cannot drift apart.
+ */
+export const RELEASE_EXTRAS = [ATTESTATION_ASSET_NAME, INSTALLER_ASSET_NAME].sort();
+
+/** What the bundle must cover: every binary, and the installer. */
+export const ATTESTED_ASSETS: readonly { readonly outName: string }[] = [
+  ...TARGETS,
+  { outName: INSTALLER_ASSET_NAME },
+];
+
 export type ArtifactVerification = {
   readonly outName: string;
   readonly ok: boolean;
@@ -54,7 +72,7 @@ type Anchor = {
 };
 
 /**
- * Verify every published binary in `dir` against the bundle beside it.
+ * Verify every published binary, and the installer, in `dir` against the bundle beside it.
  *
  * The anchor is a parameter rather than a constant so the negative self-test
  * can drive this with a synthetic authority. Production passes the compiled-in
@@ -71,7 +89,7 @@ export async function verifyReleaseDir(opts: {
   const bundleJson = await readBundle(opts.dir);
   const check = { ...opts, bundleJson, now: opts.now ?? new Date() };
   const results: ArtifactVerification[] = [];
-  for (const t of opts.targets ?? TARGETS) results.push(await verifyOne(t.outName, check));
+  for (const t of opts.targets ?? ATTESTED_ASSETS) results.push(await verifyOne(t.outName, check));
   return results;
 }
 
@@ -86,7 +104,7 @@ async function readBundle(dir: string): Promise<string | null> {
   }
 }
 
-/** One binary: `missing` when absent, else the shipped verifier's verdict. */
+/** One asset: `missing` when absent, else the shipped verifier's verdict. */
 async function verifyOne(outName: string, c: {
   readonly dir: string;
   readonly identity: string;
@@ -99,7 +117,7 @@ async function verifyOne(outName: string, c: {
     sha = await sha256OfFile(`${c.dir}/${outName}`);
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) throw err;
-    const detail = "the published release does not carry this binary, or it was not downloaded";
+    const detail = "the published release does not carry this asset, or it was not downloaded";
     return { outName, ok: false, reason: "missing", detail };
   }
   const outcome: VerificationOutcome = await verifyArtifact({
@@ -144,12 +162,12 @@ function report(results: readonly ArtifactVerification[], label: string): number
   }
   if (failed.length === 0) {
     console.log(
-      `✓ all ${results.length} published binaries verify against the ${label} attestation`,
+      `✓ all ${results.length} published assets verify against the ${label} attestation`,
     );
     return 0;
   }
   console.error(
-    `❌ ${failed.length}/${results.length} published binaries do not verify against ` +
+    `❌ ${failed.length}/${results.length} published assets do not verify against ` +
       `the attestation for ${label}.`,
   );
   console.error(
