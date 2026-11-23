@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { containerArgs } from "../../src/domain/sandbox_args.ts";
-import { AF_VSOCK, DENIED_SYSCALLS } from "../../src/domain/sandbox_syscalls.ts";
+import { AF_VSOCK, DENIED_SYSCALLS, SYSCALL_NUMBERS } from "../../src/domain/sandbox_syscalls.ts";
 import {
   CLONE_NAMESPACE_FLAGS,
   type ProfileRule,
@@ -158,4 +158,18 @@ Deno.test("seccompProfile: kcmp, fanotify_init and the memory-policy calls are r
 
 Deno.test("seccompProfile: open_tree_attr is refused, as open_tree is", () => {
   assertEquals(refusal("open_tree_attr"), EPERM);
+});
+
+// The profile names what the number tables number: a name only it held would be one bubblewrap's
+// filter never refuses, and a misspelt one a name every runtime's libseccomp skips unsaid. The
+// argument rules' four calls are numbered by tables of their own, or not at all.
+Deno.test("every name the profile lists is numbered, but the argument rules' four", () => {
+  const numbered = new Set(Object.values(SYSCALL_NUMBERS).flatMap((t) => Object.keys(t)));
+  const names = new Set(seccompProfile().syscalls.flatMap((r) => r.names));
+  assertEquals([...names].filter((n) => !numbered.has(n)).sort(), [
+    "clone",
+    "clone3",
+    "personality",
+    "socket",
+  ]);
 });
