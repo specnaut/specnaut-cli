@@ -1,8 +1,9 @@
 # shellcheck shell=bash
 # _hooks_off.sh <name> - the prologue land-feature.sh and lfs-push.sh share (cli#806). Sourced,
-# never run, under the caller's `set -Eeuo pipefail`, and before _verifier.sh: an alias applies
-# only to lines bash parses after it is defined, and _verifier.sh's functions call git. <name> is
-# the caller's, into `me`: what it, the ERR trap and _verifier.sh print starts with it.
+# never run, under the caller's `set -Eeuo pipefail`, and before the rest of the caller: an alias
+# applies only to lines bash parses after it is defined, and land-feature.sh, lfs-push.sh and the
+# _approvals.sh land-feature.sh sources call git. <name> is the caller's, into `me`: what it, the
+# ERR trap and _verifier.sh print starts with it.
 
 # Every git call of the caller runs no hook: the branch being landed could commit hooks and a
 # repository-relative core.hooksPath naming them, and the caller fetches, checks out, merges and

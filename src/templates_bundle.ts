@@ -3900,23 +3900,23 @@ gate reads § The config verdicts.
 
 Every block that runs the verifier runs this one first, in the same shell, and then calls \`"\$sn"
 verify-scripts\`, never the bare name: the PATH can name a folder of the tree, where a branch puts a
-\`specnaut\` of its own. Before git runs, it judges the PATH itself, every command being looked up on
-it: an entry that is empty or relative (searched from the working folder), holds a \`.\` or \`..\`, or
-sits in the tree (the nearest folder holding a \`.git\` folder, a submodule's or a linked work tree's
-\`.git\` file walked through) can supply any command, and the first one is refused by name. An entry
-sits in the tree when it is spelled there, whatever a link of the tree
-points at, or when the links on it lead there. Then it sets \`sn\` to the physical file \`specnaut\` resolves to, following each
-link one hop at a time (40 at most), and refuses a name that is not an absolute path, or one whose
-folder, or any link on the way to it, sits in that same tree - never git's toplevel, which in a
-submodule stops short of the superproject the hooks judge against. \`-ef\` compares device and inode, so
-neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository. It runs
-in bash and in zsh alike, in the session's own shell: it reaches \`cd\`, \`pwd\` and \`command\` through
-\`\\builtin\`, and clears zsh's \`chpwd\` hooks inside each \`\$(…)\` that changes folder, so no function,
-alias or hook of that shell stands in for them. \`land-feature.sh\` holds the same rule as
-\`refuse_unsafe_path\` and \`resolve_specnaut\`, in \`_verifier.sh\` beside it; the Claude Code review
-hooks drop such entries instead (\`_clean-path.sh\`), and every Claude Code hook Specnaut runs with
-bash starts under \`bash -p\`, resolved on the PATH they keep as \`specnaut\` is (\`run-hook.sh\`): no
-\`BASH_ENV\` and no exported function runs before its first line.
+\`specnaut\` of its own. Before any command it names runs, it judges the PATH itself, every command
+being looked up on it: an entry that is empty or relative (searched from the working folder), holds
+a \`.\` or \`..\`, or sits in the tree (the nearest folder holding a \`.git\` folder, a submodule's or a
+linked work tree's \`.git\` file walked through) can supply any command, and the first one is refused
+by name. An entry sits in the tree when it is spelled there, whatever a link of the tree points at,
+or when the links on it lead there. Then it sets \`sn\` to the physical file \`specnaut\` resolves to,
+following each link one hop at a time (40 at most), and refuses a name that is not an absolute path,
+or one whose folder, or any link on the way to it, sits in that same tree - never git's toplevel,
+which in a submodule stops short of the superproject the hooks judge against. \`-ef\` compares device
+and inode, so neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the
+repository. It runs in bash and in zsh alike, in the session's own shell: it reaches \`cd\`, \`pwd\` and
+\`command\` through \`\\builtin\`, and clears zsh's \`chpwd\` hooks inside each \`\$(…)\` that changes folder,
+so no function, alias or hook of that shell stands in for them. \`land-feature.sh\` holds the same
+rule as \`refuse_unsafe_path\` and \`resolve_specnaut\`, in \`_verifier.sh\` beside it; the Claude Code
+review hooks drop such entries instead (\`_clean-path.sh\`), and every Claude Code hook Specnaut runs
+with bash starts under \`bash -p\`, resolved on the PATH they keep as \`specnaut\` is (\`run-hook.sh\`):
+no \`BASH_ENV\` and no exported function runs before its first line.
 
 The rule judges where a command is found, not what ran before it was asked. Out of its reach: what
 the session's shell loaded when it started (its rc files, \`BASH_ENV\`), and a function of that shell
@@ -33557,11 +33557,11 @@ entry_in_tree() {
 # path, and neither its folder nor any link on the way to it may sit in the tree - the PATH can
 # name a folder of it, where the branch being landed puts a \`specnaut\` of its own. The tree is
 # tree_top's, the one the PATH and the hooks are judged against: git's toplevel would stop at a
-# submodule and let a \`specnaut\` of its superproject through. Each
-# link is followed one hop at a time to the physical file; \`-ef\` compares device and inode, so
-# neither case, a drive-letter spelling nor a \`<repo>-x\` sibling passes for the repository. The
-# rule of phases/script-gate.md § Resolving the verifier, which runs before any script of the tree
-# is trusted, so the two spell it apart; one test runs both against the same cases.
+# submodule and let a \`specnaut\` of its superproject through. Each link is followed one hop at a
+# time to the physical file; \`-ef\` compares device and inode, so neither case, a drive-letter
+# spelling nor a \`<repo>-x\` sibling passes for the repository. The rule of phases/script-gate.md
+# § Resolving the verifier, which runs before any script of the tree is trusted, so the two spell
+# it apart; one test runs both against the same cases.
 resolve_specnaut() {
   local p why="" n=0 d a t top
   p=\$(command -v specnaut) || p=""
@@ -33736,9 +33736,10 @@ approvals_commit_is() {
     suffix: "scripts/bash/_hooks_off.sh",
     content: `# shellcheck shell=bash
 # _hooks_off.sh <name> - the prologue land-feature.sh and lfs-push.sh share (cli#806). Sourced,
-# never run, under the caller's \`set -Eeuo pipefail\`, and before _verifier.sh: an alias applies
-# only to lines bash parses after it is defined, and _verifier.sh's functions call git. <name> is
-# the caller's, into \`me\`: what it, the ERR trap and _verifier.sh print starts with it.
+# never run, under the caller's \`set -Eeuo pipefail\`, and before the rest of the caller: an alias
+# applies only to lines bash parses after it is defined, and land-feature.sh, lfs-push.sh and the
+# _approvals.sh land-feature.sh sources call git. <name> is the caller's, into \`me\`: what it, the
+# ERR trap and _verifier.sh print starts with it.
 
 # Every git call of the caller runs no hook: the branch being landed could commit hooks and a
 # repository-relative core.hooksPath naming them, and the caller fetches, checks out, merges and
