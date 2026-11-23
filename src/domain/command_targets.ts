@@ -8,8 +8,8 @@ import {
   rawWords,
   type Reading,
   reading,
-  valueEntries,
 } from "./command_words.ts";
+import { valueEntries } from "./command_values.ts";
 import { pathPieces, rawPathValues } from "./command_search_path.ts";
 import { foldersOf, pathsIn } from "./command_word_paths.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";

@@ -5,8 +5,8 @@ import {
   parsedGroups,
   rawWords,
   type Reading,
-  valueEntries,
 } from "./command_words.ts";
+import { valueEntries } from "./command_values.ts";
 
 /**
  * The commands a Claude Code skill, agent or slash command holds in its own file: the `hooks:` its
