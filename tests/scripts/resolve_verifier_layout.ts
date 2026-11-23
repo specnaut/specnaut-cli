@@ -5,7 +5,8 @@ import { git, run } from "./git_sandbox.ts";
 /**
  * The folders the PATH check's table runs in (resolve_verifier_test.ts): a repository whose folders
  * hold a marker for every command the spellings run, `specnaut` stubs outside and beside it,
- * links across its edge both ways, a folder holding only the real tools, and a held lock's copy.
+ * links across its edge both ways, a submodule holding a clone, a linked work tree outside it, a
+ * folder holding only the real tools, and a held lock's copy.
  */
 
 /** Every name a script of the table runs, planted where a PATH entry it must not trust points. */
@@ -19,6 +20,12 @@ export type Layout = {
   bin: string;
   /** A submodule's work tree in the repository: its `.git` is a file, its git folder the top's. */
   submodule: string;
+  /** A linked work tree of the repository, outside it: its `.git` is a file, `bin` holds markers. */
+  worktree: string;
+  /** A repository inside the submodule: its `.git` is a folder. */
+  clone: string;
+  /** A `specnaut` stub in the submodule, above the clone. */
+  aboveClone: string;
   tools: string;
   outside: string;
   sibling: string;
@@ -51,15 +58,11 @@ async function layout(tmp: string): Promise<Layout> {
   const bin = join(repo, "bin");
   await markers(tmp, bin);
   await markers(tmp, join(repo, "~", "bin"));
-  const submodule = join(repo, "mod");
-  const modules = join(repo, ".git", "modules", "mod");
-  await Deno.mkdir(join(repo, ".git", "modules"));
-  await git(repo, "init", "--quiet", `--separate-git-dir=${modules}`, submodule);
   const l: Layout = {
     tmp,
     repo,
     bin,
-    submodule,
+    ...await trees(tmp, repo),
     tools: await toolsIn(tmp, ["git", "readlink", "cat", "env", "rm", "dirname", "bash"]),
     outside: await stub({ tmp }, join(tmp, "outside", "real")),
     sibling: await stub({ tmp }, join(tmp, "repo-x", "bin")),
@@ -68,6 +71,25 @@ async function layout(tmp: string): Promise<Layout> {
   };
   await links(l);
   return l;
+}
+
+/**
+ * The trees beside the repository's own: a submodule, a linked work tree outside the repository
+ * holding a folder `sub`, a repository inside the submodule, and a stub above that one.
+ */
+async function trees(tmp: string, repo: string) {
+  const submodule = join(repo, "mod");
+  const modules = join(repo, ".git", "modules");
+  await Deno.mkdir(modules);
+  await git(repo, "init", "--quiet", `--separate-git-dir=${join(modules, "mod")}`, submodule);
+  await git(repo, "commit", "--quiet", "--allow-empty", "-m", "base");
+  const worktree = join(tmp, "worktree");
+  await git(repo, "worktree", "add", "--quiet", "--detach", worktree);
+  await markers(tmp, join(worktree, "bin"));
+  await Deno.mkdir(join(worktree, "sub"));
+  const clone = join(submodule, "clone");
+  await git(submodule, "init", "--quiet", clone);
+  return { submodule, worktree, clone, aboveClone: await stub({ tmp }, join(submodule, "bin")) };
 }
 
 /** A per-user state folder holding the copy of session s-1's review lock: the lock is held. */

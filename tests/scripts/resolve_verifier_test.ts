@@ -113,6 +113,25 @@ function pastThePath(l: Layout): Case[] {
   ];
 }
 
+/**
+ * Trees of their own, judged from inside: a linked work tree outside the repository, whose `.git`
+ * file is the top from any folder below it; a clone in a submodule, whose `.git` folder ends the
+ * walk, so the submodule's folders above it are outside.
+ */
+function ownTrees(l: Layout): Case[] {
+  const sub = join(l.worktree, "sub");
+  // deno-fmt-ignore
+  return [
+    { ...bad(l, "a work tree's folder, from below its top", join(l.worktree, "bin"), INSIDE, sub),
+      project: sub },
+    { name: "the folder of the submodule a clone is in, from the clone", cwd: l.clone, project: l.clone,
+      entries: [join(l.submodule, "bin"), l.tools], spec: { resolved: l.aboveClone } },
+  ];
+}
+
+/** Every case of the table. */
+const table = (l: Layout) => [...spelledBad(l), ...inTree(l), ...pastThePath(l), ...ownTrees(l)];
+
 /** The spellings whose answer is another's: zsh runs the doc block, the launcher the lock hook. */
 const SAME_AS: Record<string, string> = { zsh: "doc", launch: "lock" };
 
@@ -159,7 +178,7 @@ Deno.test({
   ignore: Deno.build.os === "windows",
   fn: () =>
     inLayout(async (l, shells) => {
-      for (const c of [...spelledBad(l), ...inTree(l), ...pastThePath(l)]) {
+      for (const c of table(l)) {
         if (c.skip) {
           console.warn(`skipped "${c.name}": ${c.skip}`);
           continue;
@@ -180,7 +199,7 @@ Deno.test({
   ignore: Deno.build.os === "windows",
   fn: () =>
     inLayout((l) => {
-      for (const c of [...spelledBad(l), ...inTree(l), ...pastThePath(l)]) {
+      for (const c of table(l)) {
         if (c.skip) continue;
         const top = treeTop(c.cwd);
         const why = c.entries.map((_, i) => i === c.bad?.[0] ? c.bad[1] : undefined);
