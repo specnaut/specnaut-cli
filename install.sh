@@ -142,11 +142,12 @@ dry_run() {
 
 # Creates the folder $1 as the user when it is missing and its nearest existing parent is a folder
 # the user can write, as under $HOME (cli#816): `sudo mkdir -p` there leaves a root-owned folder in
-# the home, and a refused sudo aborted an explicit PREFIX. Anywhere else, sudo is asked as before.
+# the home, and a refused sudo aborted an explicit PREFIX. Anywhere else, sudo is asked as before,
+# as when the walk meets its own dirname unfound ("." in an unsearchable folder, cli#825).
 make_dir_as_user() {
   local parent="$1"
   [[ -e "$1" ]] && return 0
-  while [[ ! -e "$parent" ]]; do parent="$(dirname "$parent")"; done
+  while [[ ! -e "$parent" && "$parent" != "$(dirname "$parent")" ]]; do parent="$(dirname "$parent")"; done
   [[ -d "$parent" && -w "$parent" ]] || return 0
   mkdir -p "$1" || warn "could not create $1 as you."
 }
@@ -160,8 +161,7 @@ install_with_sudo() {
   [[ -e /dev/tty ]] && command -v sudo >/dev/null 2>&1 || return 1
   info "${dest_dir} requires admin access - you'll be prompted for your password."
   if sudo -p "  [sudo] password for %u: " mkdir -p "$dest_dir" </dev/tty \
-     && sudo mv -f "$src" "$dest" </dev/tty \
-     && sudo chmod 755 "$dest" </dev/tty; then
+     && sudo mv -f "$src" "$dest" </dev/tty; then
     return 0
   fi
   warn "sudo failed - falling back to a user-writable location."
@@ -170,16 +170,18 @@ install_with_sudo() {
 
 # Move $1 to $2, handling permission elevation transparently.
 # Sets FINAL_DEST to the actual install path (may differ from $2 on fallback).
+# The mode is set once, on the file the user owns, before any move carries it (cli#825): a chmod
+# after the move, as root, follows a link at $2 to whatever it names.
 install_binary() {
   local src="$1" dest="$2" dest_dir
   dest_dir="$(dirname "$dest")"
   FINAL_DEST=""
+  chmod 755 "$src"
   make_dir_as_user "$dest_dir"
 
   # Best case: directory exists and is writable.
   if [[ -d "$dest_dir" && -w "$dest_dir" ]]; then
     mv -f "$src" "$dest"
-    chmod 755 "$dest"
     FINAL_DEST="$dest"
     return 0
   fi
@@ -197,7 +199,6 @@ install_binary() {
   local fallback_dest="$fallback_dir/specnaut"
   mkdir -p "$fallback_dir"
   mv -f "$src" "$fallback_dest"
-  chmod 755 "$fallback_dest"
   warn "installed to ${fallback_dir} instead of ${dest_dir}."
   FINAL_DEST="$fallback_dest"
 }
@@ -298,7 +299,6 @@ main() {
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/specnaut-install.XXXXXX")"
   trap 'rm -rf "$tmp"' EXIT
   verify_download "$tmp"
-  chmod 755 "$tmp/specnaut"
   install_binary "$tmp/specnaut" "${PREFIX}/specnaut"
   report_install "$FINAL_DEST"
 }

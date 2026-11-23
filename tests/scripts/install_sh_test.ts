@@ -9,6 +9,9 @@ import { ignore, inSandbox, install, stubLog } from "./install_sh_sandbox.ts";
  * is the user's, so it is created as the user: no sudo, which would leave a root-owned folder in the
  * home, or abort when refused. The sandbox (`install_sh_sandbox.ts`) serves a fake release; its
  * sudo logs every call and refuses it.
+ *
+ * cli#825 — the walk up to that parent ends where `dirname` returns its input, and the binary's
+ * mode is set before any move, so no chmod runs as root on what the move left at PREFIX.
  */
 
 Deno.test({
@@ -83,4 +86,46 @@ Deno.test({
       assertEquals(calls.length, 3, "binary, checksum, bundle"); // the version was pinned
       for (const call of calls) assertStringIncludes(call, "--proto =https --tlsv1.2 ");
     }),
+});
+
+Deno.test({
+  name: "install.sh exits through sudo on a relative PREFIX run from an unsearchable folder",
+  ignore: !UNREADABLE_OK, // root searches every folder, so never meets the end of the walk
+  fn: () =>
+    inSandbox({}, async (s) => {
+      const dark = join(s.home, "dark");
+      await Deno.mkdir(dark);
+      // A spawn cannot start in a folder it cannot search: bash enters it, then closes it.
+      const enter = ["-c", 'cd "$1" && chmod 600 . && exec /bin/bash "$2"', "_", dark, s.script];
+      try {
+        const { code, out } = await install(s, { PREFIX: "rel/bin" }, enter);
+        assertEquals(code, 1, out); // the stub sudo refuses, and PREFIX was set explicitly
+        assertStringIncludes(out, "rel/bin requires admin access");
+      } finally {
+        await Deno.chmod(dark, 0o755);
+      }
+    }),
+});
+
+Deno.test({
+  name: "install.sh sets the mode before the sudo move and runs no chmod as root",
+  ignore: !UNREADABLE_OK, // root writes every folder, so never needs sudo for one
+  fn: async () => {
+    const locked = await Deno.makeTempDir({ prefix: "install-sh-locked-" });
+    await Deno.chmod(locked, 0o555);
+    try {
+      await inSandbox({ sudoWrites: locked }, async (s) => {
+        const { code, out } = await install(s, { PREFIX: locked });
+        assertEquals(code, 0, out);
+        assertStringIncludes(out, `${locked} requires admin access`);
+        assertEquals((await Deno.stat(join(locked, "specnaut"))).mode! & 0o777, 0o755);
+        const sudo = (await stubLog(s, "sudo")).trim().split("\n");
+        assert(sudo.some((call) => call.startsWith("mv -f ")), sudo.join("\n"));
+        assert(!sudo.some((call) => call.includes("chmod")), sudo.join("\n"));
+      });
+    } finally {
+      await Deno.chmod(locked, 0o755);
+      await Deno.remove(locked, { recursive: true });
+    }
+  },
 });

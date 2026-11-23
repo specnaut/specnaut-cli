@@ -8,8 +8,9 @@ import { fromFileUrl, join } from "@std/path";
  * stub, so "gh is missing" means missing, and no case can reach a real verifier or the network.
  *
  * curl serves a fake release from files beside the stubs and logs each call; gh logs each call,
- * one argument per line, and answers as the case says; sudo logs and refuses. Every folder is
- * temporary and removed after the case, whatever it did.
+ * one argument per line, and answers as the case says; sudo logs and refuses, unless the case
+ * names a folder it may write, as root could. Every folder is temporary and removed after the case,
+ * whatever it did, and no run outlives RUN_TIMEOUT_MS: a hang fails its case instead of the suite.
  */
 
 export const INSTALL = fromFileUrl(new URL("../../install.sh", import.meta.url));
@@ -35,6 +36,11 @@ export type World = {
   missing?: string;
   /** install.sh as it is run; the repository's copy by default. */
   script?: string;
+  /**
+   * A folder sudo makes writable for the command it then runs, as root could. Without a terminal
+   * to read a password from, the script's /dev/tty is then a file beside the stubs.
+   */
+  sudoWrites?: string;
 };
 
 export type Sandbox = { bin: string; home: string; tmp: string; script: string };
@@ -46,7 +52,7 @@ out="" url=""
 while [ $# -gt 0 ]; do case $1 in -o) out=$2; shift ;; --proto) shift ;; -*) ;; *) url=$1 ;; esac; shift; done
 ${missing ? `case $url in *'${missing}') exit 22 ;; esac` : ""}
 case $url in *.sha256) f=fake.sha256 ;; */releases/latest) f=latest ;; *.sigstore.json) f=bundle ;; *) f=fake ;; esac
-if [ -n "$out" ]; then cp '${dir}/'$f "$out"; else cat '${dir}/'$f; fi
+if [ -n "$out" ]; then cat '${dir}/'$f >"$out"; else cat '${dir}/'$f; fi
 `;
 
 function ghStub(dir: string, gh: Exclude<Gh, null>): string {
@@ -60,6 +66,13 @@ echo -- >>'${dir}/gh.log'
 case "$*" in *--help*) ${help} ;; "attestation verify"*) ${verify} ;; esac
 exit 1
 `;
+}
+
+function sudoStub(dir: string, writes: string | undefined): string {
+  const run = writes === undefined
+    ? "exit 1"
+    : `[ "$1" = -p ] && shift 2\nchmod u+w '${writes}'; "$@"; rc=$?; chmod u-w '${writes}'; exit $rc`;
+  return `#!/bin/sh\nprintf '%s\\n' "$*" >>'${dir}/sudo.log'\n${run}\n`;
 }
 
 export async function writeExecutable(path: string, text: string): Promise<void> {
@@ -97,17 +110,22 @@ async function build(world: World): Promise<Sandbox> {
   );
   await serveRelease(bin, world);
   await writeExecutable(join(bin, "curl"), curlStub(bin, world.missing ?? ""));
-  await writeExecutable(
-    join(bin, "sudo"),
-    `#!/bin/sh\nprintf '%s\\n' "$*" >>'${bin}/sudo.log'\nexit 1\n`,
-  );
+  await writeExecutable(join(bin, "sudo"), sudoStub(bin, world.sudoWrites));
   const gh = world.gh === undefined ? "valid" : world.gh;
   if (gh !== null) await writeExecutable(join(bin, "gh"), ghStub(bin, gh));
   await linkTools(bin, TOOLS);
   const script = join(bin, "install.sh");
-  await Deno.writeTextFile(script, world.script ?? await Deno.readTextFile(INSTALL));
+  let text = world.script ?? await Deno.readTextFile(INSTALL);
+  if (world.sudoWrites !== undefined) {
+    await Deno.writeTextFile(join(bin, "tty"), "");
+    text = text.replaceAll("/dev/tty", join(bin, "tty"));
+  }
+  await Deno.writeTextFile(script, text);
   return { bin, home, tmp, script };
 }
+
+/** How long one run may take before it is killed and its case fails. */
+export const RUN_TIMEOUT_MS = 30_000;
 
 /** /bin/bash run with exactly `env`: its exit code and its stdout and stderr, joined. */
 export async function bash(args: string[], env: Record<string, string>, cwd?: string) {
@@ -118,6 +136,7 @@ export async function bash(args: string[], env: Record<string, string>, cwd?: st
     env,
     stdout: "piped",
     stderr: "piped",
+    signal: AbortSignal.timeout(RUN_TIMEOUT_MS),
   }).output();
   const dec = new TextDecoder();
   return { code: r.code, out: dec.decode(r.stdout) + dec.decode(r.stderr) };
@@ -135,9 +154,10 @@ export async function inSandbox(world: World, fn: (s: Sandbox) => Promise<void>)
 
 /**
  * install.sh run with nothing of this process's environment: PREFIX under HOME, the version
- * pinned to v9.9.9 unless `env` says otherwise (an empty value unsets a variable).
+ * pinned to v9.9.9 unless `env` says otherwise (an empty value unsets a variable). `args` are
+ * bash's own, for a case that must run it from somewhere a spawn cannot start in.
  */
-export async function install(s: Sandbox, env: Record<string, string> = {}) {
+export async function install(s: Sandbox, env: Record<string, string> = {}, args = [s.script]) {
   const all: Record<string, string> = {
     HOME: s.home,
     PATH: s.bin,
@@ -147,7 +167,7 @@ export async function install(s: Sandbox, env: Record<string, string> = {}) {
     ...env,
   };
   for (const [k, v] of Object.entries(all)) if (v === "") delete all[k];
-  return await bash([s.script], all, s.home);
+  return await bash(args, all, s.home);
 }
 
 /** The text at `path`, or null when nothing is there; any other failure is thrown. */
