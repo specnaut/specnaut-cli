@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { commandPaths } from "../../src/domain/command_targets.ts";
+import { buildsPathUnread } from "../../src/domain/powershell_path.ts";
 
 /**
  * The ways of setting PowerShell's PATH that no reading of a value gives whole: a spelling only the
@@ -26,6 +27,8 @@ Deno.test("a PATH spelled through an escape, a comment or a line's join is not r
       "$env:Path `\n= (Resolve-Path tools).Path",
       "Write-Output a#b; ${env:Pat`h} = 'tools'",
       "$x = $y#'\nWrite-Output a#b; ${env:Pat`h} = 'tools'",
+      "Write-Output a#b; $env:Path <#c#>= 'tools'",
+      "Write-Output a#b; $env:Path <#c#>= 'tools'",
       "pwsh -c \"${env:Pat`h} = 'tools'\"",
     ]),
     [],
@@ -137,8 +140,39 @@ Deno.test("a write the next session inherits is not read whole", () => {
 });
 
 Deno.test("a string PowerShell reads otherwise than its words do is not read whole", () => {
+  const strings = ["$env:Path = 'to''ols'", '$env:Path = "tool`s"', '$env:Path = "to""ols"'];
+  assertEquals(unread(strings), []);
+  assertEquals(strings.filter((s) => !buildsPathUnread(s)), []);
+});
+
+Deno.test("each form names its source alone, no other form matching it", () => {
   assertEquals(
-    unread(["$env:Path = 'to''ols'", '$env:Path = "tool`s"', '$env:Path = "to""ols"']),
+    unread([
+      "Set-Location Environment::; si Path tools",
+      'Set-Item "$($d):Path" tools',
+      "Set-Item \"env$(':')Path\" tools",
+      "New-PSDrive -Name E -PSProvider Environment -Root ''",
+      "ndr E Environment ''",
+      "mount E Environment ''",
+      "$s.Drive.New($d, 'global')",
+      "& ('Get-' + 'Date')",
+      "[Environment]::$m($n, $v)",
+      "[Environment]::('Set' + 'X')($n, $v)",
+      "[Environment].GetMethod($m).Invoke($null, $a)",
+      "$t.InvokeMember($m, 'InvokeMethod', $null, $null, $a)",
+      "[Environment]::SetEnvironmentVariable($n, $v)",
+    ]),
     [],
   );
+});
+
+Deno.test("a list left as a list, or joined and then added to, is not read whole", () => {
+  assertEquals(
+    unread(["$env:Path = 'tools', 'bin'", "$env:Path = @('a', 'b') -join ';' + 'x'"]),
+    [],
+  );
+});
+
+Deno.test("a PATH only the text as PowerShell reads it spells is not read whole, even read alone", () => {
+  assertEquals(unread(["Write-Host ${env:Pat`h}"]), []);
 });

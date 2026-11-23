@@ -120,9 +120,14 @@ function itemEnd(text: string, at: number): number {
 /**
  * Whether the words of a PATH value give it whole: each item read as written (`readableItem`), and
  * each operator joining its parts at a `;` (`joinsAtSemicolon`), as the words are read as folders
- * one by one; a list (`@('tools', $env:Path)`, `'tools', $env:Path`) is read element by element.
+ * one by one; a list (`@('tools', $env:Path)`, `'tools', $env:Path`) is read element by element
+ * only when the value ends in its `-join ';'`. PowerShell joins a list left as one with blanks
+ * (`'tools', 'bin'` is `tools bin`), and anything after the `-join` is part of what it joins with.
  */
 function readableValue(value: readonly string[]): boolean {
+  const join = value.findIndex((item) => item.toLowerCase() === "-join");
+  const listed = value.some((item) => item === "," || item === "@(");
+  if (listed && join !== value.length - 2) return false;
   return value.every((item, at) =>
     OPERATOR.test(item) ? joinsAtSemicolon(value, at) : readableItem(item)
   );

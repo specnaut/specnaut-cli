@@ -72,6 +72,14 @@ Deno.test("a source spelling the project's variable otherwise cancels it as the 
   assertEquals(kept, []);
   const key = enc(`{"env": {"PATH": "${PATH}", "CLAUDE_PROJECT_\\u0044IR": "/tmp"}}`);
   assertEquals(commandPaths(".claude/settings.json", key, none).whole, false);
+  // Spelled through an escape the parse reads, and a comment only PowerShell's reading takes off.
+  const escaped = `$env:CLAUDE_PROJECT_\\u0044IR <#c#>= 'x'`;
+  const string = enc(`{"env": {"PATH": "${PATH}"}, "statusLine": {"command": "${escaped}"}}`);
+  assertEquals(commandPaths(".claude/settings.json", string, none).whole, false);
+  // A key met twice is parsed once, as its last value: the text as written holds the first.
+  const twice = `"statusLine": {"command": "export CLAUDE_PROJECT_DIR=/tmp"}`;
+  const duplicated = `{"env": {"PATH": "${PATH}"}, ${twice}, "statusLine": {"command": "lint"}}`;
+  assertEquals(commandPaths(".claude/settings.json", enc(duplicated), none).whole, false);
 });
 
 Deno.test("a binding through an expansion, or eval, cancels the project's variable", () => {
