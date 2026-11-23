@@ -57,9 +57,16 @@ function Get-Folders($value) {
 function Test-EnvironmentPath([string] $path) {
     if ($path -match '(?i)^(hk\w+:|registry::|hkey_).*[\\/]environment$') { return $true }
     $provider = $null; $drive = $null; $paths = $ExecutionContext.SessionState.Path
-    # A path on no drive PowerShell knows names no item of any provider.
+    # A path on no drive or provider PowerShell knows names no item of any provider; any other
+    # failure is the oracle's own, and stops it.
     try { $null = $paths.GetUnresolvedProviderPathFromPSPath($path, [ref]$provider, [ref]$drive) }
-    catch [System.Management.Automation.MethodInvocationException] { return $false }
+    catch [System.Management.Automation.MethodInvocationException] {
+        $inner = $_.Exception.InnerException
+        $unknown = $inner -is [System.Management.Automation.DriveNotFoundException] -or
+            $inner -is [System.Management.Automation.ProviderNotFoundException]
+        if ($unknown) { return $false }
+        throw
+    }
     return $provider.Name -eq 'Environment'
 }
 
@@ -153,7 +160,13 @@ function Add-ShellWrites($elements, [int] $depth, $writes) {
         if ($option -eq '') { continue }
         if ('command'.StartsWith($option, 'OrdinalIgnoreCase')) { Add-CodeWrites $next.Value $depth $writes }
         if ($option -eq 'ec' -or 'encodedcommand'.StartsWith($option, 'OrdinalIgnoreCase')) {
-            $bytes = [Convert]::FromBase64String($next.Value)
+            # An option PowerShell cannot decode hands it no code the oracle can read: unknown.
+            try { $bytes = [Convert]::FromBase64String($next.Value) }
+            catch [System.Management.Automation.MethodInvocationException] {
+                if ($_.Exception.InnerException -isnot [FormatException]) { throw }
+                $writes.Add($null)
+                continue
+            }
             Add-CodeWrites ([Text.Encoding]::Unicode.GetString($bytes)) $depth $writes
         }
     }

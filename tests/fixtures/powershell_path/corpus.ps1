@@ -46,3 +46,16 @@ reg add HKCU\Environment /v Path /d tools /f
 Write-Host $env:Path
 $env:PathExt += ';.X'
 lint --fix
+si "E$()nv$([char]58)Pa$()th" tools
+$d = (gdr -PSProvider Environment).Name; si "$($d):Path" tools
+si env:/Path tools
+si env:P*h tools
+$n = 'Path'; si env:$n tools
+Copy-Item tools -Destination "E$()nv:Path"
+sl ("E" + "nv:"); si Path tools
+& $c E:Path tools
+. $s
+true;pwsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA
+(pwsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA)
+p''wsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA
+&pwsh -e JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA

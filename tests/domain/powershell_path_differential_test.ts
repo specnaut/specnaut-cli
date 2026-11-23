@@ -14,15 +14,41 @@ import { commandPaths } from "../../src/domain/command_targets.ts";
 
 const FIXTURES = fromFileUrl(new URL("../fixtures/powershell_path/", import.meta.url));
 /** How many lines of the corpus write PATH, as PowerShell's parser reads them. */
-const WRITING_LINES = 45;
+const WRITING_LINES = 58;
 
+/**
+ * A line or a variant of it: its corpus line, how it was varied (`base` for none), its text, its
+ * parse errors, its PATH writes, and the folders they put on PATH when all are constants.
+ */
 type Line = {
+  line: string;
+  kind: "base" | "comment" | "join" | "backtick" | "case";
   text: string;
-  base: boolean;
   errors: number;
   writes: number;
   folders: string[] | null;
 };
+
+const ENCODED = "JABlAG4AdgA6AFAAYQB0AGgAIAArAD0AIAAnADsAdABvAG8AbABzACcA";
+/**
+ * The corpus lines built of constants that the reader names, by design, rather than reads, each
+ * with its reason. Every other such line, and its letter-case flips, must be read with PowerShell's
+ * very folders: being named is no pass for a value the reader should read.
+ */
+const NAMED: ReadonlyMap<string, string> = new Map([
+  ["$env:Path = 'tools', 'bin'", "a list PowerShell joins with blanks"],
+  ["$env:Path = @('tools', 'bin') -join ';' + 'x'", "a separator built after the -join"],
+  ['$env:Path = "tool`s;$env:Path"', "a string a backtick escapes"],
+  ["$env:Path = 'to''ols'", "a string a doubled quote escapes"],
+  ["pwsh -NoProfile -Command '$env:Path += '';tools''; lint'", "quotes a shell reads otherwise"],
+  ...[
+    "pwsh -NoProfile -EncodedCommand",
+    "true;pwsh -e",
+    "(pwsh -e",
+    "p''wsh -e",
+    "&pwsh -e",
+  ].map((s) => [`${s} ${ENCODED}${s.startsWith("(") ? ")" : ""}`, "an encoded command"] as const),
+]);
 
 /**
  * Whether `pwsh` runs here. Off Windows and Linux CI, its absence skips the test loudly; on them
@@ -65,13 +91,16 @@ const hook = (command: string) =>
   );
 
 /**
- * Whether the reader holds what PowerShell does with `line`: not whole, or every folder its
- * constants put on PATH on the reader's PATH.
+ * Whether the reader holds what PowerShell does with `line`: every folder its constants put on PATH
+ * on the reader's PATH. Not whole is enough for a variant spelled through a comment, a line's join
+ * or a backtick, which the reader names by design, for a value not built of constants, and for a
+ * line {@link NAMED} gives a reason for.
  */
 function held(line: Line): boolean {
   const found = commandPaths(".claude/settings.json", hook(line.text), () => false);
-  return !found.whole ||
-    (line.folders !== null && line.folders.every((f) => found.onPath.includes(f)));
+  const read = line.folders !== null && line.folders.every((f) => found.onPath.includes(f));
+  const plain = (line.kind === "base" || line.kind === "case") && !NAMED.has(line.line);
+  return read || (!found.whole && (line.folders === null || !plain));
 }
 
 Deno.test({
@@ -80,10 +109,12 @@ Deno.test({
   async fn() {
     assert(PWSH, "pwsh is required here: install PowerShell on this runner");
     const lines = await oracle();
-    const base = lines.filter((l) => l.base);
+    const base = lines.filter((l) => l.kind === "base");
+    const named = base.filter((l) => NAMED.has(l.text));
+    assertEquals(named.length, NAMED.size, "each named line is in the corpus");
     assertEquals(base.filter((l) => l.errors > 0).map((l) => l.text), []);
     assertEquals(base.filter((l) => l.writes > 0).length, WRITING_LINES);
-    assert(lines.filter((l) => !l.base && l.writes > 0).length > WRITING_LINES * 10);
+    assert(lines.filter((l) => l.kind !== "base" && l.writes > 0).length > WRITING_LINES * 10);
     const missed = lines.filter((l) => l.errors === 0 && l.writes > 0 && !held(l));
     assertEquals(missed.map((l) => l.text), []);
   },
