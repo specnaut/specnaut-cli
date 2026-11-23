@@ -13,8 +13,10 @@ const INERT = declaration().inert as string[];
 const FULL_ON = declaration().full_on as string[];
 
 /**
- * A changed name Win32 reads as another widens. Each one, compared as text, is a file `web` holds,
- * so a graph that compared it would narrow the run to `web`. A Windows checkout cannot hold it.
+ * A changed name Win32 reads as another widens. Compared as text, each file name ending in a dot,
+ * a space or holding a colon is a file `web` holds, so a graph that compared it would narrow the
+ * run to `web`; `apps/web./a.ts` is under no owner root, so compared as text it would widen the
+ * run as unowned, where Win32 reads it as `web`'s. A Windows checkout cannot hold any of them.
  */
 const win32 = (name: string, path: string): Case => ({
   name,
