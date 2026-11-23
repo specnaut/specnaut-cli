@@ -67,8 +67,9 @@ throughout the process.
 
 Every release binary is signed at build time with [Sigstore](https://www.sigstore.dev/) keyless
 signing. The release workflow exchanges its GitHub OIDC identity for a short-lived certificate from
-the public-good Fulcio certificate authority and attests each artefact; the resulting bundle is
-published as the release asset `specnaut.attestation.sigstore.json`.
+the public-good Fulcio certificate authority and attests each binary; the binaries' bundle is
+published as the release asset `specnaut.attestation.sigstore.json`. The release's `install.sh` is
+attested in a bundle of its own, `installer.attestation.sigstore.json`.
 
 `specnaut self-update` verifies that signature **before** it replaces the running binary. It checks
 that the signing certificate was issued by the Fulcio intermediate pinned inside the binary, that it
@@ -103,11 +104,11 @@ to reinstall from <https://specnaut.com>.
 Each release publishes its own `install.sh`, with its tag written in and attested by the same
 workflow as the binaries, in a bundle of its own: every digest in the binaries' bundle is a
 binary's. Before it places anything, the script checks the binary's checksum and then runs
-`gh attestation verify` against the release's bundle, requiring the identity `self-update` requires:
-this repository's `release.yml` at the exact tag, the GitHub Actions OIDC issuer, and a
-GitHub-hosted runner. A refusal stops the install; the binary is neither placed nor run. `REPO` may
-point the downloads elsewhere, but the signer stays this repository, and such an install is never
-accepted on a checksum alone.
+`gh attestation verify` against the binaries' bundle, `specnaut.attestation.sigstore.json`,
+requiring the identity `self-update` requires: this repository's `release.yml` at the exact tag, the
+GitHub Actions OIDC issuer, and a GitHub-hosted runner. A refusal stops the install; the binary is
+neither placed nor run. `REPO` may point the downloads elsewhere, but the signer stays this
+repository, and such an install is never accepted on a checksum alone.
 
 What it does **not** claim:
 
@@ -119,18 +120,19 @@ What it does **not** claim:
   releases); `REQUIRE_ATTESTATION=1` refuses them.
 - **The script comes from the release it installs.** Releases are not yet immutable and `v*` tags
   are not yet protected by a ruleset, so whoever can amend a release can amend its `install.sh` too.
-  Piping it into `bash` trusts that release's origin. To remove that trust, verify the script first:
+  Piping it into `bash` trusts that release's origin. To remove that trust, verify the script first;
+  each step runs only if the one before it succeeded, so a refused attestation runs nothing:
 
 ```sh
 tag=vX.Y.Z # a release that carries install.sh and its bundle
 base="https://github.com/specnaut/specnaut-cli/releases/download/$tag"
-curl --proto '=https' --tlsv1.2 -fsSLO "$base/install.sh"
-curl --proto '=https' --tlsv1.2 -fsSLO "$base/installer.attestation.sigstore.json"
-gh attestation verify install.sh --bundle installer.attestation.sigstore.json \
-  --repo specnaut/specnaut-cli --deny-self-hosted-runners \
-  --cert-identity "https://github.com/specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/$tag" \
-  --cert-oidc-issuer https://token.actions.githubusercontent.com
-REQUIRE_ATTESTATION=1 bash install.sh
+curl --proto '=https' --tlsv1.2 -fsSLO "$base/install.sh" &&
+  curl --proto '=https' --tlsv1.2 -fsSLO "$base/installer.attestation.sigstore.json" &&
+  gh attestation verify install.sh --bundle installer.attestation.sigstore.json \
+    --repo specnaut/specnaut-cli --deny-self-hosted-runners \
+    --cert-identity "https://github.com/specnaut/specnaut-cli/.github/workflows/release.yml@refs/tags/$tag" \
+    --cert-oidc-issuer https://token.actions.githubusercontent.com &&
+  REQUIRE_ATTESTATION=1 bash install.sh
 ```
 
 ## Scope
