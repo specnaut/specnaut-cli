@@ -10,7 +10,7 @@ const INERT = declaration().inert as string[];
 const FULL_ON = declaration().full_on as string[];
 
 /** A declared path a fold or HFS+ could read as another is refused, so the run widens. */
-const refused = (name: string, over: Record<string, unknown>, problem: string): Case => ({
+export const refused = (name: string, over: Record<string, unknown>, problem: string): Case => ({
   name,
   repo: { declaration: JSON.stringify(declaration(over)) },
   build: change("apps/web/a.ts"),
@@ -21,7 +21,7 @@ const refused = (name: string, over: Record<string, unknown>, problem: string): 
 });
 
 /** An adapter's root alike: the base's graph holds it, so the base's snapshot is refused. */
-const rootRefused = (name: string, root: string): Case => ({
+export const rootRefused = (name: string, root: string): Case => ({
   name,
   repo: { owners: [...OWNERS, owner("odd", root)] },
   build: change("apps/web/a.ts"),

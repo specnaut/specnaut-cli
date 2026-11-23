@@ -648,8 +648,7 @@ is the bare run, to the byte. \`--refs-stdin\` reads a pre-push hook's lines.
 }
 \`\`\`
 
-- **\`adapter.command\`** reports the graph. **\`adapter.files\`** names what it is built
-  from; a change to any of them widens the run.
+- **\`adapter.command\`** reports the graph. **\`adapter.files\`** names what it is built from.
 - **\`scoped_tiers\`**: a tier outside the list runs full.
 - **\`full_on\`**: a changed path here runs full. **\`inert\`**: a changed path here, in its exact
   case, affects nothing, such as what every branch commits. \`full_on\` beats \`inert\`.
@@ -659,8 +658,9 @@ is the bare run, to the byte. \`--refs-stdin\` reads a pre-push hook's lines.
   omitted when none of them is affected, and given only those that are. **A gate
   command with no check always runs.**
 - A path in \`adapter.files\`, \`full_on\`, \`inert\` and an owner's \`roots\` is a directory prefix ending
-  in \`/\`, or an exact path: relative, printable ASCII, with no \`..\`, no \`./\`, no \`//\`, no backslash,
-  no glob and no \`~\` before a digit. An owner id matches \`[A-Za-z0-9][A-Za-z0-9._-]{0,63}\`.
+  in \`/\`, or an exact path: relative, printable ASCII, with no \`..\`, \`//\`, \`:\`, backslash, glob, \`~\`
+  before a digit or name ending in \`.\` or a space. An owner id matches
+  \`[A-Za-z0-9][A-Za-z0-9._-]{0,63}\`.
 
 **The adapter.** It is the base's copy, run from a temporary worktree of the base, once
 for each base and once for the candidate. It gets no stdin and no \`GIT_*\` variable, runs
@@ -679,14 +679,14 @@ and is owned only in its own. An owner whose record differs, or that exists on o
 affected. So is every owner that depends on an affected one, over the edges of every snapshot.
 
 **Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
-\`fallback:\`: a path not UTF-8, or holding a newline or a code point above U+007F, or a name holding
-\`~\` and a digit (\`path-unreadable:\`); the root \`.gitattributes\`, \`.lfsconfig\` or \`.gitmodules\` in
-any ASCII case, even \`inert\` (\`checkout-config:\`); an unowned path, a \`full_on\` match, a gitlink, a
-symlink or a type change; a declaration, an \`adapter.files\` entry, \`gates.yml\` or
-\`.specnaut/scripts/\` that differs from a given base, or from the merge-base with the default branch;
-any of those not a tracked regular file; an adapter that fails or answers anything invalid; a
-malformed declaration; a base unresolved or never fetched; \`jq\` absent, older than 1.6, or failing
-where its answer decides the run.
+\`fallback:\`: a path not UTF-8 or holding a newline, \`:\` or a code point above U+007F, a name holding
+\`~\` and a digit or ending in \`.\` or a space (\`path-unreadable:\`); the root \`.gitattributes\`,
+\`.lfsconfig\` or \`.gitmodules\` in any ASCII case, even \`inert\` (\`checkout-config:\`); an unowned path,
+a \`full_on\` match, a gitlink, a symlink or a type change; a declaration, an \`adapter.files\` entry,
+\`gates.yml\` or \`.specnaut/scripts/\` that differs from a given base, or from the merge-base with the
+default branch; any of those not a tracked regular file; an adapter that fails or answers anything
+invalid; a malformed declaration; a base unresolved or never fetched; \`jq\` absent, older than 1.6,
+or failing where its answer decides the run.
 
 **Exit codes**, the last two only behind a flag:
 
@@ -704,8 +704,7 @@ a base's tier and gone from the candidate's, because "full" means the candidate'
 A pass whose \`scope:\` is not \`full\` **is not the full gate**, and its last line names the
 scope. Nor is a pass with a \`removed:\` line other than \`none\`: it names those commands. Evidence
 goes to \`git rev-parse --git-path specnaut/gate-evidence/<tier>-<tree>.json\`.
-It is write-only: nothing reads it to decide anything, and failing to write it changes no
-result.
+Nothing reads it to decide anything, and failing to write it changes no result.
 
 **Limits to know.** A hung adapter hangs the run, as a gate command does today. Ignored
 files are not part of the candidate. Each run costs a checkout of the base. A wrong adapter
@@ -31412,13 +31411,14 @@ gate_candidate_read_refs() {
 #
 # Anchored with \\A and \\z, because \$ also matches before a final newline, and an id
 # or a path ending in one must not pass. A path holding a code point outside printable
-# ASCII, or \`~\` and a digit, is refused: the graph never compares a changed path holding
-# one (unreadable), so a root holding one could only ever match a path by another reading.
+# ASCII, \`~\` and a digit, or \`:\`, or a name ending in a dot or a space, is refused: the graph
+# never compares a changed path holding one (unreadable), so a root holding one could only
+# ever match a path by another reading.
 GATE_READ_DEFS='
 def owner_id: type == "string" and test("\\\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\\\z");
 def clean: type == "string" and length > 0 and (test("[\\\\x00-\\\\x1f\\\\x7f]") | not);
 def path_ok: type == "string" and length > 0
-  and (test("\\\\A/|\\\\\\\\|[*?\\\\[\\\\]{}]|[^\\\\x20-\\\\x7e]|~[0-9]|\\\\.\\\\.|//|\\\\./|\\\\A\\\\.\\\\z|/\\\\.\\\\z") | not);
+  and (test("\\\\A/|\\\\\\\\|[*?\\\\[\\\\]{}]|[^\\\\x20-\\\\x7e]|~[0-9]|\\\\.\\\\.|//|[. ](/|\\\\z)|:") | not);
 def paths_ok: type == "array" and all(path_ok);
 def ids_ok: type == "array" and all(owner_id);
 '
@@ -31628,8 +31628,10 @@ gate_graph_pair() {
 # Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a path another
 # fold, a normalisation or HFS+ could read as one the graph matches is not compared but widens
 # as \`path-unreadable\` (unreadable): one holding a code point above U+007F anywhere (U+017F
-# folds to s, HFS+ ignores U+200C, NFD spells é in two), or a name holding \`~\` and a digit, as
-# an 8.3 short name (\`GITATT~1\`) does. A declared root holding either is refused when read.
+# folds to s, HFS+ ignores U+200C, NFD spells é in two), a name holding \`~\` and a digit, as
+# an 8.3 short name (\`GITATT~1\`) does, or one Win32 reads as another (win32_alias): ending in
+# a dot or a space, which it strips, or holding \`:\`, a stream separator, whatever
+# core.protectNTFS lets git hold. A declared root holding any of them is refused when read.
 # A nested .gitattributes in folder D changes how every path below D is checked out, so it
 # affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
 # being free to nest. Only a folder root that holds it holds every path below D; held by
@@ -31651,7 +31653,8 @@ GATE_GRAPH_DEFS='
       else [] end;
     def short_name: . as \$c | any(range(0; length - 1); \$c[.] == 126 and \$c[. + 1] >= 48 and \$c[. + 1] <= 57);
     def wide: any(. > 127);
-    def unreadable(\$p): (\$p | contains("\\n")) or (\$p | explode | wide or short_name);'
+    def win32_alias: test("[. ](/|\\\\z)|:");
+    def unreadable(\$p): (\$p | contains("\\n") or win32_alias) or (\$p | explode | wide or short_name);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.
@@ -38077,10 +38080,10 @@ function Read-SelectedRecords(\$Records) {
 # report, which is how it reaches the run's \`fallback:\` line.
 
 \$script:GateOwnerId = '\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z'
-# A path holding a code point outside printable ASCII, or \`~\` and a digit, is refused, as in the
-# bash twin: the graph never compares a changed path holding one, so a root holding one could
-# only ever match a path by another reading.
-\$script:GateBadPath = '\\A/|\\\\|[*?\\[\\]{}]|[^\\x20-\\x7e]|~[0-9]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z'
+# A path holding a code point outside printable ASCII, \`~\` and a digit, or \`:\`, or a name ending
+# in a dot or a space, is refused, as in the bash twin: the graph never compares a changed path
+# holding one, so a root holding one could only ever match a path by another reading.
+\$script:GateBadPath = '\\A/|\\\\|[*?\\[\\]{}]|[^\\x20-\\x7e]|~[0-9]|\\.\\.|//|[. ](/|\\z)|:'
 
 function Get-JsonProperty(\$Element, [string]\$Name) {
     \$out = [System.Text.Json.JsonElement]::new()
@@ -38386,10 +38389,12 @@ function Test-GateCheckoutConfig([string]\$Path) {
 }
 # A path another fold, a normalisation or HFS+ could read as one the graph matches is never
 # compared (the bash twin's unreadable): one holding a newline or a code point above U+007F
-# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), or a
-# name holding \`~\` and a digit, as an 8.3 short name does. A declared root holding either is refused.
+# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), a
+# name holding \`~\` and a digit, as an 8.3 short name does, or one Win32 reads as another (the
+# bash twin's win32_alias): ending in a dot or a space, or holding \`:\`. A declared root holding
+# any of them is refused.
 function Test-GateUnreadable([string]\$Path) {
-    if (\$Path.Contains("\`n")) { return \$true }
+    if (\$Path.Contains("\`n") -or \$Path -cmatch '[. ](/|\\z)|:') { return \$true }
     for (\$i = 0; \$i -lt \$Path.Length; \$i++) {
         if ([int]\$Path[\$i] -gt 127) { return \$true }
         \$next = \$i + 1 -lt \$Path.Length -and [int]\$Path[\$i + 1] -ge 48 -and [int]\$Path[\$i + 1] -le 57

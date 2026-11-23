@@ -5,6 +5,7 @@ import { CHECKOUT } from "./gate_impact_corpus_checkout.ts";
 import { FOLDING } from "./gate_impact_corpus_fold.ts";
 import { SELECTION } from "./gate_impact_corpus_select.ts";
 import { WIDENING } from "./gate_impact_corpus_widen.ts";
+import { WIN32 } from "./gate_impact_corpus_win32.ts";
 
 export type { Case };
 export const CORPUS: Case[] = [
@@ -14,4 +15,5 @@ export const CORPUS: Case[] = [
   ...CAUSES,
   ...CHECKOUT,
   ...FOLDING,
+  ...WIN32,
 ];

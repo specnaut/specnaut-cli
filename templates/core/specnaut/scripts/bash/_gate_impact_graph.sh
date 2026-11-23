@@ -70,8 +70,10 @@ gate_graph_pair() {
 # Test-GateCheckoutConfig holds the same list. Only ASCII folds, in both twins; a path another
 # fold, a normalisation or HFS+ could read as one the graph matches is not compared but widens
 # as `path-unreadable` (unreadable): one holding a code point above U+007F anywhere (U+017F
-# folds to s, HFS+ ignores U+200C, NFD spells é in two), or a name holding `~` and a digit, as
-# an 8.3 short name (`GITATT~1`) does. A declared root holding either is refused when read.
+# folds to s, HFS+ ignores U+200C, NFD spells é in two), a name holding `~` and a digit, as
+# an 8.3 short name (`GITATT~1`) does, or one Win32 reads as another (win32_alias): ending in
+# a dot or a space, which it strips, or holding `:`, a stream separator, whatever
+# core.protectNTFS lets git hold. A declared root holding any of them is refused when read.
 # A nested .gitattributes in folder D changes how every path below D is checked out, so it
 # affects, past the owners holding it, every owner with a root below D/ (affected_by), roots
 # being free to nest. Only a folder root that holds it holds every path below D; held by
@@ -93,7 +95,8 @@ GATE_GRAPH_DEFS='
       else [] end;
     def short_name: . as $c | any(range(0; length - 1); $c[.] == 126 and $c[. + 1] >= 48 and $c[. + 1] <= 57);
     def wide: any(. > 127);
-    def unreadable($p): ($p | contains("\n")) or ($p | explode | wide or short_name);'
+    def win32_alias: test("[. ](/|\\z)|:");
+    def unreadable($p): ($p | contains("\n") or win32_alias) or ($p | explode | wide or short_name);'
 
 # gate_graph_cause <pairs> <candidate-snapshot> <normalized> - prints the first changed
 # path's reason to widen, or nothing; a nested .gitattributes no folder root holds is one.

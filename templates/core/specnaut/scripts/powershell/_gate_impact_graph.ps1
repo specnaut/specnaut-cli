@@ -81,10 +81,12 @@ function Test-GateCheckoutConfig([string]$Path) {
 }
 # A path another fold, a normalisation or HFS+ could read as one the graph matches is never
 # compared (the bash twin's unreadable): one holding a newline or a code point above U+007F
-# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), or a
-# name holding `~` and a digit, as an 8.3 short name does. A declared root holding either is refused.
+# anywhere, U+FFFD among them (U+017F folds to s, HFS+ ignores U+200C, NFD spells é in two), a
+# name holding `~` and a digit, as an 8.3 short name does, or one Win32 reads as another (the
+# bash twin's win32_alias): ending in a dot or a space, or holding `:`. A declared root holding
+# any of them is refused.
 function Test-GateUnreadable([string]$Path) {
-    if ($Path.Contains("`n")) { return $true }
+    if ($Path.Contains("`n") -or $Path -cmatch '[. ](/|\z)|:') { return $true }
     for ($i = 0; $i -lt $Path.Length; $i++) {
         if ([int]$Path[$i] -gt 127) { return $true }
         $next = $i + 1 -lt $Path.Length -and [int]$Path[$i + 1] -ge 48 -and [int]$Path[$i + 1] -le 57
