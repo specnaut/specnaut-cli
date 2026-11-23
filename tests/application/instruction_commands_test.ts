@@ -68,3 +68,19 @@ Deno.test("too many programs on too many linked PATH folders to try names the so
   const partial = walk.reasons.filter((r) => r.reason === "commands not fully read");
   assertEquals(partial, [{ path: ".mcp.json", reason: "commands not fully read" }]);
 });
+
+Deno.test("a source that rebinds the project's variable names the one that puts a folder on PATH through it", async () => {
+  const set: BaseEntry = {
+    kind: "blob",
+    path: ".mcp.json",
+    bytes: enc(
+      JSON.stringify({
+        mcpServers: { x: { command: "serve", env: { PATH: "$CLAUDE_PROJECT_DIR/bin" } } },
+      }),
+    ),
+  };
+  const walk = targetWalk(reader([]), BASE);
+  await readCommands(walk, { head: [settings("export CLAUDE_PROJECT_DIR=/tmp"), set], tip: [] });
+  const partial = walk.reasons.filter((r) => r.reason === "commands not fully read");
+  assertEquals(partial, [{ path: ".mcp.json", reason: "commands not fully read" }]);
+});

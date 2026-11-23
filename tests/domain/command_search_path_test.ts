@@ -108,11 +108,13 @@ Deno.test("a program a `$(…)`, a backquote or a `-c` string runs is read with 
   }
 });
 
-Deno.test("a lone variable other than PATH on PATH is the project's folder, and stays whole", () => {
-  for (const PATH of ["$CLAUDE_PROJECT_DIR:$PATH", "${CLAUDE_PROJECT_DIR}/:$PATH", "${ROOT}"]) {
+Deno.test("the project's variable alone on PATH is the project's folder; another is not read whole", () => {
+  for (const PATH of ["$CLAUDE_PROJECT_DIR:$PATH", "${CLAUDE_PROJECT_DIR}/:$PATH"]) {
     const found = read(json({ env: { PATH } }));
     assertEquals([found.onPath, found.whole], [[""], true], PATH);
   }
+  // Only the harness sets its own variable; any other may be set to any folder before it runs.
+  assertEquals(read(json({ env: { PATH: "${ROOT}" } })).whole, false);
   assertEquals(read(json({ env: { PATH: "$PATH:${PATH}" } })).onPath, []);
 });
 

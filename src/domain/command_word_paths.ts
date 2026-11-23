@@ -2,6 +2,7 @@ import { climb, readings } from "./project_path.ts";
 import { fold, type PathIndex } from "./path_index.ts";
 import { backquoteEnd, closing } from "./shell_words.ts";
 import type { Reading } from "./command_words.ts";
+import { belowProject } from "./project_variable.ts";
 
 /**
  * The paths one word of a command may name, relative to the project's folder, read as text: a
@@ -66,21 +67,26 @@ function climbsOverVariable(glob: string): boolean {
 }
 
 /**
- * The folders one piece of a PATH value puts there, read as {@link pathOf} reads a path. `$PATH`
- * is the PATH a shell built before the session, which is not read. `.`, any other variable alone
- * (`$CLAUDE_PROJECT_DIR`, `${ROOT}`), and a piece left empty once its leading variable is dropped
- * (`$CLAUDE_PROJECT_DIR/`) are the project's folder, where the harness runs a command. One that
- * still holds a variable once its leading one is dropped (`./tools/$OS/bin`) names no folder that
- * can be known, and a pattern would miss a link under it: when the value surely sets PATH
- * (`sure`), the reading is not whole and the caller names its source; any other is skipped.
+ * The folders one piece of a PATH value puts there, read as {@link pathOf} reads a path; none for
+ * `$PATH`, the PATH a shell built before the session. In a value surely setting PATH (`sure`), a
+ * piece holding any other expansion (`$T/bin`, `${X:+tools}`, `$(cat .dir)`) names no folder that
+ * can be known, and the reading is not whole, but for the project's variable as the harness sets
+ * it (`belowProject`), unless a source spells it otherwise (`rebindsProject`). In any other value,
+ * `.`, a variable alone and a piece empty once its leading variable is dropped are the project's
+ * folder, where the harness runs a command, and one holding a variable past its start is skipped.
  */
 export function foldersOf(piece: string, read: Reading, sure: boolean): string[] {
   if (/^\$(?:PATH|\{PATH\})$/.test(piece)) return [];
+  if (sure && globbed(piece).includes(VAR)) {
+    const below = belowProject(piece);
+    const known = below !== undefined && !globbed(below).includes(VAR);
+    if (!known || read.rebindsProject) read.whole = false;
+    read.leansOnProject ||= known;
+    return !known ? [] : below === "" ? [""] : pathOf(piece, read);
+  }
   const glob = globbed(withoutVariable(piece));
   if (glob === VAR || glob === "" || /^\.\/?$/.test(glob)) return [""];
-  if (!glob.includes(VAR)) return pathOf(piece, read);
-  if (sure) read.whole = false;
-  return [];
+  return glob.includes(VAR) ? [] : pathOf(piece, read);
 }
 
 /**

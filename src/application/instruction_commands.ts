@@ -1,4 +1,5 @@
 import {
+  acrossSources,
   COMMAND_REASON,
   type CommandPaths,
   commandPaths,
@@ -57,10 +58,10 @@ type Found = CommandPaths & { readonly source: Read };
 function commandTargets(walk: Walk, read: readonly Read[], at: Indexes) {
   const isFolder = (path: string) => (at.head.get(fold(path)) ?? []).some((p) => p.kind === "tree");
   const depth = walk.git.projectPrefix.split("/").filter(Boolean).length;
-  const found: Found[] = read.map((source) => ({
+  const found: Found[] = acrossSources(read.map((source) => ({
     source,
     ...commandPaths(source.entry.path, source.bytes, isFolder, depth),
-  }));
+  })));
   for (const f of found) if (!f.whole && f.source.atHead) partial(walk, f.source.entry.path);
   const targets = new Set(found.flatMap((f) => f.paths));
   const patterns = [...new Set(found.flatMap((f) => f.patterns))];

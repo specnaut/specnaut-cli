@@ -7,6 +7,7 @@ import {
 } from "./command_search_path.ts";
 import { buildsPathUnread, setsPathUnread } from "./powershell_path.ts";
 import { nestedSegments } from "./nested_commands.ts";
+import { bindsByExpansion, respellsProjectVariable } from "./project_variable.ts";
 
 /**
  * The words a parsed command source holds, grouped as the harness reads them: each object's strings
@@ -23,11 +24,14 @@ import { nestedSegments } from "./nested_commands.ts";
  * What a reading of one source found beside its words: whether it met no limit (a source that did
  * not parse, a word or an expansion past a cap), each value it sets PATH to, each word its
  * commands hold that may be a program named by name alone (`isProgram`), and each pattern a path
- * built around a variable reads as (`command_word_paths.ts`). And how many folders the project
- * sits below the repository's top.
+ * built around a variable reads as (`command_word_paths.ts`). Whether it spells the project's
+ * variable otherwise than reading it, and whether a folder it puts on PATH leans on that variable
+ * (`project_variable.ts`). And how many folders the project sits below the repository's top.
  */
 export type Reading = {
   whole: boolean;
+  rebindsProject: boolean;
+  leansOnProject: boolean;
   readonly pathValues: PathValue[];
   readonly programs: Set<string>;
   readonly patterns: Set<string>;
@@ -48,6 +52,8 @@ const MAX_VISITS = PARSE_LIMIT;
 
 export const reading = (depth = 0): Reading => ({
   whole: true,
+  rebindsProject: false,
+  leansOnProject: false,
   pathValues: [],
   programs: new Set(),
   patterns: new Set(),
@@ -92,6 +98,8 @@ export function commandWords(strings: readonly string[], read: Reading): string[
     if (setsPathUnread(word)) read.whole = false;
   }
   if (strings.some((s) => setsPathUnread(s) || buildsPathUnread(s))) read.whole = false;
+  const respells = [...strings, ...commands.flat()].some(respellsProjectVariable);
+  if (respells || commands.some(bindsByExpansion)) read.rebindsProject = true;
   return [...commands.flat(), ...commands.flatMap(manifestsOf)];
 }
 
@@ -122,6 +130,7 @@ function stringsOf(value: unknown, walk: Walk, under: readonly string[]): string
   if (Array.isArray(value)) return value.flatMap((v) => stringsOf(v, walk, below(under, "")));
   const strings: string[] = [];
   for (const [key, v] of Object.entries(value)) {
+    if (respellsProjectVariable(key)) walk.read.rebindsProject = true;
     if (isPathKey(key) && typeof v === "string") {
       walk.read.pathValues.push({ value: v, sure: surelySetsPath(key, under) });
     }

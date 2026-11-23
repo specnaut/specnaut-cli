@@ -13,6 +13,7 @@ import {
 import { pathPieces, rawPathValues } from "./command_search_path.ts";
 import { foldersOf, pathsIn } from "./command_word_paths.ts";
 import { isCommandMarkdown, markdownEntries } from "./markdown_commands.ts";
+import { respellsProjectVariable } from "./project_variable.ts";
 
 /**
  * The repository files a judged config makes a harness run: a hook's or a status line's command,
@@ -47,7 +48,9 @@ const MAX_JOINS = 50_000;
 /**
  * What a source's commands name, and whether every word of it was read; and, for the programs a
  * bare name runs (`command_search_path.ts`), the folders it puts on PATH and the programs it names;
- * and the patterns its paths built around a variable read as (`command_word_paths.ts`).
+ * and the patterns its paths built around a variable read as (`command_word_paths.ts`); and whether
+ * it spells the project's variable otherwise than reading it, or puts a folder on PATH through it
+ * (`project_variable.ts`).
  */
 export type CommandPaths = {
   readonly paths: readonly string[];
@@ -55,6 +58,8 @@ export type CommandPaths = {
   readonly onPath: readonly string[];
   readonly programs: readonly string[];
   readonly patterns: readonly string[];
+  readonly rebindsProject: boolean;
+  readonly leansOnProject: boolean;
 };
 
 /**
@@ -72,6 +77,7 @@ export function commandPaths(
 ): CommandPaths {
   const read = reading(depth);
   const text = new TextDecoder().decode(bytes);
+  read.rebindsProject = respellsProjectVariable(text);
   const entries = isCommandMarkdown(path)
     ? markdownEntries(path, text, read)
     : [...parsedEntries(path, text, read), ...rawEntries(text, read)];
@@ -87,7 +93,19 @@ function found(paths: readonly string[], read: Reading): CommandPaths {
     onPath,
     programs: [...read.programs],
     patterns: [...read.patterns],
+    rebindsProject: read.rebindsProject,
+    leansOnProject: read.leansOnProject,
   };
+}
+
+/**
+ * The sources as read together: the harness sets the project's variable once for every command
+ * it runs, so a source that spells it otherwise (`rebindsProject`) makes each source that puts a
+ * folder on PATH through it (`leansOnProject`) not whole, whichever source that is.
+ */
+export function acrossSources<T extends CommandPaths>(found: readonly T[]): T[] {
+  if (!found.some((f) => f.rebindsProject)) return [...found];
+  return found.map((f) => f.leansOnProject ? { ...f, whole: false } : f);
 }
 
 /**
