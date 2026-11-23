@@ -22,7 +22,7 @@ import type { EnvSemantics } from "./env_surfaces.ts";
 
 /** A key or a word that sets PATH, in any letter case. */
 export const isPathKey = (key: string): boolean => /^path$/i.test(key);
-const PATH_WORD = /^(path)\+?=(.*)$/is;
+const PATH_WORD = /^(path)(\+?=)(.*)$/is;
 
 /** Whether a key or a word named `name` surely sets PATH: spelled as a shell spells it. */
 export const isSurelyPath = (name: string): boolean => name === "PATH";
@@ -37,10 +37,32 @@ export type PathValue = {
   readonly semantics: EnvSemantics;
 };
 
-/** What a word sets PATH to, when it sets it: `PATH=./bin:$PATH` sets it to `./bin:$PATH`. */
+/**
+ * What a word sets PATH to, when it sets it: `PATH=./bin:$PATH` sets it to `./bin:$PATH`. A value
+ * appended (`PATH+=:bin`) follows the PATH in effect: its first separator joins the two.
+ */
 function pathWordValue(word: string): PathValue | undefined {
   const set = PATH_WORD.exec(word);
-  return set ? { value: set[2], sure: isSurelyPath(set[1]), semantics: "shell" } : undefined;
+  if (!set) return undefined;
+  const value = set[2] === "+=" ? set[3].replace(/^[:;]/, "") : set[3];
+  return { value, sure: isSurelyPath(set[1]), semantics: "shell" };
+}
+
+/** A word that joins PowerShell values rather than being one. */
+const PS_OPERATOR = /^(?:\+|-\w+)$/;
+
+/**
+ * The parts of a PowerShell value, each without the separator that joins it to a part before or
+ * after it (or to the PATH in effect, appended to): `$env:Path + ';tools'` has no empty element.
+ */
+function joinersOff(parts: readonly string[], appended: boolean): string[] {
+  const operands = parts.flatMap((part, i) => PS_OPERATOR.test(part) ? [] : [i]);
+  return parts.map((part, i) => {
+    const k = operands.indexOf(i);
+    if (k < 0) return part;
+    const lead = k > 0 || appended ? part.replace(/^[:;]/, "") : part;
+    return k < operands.length - 1 ? lead.replace(/[:;]$/, "") : lead;
+  });
 }
 
 /**
@@ -66,15 +88,16 @@ export function pathAssignments(words: readonly string[]): PathValue[] {
   const values = words.flatMap((word) => pathWordValue(word) ?? []);
   const at = words.findIndex((word) => PS_PATH_WORD.test(word));
   if (at < 0) return values;
-  const rest = [PS_PATH_WORD.exec(words[at])![1] ?? "", ...words.slice(at + 1)]
-    .map((word) => word.replace(/^\+?=/, ""))
+  const parts = [PS_PATH_WORD.exec(words[at])![1] ?? "", ...words.slice(at + 1)];
+  const appended = (parts.find(Boolean) ?? "").startsWith("+=");
+  const rest = joinersOff(parts.map((word) => word.replace(/^\+?=/, "")).filter(Boolean), appended)
     .flatMap((word) => word.includes(",") ? [word, ...word.split(",")] : [word])
     .filter(Boolean);
   return [...values, ...rest.map((value) => ({ value, sure: true, semantics: "shell" as const }))];
 }
 
 /** A PATH key or assignment as raw bytes show it: not `$PATH` or `${PATH}`, which only read it. */
-const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;
+const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*([:=]|\+=)\s*["']?([^"'\s,&|]*)/gi;
 
 /**
  * What each PATH key or assignment on a raw line sets PATH to: what a parser rejects is read. One
@@ -82,8 +105,8 @@ const RAW_PATH = /(?<![\w${])(path)\}?["']?\s*(?:[:=]|\+=)\s*["']?([^"'\s,&|]*)/
  * raw line says no surface, and a source whose parse fails is not read whole anyway.
  */
 export function rawPathValues(line: string): PathValue[] {
-  return [...line.matchAll(RAW_PATH)].filter((m) => m[2] !== "").map((m) => ({
-    value: m[2],
+  return [...line.matchAll(RAW_PATH)].filter((m) => m[3] !== "").map((m) => ({
+    value: m[2] === "+=" ? m[3].replace(/^[:;]/, "") : m[3],
     sure: isSurelyPath(m[1]) && line[m.index - 1] !== "-",
     semantics: "shell",
   }));
@@ -91,10 +114,11 @@ export function rawPathValues(line: string): PathValue[] {
 
 /**
  * The pieces of a PATH value, each a folder as written: `:` and Windows' `;` both separate, and
- * PowerShell's `$env:Path` is read as `$PATH`, the PATH in effect, before its `:` splits it.
+ * PowerShell's `$env:Path` is read as `$PATH`, the PATH in effect, before its `:` splits it. An
+ * empty piece (a leading, trailing or doubled separator) is the working folder, read as `.`.
  */
 export const pathPieces = (value: string): string[] =>
-  psPathAsShell(value).split(/[:;]/).filter(Boolean);
+  psPathAsShell(value).split(/[:;]/).map((piece) => piece === "" ? "." : piece);
 
 /** The extensions Windows tries a bare name with: `PATHEXT`'s default, and PowerShell's `.ps1`. */
 const WINDOWS_EXTENSION = /\.(?:com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc|ps1)$/;

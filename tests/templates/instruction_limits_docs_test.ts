@@ -60,6 +60,7 @@ Deno.test("the row names the programs on a judged PATH, and the PATH a shell bui
   assert(row.includes("`PATH` folder that holds any expansion but `$PATH` and that variable"), row);
   assert(row.includes("(`$T/bin`, `${X:+…}`, `$(…)`) or a variable past its start"), row);
   assert(row.includes("(`./tools/$OS/bin`) under a key or a word spelled `PATH`"), row);
+  assert(row.includes("as is an empty element (`:tools`, `tools::$PATH`) but for the"), row);
   assert(row.includes("a key `path` in any letter case of an `env` object or of Codex's"), row);
   assert(
     row.includes("`$CLAUDE_PROJECT_DIR` or `${CLAUDE_PROJECT_DIR}`, alone or before a `/`"),
