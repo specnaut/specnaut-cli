@@ -74,6 +74,8 @@ here=$(CDPATH="" cd "${here:-/}" && pwd)
 . "$here/_verifier.sh"
 # shellcheck source=./_approvals.sh
 . "$here/_approvals.sh"
+# The approvals' temp file and index folder go on every exit, the ERR trap's 12 included.
+trap approvals_cleanup EXIT
 # Before the first command looked up on the PATH: `bash` below is one.
 refuse_unsafe_path landed
 

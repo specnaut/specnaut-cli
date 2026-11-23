@@ -2,18 +2,19 @@
 # The approvals a yes leaves, for land-feature.sh - sourced, never run, after _hooks_off.sh and
 # _verifier.sh, under the caller's `set -Eeuo pipefail`. record_approvals runs after judge_head,
 # whose `out`, `sn` and `base_tip` it reads with `last` and `instructions_digest`. Exits 12 and 13
-# are the caller's: its header says what they mean.
+# are the caller's: its header says what they mean. It sets no trap: the caller installs
+# approvals_cleanup as its EXIT trap.
 
 # After a yes that held, the approvals of the customised shipped skills it covered: the binary
 # writes the whole file to a temp file, and commit_approvals commits it on top of the judged commit.
 # `land` is what lands: that commit, or the judged commit itself. The temp file and the index folder
-# are removed on every exit from here on, an ERR trap's exit 12 included: an EXIT trap runs after it.
+# are removed by approvals_cleanup, which the sourcing script installs as its EXIT trap (cli#828):
+# the process's trap is the caller's, and an ERR trap's exit 12 runs it too.
 record_approvals() {
   local rc=0 rec
   land=$last
   { [ -n "$instructions_digest" ] && grep -q '^APPROVAL instructions holds ' <<<"$out"; } || return 0
   approvals_tmp="" approvals_idx=""
-  trap approvals_cleanup EXIT
   rec=$("$sn" record-approvals --instructions-digest "$instructions_digest" --head "$last" \
     --base-tip "$base_tip") || rc=$?
   [ "$rc" = 0 ] || { not_recorded "$rc"; return 0; }
@@ -62,7 +63,8 @@ commit_approvals() {
   approvals_commit_is "$blob" "$path"
 }
 
-# Removes the temp file and the index folder, when there are: on the way, and as the EXIT trap.
+# Removes the temp file and the index folder, when there are: on the way, and as the caller's EXIT
+# trap.
 approvals_cleanup() {
   [ -z "${approvals_tmp:-}" ] || rm -f -- "$approvals_tmp"
   [ -z "${approvals_idx:-}" ] || rm -rf -- "$approvals_idx"
