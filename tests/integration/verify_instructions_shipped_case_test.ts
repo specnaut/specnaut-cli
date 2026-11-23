@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { sha256Hex } from "../../src/domain/sha256.ts";
+import { NON_ASCII_REASON } from "../../src/domain/non_ascii_path.ts";
 import { SHIPPED_REASON } from "../../src/domain/shipped_skills.ts";
 import { APPROVALS_FILE } from "../../src/domain/skill_approvals.ts";
 import { bundled, commitAll, fixture, write } from "./verify_scripts_fixture.ts";
@@ -40,3 +41,19 @@ Deno.test("an approval at a renamed path holds nothing once its shipped twin lea
   await commitAll(root, "switch the harness");
   assertEquals(await lines(root), [NAMED]);
 });
+
+// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i.
+const ALIASES = [
+  ["U+017F", ".claude/skills/ta\u017fk/SKILL.md"],
+  ["U+0131", ".claude/skills/task/SK\u0131LL.md"],
+];
+
+for (const [code, alias] of ALIASES) {
+  Deno.test(`a name holding ${code} that may open a shipped skill is asked about`, async () => {
+    const files = { ...base(), [alias]: bundled(SKILL), [APPROVALS_FILE]: await approving(alias) };
+    const { root } = await fixture({ files });
+    assertEquals(await lines(root), [
+      `VERDICT instructions untrusted ${alias} ${NON_ASCII_REASON}`,
+    ]);
+  });
+}

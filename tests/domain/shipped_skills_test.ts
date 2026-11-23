@@ -11,6 +11,7 @@ import {
   shippedLookup,
   shippedReasons,
 } from "../../src/domain/shipped_skills.ts";
+import { NON_ASCII_REASON } from "../../src/domain/non_ascii_path.ts";
 
 /**
  * A skill Specnaut ships is judged against the copy it ships, whatever the base holds: a base that
@@ -130,4 +131,19 @@ Deno.test("an approval at a case-renamed path is dropped when its shipped twin l
   const out = leavingCopies(tip, new Map([[SKILL, {}]]), new Set());
   assertEquals(out.get(TWIN), { bytes: enc("ship") });
   assertEquals(leavingCopies(tip, new Map([[SKILL, {}]]), new Set([SKILL])).get(TWIN), twin);
+});
+
+// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i.
+const LONG_S = ".claude/skills/ta\u017fk/SKILL.md";
+const DOTLESS_I = ".claude/skills/task/SK\u0131LL.md";
+
+Deno.test("a skill path holding U+017F or U+0131 that may open a shipped one is named", async () => {
+  const ship: [string, ShippedCopy][] = [[SKILL, { bytes: enc("ship") }]];
+  for (const path of [LONG_S, DOTLESS_I]) {
+    assertEquals(await judge([blob(path, "ship")], ship), [`${path} ${NON_ASCII_REASON}`], path);
+  }
+  assertEquals(await judge([blob(".claude/skills/t\u00e2sk/SKILL.md", "x")], ship), [
+    `.claude/skills/t\u00e2sk/SKILL.md ${NON_ASCII_REASON}`,
+  ]);
+  assertEquals(await judge([blob(".claude/skills/caf\u00e9/SKILL.md", "x")], ship), []);
 });

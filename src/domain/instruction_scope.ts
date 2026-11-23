@@ -1,5 +1,6 @@
 import { inScopeRoot, isNestedSurface, NESTED_NAMES, type ScopeRoot } from "./checkout_scope.ts";
 import type { ConfigFile } from "./config_trust.ts";
+import { asciiSkeleton, holdsNonAscii, NON_ASCII_REASON } from "./non_ascii_path.ts";
 import { type BaseEntry, type CommitEntry, REASON, type Untrusted } from "./script_trust.ts";
 import { APPROVALS_FILE } from "./skill_approvals.ts";
 
@@ -8,7 +9,9 @@ import { APPROVALS_FILE } from "./skill_approvals.ts";
  * read for them. HEAD is listed whole, never through a pathspec: git matches a pathspec by exact
  * case, so `Docs/constitution.md` or `agents.override.md` would land unlisted, yet a case-blind
  * disk gives either to a session that reads the other name. So scope is decided on the path folded
- * to lower case, and a path in scope only when folded is named.
+ * to lower case, and a path in scope only when folded is named. A disk may fold beyond ASCII too:
+ * a path holding a code point outside it is kept when its ASCII skeleton is in scope
+ * (`non_ascii_path.ts`), and named unless the tip holds it as written, never matched to another.
  */
 
 /**
@@ -99,8 +102,16 @@ export function nestedRoots(paths: readonly string[]): ScopeRoot[] {
 export const inComparedRoot = (path: string): boolean =>
   INSTRUCTION_SCOPE.some((r) => r.deep && inScopeRoot(r, path));
 
-/** Whether HEAD's listing keeps `path`, folded: an instruction path, an override, or a folder. */
+/**
+ * Whether HEAD's listing keeps `path`, folded: an instruction path, an override, or a folder; one
+ * holding a code point outside ASCII also when its ASCII skeleton is one of them. Every path of
+ * HEAD's tree comes through here, so an ASCII one is never normalised: its skeleton is its fold.
+ */
 export function keptAtHead(path: string): boolean {
+  return keptFolded(path) || (holdsNonAscii(path) && keptFolded(asciiSkeleton(path)));
+}
+
+function keptFolded(path: string): boolean {
   const folded = path.toLowerCase();
   return foldedInScope(path) || OVERRIDES.includes(folded) || FOLDERS.includes(folded);
 }
@@ -111,7 +122,10 @@ export type HeadSplit = {
   readonly entries: readonly BaseEntry[];
   /** Each override HEAD holds under its own name. */
   readonly overrides: ReadonlyMap<string, ConfigFile>;
-  /** A name in another case the tip does not hold as written, or a folder that is not one. */
+  /**
+   * A name in another case, or holding a code point outside ASCII, that the tip does not hold as
+   * written, or a folder that is not one.
+   */
   readonly reasons: readonly Untrusted[];
 };
 
@@ -129,6 +143,7 @@ type Split = { entries: BaseEntry[]; overrides: Map<string, ConfigFile>; reasons
 
 /** Where one listed entry goes: a folder that is not one, an override, an instruction path. */
 function place(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split): void {
+  if (holdsNonAscii(e.path)) return placeNonAscii(e, tip, split);
   const folded = e.path.toLowerCase();
   if (FOLDERS.includes(folded) && e.kind !== "tree") split.reasons.push(why(e.path, NOT_A_FOLDER));
   if (e.kind === "tree") return;
@@ -141,6 +156,13 @@ function place(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split
       split.reasons.push(why(e.path, REASON.caseDiffers));
     }
   }
+}
+
+/** A name holding a code point outside ASCII is judged as written, never as the name it may be. */
+function placeNonAscii(e: CommitEntry, tip: ReadonlyMap<string, BaseEntry>, split: Split): void {
+  if (e.kind === "tree") return;
+  split.entries.push(e);
+  if (!tip.has(e.path)) split.reasons.push(why(e.path, NON_ASCII_REASON));
 }
 
 const isOverride = (path: string) => COMMITTED_INSTRUCTIONS.some((p) => p === path);

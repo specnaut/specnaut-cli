@@ -1,4 +1,5 @@
 import { sameBytes } from "./bytes.ts";
+import { asciiSkeleton, holdsNonAscii, NON_ASCII_REASON } from "./non_ascii_path.ts";
 import { sha256HexBytes } from "./sha256.ts";
 import type { LockEntry } from "./installed_lock.ts";
 import { BASE_LOCK, type BaseEntry, type Untrusted } from "./script_trust.ts";
@@ -59,7 +60,9 @@ export function shippedLookup(
 /**
  * Each of HEAD's skill files that Specnaut ships (`shipped`, by path in any letter case,
  * {@link shippedLookup}) and that holds neither copy. A link where Specnaut ships a file is named:
- * it reads as some other file.
+ * it reads as some other file. A path holding a code point outside ASCII that a disk may open as
+ * a shipped one ({@link shippedAlias}) is named whatever it holds and whatever the base holds: no
+ * fold here can say which file a disk opens for it, so it is asked about rather than matched.
  */
 export async function shippedReasons(
   head: readonly BaseEntry[],
@@ -67,13 +70,21 @@ export async function shippedReasons(
 ): Promise<Untrusted[]> {
   const out: Untrusted[] = [];
   const copyAt = shippedLookup(shipped);
+  const alias = shippedAlias(shipped);
   for (const e of head) {
     const copy = copyAt(e.path);
+    if (copy === undefined && alias(e.path)) out.push({ path: e.path, reason: NON_ASCII_REASON });
     if (copy !== undefined && !await holdsCopy(e, copy)) {
       out.push({ path: e.path, reason: SHIPPED_REASON });
     }
   }
   return out;
+}
+
+/** Whether a path holding a code point outside ASCII may stand for one Specnaut ships. */
+function shippedAlias(shipped: ReadonlyMap<string, ShippedCopy>): (path: string) => boolean {
+  const skeletons = new Set([...shipped.keys()].map(asciiSkeleton));
+  return (path) => holdsNonAscii(path) && skeletons.has(asciiSkeleton(path));
 }
 
 /**

@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
+import { NON_ASCII_REASON } from "../../src/domain/non_ascii_path.ts";
 import { commitAll, fixture, git, write } from "./verify_scripts_fixture.ts";
 import { base, lines } from "./verify_instructions_fixture.ts";
 
@@ -102,3 +103,14 @@ Deno.test("a twin that is a link out of the repository is named as one", async (
     "VERDICT instructions untrusted docs/Rules.md a link on the way at HEAD: docs/Rules.md",
   ]);
 });
+
+// U+017F LATIN SMALL LETTER LONG S and U+0131 LATIN SMALL LETTER DOTLESS I, in place of s and i.
+const SPELLED = [["U+017F", "docs/con\u017ftitution.md"], ["U+0131", ".claude/sett\u0131ngs.json"]];
+
+for (const [code, path] of SPELLED) {
+  Deno.test(`an instruction file the branch adds under a name holding ${code} is named`, async () => {
+    const { root } = await fixture({ files: base() });
+    await commitTwin(root, path);
+    assertEquals(await lines(root), [`VERDICT instructions untrusted ${path} ${NON_ASCII_REASON}`]);
+  });
+}
